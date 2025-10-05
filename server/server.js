@@ -1,10 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const dotenv = require('dotenv'); // <-- 1. Import dotenv
+
+dotenv.config();
 // Import the DB connection handler and Mongoose models
 const connectDB = require('./db'); 
 const Inventory = require('./models/Inventory'); 
 const Customer = require('./models/Customer');
 const Sale = require('./models/Sale');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
