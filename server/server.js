@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv'); // <-- 1. Import dotenv
+const dotenv = require('dotenv'); 
 
 dotenv.config();
 // Import the DB connection handler and Mongoose models
@@ -9,16 +9,9 @@ const Inventory = require('./models/Inventory');
 const Customer = require('./models/Customer');
 const Sale = require('./models/Sale');
 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MOCK_LATENCY = 300; 
-
-// --- Initial Data for Seeding ---
-// Initial mock data removed.
-
-// Seeding function: Inserts mock data if collections are empty.
-// Seeding logic removed.
 
 // --- Middleware setup ---
 app.use(cors({ origin: '*' }));
@@ -39,6 +32,33 @@ const respondWithDelay = (res, data) => {
         res.json(data);
     }, MOCK_LATENCY);
 };
+
+// New Utility: Parses date range query parameters into a MongoDB query object
+const getSalesDateFilter = (req) => {
+    const { startDate, endDate } = req.query;
+    let filter = {};
+
+    if (startDate) {
+        // Use Start of the day (00:00:00.000) for $gte
+        // Using new Date() on 'YYYY-MM-DD' strings often creates a UTC timestamp 
+        // that corresponds to 00:00:00 in the local timezone's offset.
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // Ensure the time is set to the start of the day
+        filter.$gte = start;
+    }
+
+    if (endDate) {
+        // --- FIX: Use $lt (Less Than) the start of the NEXT day for a robust end boundary ---
+        const end = new Date(endDate);
+        end.setDate(end.getDate() + 1); // Increment by one day
+        end.setHours(0, 0, 0, 0);       // Set time to 00:00:00.000
+        filter.$lt = end; // Use $lt (Less Than) - includes the entire original endDate day
+    }
+
+    // Only return the timestamp filter if either date is present
+    return (startDate || endDate) ? { timestamp: filter } : {};
+};
+
 
 // --- API ENDPOINTS (GET - Read Operations) ---
 
@@ -63,6 +83,7 @@ app.get('/api/customers', async (req, res) => {
 });
 
 // 3. Get Sales Data (for Dashboard)
+// This is typically used by the frontend for simple lists/dashboard feeds.
 app.get('/api/sales', async (req, res) => {
     try {
         const sales = await Sale.find({}).sort({ timestamp: -1 });
@@ -73,9 +94,166 @@ app.get('/api/sales', async (req, res) => {
 });
 
 
-// --- API ENDPOINTS (POST/PUT/DELETE - Write Operations) ---
+// ----------------------------------------------------
+// --- NEW API ENDPOINTS FOR REPORTS PAGE (4 & 5) ---
+// ----------------------------------------------------
 
-// 4. POST New Sale - Billing API (Handles Inventory Deduction and Credit Update)
+// 4. Get Summary Metrics and Top Items for a given date range
+app.get('/api/reports/summary', async (req, res) => {
+    try {
+        const dateFilter = getSalesDateFilter(req);
+        console.log('dateFilter',dateFilter)
+        
+        // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS
+        const [filteredSales, customers, inventoryItems] = await Promise.all([
+            Sale.find(dateFilter),
+            Customer.find({}), // Need all customers for total credit
+            Inventory.find({}) // <-- NEW: Fetch all inventory to map item IDs to current names/prices
+        ]);
+        
+        // Create a quick lookup map for current inventory names and prices
+        const inventoryMap = new Map();
+        inventoryItems.forEach(item => {
+            inventoryMap.set(item._id.toString(), { 
+                name: item.name, 
+                price: item.price // Optional: could be useful later
+            });
+        });
+
+
+        // Step 2: Calculate Metrics (Updated to use inventoryMap for names)
+        let revenue = 0;
+        let billsRaised = filteredSales.length; 
+        let itemVolumeMap = new Map();
+        let totalVolume = 0;
+
+        filteredSales.forEach(sale => {
+            revenue += sale.totalAmount;
+            
+            (sale.items || []).forEach(item => {
+                const key = item.itemId.toString(); // Grouping key MUST be the item ID
+                
+                // Use the name from the CURRENT Inventory, falling back to the sale name
+                const currentInventoryData = inventoryMap.get(key);
+                const itemName = currentInventoryData ? currentInventoryData.name : item.name;
+
+                const current = itemVolumeMap.get(key) || { name: itemName, quantity: 0 };
+                
+                // CRITICAL: Ensure the latest/correct name is used for the Map value
+                current.name = itemName; 
+                current.quantity += item.quantity;
+                
+                itemVolumeMap.set(key, current);
+                totalVolume += item.quantity;
+            });
+        });
+
+        const averageBillValue = billsRaised > 0 ? revenue / billsRaised : 0;
+        
+        const topItems = Array.from(itemVolumeMap.values())
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 5);
+            
+        const totalCreditOutstanding = customers.reduce((sum, cust) => sum + (cust.outstandingCredit || 0), 0);
+        
+        // Step 3: Fetch all-time stats for the Financial Summary block
+        const allTimeSales = await Sale.find({});
+        const totalAllTimeRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        const totalAllTimeBills = allTimeSales.length;
+
+
+        respondWithDelay(res, {
+            revenue,
+            billsRaised,
+            averageBillValue,
+            volume: totalVolume,
+            topItems,
+            totalCreditOutstanding,
+            totalAllTimeRevenue, 
+            totalAllTimeBills,
+        });
+
+    } catch (error) {
+        console.error('Reports Summary API Error:', error);
+        res.status(500).json({ error: 'Failed to generate report summary.' });
+    }
+});
+
+// 5. Get Chart Data (Aggregated Time Series) for a given date range and view type
+app.get('/api/reports/chart-data', async (req, res) => {
+    try {
+        const { viewType } = req.query; // 'Day', 'Week', or 'Month'
+        const dateFilter = getSalesDateFilter(req);
+        
+        let aggregationId;
+        
+        // MongoDB aggregation key based on viewType
+        if (viewType === 'Month') {
+            aggregationId = { 
+                $dateToString: { format: "%Y-%m", date: "$timestamp" } 
+            };
+        } else if (viewType === 'Week') {
+             // Calculate week number (ISO week date, 1-53)
+            aggregationId = {
+                $concat: [
+                    { $toString: { $isoWeekYear: "$timestamp" } },
+                    "-W",
+                    { 
+                        $dateToString: { 
+                            format: "%V", // %V for ISO week number (1-53)
+                            date: "$timestamp" 
+                        } 
+                    }
+                ]
+            };
+        } else { // Default to 'Day'
+            aggregationId = { 
+                $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } 
+            };
+        }
+
+        const chartData = await Sale.aggregate([
+            // 1. Filter by Date Range (using the helper)
+            { $match: dateFilter },
+            
+            // 2. Group and Aggregate
+            {
+                $group: {
+                    _id: aggregationId,
+                    revenue: { $sum: "$totalAmount" },
+                    bills: { $sum: 1 } // Count the number of sales
+                }
+            },
+            
+            // 3. Rename _id to 'name' for frontend chart compatibility
+            {
+                $project: {
+                    _id: 0,
+                    name: "$_id",
+                    revenue: 1,
+                    bills: 1
+                }
+            },
+            
+            // 4. Sort by the grouped key ('name' which is the date/week/month string)
+            {
+                $sort: { name: 1 }
+            }
+        ]);
+
+        respondWithDelay(res, chartData);
+
+    } catch (error) {
+        console.error('Reports Chart Data API Error:', error);
+        res.status(500).json({ error: 'Failed to generate chart data.' });
+    }
+});
+
+// ----------------------------------------------------
+// --- API ENDPOINTS (POST/PUT/DELETE - Write Operations) ---
+// ----------------------------------------------------
+
+// 6. POST New Sale - Billing API (Handles Inventory Deduction and Credit Update)
 app.post('/api/sales', async (req, res) => {
     // Destructure required billing data from the frontend
     const { totalAmount, paymentMethod, customerId, items } = req.body; 
@@ -178,7 +356,7 @@ app.post('/api/sales', async (req, res) => {
 });
 
 
-// 5. POST New Inventory Item
+// 7. POST New Inventory Item
 app.post('/api/inventory', async (req, res) => {
     const newItem = req.body;
     
@@ -195,7 +373,7 @@ app.post('/api/inventory', async (req, res) => {
     }
 });
 
-// 6. DELETE Inventory Item
+// 8. DELETE Inventory Item
 app.delete('/api/inventory/:id', async (req, res) => {
     const { id } = req.params;
 
@@ -213,7 +391,7 @@ app.delete('/api/inventory/:id', async (req, res) => {
     }
 });
 
-// 🌟 8. PUT Update Inventory Item
+// 9. PUT Update Inventory Item
 app.put('/api/inventory/:id', async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
@@ -244,7 +422,7 @@ app.put('/api/inventory/:id', async (req, res) => {
     }
 });
 
-// 🌟 9. POST New Customer (NEW ROUTE)
+// 10. POST New Customer (NEW ROUTE)
 app.post('/api/customers', async (req, res) => {
     // Destructure the fields expected from the frontend form
     const { name, phone, creditLimit } = req.body;
@@ -279,7 +457,7 @@ app.post('/api/customers', async (req, res) => {
 });
 
 
-// 7. PUT Update Customer Credit (Payment Received) - Khata API
+// 11. PUT Update Customer Credit (Payment Received) - Khata API
 app.put('/api/customers/:customerId/credit', async (req, res) => {
     const { customerId } = req.params;
     const { amountChange } = req.body; // amountChange should be negative for payment

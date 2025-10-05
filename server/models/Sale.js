@@ -7,6 +7,15 @@ const SaleSchema = new mongoose.Schema({
     // Link to the Customer model for credit sales
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null }, 
     timestamp: { type: Date, default: Date.now },
+    
+    // CRITICAL ADDITION: Item details for reporting
+    items: [{
+        itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', required: true },
+        name: { type: String, required: true },
+        quantity: { type: Number, required: true, min: 1 },
+        price: { type: Number, required: true, min: 0 }, // Price at time of sale
+        // Total price for item can be calculated as quantity * price
+    }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('Sale', SaleSchema);
