@@ -7,7 +7,7 @@ const Customer = require('./models/Customer');
 const Sale = require('./models/Sale');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const MOCK_LATENCY = 300; 
 
 // --- Initial Data for Seeding ---
@@ -80,12 +80,27 @@ app.post('/api/sales', async (req, res) => {
     // Filter customerId to ensure it's a valid ObjectId or null/undefined, preventing BSON errors.
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
 
+    // --- CRITICAL FIX START: Normalize Payment Method for Mongoose Enum ---
+    // Mongoose only accepts specific enum values (e.g., 'Cash', 'UPI', 'Credit').
+    // If the frontend sends a composite like 'Cash/UPI', we must map it to a valid, non-credit enum value.
+    let schemaPaymentMethod = paymentMethod;
+
+    if (paymentMethod === 'Credit') {
+        schemaPaymentMethod = 'Credit'; // Use 'Credit' explicitly for Khata transactions
+    } else if (paymentMethod.toLowerCase().includes('upi')) {
+        schemaPaymentMethod = 'UPI'; // If it contains UPI (e.g., 'Cash/UPI'), prefer UPI
+    } else if (paymentMethod.toLowerCase().includes('card')) {
+        schemaPaymentMethod = 'Card'; // If it contains card, use 'Card'
+    } else {
+        // Default to 'Cash' for any other non-credit composite/single values (e.g., 'Cash/UPI' -> 'Cash')
+        schemaPaymentMethod = 'Cash';
+    }
+    // --- CRITICAL FIX END ---
+
     try {
         // --- 1. Stock Check & Validation ---
         if (items && items.length > 0) {
-            // Use a sequential loop for checks to ensure reliable error reporting for stock issues
             for (const item of items) {
-                // Ensure the itemId is a valid ObjectId before querying
                 if (!isValidObjectId(item.itemId)) {
                     throw new Error(`Validation failed: Invalid format for Inventory item ID ${item.itemId}.`);
                 }
@@ -93,12 +108,10 @@ app.post('/api/sales', async (req, res) => {
                 const inventoryItem = await Inventory.findById(item.itemId);
 
                 if (!inventoryItem) {
-                    // Throw a specific error if an item ID is invalid/not found
                     throw new Error(`Validation failed: Inventory item ID ${item.itemId} not found.`);
                 }
 
                 if (inventoryItem.quantity < item.quantity) {
-                    // Throw a specific error if stock is insufficient
                     throw new Error(`Stock error: Cannot sell ${item.quantity} of ${inventoryItem.name}. Only ${inventoryItem.quantity} available.`);
                 }
             }
@@ -107,37 +120,33 @@ app.post('/api/sales', async (req, res) => {
         // --- 2. Create the new sale record (stores items sold for reporting) ---
         const newSale = await Sale.create({
             totalAmount,
-            paymentMethod,
-            customerId: saleCustomerId, // Use the sanitized ID
+            paymentMethod: schemaPaymentMethod, // <-- USING THE CLEANED/NORMALIZED VALUE
+            customerId: saleCustomerId, 
             items: items || [], 
         });
 
         // --- 3. Update Inventory for each sold item ---
         if (items && items.length > 0) {
             const inventoryUpdates = items.map(item =>
-                // Use the itemId (which is the MongoDB _id) to find and decrement quantity
                 Inventory.findByIdAndUpdate(
                     item.itemId, 
                     { $inc: { quantity: -item.quantity } }, 
                     { new: true } 
                 )
             );
-            // Execute all inventory updates in parallel
             await Promise.all(inventoryUpdates);
             console.log(`Inventory updated for ${items.length} items.`);
         }
 
         // --- 4. Update Credit: If payment method is 'Credit', update customer's outstanding credit ---
-        // Only update if saleCustomerId is present (meaning it was a valid ObjectId)
-        if (paymentMethod === 'Credit' && saleCustomerId) {
-            // 🌟 Enhancement: FindByIdAndUpdate returns the updated document, or null if not found.
+        // CRITICAL: Use the schemaPaymentMethod to check for 'Credit'
+        if (schemaPaymentMethod === 'Credit' && saleCustomerId) {
             const updatedCustomer = await Customer.findByIdAndUpdate(
-                saleCustomerId, // Use the sanitized ID
+                saleCustomerId,
                 { $inc: { outstandingCredit: totalAmount } },
-                { new: true } // Return the updated document
+                { new: true } 
             );
 
-            // 🌟 NEW: Throw an explicit error if customer doesn't exist for a credit sale
             if (!updatedCustomer) {
                  throw new Error(`Credit error: Customer ID ${saleCustomerId} not found for credit transaction.`);
             }
@@ -148,20 +157,15 @@ app.post('/api/sales', async (req, res) => {
         respondWithDelay(res, { message: 'Sale recorded and inventory updated.', newSale });
 
     } catch (error) {
-        // Log the detailed error for server-side debugging
         console.error('Sale POST Error (Detailed):', error.message || error);
         
-        // 🌟 CRITICAL FIX: Enhanced Error Response for Client
-        // Check if the error is a specific, known validation error
         const isClientError = error.message && (
             error.message.startsWith('Validation failed:') || 
             error.message.startsWith('Stock error:') ||
-            error.message.startsWith('Credit error:') // Catches the new customer not found error
+            error.message.startsWith('Credit error:')
         );
         
-        // Use 400 status for specific client-side input errors, 500 for unexpected server issues
         res.status(isClientError ? 400 : 500).json({ 
-            // Return the specific message if it's a known client-side error (Validation/Stock/Credit)
             error: isClientError 
                 ? error.message 
                 : 'Failed to record sale and update inventory due to an unexpected server error.' 
