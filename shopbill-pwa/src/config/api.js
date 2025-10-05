@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://shopbill-3le1.onrender.com/api';
+const API_BASE_URL = 'https://shopbill-3le1.onrender.com/api'
 // const API_BASE_URL = 'http://localhost:5000/api';
 
 const API = {
