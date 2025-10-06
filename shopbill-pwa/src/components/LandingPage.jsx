@@ -55,8 +55,8 @@ const LandingPage = ({ onStartApp }) => {
                         {/* CTA Button - NOW USES onStartApp PROP */}
                         <button 
                             onClick={onStartApp}
-                            className="bg-indigo-600 text-white text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
-                            Log In
+                            className="bg-indigo-600 text-white cursor-pointer text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
+                            Get Started
                         </button>
                     </div>
                 </div>
@@ -84,11 +84,11 @@ const LandingPage = ({ onStartApp }) => {
 
                         {/* Primary CTA - NOW USES onStartApp PROP */}
                         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                            <button 
-                                onClick={onStartApp}
+                            <a 
+                                href="#pricing"
                                 className="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-xl hover:bg-indigo-700 transition transform hover:scale-[1.02] duration-300 ease-in-out">
                                 Start Your Free Trial
-                            </button>
+                            </a>
                             <a href="#features" className="w-full sm:w-auto px-8 py-3 bg-gray-800 text-indigo-400 text-lg font-bold rounded-xl border-2 border-indigo-900 hover:bg-gray-700 transition duration-300">
                                 Explore Features
                             </a>
@@ -239,7 +239,7 @@ const LandingPage = ({ onStartApp }) => {
                                 {/* Sign Up Now button - NOW USES onStartApp PROP */}
                                 <button 
                                     onClick={onStartApp}
-                                    className="block w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
+                                    className="block cursor-pointer w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
                                     Sign Up Now
                                 </button>
                             </div>
