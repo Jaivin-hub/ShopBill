@@ -1,15 +1,19 @@
 import React from 'react';
 // Import necessary icons from lucide-react
 import { CreditCard, Receipt, Package, Users, LineChart, UserCog, Cloud } from 'lucide-react';
+// Placeholder for the cover image
+import coverImage from '../../public/covermain.png'
 
-const LandingPage = () => {
+// Added the onStartApp prop
+const LandingPage = ({ onStartApp }) => { 
     return (
-        <div className="min-h-screen bg-gray-50 scroll-smooth">
+        // Changed main background to bg-gray-950 and default text color to gray-300
+        <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300">
             {/* Custom Styles using a style block within the component */}
             <style jsx global>{`
                 :root {
-                    --color-primary: #4f46e5; /* indigo-600 */
-                    --color-secondary: #0d9488; /* teal-600 */
+                    --color-primary: #818cf8; /* indigo-400 for dark theme contrast */
+                    --color-secondary: #2dd4bf; /* teal-400 for dark theme contrast */
                 }
                 .text-gradient {
                     background-image: linear-gradient(to right, var(--color-primary), var(--color-secondary));
@@ -22,8 +26,9 @@ const LandingPage = () => {
                     transition: all 0.3s ease;
                     transform: translateY(0);
                 }
+                /* Dark theme hover shadow adjustment */
                 .feature-card:hover {
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
                     transform: translateY(-5px);
                 }
                 /* Mobile specific adjustments */
@@ -37,72 +42,78 @@ const LandingPage = () => {
                 }
             `}</style>
 
-            {/* Navigation Header */}
-            <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-md">
+            {/* Navigation Header - Changed background and shadow */}
+            <nav className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-sm shadow-xl shadow-indigo-900/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        {/* Logo/Branding - Using CreditCard icon for POS representation */}
+                        {/* Logo/Branding - Text is now white */}
                         <a href="#" className="flex items-center space-x-2">
-                            <CreditCard className="w-6 h-6 text-indigo-600" />
-                            <span className="text-xl font-bold text-gray-900">Pocket POS</span>
+                            <CreditCard className="w-6 h-6 text-indigo-400" />
+                            <span className="text-xl font-bold text-white">Pocket POS</span>
                         </a>
                         
-                        {/* CTA Button */}
-                        <a href="#pricing" className="bg-indigo-600 text-white text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
-                            Get Started
-                        </a>
+                        {/* CTA Button - NOW USES onStartApp PROP */}
+                        <button 
+                            onClick={onStartApp}
+                            className="bg-indigo-600 text-white text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
+                            Log In
+                        </button>
                     </div>
                 </div>
             </nav>
 
             {/* Main Content */}
             <main>
-                {/* 1. Hero Section */}
-                <section className="py-16 md:py-24 bg-white">
+                {/* 1. Hero Section - Changed background and titles to white */}
+                <section className="py-16 md:py-24 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                        <span className="inline-block text-sm font-semibold text-teal-600 uppercase tracking-widest bg-teal-100 px-3 py-1 rounded-full mb-3">
+                        {/* Adjusted accent colors for dark theme */}
+                        <span className="inline-block text-sm font-semibold text-teal-400 uppercase tracking-widest bg-teal-900/50 px-3 py-1 rounded-full mb-3 border border-teal-700/50">
                             #1 Retail Management Tool
                         </span>
                         
-                        <h1 className="hero-title text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tighter mb-4 text-gray-900">
+                        <h1 className="hero-title text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tighter mb-4 text-white">
                             Your Shop, Fully Managed. <br className="hidden sm:inline" />
                             Right in your <span className="text-gradient">Pocket.</span>
                         </h1>
                         
-                        <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto mb-8">
-                            Pocket POS transforms your smartphone or tablet into a powerful **Point of Sale** and **Business Manager**. Cut down on clutter, save time, and track every rupee instantly.
+                        {/* Adjusted body text color - REPLACED ** with <strong> */}
+                        <p className="mt-4 text-lg text-gray-400 max-w-3xl mx-auto mb-8">
+                            Pocket POS transforms your smartphone or tablet into a powerful <strong>Point of Sale</strong> and <strong>Business Manager</strong>. Cut down on clutter, save time, and track every rupee instantly.
                         </p>
 
-                        {/* Primary CTA */}
+                        {/* Primary CTA - NOW USES onStartApp PROP */}
                         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                            <a href="#pricing" className="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-xl hover:bg-indigo-700 transition transform hover:scale-[1.02] duration-300 ease-in-out">
+                            <button 
+                                onClick={onStartApp}
+                                className="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-xl hover:bg-indigo-700 transition transform hover:scale-[1.02] duration-300 ease-in-out">
                                 Start Your Free Trial
-                            </a>
-                            <a href="#features" className="w-full sm:w-auto px-8 py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl border-2 border-indigo-100 hover:bg-indigo-50 transition duration-300">
+                            </button>
+                            <a href="#features" className="w-full sm:w-auto px-8 py-3 bg-gray-800 text-indigo-400 text-lg font-bold rounded-xl border-2 border-indigo-900 hover:bg-gray-700 transition duration-300">
                                 Explore Features
                             </a>
                         </div>
 
-                        {/* Mock App Screenshot/Mockup */}
+                        {/* Mock App Screenshot/Mockup - Adjusted border color */}
                         <div className="mt-12">
                             {/* Placeholder image URL: 700x400, indigo background, 'Pocket POS Dashboard' text */}
                             <img 
-                                src="https://placehold.co/700x400/4f46e5/ffffff?text=Pocket+POS+Dashboard+Preview" 
+                                src={coverImage}
                                 alt="Pocket POS Application Dashboard Preview" 
-                                className="mx-auto rounded-xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.3)] border-4 border-white transform rotate-1 transition duration-500 ease-in-out hover:rotate-0 hover:scale-100" 
+                                className="mx-auto rounded-xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.3)] border-4 border-gray-800 transform rotate-1 transition duration-500 ease-in-out hover:rotate-0 hover:scale-100" 
                             />
                         </div>
                     </div>
                 </section>
                 
-                {/* 2. Core Features Section */}
-                <section id="features" className="py-16 bg-gray-50">
+                {/* 2. Core Features Section - Changed background and card styles */}
+                <section id="features" className="py-16 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="text-center mb-12">
-                            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+                            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
                                 Manage Every Aspect of Your Business
                             </h2>
-                            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
                                 From ultra-fast billing to deep financial insights, Pocket POS does the heavy lifting so you can focus on your customers.
                             </p>
                         </div>
@@ -110,64 +121,64 @@ const LandingPage = () => {
                         {/* Feature Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             
-                            {/* Feature 1: Fast Billing */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-indigo-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 mb-4">
+                            {/* Feature 1: Fast Billing - Card background changed to gray-800 */}
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-900/50 text-indigo-400 mb-4">
                                     <Receipt className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Lightning-Fast POS</h3>
-                                <p className="text-gray-600">Complete sales transactions in seconds. Intuitive touch interface designed for high-volume retail environments. Print receipts or share via SMS.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Lightning-Fast POS</h3>
+                                <p className="text-gray-400">Complete sales transactions in seconds. Intuitive touch interface designed for high-volume retail environments. Print receipts or share via SMS.</p>
                             </div>
                             
                             {/* Feature 2: Smart Inventory */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-teal-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-100 text-teal-600 mb-4">
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-teal-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-900/50 text-teal-400 mb-4">
                                     <Package className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Real-Time Stock Control</h3>
-                                <p className="text-gray-600">Add, edit, and track products effortlessly. Get instant low-stock alerts and set smart reorder levels to never miss a sale.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Real-Time Stock Control</h3>
+                                <p className="text-gray-400">Add, edit, and track products effortlessly. Get instant low-stock alerts and set smart reorder levels to never miss a sale.</p>
                             </div>
 
                             {/* Feature 3: Khata Management (Customer Ledger) */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-amber-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-600 mb-4">
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-amber-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-900/50 text-amber-400 mb-4">
                                     <Users className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Digital Khata (Credit Ledger)</h3>
-                                <p className="text-gray-600">Manage customer credit and outstanding payments easily. Send gentle reminders and record payments, keeping your ledger always balanced.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Digital Khata (Credit Ledger)</h3>
+                                <p className="text-gray-400">Manage customer credit and outstanding payments easily. Send gentle reminders and record payments, keeping your ledger always balanced.</p>
                             </div>
 
                             {/* Feature 4: Financial Reports */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-purple-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-100 text-purple-600 mb-4">
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-purple-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-900/50 text-purple-400 mb-4">
                                     <LineChart className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Instant Business Reports</h3>
-                                <p className="text-gray-600">View daily, weekly, and custom sales trends. Identify top-selling items and busy hours to optimize purchasing and staffing.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Instant Business Reports</h3>
+                                <p className="text-gray-400">View daily, weekly, and custom sales trends. Identify top-selling items and busy hours to optimize purchasing and staffing.</p>
                             </div>
                             
                             {/* Feature 5: Staff Management */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-pink-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-100 text-pink-600 mb-4">
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-pink-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-900/50 text-pink-400 mb-4">
                                     <UserCog className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Staff & Permissions</h3>
-                                <p className="text-gray-600">Set specific roles (Owner, Cashier) for your staff members. Control access to sensitive data like reports and inventory management.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Staff & Permissions</h3>
+                                <p className="text-gray-400">Set specific roles (Owner, Cashier) for your staff members. Control access to sensitive data like reports and inventory management.</p>
                             </div>
                             
                             {/* Feature 6: Cloud Sync */}
-                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-blue-100/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mb-4">
+                            <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-900/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-900/50 text-blue-400 mb-4">
                                     <Cloud className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Secure Cloud Sync</h3>
-                                <p className="text-gray-600">Your data is safe and constantly synchronized across all your devices. Never worry about losing sales data or inventory records again.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Secure Cloud Sync</h3>
+                                <p className="text-gray-400">Your data is safe and constantly synchronized across all your devices. Never worry about losing sales data or inventory records again.</p>
                             </div>
                         </div>
                     </div>
                 </section>
                 
-                {/* 3. Testimonial/Social Proof */}
+                {/* 3. Testimonial/Social Proof - Retained high-contrast background */}
                 <section className="py-16 md:py-20 bg-indigo-700">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <blockquote className="text-white">
@@ -186,19 +197,20 @@ const LandingPage = () => {
                     </div>
                 </section>
 
-                {/* 4. Pricing / Final CTA */}
-                <section id="pricing" className="py-16 md:py-20 bg-white">
+                {/* 4. Pricing / Final CTA - Changed background and text colors */}
+                <section id="pricing" className="py-16 md:py-20 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                        <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
                             Simple Pricing, Powerful Features
                         </h2>
-                        <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-10">
+                        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
                             Choose the plan that fits your business. No hidden fees, just everything you need to grow.
                         </p>
 
                         {/* Pricing Card Grid */}
                         <div className="max-w-md mx-auto">
-                            <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-white/50">
+                            {/* Pricing card remains high-contrast but slightly adjusted text colors */}
+                            <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-gray-800">
                                 <h3 className="text-2xl font-bold mb-2">Pro Plan</h3>
                                 <p className="text-indigo-200 text-sm">Best for growing retail shops and SMEs.</p>
                                 <div className="my-6">
@@ -224,9 +236,12 @@ const LandingPage = () => {
                                     </li>
                                 </ul>
                                 
-                                <a href="#" className="block w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
+                                {/* Sign Up Now button - NOW USES onStartApp PROP */}
+                                <button 
+                                    onClick={onStartApp}
+                                    className="block w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
                                     Sign Up Now
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -234,9 +249,9 @@ const LandingPage = () => {
 
             </main>
 
-            {/* Footer */}
-            <footer className="bg-gray-800 py-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-400">
+            {/* Footer - Retained but ensured text is visible */}
+            <footer className="bg-gray-900 border-t border-gray-800 py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
                     <div className="mb-4">
                         <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">Privacy Policy</a>
                         <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">Terms of Service</a>

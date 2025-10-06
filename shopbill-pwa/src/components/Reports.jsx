@@ -182,7 +182,7 @@ const Reports = ({ sales, customers, showToast }) => {
             {/* 2. FIXED HEADER BLOCK (Title, Description, and Filters) */}
             <div className="pb-4 mb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 z-10">
                 <h1 className="text-3xl font-extrabold text-gray-800 dark:text-white mb-2">
-                    <TrendingUp className="inline-block w-7 h-7 mr-2 text-indigo-500" /> Business Reports
+                    Business Reports
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400 mb-6">Analyzing data for: <span className="font-semibold text-indigo-600 dark:text-indigo-400">{getCurrentFilterLabel()}</span></p>
 
