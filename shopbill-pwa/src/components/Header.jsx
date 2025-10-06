@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, User, Moon, Sun, Bell } from 'lucide-react'; // Import Bell icon
+import { Smartphone, CheckCircle, User, Moon, Sun, Bell } from 'lucide-react'; // Changed DollarSign to Smartphone
 
 // UPDATED: onProfileClick prop is replaced by setCurrentPage
 const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDarkMode }) => (
@@ -11,14 +11,20 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                md:hidden 
                z-30 p-4 flex justify-between items-center transition-colors duration-300"
     >
+        {/*
+            --- LOGO ICON CHANGE ---
+            Replaced DollarSign with Smartphone to better represent 'Pocket POS'
+            Added CheckCircle overlay (visually implied by the color scheme) or
+            just stick with Smartphone for a clean, modern look.
+        */}
         <h1 className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate flex items-center">
-            <DollarSign className="inline-block w-5 h-5 mr-1 sm:mr-2" />
+            <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
             {companyName}
         </h1>
 
         <div className="flex space-x-3 items-center">
             
-            {/* NEW: Notification Icon with Badge - Now uses setCurrentPage */}
+            {/* Notification Icon with Badge - Now uses setCurrentPage */}
             <button
                 onClick={() => setCurrentPage('notifications')} // Navigate to 'notifications' page
                 className="p-2 rounded-full 
@@ -36,7 +42,7 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                 </span>
             </button>
 
-            {/* Dark Mode Toggle Button */}
+            {/* Dark Mode Toggle Button (commented out in your original code) */}
             {/* <button
                 onClick={onToggleDarkMode}
                 className="p-2 rounded-full 

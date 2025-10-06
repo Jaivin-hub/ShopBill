@@ -41,7 +41,7 @@ const Login = ({ onLogin, showToast }) => {
             <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700">
                 <div className="text-center mb-8">
                     <DollarSign className="w-10 h-10 mx-auto text-indigo-600 dark:text-indigo-400" />
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mt-4">Welcome to ShopBill</h1>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mt-4">Welcome to Pocket POS</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Sign in to continue to your MERN shop management system.</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-6">

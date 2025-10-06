@@ -243,7 +243,7 @@ const App = () => {
 
       {/* Header component is fixed/sticky, so it needs to be the first element */}
       <Header
-        companyName="ShopBill"
+        companyName="Pocket POS"
         userRole={userRole.charAt(0).toUpperCase() + userRole.slice(1)}
         setCurrentPage={setCurrentPage}
         isDarkMode={isDarkMode}
@@ -255,7 +255,7 @@ const App = () => {
       <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-white dark:bg-gray-800 shadow-xl z-10 transition-colors duration-300">
         <div className="p-6 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">
-            <DollarSign className="inline-block w-6 h-6 mr-2 text-indigo-600 dark:text-indigo-400" /> ShopBill
+            <DollarSign className="inline-block w-6 h-6 mr-2 text-indigo-600 dark:text-indigo-400" /> Pocket POS
           </h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
             User: {userRole.charAt(0).toUpperCase() + userRole.slice(1)} | MERN-Ready

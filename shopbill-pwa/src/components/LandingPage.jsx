@@ -1,0 +1,252 @@
+import React from 'react';
+// Import necessary icons from lucide-react
+import { CreditCard, Receipt, Package, Users, LineChart, UserCog, Cloud } from 'lucide-react';
+
+const LandingPage = () => {
+    return (
+        <div className="min-h-screen bg-gray-50 scroll-smooth">
+            {/* Custom Styles using a style block within the component */}
+            <style jsx global>{`
+                :root {
+                    --color-primary: #4f46e5; /* indigo-600 */
+                    --color-secondary: #0d9488; /* teal-600 */
+                }
+                .text-gradient {
+                    background-image: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    color: transparent;
+                }
+                .feature-card {
+                    transition: all 0.3s ease;
+                    transform: translateY(0);
+                }
+                .feature-card:hover {
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+                    transform: translateY(-5px);
+                }
+                /* Mobile specific adjustments */
+                @media (max-width: 767px) {
+                    .hero-title {
+                        font-size: 2.25rem; /* text-4xl equivalent on small screens */
+                    }
+                }
+                body {
+                    font-family: 'Inter', sans-serif;
+                }
+            `}</style>
+
+            {/* Navigation Header */}
+            <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-md">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center h-16">
+                        {/* Logo/Branding - Using CreditCard icon for POS representation */}
+                        <a href="#" className="flex items-center space-x-2">
+                            <CreditCard className="w-6 h-6 text-indigo-600" />
+                            <span className="text-xl font-bold text-gray-900">Pocket POS</span>
+                        </a>
+                        
+                        {/* CTA Button */}
+                        <a href="#pricing" className="bg-indigo-600 text-white text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            {/* Main Content */}
+            <main>
+                {/* 1. Hero Section */}
+                <section className="py-16 md:py-24 bg-white">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                        <span className="inline-block text-sm font-semibold text-teal-600 uppercase tracking-widest bg-teal-100 px-3 py-1 rounded-full mb-3">
+                            #1 Retail Management Tool
+                        </span>
+                        
+                        <h1 className="hero-title text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tighter mb-4 text-gray-900">
+                            Your Shop, Fully Managed. <br className="hidden sm:inline" />
+                            Right in your <span className="text-gradient">Pocket.</span>
+                        </h1>
+                        
+                        <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+                            Pocket POS transforms your smartphone or tablet into a powerful **Point of Sale** and **Business Manager**. Cut down on clutter, save time, and track every rupee instantly.
+                        </p>
+
+                        {/* Primary CTA */}
+                        <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                            <a href="#pricing" className="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-xl hover:bg-indigo-700 transition transform hover:scale-[1.02] duration-300 ease-in-out">
+                                Start Your Free Trial
+                            </a>
+                            <a href="#features" className="w-full sm:w-auto px-8 py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl border-2 border-indigo-100 hover:bg-indigo-50 transition duration-300">
+                                Explore Features
+                            </a>
+                        </div>
+
+                        {/* Mock App Screenshot/Mockup */}
+                        <div className="mt-12">
+                            {/* Placeholder image URL: 700x400, indigo background, 'Pocket POS Dashboard' text */}
+                            <img 
+                                src="https://placehold.co/700x400/4f46e5/ffffff?text=Pocket+POS+Dashboard+Preview" 
+                                alt="Pocket POS Application Dashboard Preview" 
+                                className="mx-auto rounded-xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.3)] border-4 border-white transform rotate-1 transition duration-500 ease-in-out hover:rotate-0 hover:scale-100" 
+                            />
+                        </div>
+                    </div>
+                </section>
+                
+                {/* 2. Core Features Section */}
+                <section id="features" className="py-16 bg-gray-50">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+                                Manage Every Aspect of Your Business
+                            </h2>
+                            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                                From ultra-fast billing to deep financial insights, Pocket POS does the heavy lifting so you can focus on your customers.
+                            </p>
+                        </div>
+                        
+                        {/* Feature Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            
+                            {/* Feature 1: Fast Billing */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-indigo-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 mb-4">
+                                    <Receipt className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Lightning-Fast POS</h3>
+                                <p className="text-gray-600">Complete sales transactions in seconds. Intuitive touch interface designed for high-volume retail environments. Print receipts or share via SMS.</p>
+                            </div>
+                            
+                            {/* Feature 2: Smart Inventory */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-teal-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-100 text-teal-600 mb-4">
+                                    <Package className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Real-Time Stock Control</h3>
+                                <p className="text-gray-600">Add, edit, and track products effortlessly. Get instant low-stock alerts and set smart reorder levels to never miss a sale.</p>
+                            </div>
+
+                            {/* Feature 3: Khata Management (Customer Ledger) */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-amber-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-600 mb-4">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Digital Khata (Credit Ledger)</h3>
+                                <p className="text-gray-600">Manage customer credit and outstanding payments easily. Send gentle reminders and record payments, keeping your ledger always balanced.</p>
+                            </div>
+
+                            {/* Feature 4: Financial Reports */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-purple-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-100 text-purple-600 mb-4">
+                                    <LineChart className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Instant Business Reports</h3>
+                                <p className="text-gray-600">View daily, weekly, and custom sales trends. Identify top-selling items and busy hours to optimize purchasing and staffing.</p>
+                            </div>
+                            
+                            {/* Feature 5: Staff Management */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-pink-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-100 text-pink-600 mb-4">
+                                    <UserCog className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Staff & Permissions</h3>
+                                <p className="text-gray-600">Set specific roles (Owner, Cashier) for your staff members. Control access to sensitive data like reports and inventory management.</p>
+                            </div>
+                            
+                            {/* Feature 6: Cloud Sync */}
+                            <div className="feature-card bg-white p-6 rounded-xl shadow-lg border border-blue-100/50 hover:shadow-2xl">
+                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mb-4">
+                                    <Cloud className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Secure Cloud Sync</h3>
+                                <p className="text-gray-600">Your data is safe and constantly synchronized across all your devices. Never worry about losing sales data or inventory records again.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                {/* 3. Testimonial/Social Proof */}
+                <section className="py-16 md:py-20 bg-indigo-700">
+                    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                        <blockquote className="text-white">
+                            <p className="text-2xl md:text-3xl font-medium leading-relaxed italic">
+                                "Pocket POS saved me hours every week. Managing credit accounts (Khata) used to be a headache, now it's just a tap away. The best mobile POS solution for my small retail shop."
+                            </p>
+                            <footer className="mt-8">
+                                <p className="text-lg font-semibold text-indigo-200">
+                                    Ravi Sharma, Owner
+                                </p>
+                                <p className="text-sm text-indigo-300">
+                                    Sharma General Store, Kochi
+                                </p>
+                            </footer>
+                        </blockquote>
+                    </div>
+                </section>
+
+                {/* 4. Pricing / Final CTA */}
+                <section id="pricing" className="py-16 md:py-20 bg-white">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+                            Simple Pricing, Powerful Features
+                        </h2>
+                        <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-10">
+                            Choose the plan that fits your business. No hidden fees, just everything you need to grow.
+                        </p>
+
+                        {/* Pricing Card Grid */}
+                        <div className="max-w-md mx-auto">
+                            <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-white/50">
+                                <h3 className="text-2xl font-bold mb-2">Pro Plan</h3>
+                                <p className="text-indigo-200 text-sm">Best for growing retail shops and SMEs.</p>
+                                <div className="my-6">
+                                    <span className="text-5xl font-extrabold">₹499</span>
+                                    <span className="text-xl font-medium text-indigo-200">/month</span>
+                                </div>
+                                <ul className="text-left space-y-3 mb-8 text-indigo-100">
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Unlimited Bills & Transactions
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Full Inventory & Stock Management
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Digital Khata & Customer Ledger
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Advanced Reports & Staff Roles
+                                    </li>
+                                </ul>
+                                
+                                <a href="#" className="block w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
+                                    Sign Up Now
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+
+            {/* Footer */}
+            <footer className="bg-gray-800 py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-400">
+                    <div className="mb-4">
+                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">Privacy Policy</a>
+                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">Terms of Service</a>
+                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">Support</a>
+                    </div>
+                    <p>&copy; 2025 Pocket POS. All rights reserved.</p>
+                </div>
+            </footer>
+        </div>
+    );
+};
+
+export default LandingPage;

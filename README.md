@@ -1,1 +1,1 @@
-# ShopBill
+# Pocket POS
