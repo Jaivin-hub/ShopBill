@@ -65,7 +65,7 @@ const LandingPage = ({ onStartApp }) => {
             {/* Main Content */}
             <main>
                 {/* 1. Hero Section - Changed background and titles to white */}
-                <section className="py-16 md:py-24 bg-gray-950">
+                <section className="py-16 md:py-10 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         {/* Adjusted accent colors for dark theme */}
                         <span className="inline-block text-sm font-semibold text-teal-400 uppercase tracking-widest bg-teal-900/50 px-3 py-1 rounded-full mb-3 border border-teal-700/50">

@@ -168,12 +168,13 @@ const App = () => {
     
     // --- 1. Unauthenticated Views (Landing Page or Login) ---
     if (!currentUser) {
-        if (isViewingLogin) {
-            return <Login onLogin={handleLoginSuccess} showToast={showToast} />;
+            if (isViewingLogin) {
+                // ADDED onBackToLanding PROP HERE
+                return <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} />;
+            }
+            // Default unauthenticated view
+            return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
         }
-        // Default unauthenticated view
-        return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
-    }
     
     // --- 2. Authenticated Loading View ---
     if (loadingData) {

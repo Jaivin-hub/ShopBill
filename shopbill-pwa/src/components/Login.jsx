@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { DollarSign, Send } from 'lucide-react';
 
-// The actual Login function called by App.js
-const Login = ({ onLogin, showToast }) => {
+// Added onBackToLanding prop to the function signature
+const Login = ({ onLogin, showToast, onBackToLanding }) => {
     const [isSignup, setIsSignup] = useState(false);
 
     // --- Mock Login/Signup Handlers (Simulating API calls) ---
@@ -164,8 +164,16 @@ const Login = ({ onLogin, showToast }) => {
 
                 {isSignup ? <SignupForm /> : <LoginForm />}
 
-                {/* Note: The 'Back to Home' button logic is handled implicitly by the App.js setting isViewingLogin to false, 
-                    but since the form is within the Login view, we don't need the explicit button you had previously. */}
+                {/* New Back Button */}
+                <div className="text-center text-sm mt-8">
+                    <button
+                        onClick={onBackToLanding} // Call the function passed from App.js
+                        className="text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+                        Back to Landing Page
+                    </button>
+                </div>
             </div>
         </div>
     );
