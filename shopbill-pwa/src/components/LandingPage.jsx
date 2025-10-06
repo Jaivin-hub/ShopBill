@@ -1,14 +1,12 @@
 import React from 'react';
-// Import necessary icons from lucide-react
 import { CreditCard, Receipt, Package, Users, LineChart, UserCog, Cloud } from 'lucide-react';
-// Placeholder for the cover image
 import coverImage from '../../public/covermain.png'
+// Placeholder for the cover image, ensuring the component remains self-contained.
+// const coverImage = 'https://placehold.co/700x400/312e81/ffffff?text=Pocket+POS+Dashboard'; 
 
-// Added the onStartApp prop
 const LandingPage = ({ onStartApp }) => { 
     return (
-        // Changed main background to bg-gray-950 and default text color to gray-300
-        <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300">
+        <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300 font-sans">
             {/* Custom Styles using a style block within the component */}
             <style jsx global>{`
                 :root {
@@ -26,33 +24,26 @@ const LandingPage = ({ onStartApp }) => {
                     transition: all 0.3s ease;
                     transform: translateY(0);
                 }
-                /* Dark theme hover shadow adjustment */
                 .feature-card:hover {
                     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
                     transform: translateY(-5px);
                 }
-                /* Mobile specific adjustments */
                 @media (max-width: 767px) {
                     .hero-title {
-                        font-size: 2.25rem; /* text-4xl equivalent on small screens */
+                        font-size: 2.25rem; 
                     }
-                }
-                body {
-                    font-family: 'Inter', sans-serif;
                 }
             `}</style>
 
-            {/* Navigation Header - Changed background and shadow */}
+            {/* Navigation Header */}
             <nav className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-sm shadow-xl shadow-indigo-900/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        {/* Logo/Branding - Text is now white */}
                         <a href="#" className="flex items-center space-x-2">
                             <CreditCard className="w-6 h-6 text-indigo-400" />
                             <span className="text-xl font-bold text-white">Pocket POS</span>
                         </a>
                         
-                        {/* CTA Button - NOW USES onStartApp PROP */}
                         <button 
                             onClick={onStartApp}
                             className="bg-indigo-600 text-white cursor-pointer text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
@@ -64,10 +55,9 @@ const LandingPage = ({ onStartApp }) => {
 
             {/* Main Content */}
             <main>
-                {/* 1. Hero Section - Changed background and titles to white */}
-                <section className="py-16 md:py-10 bg-gray-950">
+                {/* 1. Hero Section */}
+                <section className="py-16 md:py-24 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                        {/* Adjusted accent colors for dark theme */}
                         <span className="inline-block text-sm font-semibold text-teal-400 uppercase tracking-widest bg-teal-900/50 px-3 py-1 rounded-full mb-3 border border-teal-700/50">
                             #1 Retail Management Tool
                         </span>
@@ -77,12 +67,11 @@ const LandingPage = ({ onStartApp }) => {
                             Right in your <span className="text-gradient">Pocket.</span>
                         </h1>
                         
-                        {/* Adjusted body text color - REPLACED ** with <strong> */}
                         <p className="mt-4 text-lg text-gray-400 max-w-3xl mx-auto mb-8">
                             Pocket POS transforms your smartphone or tablet into a powerful <strong>Point of Sale</strong> and <strong>Business Manager</strong>. Cut down on clutter, save time, and track every rupee instantly.
                         </p>
 
-                        {/* Primary CTA - NOW USES onStartApp PROP */}
+                        {/* Primary CTAs */}
                         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                             <a 
                                 href="#pricing"
@@ -94,9 +83,8 @@ const LandingPage = ({ onStartApp }) => {
                             </a>
                         </div>
 
-                        {/* Mock App Screenshot/Mockup - Adjusted border color */}
+                        {/* Mock App Screenshot/Mockup */}
                         <div className="mt-12">
-                            {/* Placeholder image URL: 700x400, indigo background, 'Pocket POS Dashboard' text */}
                             <img 
                                 src={coverImage}
                                 alt="Pocket POS Application Dashboard Preview" 
@@ -106,7 +94,7 @@ const LandingPage = ({ onStartApp }) => {
                     </div>
                 </section>
                 
-                {/* 2. Core Features Section - Changed background and card styles */}
+                {/* 2. Core Features Section */}
                 <section id="features" className="py-16 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="text-center mb-12">
@@ -118,10 +106,8 @@ const LandingPage = ({ onStartApp }) => {
                             </p>
                         </div>
                         
-                        {/* Feature Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             
-                            {/* Feature 1: Fast Billing - Card background changed to gray-800 */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-900/50 text-indigo-400 mb-4">
                                     <Receipt className="w-6 h-6" />
@@ -130,7 +116,6 @@ const LandingPage = ({ onStartApp }) => {
                                 <p className="text-gray-400">Complete sales transactions in seconds. Intuitive touch interface designed for high-volume retail environments. Print receipts or share via SMS.</p>
                             </div>
                             
-                            {/* Feature 2: Smart Inventory */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-teal-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-900/50 text-teal-400 mb-4">
                                     <Package className="w-6 h-6" />
@@ -139,7 +124,6 @@ const LandingPage = ({ onStartApp }) => {
                                 <p className="text-gray-400">Add, edit, and track products effortlessly. Get instant low-stock alerts and set smart reorder levels to never miss a sale.</p>
                             </div>
 
-                            {/* Feature 3: Khata Management (Customer Ledger) */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-amber-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-900/50 text-amber-400 mb-4">
                                     <Users className="w-6 h-6" />
@@ -148,7 +132,6 @@ const LandingPage = ({ onStartApp }) => {
                                 <p className="text-gray-400">Manage customer credit and outstanding payments easily. Send gentle reminders and record payments, keeping your ledger always balanced.</p>
                             </div>
 
-                            {/* Feature 4: Financial Reports */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-purple-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-900/50 text-purple-400 mb-4">
                                     <LineChart className="w-6 h-6" />
@@ -157,7 +140,6 @@ const LandingPage = ({ onStartApp }) => {
                                 <p className="text-gray-400">View daily, weekly, and custom sales trends. Identify top-selling items and busy hours to optimize purchasing and staffing.</p>
                             </div>
                             
-                            {/* Feature 5: Staff Management */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-pink-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-900/50 text-pink-400 mb-4">
                                     <UserCog className="w-6 h-6" />
@@ -166,7 +148,6 @@ const LandingPage = ({ onStartApp }) => {
                                 <p className="text-gray-400">Set specific roles (Owner, Cashier) for your staff members. Control access to sensitive data like reports and inventory management.</p>
                             </div>
                             
-                            {/* Feature 6: Cloud Sync */}
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-900/50 text-blue-400 mb-4">
                                     <Cloud className="w-6 h-6" />
@@ -178,7 +159,7 @@ const LandingPage = ({ onStartApp }) => {
                     </div>
                 </section>
                 
-                {/* 3. Testimonial/Social Proof - Retained high-contrast background */}
+                {/* 3. Testimonial/Social Proof */}
                 <section className="py-16 md:py-20 bg-indigo-700">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <blockquote className="text-white">
@@ -197,7 +178,7 @@ const LandingPage = ({ onStartApp }) => {
                     </div>
                 </section>
 
-                {/* 4. Pricing / Final CTA - Changed background and text colors */}
+                {/* 4. Pricing / Final CTA */}
                 <section id="pricing" className="py-16 md:py-20 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
@@ -207,40 +188,112 @@ const LandingPage = ({ onStartApp }) => {
                             Choose the plan that fits your business. No hidden fees, just everything you need to grow.
                         </p>
 
-                        {/* Pricing Card Grid */}
-                        <div className="max-w-md mx-auto">
-                            {/* Pricing card remains high-contrast but slightly adjusted text colors */}
-                            <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-gray-800">
-                                <h3 className="text-2xl font-bold mb-2">Pro Plan</h3>
-                                <p className="text-indigo-200 text-sm">Best for growing retail shops and SMEs.</p>
+                        {/* Pricing Card Grid (3 Columns) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                            
+                            {/* -------------------- FREE PLAN -------------------- */}
+                            <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-teal-600 transition duration-300">
+                                <h3 className="text-2xl font-bold mb-2 text-white">Free Plan</h3>
+                                <p className="text-gray-400 text-sm">Perfect for new sellers and home businesses.</p>
                                 <div className="my-6">
-                                    <span className="text-5xl font-extrabold">₹499</span>
+                                    <span className="text-5xl font-extrabold text-white">₹0</span>
+                                    <span className="text-xl font-medium text-gray-400">/month</span>
+                                </div>
+                                <ul className="text-left space-y-3 mb-8 text-gray-300">
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Up to 50 Transactions/month
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        1 User (Owner Only)
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Basic Inventory (100 items)
+                                    </li>
+                                    <li className="flex items-center text-gray-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-red-500"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                        Digital Khata (View Only)
+                                    </li>
+                                </ul>
+                                
+                                <button 
+                                    onClick={onStartApp}
+                                    className="block cursor-pointer w-full py-3 bg-teal-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-teal-700 transition duration-300">
+                                    Get Started Free
+                                </button>
+                            </div>
+
+                            {/* -------------------- BASIC PLAN -------------------- */}
+                            <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-indigo-600 transition duration-300">
+                                <h3 className="text-2xl font-bold mb-2 text-white">Basic Plan</h3>
+                                <p className="text-gray-400 text-sm">Best for single outlets and small teams.</p>
+                                <div className="my-6">
+                                    <span className="text-5xl font-extrabold text-white">₹499</span>
+                                    <span className="text-xl font-medium text-gray-400">/month</span>
+                                </div>
+                                <ul className="text-left space-y-3 mb-8 text-gray-300">
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Unlimited Transactions
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        2 Users (Owner + 1 Cashier)
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Full Inventory Management
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Full Digital Khata Ledger
+                                    </li>
+                                </ul>
+                                
+                                <button 
+                                    onClick={onStartApp}
+                                    className="block cursor-pointer w-full py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition duration-300">
+                                    Select Basic
+                                </button>
+                            </div>
+
+
+                            {/* -------------------- PRO PLAN (FEATURED - ₹999/month) -------------------- */}
+                            <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-indigo-400 transform scale-100 lg:scale-[1.05] lg:relative lg:-top-3 transition duration-300">
+                                <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-teal-400 text-gray-900 text-xs font-bold py-1 px-3 rounded-full shadow-md">
+                                    Recommended
+                                </div>
+                                <h3 className="text-2xl font-bold mb-2">Pro Plan</h3>
+                                <p className="text-indigo-200 text-sm">Ideal for multiple outlets and high-growth businesses.</p>
+                                <div className="my-6">
+                                    <span className="text-5xl font-extrabold text-white">₹999</span>
                                     <span className="text-xl font-medium text-indigo-200">/month</span>
                                 </div>
                                 <ul className="text-left space-y-3 mb-8 text-indigo-100">
                                     <li className="flex items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
-                                        Unlimited Bills & Transactions
+                                        Unlimited Transactions & Bills
                                     </li>
                                     <li className="flex items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
-                                        Full Inventory & Stock Management
+                                        Unlimited Users & Roles
                                     </li>
                                     <li className="flex items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
-                                        Digital Khata & Customer Ledger
+                                        Full Inventory & Bulk Tools
                                     </li>
                                     <li className="flex items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-white"><polyline points="20 6 9 17 4 12"/></svg>
-                                        Advanced Reports & Staff Roles
+                                        Khata + Automated SMS Reminders
                                     </li>
                                 </ul>
                                 
-                                {/* Sign Up Now button - NOW USES onStartApp PROP */}
                                 <button 
                                     onClick={onStartApp}
-                                    className="block cursor-pointer w-full py-3 bg-white text-indigo-600 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
-                                    Sign Up Now
+                                    className="block cursor-pointer w-full py-3 bg-white text-indigo-700 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
+                                    Choose Pro
                                 </button>
                             </div>
                         </div>
@@ -249,7 +302,7 @@ const LandingPage = ({ onStartApp }) => {
 
             </main>
 
-            {/* Footer - Retained but ensured text is visible */}
+            {/* Footer */}
             <footer className="bg-gray-900 border-t border-gray-800 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
                     <div className="mb-4">
