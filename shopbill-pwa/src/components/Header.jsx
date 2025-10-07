@@ -1,8 +1,7 @@
 import React from 'react';
-import { Smartphone, CheckCircle, User, Moon, Sun, Bell } from 'lucide-react'; // Changed DollarSign to Smartphone
+import { Smartphone, User, Moon, Sun, Bell, LogOut } from 'lucide-react'; 
 
-// UPDATED: onProfileClick prop is replaced by setCurrentPage
-const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDarkMode }) => (
+const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDarkMode, onLogout }) => (
     <header
         className="fixed top-0 left-0 right-0 
                bg-white dark:bg-gray-800 
@@ -11,12 +10,6 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                md:hidden 
                z-30 p-4 flex justify-between items-center transition-colors duration-300"
     >
-        {/*
-            --- LOGO ICON CHANGE ---
-            Replaced DollarSign with Smartphone to better represent 'Pocket POS'
-            Added CheckCircle overlay (visually implied by the color scheme) or
-            just stick with Smartphone for a clean, modern look.
-        */}
         <h1 className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate flex items-center">
             <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
             {companyName}
@@ -24,9 +17,9 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
 
         <div className="flex space-x-3 items-center">
             
-            {/* Notification Icon with Badge - Now uses setCurrentPage */}
+            {/* Notification Icon */}
             <button
-                onClick={() => setCurrentPage('notifications')} // Navigate to 'notifications' page
+                onClick={() => setCurrentPage('notifications')} 
                 className="p-2 rounded-full 
                    bg-gray-100 dark:bg-gray-700 
                    text-gray-600 dark:text-gray-300 
@@ -42,7 +35,20 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                 </span>
             </button>
 
-            {/* Dark Mode Toggle Button (commented out in your original code) */}
+            {/* LOGOUT BUTTON - STYLED TO MATCH OTHER ICONS */}
+            <button
+                onClick={onLogout} 
+                className="p-2 rounded-full 
+                   bg-red-100 dark:bg-red-800/50 
+                   text-red-600 dark:text-red-300 
+                   hover:bg-red-200 dark:hover:bg-red-700/60
+                   transition-all duration-300 active:scale-95 transform"
+                title="Logout"
+            >
+                <LogOut className="w-5 h-5" />
+            </button>
+
+            {/* Dark Mode Toggle Button (You can uncomment this section if you decide to use it) */}
             {/* <button
                 onClick={onToggleDarkMode}
                 className="p-2 rounded-full 
@@ -59,9 +65,9 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                 )}
             </button> */}
 
-            {/* User Profile Button - Now uses setCurrentPage */}
+            {/* User Profile Button */}
             <button
-                onClick={() => setCurrentPage('profile')} // Navigate to 'profile' page
+                onClick={() => setCurrentPage('profile')} 
                 className="p-2 rounded-full 
                    bg-indigo-100 dark:bg-indigo-700 
                    text-indigo-600 dark:text-indigo-200 

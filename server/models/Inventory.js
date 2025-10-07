@@ -7,6 +7,11 @@ const InventorySchema = new mongoose.Schema({
     quantity: { type: Number, default: 0, min: 0 },
     reorderLevel: { type: Number, default: 5, min: 0 },
     hsn: { type: String, trim: true, default: '' },
+    shopId: { 
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'User', 
+            required: true 
+        },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Inventory', InventorySchema);

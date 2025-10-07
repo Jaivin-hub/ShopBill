@@ -6,6 +6,11 @@ const SaleSchema = new mongoose.Schema({
     paymentMethod: { type: String, enum: ['Cash', 'Credit', 'UPI'], required: true },
     // Link to the Customer model for credit sales
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null }, 
+    shopId: { 
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'User', 
+            required: true 
+        },
     timestamp: { type: Date, default: Date.now },
     
     // CRITICAL ADDITION: Item details for reporting

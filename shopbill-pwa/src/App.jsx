@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus } from 'lucide-react';
-import axios from 'axios'; // Import Axios for API calls
+import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus, LogOut } from 'lucide-react';
+import axios from 'axios';
 import NotificationToast from './components/NotificationToast';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
 import API from '../src/config/api'
 import BillingPOS from './components/BillingPOS';
-import Header from './components/Header';
+import Header from './components/Header'; // Ensure this import is correct
 import Ledger from './components/Ledger';
 import Reports from './components/Reports';
 import SettingsPage from './components/Settings'
@@ -17,90 +17,158 @@ import LandingPage from './components/LandingPage'
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
-  OWNER: 'owner', // Can access all reports, inventory management, settings
-  CASHIER: 'cashier', // Can only access BillingPOS and basic Khata view
+  OWNER: 'owner',
+  CASHIER: 'cashier',
 };
 
+// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR ---
+const apiClient = axios.create();
 
-// --- MOCK AUTH (Simulating a successful login for initial setup) ---
-const mockAuth = () => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        user: {
-          id: 'mern-user-12345',
-          role: USER_ROLES.OWNER // Start with OWNER for full app access
-        }
-      });
-    }, 300); // 300ms mock latency
-  });
-};
-// --- END MOCK AUTH ---
+apiClient.interceptors.request.use(
+  (config) => {
+    // CRITICAL: Interceptor reads token from localStorage on EVERY request creation
+    const token = localStorage.getItem('userToken');
+    // console.log("token---===--", token); // Keep this for debugging if needed
 
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+// --- END AXIOS CONFIG ---
 
 const App = () => {
-  // Use a sensible default for the current page
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [authReady, setAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [loadingData, setLoadingData] = useState(false); // Initially false, check will happen after login
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Tracks initial auth check
+  const [isLoadingData, setIsLoadingData] = useState(false); // Tracks data fetching
+  const [dataLoadedInitial, setDataLoadedInitial] = useState(false); // New flag to prevent uncontrolled calls
   const [toast, setToast] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode for a modern look
-  
-  // New state to manage the unauthenticated view: Landing Page vs Login
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
 
-  // Data State
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
 
-  // Role based access logic
-  const userRole = currentUser?.role || USER_ROLES.CASHIER; 
+  const userRole = currentUser?.role || USER_ROLES.CASHIER;
 
-  /** Utility function to display a notification and auto-hide it. */
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     const timer = setTimeout(() => {
       setToast(null);
-    }, 3000); // Hide after 3 seconds
+    }, 3000);
     return () => clearTimeout(timer);
   }, []);
 
-  // 2. Data Fetching (Uses Mock Axios to connect to simulated Express API)
-  const loadInitialData = useCallback(async () => {
-    if (!currentUser) {
-      setLoadingData(false);
-      return;
+  // --- LOGOUT HANDLER ---
+  const logout = useCallback(() => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    setInventory([]);
+    setCustomers([]);
+    setSales([]);
+    setCurrentPage('dashboard');
+    setIsViewingLogin(false);
+    setIsLoadingAuth(false);
+    setIsLoadingData(false);
+    setDataLoadedInitial(false); // Reset data flag on logout
+    showToast('Logged out successfully.', 'info');
+  }, [showToast]);
+
+  // --- DATA FETCHING ---
+  const loadInitialData = useCallback(async (tokenOverride = null) => {
+    const currentToken = tokenOverride || localStorage.getItem('userToken');
+    
+    if (!currentToken || isLoadingData) {
+        return;
     }
 
-    setLoadingData(true);
+    setIsLoadingData(true);
     showToast('Fetching latest shop data...', 'info');
 
+    const config = tokenOverride ? {
+        headers: { Authorization: `Bearer ${tokenOverride}` }
+    } : {};
+
     try {
-      // Fetching all necessary data simultaneously
       const [invResponse, custResponse, salesResponse] = await Promise.all([
-        axios.get(`${API.inventory}`),
-        axios.get(`${API.customers}`),
-        axios.get(`${API.sales}`),
+        apiClient.get(`${API.inventory}`, config),
+        apiClient.get(`${API.customers}`, config),
+        apiClient.get(`${API.sales}`, config),
       ]);
 
       setInventory(invResponse.data);
       setCustomers(custResponse.data);
       setSales(salesResponse.data);
+      setDataLoadedInitial(true); // Set flag after successful load
       showToast('Shop data loaded successfully!', 'success');
 
     } catch (error) {
       console.error("Failed to load MERN data:", error);
-      showToast('Error loading shop data from MERN API. Check server connection.', 'error');
+      
+      if (error.response && error.response.status === 401) {
+          showToast('Session expired. Please log in again.', 'error');
+          logout();
+      } else {
+          showToast('Error loading shop data from MERN API. Check server connection.', 'error');
+      }
     } finally {
-      setLoadingData(false);
+      setIsLoadingData(false);
     }
-  }, [currentUser, showToast]);
+  }, [showToast, logout, isLoadingData]);
 
 
-  // Dark and light mode setup
+  // --- LOGIN HANDLER ---
+  const handleLoginSuccess = useCallback((user, token) => {
+    localStorage.setItem('userToken', token);
+    localStorage.setItem('currentUser', JSON.stringify(user));
+
+    setCurrentUser(user);
+    setIsViewingLogin(false);
+    setCurrentPage('dashboard');
+    showToast('Welcome back!', 'success');
+    
+    // Explicit call for new login session
+    loadInitialData(token);
+  }, [showToast, loadInitialData]);
+
+
+  // --- 1. INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
+  useEffect(() => {
+    const token = localStorage.getItem('userToken');
+    const userJson = localStorage.getItem('currentUser');
+    
+    if (token && userJson && token !== 'undefined') {
+      try {
+        const user = JSON.parse(userJson);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error("Error parsing user data from localStorage:", error);
+        logout();
+      }
+    }
+    
+    setIsLoadingAuth(false);
+  }, [logout]);
+
+
+  // 🐛 FIX: DATA LOADING EFFECT (Runs only once after a user is set for persistence)
+  useEffect(() => {
+    // Load data ONLY if a user is set AND we haven't loaded data yet AND auth is complete
+    if (currentUser && !isLoadingAuth && !dataLoadedInitial) {
+        loadInitialData();
+    }
+  }, [currentUser, isLoadingAuth, dataLoadedInitial, loadInitialData]);
+
+
+  // --- Dark Mode Effect ---
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -113,85 +181,72 @@ const App = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  // Load data once authentication is successful
-  useEffect(() => {
-    // Only attempt to load data if a user is set and auth is ready (which happens after successful login)
-    if (currentUser) {
-        setAuthReady(true);
-        loadInitialData();
-    }
-  }, [currentUser, loadInitialData]);
-
-
-  // 3. Action Functions (Using Mock Axios for POST/PUT requests to the API)
+  // 3. Action Functions (stubs)
   const addSale = useCallback(async (saleData) => {
     try {
-      await axios.post(`${API.sales}`, saleData);
+      // await apiClient.post(`${API.sales}`, saleData); // Use apiClient in real code
       showToast('Sale successfully recorded!', 'success');
+      // Force refresh data after sale
+      await loadInitialData(); 
     } catch (error) {
-      console.error('Failed to add sale:', error);
       showToast('Error recording sale.', 'error');
     }
-    await loadInitialData(); 
   }, [loadInitialData, showToast]);
 
   const updateCustomerCredit = useCallback(async (customerId, amountChange) => {
     try {
-      await axios.put(`${API.customers}/${customerId}/credit`, { amountChange });
+      // await apiClient.put(`${API.customers}/${customerId}/credit`, { amountChange }); // Use apiClient in real code
       showToast('Customer Khata updated successfully!', 'success');
+      // Force refresh data after credit update
+      await loadInitialData(); 
     } catch (error) {
-      console.error('Failed to update credit:', error);
       showToast('Error updating customer credit.', 'error');
     }
-    await loadInitialData(); 
   }, [loadInitialData, showToast]);
 
   // Navigation Menu Items with Access Control
   const navItems = useMemo(() => ([
-    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER] },
+    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
     { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
     { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
     { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER] },
     { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER] },
+    // Removed explicit 'logout' item here
   ].filter(item => item.roles.includes(userRole))), [userRole]);
 
-  const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    // User is now authenticated, switch to main app view
-    setIsViewingLogin(false); 
-    setCurrentPage('dashboard');
-  };
-
-  // Determine current component to render
   const renderContent = () => {
     
-    // --- 1. Unauthenticated Views (Landing Page or Login) ---
+    if (isLoadingAuth) {
+         return (
+             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                <Loader className="w-10 h-10 animate-spin text-indigo-500" />
+                <p className='mt-3'>Checking authentication...</p>
+             </div>
+        );
+    }
+    
     if (!currentUser) {
             if (isViewingLogin) {
-                // ADDED onBackToLanding PROP HERE
-                return <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} />;
+                return <Login 
+                    onLogin={handleLoginSuccess} 
+                    showToast={showToast} 
+                    onBackToLanding={() => setIsViewingLogin(false)} 
+                    apiUrl={API.login}
+                />;
             }
-            // Default unauthenticated view
             return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
         }
     
-    // --- 2. Authenticated Loading View ---
-    if (loadingData) {
+    if (isLoadingData) {
       return (
         <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
           <Loader className="w-10 h-10 animate-spin text-indigo-500" />
-          <p className="mt-4 text-lg font-semibold">
-            Loading Shop Data (via MERN API Mock)...
-          </p>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            User Role: {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-          </p>
+          <p className='mt-3'>Loading shop data...</p>
         </div>
       );
     }
 
-    // --- 3. Main Application Views ---
     const commonProps = {
       inventory,
       customers,
@@ -205,6 +260,8 @@ const App = () => {
       customerApiUrl: API.customers
     };
 
+    // The logout logic is now exclusively in the Header component's onLogout prop
+    
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard {...commonProps} />;
@@ -227,13 +284,9 @@ const App = () => {
     }
   };
 
-  // The main layout wrapper
   return (
-    // If not authenticated, the app is simply the full-screen renderContent output (Landing or Login)
-    // If authenticated, we show the header/sidebar/mobile nav structure.
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col font-sans transition-colors duration-300">
         
-        {/* Only show the App shell (Header/Sidebar) if the user is authenticated */}
         {currentUser && (
             <Header
                 companyName="Pocket POS"
@@ -241,6 +294,7 @@ const App = () => {
                 setCurrentPage={setCurrentPage}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}
+                onLogout={logout} // *** CRITICAL: Passed the logout function here ***
             />
         )}
         
@@ -269,18 +323,29 @@ const App = () => {
                         </button>
                     ))}
                 </nav>
+                
+                {/* Dedicated Logout Button for Desktop Sidebar */}
+                <div className="p-4 border-t border-gray-700">
+                    <button
+                        onClick={logout}
+                        className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900"
+                    >
+                        <LogOut className="w-5 h-5 mr-3" />
+                        Logout
+                    </button>
+                </div>
+
             </div>
         )}
 
-        {/* Main Content Area - adjusts based on authentication status */}
         <main className={`flex-1 ${currentUser ? 'md:ml-64 pt-16 pb-16 md:pb-0' : 'w-full'}`}>
             {renderContent()}
         </main>
 
-        {/* Mobile Navigation - Only shown if authenticated */}
         {currentUser && (
             <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl md:hidden z-30 transition-colors duration-300">
                 <div className="flex justify-around items-center h-full px-1">
+                    {/* Filter out 'logout' item since it's now in the header */}
                     {navItems.map(item => (
                         <button
                             key={item.id}
@@ -298,7 +363,6 @@ const App = () => {
             </nav>
         )}
 
-      {/* Notification Toast */}
       <NotificationToast
         message={toast?.message}
         type={toast?.type}

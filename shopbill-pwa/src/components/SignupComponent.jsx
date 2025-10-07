@@ -6,25 +6,30 @@ const SignupComponent = ({ onSwitchToLogin, onBackToHome }) => (
             Get Started Free
         </h2>
         <form className="space-y-4">
-            {/* Shop Name Input */}
-            <input
-                type="text"
-                placeholder="Your Shop Name"
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150"
-                required
-            />
             {/* Email Input */}
             <input
                 type="email"
                 placeholder="Email Address"
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150"
                 required
             />
-            {/* Password Input */}
+            
+            {/* Phone Number Input - NEW */}
+            <input
+                type="tel" // Use type="tel" for phone numbers
+                placeholder="Phone Number"
+                // Added a basic pattern for numbers, feel free to update for specific formats
+                pattern="[0-9]{10,15}" 
+                title="Phone number must be between 10 and 15 digits"
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                required
+            />
+            
+            {/* Password Input (Focus ring updated for consistency) */}
             <input
                 type="password"
                 placeholder="Password"
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150"
                 required
             />
 
@@ -36,7 +41,7 @@ const SignupComponent = ({ onSwitchToLogin, onBackToHome }) => (
                 Create Account
             </button>
             <p className="text-xs text-gray-400 pt-2 text-center">
-                By clicking Create Account, you agree to our Terms and Conditions.
+                By clicking Create Account, you agree to our **Terms and Conditions**.
             </p>
         </form>
 
