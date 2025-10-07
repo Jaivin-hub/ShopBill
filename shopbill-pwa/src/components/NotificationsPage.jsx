@@ -37,16 +37,21 @@ const dummyNotifications = [
 
 // Helper function to get the appropriate icon and color based on notification type
 const getNotificationTypeDetails = (type) => {
+    // Note: Dark theme background classes now use darker colors (e.g., -900/40)
     switch (type) {
         case 'warning':
-            return { icon: AlertTriangle, color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-900/40' };
+            // Using Amber/Orange for warning
+            return { icon: AlertTriangle, color: 'text-amber-400', bgColor: 'bg-amber-900/20', borderColor: 'border-amber-700/50' };
         case 'error':
-            return { icon: X, color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/40' };
+            // Using Red
+            return { icon: X, color: 'text-red-400', bgColor: 'bg-red-900/20', borderColor: 'border-red-700/50' };
         case 'success':
-            return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-100 dark:bg-green-900/40' };
+            // Using Teal/Green for success
+            return { icon: CheckCircle, color: 'text-teal-400', bgColor: 'bg-teal-900/20', borderColor: 'border-teal-700/50' };
         case 'info':
         default:
-            return { icon: Info, color: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/40' };
+            // Using Indigo/Blue for info
+            return { icon: Info, color: 'text-indigo-400', bgColor: 'bg-indigo-900/20', borderColor: 'border-indigo-700/50' };
     }
 };
 
@@ -59,42 +64,47 @@ const NotificationsPage = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1 flex items-center">
-                <Bell className="w-7 h-7 mr-2 text-indigo-600" />
+        // Main container uses the darkest background
+        <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
+            
+            {/* Header - Updated for dark theme */}
+            <h1 className="text-3xl font-extrabold text-white mb-1 flex items-center">
+                <Bell className="w-7 h-7 mr-2 text-indigo-400" />
                 Notifications
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Review system alerts, stock updates, and recent activity.</p>
+            <p className="text-gray-400 mb-6">Review system alerts, stock updates, and recent activity.</p>
 
             <div className="space-y-4 max-w-3xl mx-auto">
                 {notifications.length > 0 ? (
                     notifications.map(notification => {
-                        const { icon: Icon, color, bgColor } = getNotificationTypeDetails(notification.type);
+                        // Using the new borderColor class
+                        const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);
 
                         return (
                             <div 
                                 key={notification.id} 
-                                className={`flex items-start p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition duration-300 ${bgColor}`}
+                                // Updated to use the dark gray card background and the specific type border/bg
+                                className={`flex items-start p-4 rounded-xl shadow-lg border ${borderColor} bg-gray-900 transition duration-300 ${bgColor}`}
                             >
-                                {/* Icon */}
+                                {/* Icon - Color derived from type */}
                                 <div className={`flex-shrink-0 mr-3 ${color}`}>
                                     <Icon className="w-5 h-5 mt-0.5" />
                                 </div>
                                 
-                                {/* Content */}
+                                {/* Content - Updated text colors for dark theme */}
                                 <div className="flex-grow">
-                                    <p className="font-medium text-gray-800 dark:text-gray-100 leading-snug">
+                                    <p className="font-medium text-gray-100 leading-snug">
                                         {notification.message}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    <p className="text-xs text-gray-400 mt-1">
                                         {notification.time}
                                     </p>
                                 </div>
 
-                                {/* Dismiss Button */}
+                                {/* Dismiss Button - Updated colors for dark theme */}
                                 <button
                                     onClick={() => dismissNotification(notification.id)}
-                                    className="ml-4 p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                                    className="ml-4 p-1 text-gray-500 hover:text-red-400 transition-colors"
                                     title="Dismiss Notification"
                                 >
                                     <X className="w-4 h-4" />
@@ -103,10 +113,11 @@ const NotificationsPage = () => {
                         );
                     })
                 ) : (
-                    <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                        <CheckCircle className="w-8 h-8 mx-auto mb-3 text-green-500" />
-                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">All caught up!</p>
-                        <p className="text-gray-500 dark:text-gray-400">You have no new notifications.</p>
+                    // All caught up message box - Updated for dark theme
+                    <div className="text-center py-12 bg-gray-900 rounded-xl shadow-2xl border border-gray-800">
+                        <CheckCircle className="w-8 h-8 mx-auto mb-3 text-teal-400" />
+                        <p className="text-lg font-semibold text-gray-200">All caught up!</p>
+                        <p className="text-gray-400">You have no new notifications.</p>
                     </div>
                 )}
             </div>

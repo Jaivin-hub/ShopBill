@@ -219,8 +219,9 @@ const App = () => {
     
     if (isLoadingAuth) {
          return (
-             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-indigo-500" />
+             // Updated Loader styling for dark theme
+             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+                <Loader className="w-10 h-10 animate-spin text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
              </div>
         );
@@ -240,8 +241,8 @@ const App = () => {
     
     if (isLoadingData) {
       return (
-        <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-          <Loader className="w-10 h-10 animate-spin text-indigo-500" />
+        <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+          <Loader className="w-10 h-10 animate-spin text-teal-400" />
           <p className='mt-3'>Loading shop data...</p>
         </div>
       );
@@ -285,7 +286,8 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col font-sans transition-colors duration-300">
+    // Main App Container - Updated to darkest background
+    <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {currentUser && (
             <Header
@@ -294,17 +296,19 @@ const App = () => {
                 setCurrentPage={setCurrentPage}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}
-                onLogout={logout} // *** CRITICAL: Passed the logout function here ***
+                onLogout={logout} 
             />
         )}
         
         {currentUser && (
-            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-white dark:bg-gray-800 shadow-xl z-10 transition-colors duration-300">
-                <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-                    <h2 className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">
-                        <DollarSign className="inline-block w-6 h-6 mr-2 text-indigo-600 dark:text-indigo-400" /> Pocket POS
+            // Desktop Sidebar - Updated to dark theme
+            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 transition-colors duration-300 border-r border-gray-800">
+                <div className="p-6 border-b border-gray-800">
+                    {/* Header Text/Logo - Using Teal accent */}
+                    <h2 className="text-2xl font-extrabold text-teal-400">
+                        <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-400" /> Pocket POS
                     </h2>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
+                    <p className="text-xs text-gray-500 mt-1 truncate">
                         User: {userRole.charAt(0).toUpperCase() + userRole.slice(1)} | MERN-Ready
                     </p>
                 </div>
@@ -314,8 +318,8 @@ const App = () => {
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
                             className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' // Active: Indigo
+                                : 'text-gray-300 hover:bg-gray-800' // Inactive: Dark hover
                             }`}
                         >
                             <item.icon className="w-5 h-5 mr-3" />
@@ -324,11 +328,11 @@ const App = () => {
                     ))}
                 </nav>
                 
-                {/* Dedicated Logout Button for Desktop Sidebar */}
-                <div className="p-4 border-t border-gray-700">
+                {/* Dedicated Logout Button for Desktop Sidebar - Updated to dark theme */}
+                <div className="p-4 border-t border-gray-800">
                     <button
                         onClick={logout}
-                        className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900"
+                        className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-400 hover:bg-red-900/20"
                     >
                         <LogOut className="w-5 h-5 mr-3" />
                         Logout
@@ -338,12 +342,14 @@ const App = () => {
             </div>
         )}
 
+        {/* Main Content Area */}
         <main className={`flex-1 ${currentUser ? 'md:ml-64 pt-16 pb-16 md:pb-0' : 'w-full'}`}>
             {renderContent()}
         </main>
 
         {currentUser && (
-            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl md:hidden z-30 transition-colors duration-300">
+            // Mobile Navigation Bar - Updated to dark theme
+            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 shadow-2xl md:hidden z-30 transition-colors duration-300">
                 <div className="flex justify-around items-center h-full px-1">
                     {/* Filter out 'logout' item since it's now in the header */}
                     {navItems.map(item => (
@@ -351,8 +357,8 @@ const App = () => {
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
                             className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id
-                                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-300'
+                                ? 'text-indigo-400 font-bold' // Active: Indigo
+                                : 'text-gray-400 hover:text-indigo-300' // Inactive: Dark text with light hover
                             }`}
                         >
                             <item.icon className="w-5 h-5" />
