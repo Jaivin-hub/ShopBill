@@ -1,24 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     User, Mail, Phone, MapPin, DollarSign, Clock, Check, Building, 
     UploadCloud, Edit, Shield
 } from 'lucide-react';
 
 function Profile() {
-    // --- Mock State for Profile and Business Details ---
+    // State for the authenticated user object retrieved from localStorage
+    const [currentUser, setCurrentUser] = useState(null);
+    
+    // --- State for Profile and Business Details (Initialized with placeholders) ---
     const [profile, setProfile] = useState({
-        name: 'Alex Johnson (Owner)',
-        email: 'alex.johnson@shopbill.com',
-        phone: '+91 98765 43210',
-        shopName: 'ShopBill Retail Outlet',
-        taxId: '22AAAAA0000A1Z5',
-        address: '123 Main Street, Downtown, Kochi, 682001',
-        currency: 'INR - Indian Rupee',
-        timezone: 'Asia/Kolkata (GMT+5:30)',
-        profileImageUrl: 'https://placehold.co/120x120/4f46e5/ffffff?text=AJ' 
+        name: '', // Will be updated from localStorage
+        email: '', // Will be updated from localStorage
+        phone: '', // Will be updated from localStorage
+        shopName: 'Loading Business...',
+        taxId: 'Loading...',
+        address: 'Loading...',
+        currency: 'Loading...',
+        timezone: 'Loading...',
+        profileImageUrl: 'https://placehold.co/120x120/4f46e5/ffffff?text=U' 
     });
 
     const [isEditing, setIsEditing] = useState(false);
+
+    // --- useEffect to load user data from localStorage ---
+    useEffect(() => {
+        try {
+            // 1. Get the raw string from localStorage
+            const userString = localStorage.getItem('currentUser');
+            
+            if (userString) {
+                // 2. Parse the JSON string into an object
+                const userData = JSON.parse(userString);
+                
+                setCurrentUser(userData);
+
+                // 3. Initialize the editable profile state with the user data
+                setProfile({
+                    name: userData.name || 'User Name Missing',
+                    email: userData.email || 'N/A',
+                    phone: userData.phone || '+91 XXXX XXXXX',
+                    // Assume business details are nested or available here. 
+                    // Adjust keys based on your actual userData structure.
+                    shopName: userData.business?.shopName || 'ShopBill Retail Outlet',
+                    taxId: userData.business?.taxId || 'N/A',
+                    address: userData.business?.address || 'Address Not Set',
+                    currency: userData.business?.currency || 'INR - Indian Rupee',
+                    timezone: userData.business?.timezone || 'Asia/Kolkata (GMT+5:30)',
+                    profileImageUrl: userData.profileImageUrl || 'https://placehold.co/120x120/4f46e5/ffffff?text=' + (userData.name ? userData.name[0] : 'U')
+                });
+            } else {
+                 console.warn("No 'currentUser' found in localStorage.");
+                 // Optionally, redirect to login or show an error
+            }
+        } catch (error) {
+            console.error("Error parsing 'currentUser' from localStorage:", error);
+        }
+    }, []); // Empty dependency array means this runs only once on mount
+
 
     // Placeholder handler for saving data (simulating an API call)
     const handleSave = () => {
@@ -27,6 +66,8 @@ function Profile() {
         console.log("Saving updated profile:", profile);
         alert("Profile and Business Details updated!");
         setIsEditing(false);
+        // OPTIONAL: Update localStorage with the new profile data after a successful save
+        // localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...profile })); 
     };
 
     const handleChange = (e) => {
@@ -74,7 +115,10 @@ function Profile() {
                     </p>
                 </div>
                 <button 
-                    onClick={() => setIsEditing(prev => !prev)}
+                    onClick={() => {
+                        if (isEditing) handleSave(); // Save if currently editing
+                        setIsEditing(prev => !prev); // Toggle editing state
+                    }}
                     className={`flex items-center px-4 py-2 rounded-full font-semibold transition duration-150 shadow-md text-sm sm:text-base 
                         ${isEditing 
                             ? 'bg-red-500 hover:bg-red-600 text-white' 
@@ -110,7 +154,10 @@ function Profile() {
                         </div>
                         <div className="text-center sm:text-left">
                             <p className="text-xl font-bold text-gray-900 dark:text-white">{profile.name}</p>
-                            <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Shop Owner / Administrator</p>
+                            {/* Display a key piece of loaded info to confirm success */}
+                            {/* <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                                {currentUser ? `User ID: ${currentUser.id || 'N/A'}` : 'Shop Owner / Administrator'}
+                            </p> */}
                         </div>
                     </div>
 
@@ -168,17 +215,19 @@ function Profile() {
                             name="currency" 
                             value={profile.currency} 
                             icon={DollarSign} 
+                            readOnly={true}
                         />
                          <ProfileInputField 
                             label="Timezone" 
                             name="timezone" 
                             value={profile.timezone} 
                             icon={Clock} 
+                            readOnly={true}
                         />
                     </div>
                 </section>
                 
-                {/* Save Button (Visible only when editing and if not already using the header button) */}
+                {/* Save Button (Visible only when editing) */}
                 {isEditing && (
                     <div className="p-4 sm:p-0">
                         <button 

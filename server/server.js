@@ -145,6 +145,7 @@ app.post('/api/auth/login', async (req, res) => {
                     email: user.email,
                     role: user.role,
                     shopId: user.shopId,
+                    phone: user.phone
                 }
             });
         } else {
@@ -193,6 +194,8 @@ app.post('/api/auth/signup', async (req, res) => {
                 email: newUser.email,
                 role: newUser.role,
                 shopId: newUser.shopId,
+                phone: newUser.phone,
+
             }
         });
 

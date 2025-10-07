@@ -85,7 +85,25 @@ const Reports = ({ sales, customers, showToast }) => {
     // --- Data Fetching Logic (useEffect) ---
     const fetchReportData = useCallback(async () => {
         setIsLoading(true);
-        // 1. Get formatted date strings based on current state
+        
+        // --- AUTHENTICATION UPDATE ---
+        // 1. Get user token from localStorage
+        const userToken = localStorage.getItem('userToken'); 
+
+        if (!userToken) {
+             console.error("User token not found in localStorage. Cannot fetch reports.");
+             showToast({ message: "Authentication failed. Please log in.", type: 'error' });
+             setIsLoading(false);
+             return;
+        }
+
+        // 2. Prepare headers with Bearer token
+        const headers = {
+            'Authorization': `Bearer ${userToken}`
+        };
+        // --- END AUTHENTICATION UPDATE ---
+
+        // 3. Get formatted date strings based on current state
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
 
         // Prepare query parameters
@@ -96,7 +114,10 @@ const Reports = ({ sales, customers, showToast }) => {
 
         try {
             // --- Fetch Summary Metrics ---
-            const summaryResponse = await axios.get(API.reportsSummary, { params: queryParams });
+            const summaryResponse = await axios.get(API.reportsSummary, { 
+                params: queryParams,
+                headers: headers // Pass the headers here
+            });
             setSummaryData(summaryResponse.data);
             
             // --- Fetch Chart Data (requires viewType) ---
@@ -104,7 +125,8 @@ const Reports = ({ sales, customers, showToast }) => {
                 params: { 
                     ...queryParams,
                     viewType: viewType // Add viewType to the chart query
-                } 
+                },
+                headers: headers // Pass the headers here
             });
             setChartData(chartResponse.data);
 
