@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
     User, Lock, Moon, Sun, Key, Cloud, Globe, Check, Shield, Server, Bell, 
-    RefreshCw, Trash2, ChevronRight, Users, Briefcase 
-} from 'lucide-react';
+    RefreshCw, Trash2, ChevronRight, Users, Briefcase, LogOut 
+} from 'lucide-react'; // <-- Added LogOut icon
 // Assuming these are imported from sibling components/files
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
@@ -14,9 +14,10 @@ import ChangePasswordForm from './ChangePasswordForm';
 // Placeholder for ConfirmationModal (Dark Theme Styling)
 const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
-        <div className="bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-red-700 transform transition-transform duration-300">
+        <div className="bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-gray-700 transform transition-transform duration-300">
             <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-red-900/40 rounded-t-xl">
-                <h2 className="text-xl font-bold text-red-300 flex items-center"><Trash2 className="w-5 h-5 mr-2" /> Confirm Action</h2>
+                {/* Changed icon and color for general confirmation */}
+                <h2 className="text-xl font-bold text-red-300 flex items-center"><LogOut className="w-5 h-5 mr-2" /> Confirm Action</h2> 
             </div>
             <div className="p-5">
                 <p className="text-gray-300">
@@ -32,9 +33,12 @@ const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
                 </button>
                 <button 
                     onClick={onConfirm}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg shadow-lg hover:bg-red-700 transition flex items-center"
+                    // Adjusted button for confirmation, making it red only for 'wipe' or important actions
+                    className={`px-4 py-2 text-white rounded-lg shadow-lg transition flex items-center ${
+                         message.includes('clear the local cache') ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                    }`}
                 >
-                    Confirm Wipe
+                    {message.includes('clear the local cache') ? 'Confirm Wipe' : 'Confirm'}
                 </button>
             </div>
         </div>
@@ -42,7 +46,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
 );
 
 
-function Settings() {
+function Settings({onLogout}) {
     // 'main', 'password', 'staff'
     const [currentView, setCurrentView] = useState('main'); 
     const [isDarkMode, setIsDarkMode] = useState(true);
@@ -76,7 +80,7 @@ function Settings() {
     const handleAPIKeyClick = () => showToast('Navigating to API Key Management (Mock)', 'info');
 
     const handleWipeLocalData = () => { 
-        // Replaced window.confirm with custom modal logic
+        // Logic for Clear Cache confirmation
         setConfirmModal({
             message: "Are you sure you want to clear the local cache? This will wipe browser storage and require a full data re-sync from the server.",
             onConfirm: () => {
@@ -87,6 +91,24 @@ function Settings() {
             onCancel: () => setConfirmModal(null)
         });
     };
+    
+    // --- New Logout Handler ---
+    const handleLogout = () => {
+        setConfirmModal({
+            message: "Are you sure you want to log out of your owner/admin account?",
+            onConfirm: () => {
+                // REMOVED: showToast('Logged out successfully.', 'success');
+                setConfirmModal(null);
+                
+                // NEW: Call the external onLogout function provided as a prop
+                if (onLogout) {
+                    onLogout();
+                }
+            },
+            onCancel: () => setConfirmModal(null)
+        });
+    };
+    // -------------------------
     
     // --- Render Logic ---
     const renderSettingsList = () => (
@@ -122,6 +144,15 @@ function Settings() {
                         description="Manage integration tokens for advanced use."
                         onClick={handleAPIKeyClick}
                         accentColor="text-yellow-400"
+                    />
+                    
+                    {/* NEW FEATURE: Logout */}
+                    <SettingItem 
+                        icon={LogOut}
+                        title="Log Out"
+                        description="Securely log out of your current session."
+                        onClick={handleLogout}
+                        accentColor="text-red-500" // Highlight logout action
                     />
                 </div>
             </section>
@@ -203,9 +234,10 @@ function Settings() {
             {currentView === 'main' && (
                 <header className="mb-8 pt-4 md:pt-0 max-w-xl mx-auto">
                     <h1 className="text-3xl font-extrabold text-white flex items-center">
-                        <Shield className="w-7 h-7 mr-2 text-teal-400" /> Settings
+                        {/* <Shield className="w-7 h-7 mr-2 text-teal-400" />  */}
+                        Settings
                     </h1>
-                    <p className="text-gray-400 mt-1">Manage your shop's configuration and app preferences.</p>
+                    <p className="text-gray-400 mt-1">Manage shop configuration and app settings.</p>
                 </header>
             )}
 

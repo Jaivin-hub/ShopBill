@@ -1,7 +1,7 @@
 import React from 'react';
 import { Smartphone, User, Moon, Sun, Bell, LogOut } from 'lucide-react'; 
 
-const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDarkMode, onLogout }) => (
+const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDarkMode }) => (
     <header
         className="fixed top-0 left-0 right-0 
                bg-gray-900 
@@ -11,7 +11,11 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                z-30 p-4 flex justify-between items-center transition-colors duration-300"
     >
         {/* Company Name/Logo - Using Teal as the primary app accent for a vibrant header */}
-        <h1 className="text-xl font-extrabold text-teal-400 truncate flex items-center">
+        {/* <h1 className="text-xl font-extrabold text-teal-400 truncate flex items-center">
+            <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
+            {companyName}
+        </h1> */}
+        <h1 className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate flex items-center">
             <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
             {companyName}
         </h1>
@@ -37,7 +41,7 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
             </button>
 
             {/* LOGOUT BUTTON - STYLED FOR DARK THEME (Red accent) */}
-            <button
+            {/* <button
                 onClick={onLogout} 
                 className="p-2 rounded-full 
                    bg-red-900/40
@@ -47,10 +51,10 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                 title="Logout"
             >
                 <LogOut className="w-5 h-5" />
-            </button>
+            </button> */}
 
             {/* Dark Mode Toggle Button (Uncommented and styled for dark theme) */}
-            <button
+            {/* <button
                 onClick={onToggleDarkMode}
                 className="p-2 rounded-full 
                    bg-gray-800 
@@ -64,7 +68,7 @@ const Header = ({ companyName, userRole, setCurrentPage, isDarkMode, onToggleDar
                 ) : (
                     <Moon className="w-5 h-5 text-indigo-400" />
                 )}
-            </button>
+            </button> */}
 
             {/* User Profile Button - Uses Indigo accent */}
             <button

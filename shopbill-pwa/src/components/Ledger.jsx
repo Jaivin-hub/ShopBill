@@ -108,7 +108,8 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
 
         // Mock API POST request
         if (customerApiUrl) {
-            await axios.post(customerApiUrl, dataToSend);
+            // NOTE: Token authentication might be required here if you are using it globally
+            await axios.post(customerApiUrl, dataToSend); 
         } else {
             // Simulate API call delay if no URL is provided
             await new Promise(resolve => setTimeout(resolve, 800));
@@ -218,53 +219,21 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
   // --- Component Render ---
 
   return (
-    // Updated background to bg-gray-950 and pb-40 ensures scroll space above the action bar
-    <div className="p-4 md:p-8 h-full overflow-y-auto pb-40 bg-gray-950 transition-colors duration-300">
+    // ADJUSTED: padding-bottom (pb-56) ensures scroll space above the fixed action bar
+    <div className="p-4 md:p-8 h-full overflow-y-auto pb-56 sm:pb-32 bg-gray-950 transition-colors duration-300">
       <h1 className="text-3xl font-extrabold text-white mb-2 flex items-center">
-        <DollarSign className="w-7 h-7 mr-2 text-teal-400" /> Khata Manager
+        Khata Manager
       </h1>
       <p className="text-gray-400 mb-6">Track customer dues and easily record payments.</p>
       
-      {/* 1. Total Outstanding Summary Card - Updated for Dark Theme */}
-      <div className="mb-6 p-5 bg-gray-900 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800">
-        <div className="text-white"> 
-            
-            <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2 text-indigo-400" />
-                    <span className="text-sm font-medium text-gray-400">Total Outstanding Due</span>
-                </div>
-                
-                {/* Teal accent for the main number */}
-                <span className="text-4xl font-extrabold block ml-4 text-teal-400">
-                    ₹{totalOutstanding.toFixed(0)}
-                </span>
-            </div>
-        </div>
-      </div>
-      
-      {/* 2. Main Ledger Card with List - Updated for Dark Theme */}
+      {/* 1. Main Ledger Card with List - Updated for Dark Theme */}
       <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition-colors duration-300">
         
-        {/* Header with Remind Button */}
+        {/* Header (Remind All button removed from here) */}
         <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-4">
             <h3 className="text-xl font-bold flex items-center text-white">
                 <List className="w-5 h-5 mr-2 text-indigo-400" /> Customer List ({outstandingCustomers.length})
             </h3>
-            
-            {/* Single "Remind All" Button - Red/Accent color for action */}
-            <button 
-                className={`py-2 px-3 rounded-xl font-bold text-sm shadow-lg transition flex items-center justify-center active:scale-[0.99] ${
-                    outstandingCustomers.length === 0
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                        : 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/50'
-                }`}
-                onClick={handleSendReminders}
-                disabled={outstandingCustomers.length === 0 || loading}
-            >
-                <MessageSquare className="w-4 h-4 mr-1" />
-                Remind All
-            </button>
         </div>
         
         {/* Customer List */}
@@ -287,23 +256,54 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
         </div>
       </div>
       
-      {/* 💥 FIX APPLIED HERE: Changed bottom-0 to bottom-16 to lift the button above the footer menu. */}
+      {/* --- FIXED BOTTOM ACTION BAR (NEW IMPLEMENTATION - FIXED ABOVE FOOTER) --- */}
       <div className="fixed **bottom-16** left-0 right-0 p-4 bg-gray-900 z-30 shadow-[0_-6px_20px_rgba(0,0,0,0.5)] border-t border-gray-800 transition-colors duration-300">
-        <div className="max-w-xl mx-auto">
+        <div className="max-w-xl mx-auto space-y-3">
             
-            {/* Add Customer Button (Full Width Primary Action - Teal for New/Add) */}
-            <button 
-                className="w-full py-3 bg-teal-600 text-white rounded-xl font-extrabold text-lg shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] disabled:opacity-50"
-                onClick={openAddCustomerModal}
-                disabled={loading}
-            >
-                <UserPlus className="w-5 h-5 mr-2" /> 
-                New Khata Customer
-            </button>
+            {/* 1. Total Outstanding Due (Visible on the bar) */}
+            <div className="flex items-center justify-between px-2 py-1 bg-gray-800 rounded-lg border border-gray-700">
+                <div className="flex items-center">
+                    <TrendingUp className="w-4 h-4 mr-2 text-indigo-400" />
+                    <span className="text-sm font-medium text-gray-400">Total Due:</span>
+                </div>
+                <span className="text-2xl font-extrabold block text-teal-400">
+                    ₹{totalOutstanding.toFixed(0)}
+                </span>
+            </div>
+
+            {/* 2. Action Buttons (New Customer & Remind All) */}
+            <div className="grid grid-cols-2 gap-3">
+                
+                {/* Primary Action: New Customer (Teal) */}
+                <button 
+                    className="py-3 bg-teal-600 text-white rounded-xl font-extrabold text-sm shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] disabled:opacity-50"
+                    onClick={openAddCustomerModal}
+                    disabled={loading}
+                >
+                    <UserPlus className="w-4 h-4 mr-2" /> 
+                    New Customer
+                </button>
+                
+                {/* Secondary Action: Remind All (Red/Accent) */}
+                <button 
+                    className={`py-3 rounded-xl font-bold text-sm shadow-xl transition flex items-center justify-center active:scale-[0.99] ${
+                        outstandingCustomers.length === 0
+                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            : 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/50'
+                    }`}
+                    onClick={handleSendReminders}
+                    disabled={outstandingCustomers.length === 0 || loading}
+                >
+                    <MessageSquare className="w-4 h-4 mr-1" />
+                    Remind All
+                </button>
+            </div>
         </div>
       </div>
+      {/* --- END FIXED BOTTOM ACTION BAR --- */}
 
-      {/* --- MODALS (Payment Modal) - Updated for Dark Theme --- */}
+
+      {/* --- MODALS (Payment Modal) --- */}
       {isPaymentModalOpen && selectedCustomer && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 w-full md:w-96 rounded-xl shadow-2xl border border-indigo-700 transform transition-transform duration-300">
@@ -353,7 +353,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
         </div>
       )}
       
-      {/* --- MODALS (Add Customer Modal) - Updated for Dark Theme --- */}
+      {/* --- MODALS (Add Customer Modal) --- */}
       {isAddCustomerModalOpen && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
           <form onSubmit={handleAddNewCustomer} className="bg-gray-800 w-full md:w-96 rounded-xl shadow-2xl border border-indigo-700 transform transition-transform duration-300">

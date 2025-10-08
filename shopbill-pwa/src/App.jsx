@@ -258,7 +258,8 @@ const App = () => {
       userRole,
       showToast,
       refreshData: loadInitialData,
-      customerApiUrl: API.customers
+      customerApiUrl: API.customers,
+      onLogout:logout
     };
 
     // The logout logic is now exclusively in the Header component's onLogout prop
@@ -296,7 +297,6 @@ const App = () => {
                 setCurrentPage={setCurrentPage}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}
-                onLogout={logout} 
             />
         )}
         

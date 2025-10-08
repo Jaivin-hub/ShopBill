@@ -117,10 +117,11 @@ function Profile() {
                 <div>
                     {/* Header Text - Updated for dark theme/teal accent */}
                     <h1 className="text-3xl font-extrabold text-white flex items-center">
-                        <User className="w-7 h-7 mr-2 text-teal-400" /> My Profile
+                        {/* <User className="w-7 h-7 mr-2 text-teal-400" />  */}
+                        My Profile
                     </h1>
                     <p className="text-gray-400 mt-1">
-                        View and update your personal and business details.
+                        Manage personal and business details.
                     </p>
                 </div>
                 {/* Edit/Save Button - Updated for dark theme/indigo accent */}

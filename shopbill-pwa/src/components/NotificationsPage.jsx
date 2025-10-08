@@ -69,10 +69,10 @@ const NotificationsPage = () => {
             
             {/* Header - Updated for dark theme */}
             <h1 className="text-3xl font-extrabold text-white mb-1 flex items-center">
-                <Bell className="w-7 h-7 mr-2 text-indigo-400" />
+                {/* <Bell className="w-7 h-7 mr-2 text-indigo-400" /> */}
                 Notifications
             </h1>
-            <p className="text-gray-400 mb-6">Review system alerts, stock updates, and recent activity.</p>
+            <p className="text-gray-400 mb-6">View alerts, stock updates, and recent activity.</p>
 
             <div className="space-y-4 max-w-3xl mx-auto">
                 {notifications.length > 0 ? (
