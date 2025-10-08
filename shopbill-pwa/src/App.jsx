@@ -6,7 +6,7 @@ import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
 import API from '../src/config/api'
 import BillingPOS from './components/BillingPOS';
-import Header from './components/Header'; // Ensure this import is correct
+import Header from './components/Header';
 import Ledger from './components/Ledger';
 import Reports from './components/Reports';
 import SettingsPage from './components/Settings'
@@ -28,7 +28,6 @@ apiClient.interceptors.request.use(
   (config) => {
     // CRITICAL: Interceptor reads token from localStorage on EVERY request creation
     const token = localStorage.getItem('userToken');
-    // console.log("token---===--", token); // Keep this for debugging if needed
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -45,9 +44,9 @@ apiClient.interceptors.request.use(
 const App = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Tracks initial auth check
-  const [isLoadingData, setIsLoadingData] = useState(false); // Tracks data fetching
-  const [dataLoadedInitial, setDataLoadedInitial] = useState(false); // New flag to prevent uncontrolled calls
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [dataLoadedInitial, setDataLoadedInitial] = useState(false);
   const [toast, setToast] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
@@ -82,22 +81,24 @@ const App = () => {
     showToast('Logged out successfully.', 'info');
   }, [showToast]);
 
-  // --- DATA FETCHING ---
+  // --- DATA FETCHING (Used by useEffect, Login, and Ledger component) ---
   const loadInitialData = useCallback(async (tokenOverride = null) => {
     const currentToken = tokenOverride || localStorage.getItem('userToken');
     
-    if (!currentToken || isLoadingData) {
+    // Bail out if token is missing or loading is already in progress
+    if (!currentToken || currentToken === 'undefined' || isLoadingData) {
         return;
     }
 
     setIsLoadingData(true);
-    showToast('Fetching latest shop data...', 'info');
+    // showToast('Fetching latest shop data...', 'info'); // Commented out to reduce toast clutter
 
     const config = tokenOverride ? {
         headers: { Authorization: `Bearer ${tokenOverride}` }
     } : {};
 
     try {
+      // NOTE: We rely on the Axios Interceptor for auth unless tokenOverride is provided
       const [invResponse, custResponse, salesResponse] = await Promise.all([
         apiClient.get(`${API.inventory}`, config),
         apiClient.get(`${API.customers}`, config),
@@ -105,24 +106,25 @@ const App = () => {
       ]);
 
       setInventory(invResponse.data);
-      setCustomers(custResponse.data);
+      // CRITICAL: Updating the customer state here is what automatically refreshes the Ledger
+      setCustomers(custResponse.data); 
       setSales(salesResponse.data);
-      setDataLoadedInitial(true); // Set flag after successful load
-      showToast('Shop data loaded successfully!', 'success');
+      setDataLoadedInitial(true); 
+      // showToast('Shop data loaded successfully!', 'success'); // Commented out to reduce toast clutter
 
     } catch (error) {
       console.error("Failed to load MERN data:", error);
       
       if (error.response && error.response.status === 401) {
           showToast('Session expired. Please log in again.', 'error');
-          logout();
+          logout(); 
       } else {
           showToast('Error loading shop data from MERN API. Check server connection.', 'error');
       }
     } finally {
       setIsLoadingData(false);
     }
-  }, [showToast, logout, isLoadingData]);
+  }, [showToast, logout, isLoadingData]); // isLoadingData kept for the guard clause
 
 
   // --- LOGIN HANDLER ---
@@ -135,7 +137,7 @@ const App = () => {
     setCurrentPage('dashboard');
     showToast('Welcome back!', 'success');
     
-    // Explicit call for new login session
+    // Explicit call to load data after successful login
     loadInitialData(token);
   }, [showToast, loadInitialData]);
 
@@ -145,7 +147,7 @@ const App = () => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
     
-    if (token && userJson && token !== 'undefined') {
+    if (token && userJson && token !== 'undefined' && token !== null) {
       try {
         const user = JSON.parse(userJson);
         setCurrentUser(user);
@@ -155,16 +157,17 @@ const App = () => {
       }
     }
     
-    setIsLoadingAuth(false);
+    setIsLoadingAuth(false); 
   }, [logout]);
 
 
-  // 🐛 FIX: DATA LOADING EFFECT (Runs only once after a user is set for persistence)
+  // --- 2. DATA LOADING EFFECT (Runs only after a user is set) ---
   useEffect(() => {
-    // Load data ONLY if a user is set AND we haven't loaded data yet AND auth is complete
+    // Load data ONLY if a user is set, auth check is complete, and data hasn't been loaded yet.
     if (currentUser && !isLoadingAuth && !dataLoadedInitial) {
         loadInitialData();
     }
+    
   }, [currentUser, isLoadingAuth, dataLoadedInitial, loadInitialData]);
 
 
@@ -181,10 +184,10 @@ const App = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  // 3. Action Functions (stubs)
+  // 3. Action Functions
   const addSale = useCallback(async (saleData) => {
     try {
-      // await apiClient.post(`${API.sales}`, saleData); // Use apiClient in real code
+      // Logic for adding a sale via API should be here
       showToast('Sale successfully recorded!', 'success');
       // Force refresh data after sale
       await loadInitialData(); 
@@ -195,7 +198,7 @@ const App = () => {
 
   const updateCustomerCredit = useCallback(async (customerId, amountChange) => {
     try {
-      // await apiClient.put(`${API.customers}/${customerId}/credit`, { amountChange }); // Use apiClient in real code
+      // Logic for updating credit via API should be here
       showToast('Customer Khata updated successfully!', 'success');
       // Force refresh data after credit update
       await loadInitialData(); 
@@ -212,14 +215,12 @@ const App = () => {
     { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER] },
     { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER] },
-    // Removed explicit 'logout' item here
   ].filter(item => item.roles.includes(userRole))), [userRole]);
 
   const renderContent = () => {
     
     if (isLoadingAuth) {
          return (
-             // Updated Loader styling for dark theme
              <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
@@ -236,6 +237,7 @@ const App = () => {
                     apiUrl={API.login}
                 />;
             }
+            // If no user and not viewing login, show landing page.
             return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
         }
     
@@ -257,12 +259,11 @@ const App = () => {
       updateCustomerCredit,
       userRole,
       showToast,
-      refreshData: loadInitialData,
+      // CRITICAL: Passing the data fetcher as 'refreshData' to Ledger
+      refreshData: loadInitialData, 
       customerApiUrl: API.customers,
       onLogout:logout
     };
-
-    // The logout logic is now exclusively in the Header component's onLogout prop
     
     switch (currentPage) {
       case 'dashboard':
@@ -287,7 +288,7 @@ const App = () => {
   };
 
   return (
-    // Main App Container - Updated to darkest background
+    // Main App Container
     <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {currentUser && (
@@ -297,11 +298,12 @@ const App = () => {
                 setCurrentPage={setCurrentPage}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}
+                onLogout={logout}
             />
         )}
         
         {currentUser && (
-            // Desktop Sidebar - Updated to dark theme
+            // Desktop Sidebar
             <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 transition-colors duration-300 border-r border-gray-800">
                 <div className="p-6 border-b border-gray-800">
                     {/* Header Text/Logo - Using Teal accent */}
@@ -318,8 +320,8 @@ const App = () => {
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
                             className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
-                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' // Active: Indigo
-                                : 'text-gray-300 hover:bg-gray-800' // Inactive: Dark hover
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
+                                : 'text-gray-300 hover:bg-gray-800'
                             }`}
                         >
                             <item.icon className="w-5 h-5 mr-3" />
@@ -328,7 +330,7 @@ const App = () => {
                     ))}
                 </nav>
                 
-                {/* Dedicated Logout Button for Desktop Sidebar - Updated to dark theme */}
+                {/* Dedicated Logout Button for Desktop Sidebar */}
                 <div className="p-4 border-t border-gray-800">
                     <button
                         onClick={logout}
@@ -348,17 +350,16 @@ const App = () => {
         </main>
 
         {currentUser && (
-            // Mobile Navigation Bar - Updated to dark theme
+            // Mobile Navigation Bar
             <nav className="fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 shadow-2xl md:hidden z-30 transition-colors duration-300">
                 <div className="flex justify-around items-center h-full px-1">
-                    {/* Filter out 'logout' item since it's now in the header */}
                     {navItems.map(item => (
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
                             className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id
-                                ? 'text-indigo-400 font-bold' // Active: Indigo
-                                : 'text-gray-400 hover:text-indigo-300' // Inactive: Dark text with light hover
+                                ? 'text-indigo-400 font-bold'
+                                : 'text-gray-400 hover:text-indigo-300'
                             }`}
                         >
                             <item.icon className="w-5 h-5" />

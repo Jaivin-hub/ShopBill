@@ -1,241 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { CreditCard, DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, TrendingUp, X } from 'lucide-react';
+import { DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X } from 'lucide-react';
+// Import the PaymentModal and WALK_IN_CUSTOMER from the new file
+import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal'; 
 
-// Default Walk-in Customer for Cash/UPI sales
-const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
-
-// Sub-component for Payment Modal: Handles Cash, Full Credit, or Partial/Mixed Payments
-const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processPayment, showToast }) => {
-    // Initialize amountPaid with the total due amount for quick full cash sale
-    const [amountPaidInput, setAmountPaidInput] = useState(totalAmount.toFixed(2));
-    const [paymentType, setPaymentType] = useState('Cash/UPI'); // 'Cash/UPI', 'Credit'
-
-    // Reset state when modal opens/total changes
-    React.useEffect(() => {
-        if (isOpen) {
-            setAmountPaidInput(totalAmount.toFixed(2));
-            setPaymentType('Cash/UPI');
-        }
-    }, [isOpen, totalAmount]);
-
-    const khataDue = selectedCustomer.outstandingCredit || 0;
-    const isCreditCustomer = selectedCustomer.id !== WALK_IN_CUSTOMER.id;
-
-    const amountPaid = parseFloat(amountPaidInput) || 0;
-    
-    // Calculations based on user input (memoized for performance)
-    const {
-        amountCredited, // Amount of CURRENT bill added to khata (if paid < total or full credit selected)
-        changeDue,      // Change to return (if paid > total)
-        newKhataBalance, // The customer's total Khata due *after* this transaction
-        paymentMethod    // 'Cash/UPI', 'Credit', or 'Mixed'
-    } = useMemo(() => {
-        const total = totalAmount;
-
-        let amountCredited = 0;
-        let changeDue = 0;
-        let method = paymentType;
-        
-        if (paymentType === 'Credit') {
-            // Full Credit Sale
-            amountCredited = total;
-            method = 'Credit';
-        }
-        else {
-            if (amountPaid >= total) {
-                // Full payment or Overpayment
-                changeDue = amountPaid - total;
-                method = 'Cash/UPI';
-            } else if (amountPaid > 0 && amountPaid < total) {
-                // Partial payment: Remaining amount goes to Khata
-                amountCredited = total - amountPaid;
-                method = 'Mixed'; // Cash + Credit
-            } else {
-                 // Paid 0 cash/UPI, meaning full amount must be credited
-                 amountCredited = total;
-                 method = 'Credit';
-            }
-        }
-        
-        // Final Khata balance calculation
-        const newKhataBalance = khataDue + amountCredited;
-
-        return { amountCredited, changeDue, newKhataBalance, paymentMethod: method };
-    }, [amountPaid, totalAmount, paymentType, khataDue]);
-
-
-    const handleConfirmPayment = () => {
-        if (totalAmount <= 0) {
-            showToast('Cart is empty. Cannot process payment.', 'error');
-            return;
-        }
-
-        // Validation: Credit/Mixed sale requires a saved customer
-        if (amountCredited > 0 && selectedCustomer.id === WALK_IN_CUSTOMER.id) {
-            showToast('Please select a specific customer to add the remaining amount to Khata/Credit.', 'error');
-            return;
-        }
-
-        // Validation: Amount paid cannot be negative
-        if (amountPaid < 0) {
-             showToast('Amount paid cannot be negative.', 'error');
-             return;
-        }
-        
-        // Call the main processing function
-        processPayment(amountPaid, amountCredited, paymentMethod);
-    };
-
-
-    if (!isOpen) return null;
-
-    // Updated Styling for the modal (Dark/Indigo theme)
-    return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-indigo-700">
-                
-                {/* Modal Header */}
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-white flex items-center">
-                        <DollarSign className="w-6 h-6 text-teal-400 mr-2" />
-                        Process Payment
-                    </h2>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-400">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Modal Body */}
-                <div className="p-5 space-y-5">
-                    
-                    {/* Customer Info */}
-                    <div className="flex justify-between items-center p-3 bg-indigo-900/40 rounded-lg border border-indigo-700">
-                        <span className="text-sm font-semibold text-gray-300">Bill To:</span>
-                        <span className="font-extrabold text-indigo-400 truncate max-w-[60%] text-lg">{selectedCustomer.name}</span>
-                    </div>
-
-                    {/* Total Due */}
-                    <div className="p-4 bg-indigo-900/60 rounded-xl shadow-xl border border-indigo-600">
-                        <p className="flex justify-between items-center text-xl font-medium text-gray-200">
-                            <span>Sale Total:</span>
-                            <span className="text-4xl font-extrabold text-teal-400">₹{totalAmount.toFixed(2)}</span>
-                        </p>
-                    </div>
-
-                    {/* Khata Status */}
-                    {isCreditCustomer && (
-                        <div className="flex justify-between items-center p-2 border-b border-gray-700 text-sm">
-                            <span className="font-medium text-gray-300">Customer Outstanding Khata:</span>
-                            <span className={`font-bold ${khataDue > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                ₹{khataDue.toFixed(2)}
-                            </span>
-                        </div>
-                    )}
-                    
-                    {/* Payment Type Toggle (Full Credit vs Cash/Mixed) */}
-                    <div className="flex rounded-xl overflow-hidden shadow-2xl">
-                        <button
-                            onClick={() => setPaymentType('Cash/UPI')}
-                            className={`flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
-                                paymentType === 'Cash/UPI' 
-                                    ? 'bg-teal-600 text-white shadow-inner shadow-teal-900' 
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                        >
-                            <DollarSign className="w-5 h-5 inline-block mr-1" /> Cash / Mixed
-                        </button>
-                        <button
-                            onClick={() => setPaymentType('Credit')}
-                            disabled={!isCreditCustomer}
-                            className={`flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
-                                paymentType === 'Credit' 
-                                    ? 'bg-red-600 text-white shadow-inner shadow-red-900' 
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            title={!isCreditCustomer ? 'Requires a selected customer other than Walk-in' : ''}
-                        >
-                            <CreditCard className="w-5 h-5 inline-block mr-1" /> Full Khata
-                        </button>
-                    </div>
-
-                    {/* Amount Paid Input (Visible only for Cash/Mixed) */}
-                    {paymentType === 'Cash/UPI' && (
-                        <div className="space-y-2">
-                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received (Cash/UPI)</label>
-                            <input
-                                id="amount-paid"
-                                type="number"
-                                step="0.01"
-                                value={amountPaidInput}
-                                onChange={(e) => setAmountPaidInput(e.target.value)}
-                                className="w-full p-4 border-2 border-teal-600 bg-gray-700 text-teal-400 rounded-xl text-3xl font-extrabold focus:ring-teal-500 focus:border-teal-500 shadow-xl transition-colors"
-                                placeholder={totalAmount.toFixed(2)}
-                                autoFocus
-                            />
-                        </div>
-                    )}
-                    
-                    {/* Transaction Summary */}
-                    <div className="pt-2 space-y-3">
-                        {/* Change Due (Cash Overpayment) */}
-                        {changeDue > 0.01 && (
-                            <p className="flex justify-between font-bold text-xl text-green-400 p-3 bg-green-900/40 rounded-lg border border-green-700">
-                                <span>Change Due:</span>
-                                <span>₹{changeDue.toFixed(2)}</span>
-                            </p>
-                        )}
-
-                        {/* Amount Added to Khata (Credit/Partial Payment) */}
-                        {amountCredited > 0.01 && (
-                             <p className={`flex justify-between font-bold text-xl p-3 rounded-lg border ${
-                                 amountCredited > 0 && isCreditCustomer 
-                                     ? 'bg-red-900/40 text-red-400 border-red-700'
-                                     : 'bg-yellow-900/40 text-yellow-400 border-yellow-700'
-                             }`}>
-                                <span>{paymentMethod === 'Credit' ? 'Full Sale to Khata' : 'Remaining Khata/Credit:'}</span>
-                                <span className="text-2xl font-extrabold">₹{amountCredited.toFixed(2)}</span>
-                            </p>
-                        )}
-
-                        {/* New Khata Balance */}
-                        {isCreditCustomer && amountCredited > 0 && (
-                            <p className="flex justify-between text-sm text-gray-400 pt-3 border-t border-gray-700 mt-2">
-                                <span>New Outstanding Khata Balance:</span>
-                                <span className="font-semibold text-white text-base">₹{newKhataBalance.toFixed(2)}</span>
-                            </p>
-                        )}
-                        
-                        {/* Status Message if paid 0 in Cash/UPI mode and not credit customer */}
-                        {paymentType === 'Cash/UPI' && amountCredited > 0 && !isCreditCustomer && (
-                             <p className="text-xs text-center text-yellow-400 p-2 bg-yellow-900/30 rounded-lg">
-                                This transaction requires selecting a saved customer to be recorded as Khata/Credit.
-                            </p>
-                        )}
-                    </div>
-
-                </div>
-
-                {/* Modal Footer (Action Button) */}
-                <div className="p-5 border-t border-gray-700">
-                    <button 
-                        onClick={handleConfirmPayment} 
-                        className="w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50"
-                        disabled={totalAmount <= 0}
-                    >
-                        Confirm {paymentMethod} Transaction
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
+/**
+ * Main POS component: Manages cart, customer selection, inventory search, and sale finalization.
+ */
 const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(WALK_IN_CUSTOMER);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false); // NEW STATE FOR MODAL
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   // 1. Total Amount Calculation
   const totalAmount = useMemo(() => {
@@ -265,8 +40,9 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c.id !== WALK_IN_CUSTOMER.id)], [customers]);
 
 
+  // --- Cart Management Functions ---
+
   const addItemToCart = useCallback((itemToAdd) => {
-    // Basic stock check before adding (though filteredInventory handles display, this handles direct action)
     if (itemToAdd.quantity <= 0) {
         showToast(`${itemToAdd.name} is currently out of stock.`, 'error');
         return;
@@ -276,21 +52,18 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
       const existingItem = prevCart.find(item => item._id === itemToAdd._id);
       
       if (existingItem) {
-        // Check if adding one more exceeds available inventory stock
         const inventoryItem = inventory.find(i => i._id === itemToAdd._id);
         if (existingItem.quantity + 1 > inventoryItem?.quantity) {
              showToast(`Only ${inventoryItem.quantity} units of ${itemToAdd.name} available.`, 'error');
              return prevCart;
         }
         
-        // Increase quantity if item exists
         return prevCart.map(item =>
           item._id === itemToAdd._id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       } else {
-        // Add new item to cart
         return [...prevCart, { ...itemToAdd, quantity: 1 }];
       }
     });
@@ -299,7 +72,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
 
   const updateCartQuantity = useCallback((itemId, amount) => {
     setCart(prevCart => {
-        // Find by MongoDB _id
         const item = prevCart.find(i => i._id === itemId);
         const inventoryItem = inventory.find(i => i._id === itemId);
 
@@ -307,17 +79,14 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
 
         const newQuantity = item.quantity + amount;
         
-        // Prevent increasing past available stock
         if (amount > 0 && newQuantity > inventoryItem.quantity) {
              showToast(`Cannot add more. Only ${inventoryItem.quantity} units available.`, 'error');
              return prevCart;
         }
 
         if (newQuantity <= 0) {
-            // Remove item if quantity drops to zero
             return prevCart.filter(i => i._id !== itemId);
         } else {
-            // Update quantity
             return prevCart.map(i => 
                 i._id === itemId ? { ...i, quantity: newQuantity } : i 
             );
@@ -330,8 +99,8 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
     showToast('Item removed from cart.', 'error');
   }, [showToast]);
     
-  // Renamed and updated to handle mixed payments from the modal
-  const processPayment = async (amountPaid, amountCredited, paymentMethod) => {
+  // Sale Finalization Logic (passed to PaymentModal)
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod) => {
     if (totalAmount <= 0) {
       showToast('Cart is empty. Cannot process sale.', 'error');
       return;
@@ -374,15 +143,14 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
     setSearchTerm(''); // Clear search term after sale
     setIsPaymentModalOpen(false); // Close modal
      
-    // App.js now handles the success toast.
-  };
+  }, [totalAmount, selectedCustomer, cart, addSale, showToast]);
 
 
   // --- Component Render ---
 
   return (
-    // Updated background to match LandingPage's primary dark color
-    <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 text-gray-300 pb-60 md:pb-8 transition-colors duration-300">
+    // Adjusted bottom padding on mobile (pb-24) to accommodate the sticky footer
+    <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 text-gray-300 pb-24 md:pb-8 transition-colors duration-300">
       
       {/* 1. Main Heading and Description */}
       <h1 className="text-3xl font-extrabold text-white mb-1">Point of Sale (POS)</h1>
@@ -405,7 +173,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                     const customer = allCustomers.find(c => (c._id || c.id) === customerId) || WALK_IN_CUSTOMER;
                     setSelectedCustomer(customer);
                     }}
-                    // Updated styling: dark background, indigo border, white text
                     className="appearance-none w-full p-3.5 border border-indigo-600 bg-gray-700 text-white rounded-lg text-base font-semibold focus:ring-indigo-500 focus:border-indigo-500 pr-10 transition-colors shadow-inner"
                 >
                     {allCustomers.map(c => (
@@ -419,7 +186,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                 </div>
             </div>
             {selectedCustomer.outstandingCredit > 0 && (
-                // Enhanced credit display
                 <div className="flex justify-end mt-3">
                     <p className="text-sm text-red-400 font-bold p-2 bg-red-900/30 rounded-lg shadow-sm border border-red-700">
                         <span className="opacity-80 font-medium text-gray-300">Khata Due:</span> ₹{selectedCustomer.outstandingCredit.toFixed(0)}
@@ -436,11 +202,9 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                 placeholder="Search Item by Name or Barcode..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                // Updated styling: dark background, gray border, indigo focus
                 className="w-full pl-10 pr-10 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
             />
              {searchTerm && (
-                // Clear button placed inside the input field
                 <button
                     onClick={() => setSearchTerm('')}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white p-1 rounded-full bg-gray-700/50 transition-colors"
@@ -457,7 +221,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                 {filteredInventory.map(item => ( 
                     <button 
                         key={item._id || item.id}
-                        // Updated button style: darker background, purple accent
                         className="bg-indigo-900/40 text-indigo-300 p-2 rounded-lg font-semibold text-xs transition hover:bg-indigo-800/60 shadow-md border border-indigo-700 active:scale-[0.98] transform whitespace-nowrap overflow-hidden text-ellipsis"
                         onClick={() => addItemToCart(item)}
                         title={item.name}
@@ -467,7 +230,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                     </button>
                 ))}
             
-                {/* Display message if no items are found */}
                 {filteredInventory.length === 0 && (
                     <div className="col-span-4 sm:col-span-5 md:col-span-6 lg:col-span-8 text-center py-4 text-gray-500">
                         <Search className="w-5 h-5 mx-auto mb-1 text-gray-600" />
@@ -488,7 +250,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
              
             <div className="max-h-80 overflow-y-auto space-y-3 p-1">
                 {cart.map(item => (
-                    // Updated item card style: darker background, gray border
                     <div key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-gray-800 rounded-xl border border-gray-700 shadow-inner">
                         <span className="font-medium text-white w-2/5 truncate">{item.name}</span>
                          
@@ -531,25 +292,52 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                 )}
             </div>
         </div>
+
+        {/* 🌟 MODIFIED POSITION FOR TOTAL DISPLAY & BUTTON (Desktop/In-Scroll - md:block) */}
+        {cart.length > 0 && (
+            <div className="hidden md:block p-3 bg-gray-900 rounded-xl mb-3 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
+                <div className="flex justify-between items-stretch space-x-4">
+                    {/* Total Display: Desktop version was already correct */}
+                    <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+                        <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
+                        <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
+                    </div>
+
+                    {/* Payment Button */}
+                    <button 
+                        className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
+                        onClick={() => {
+                            if (totalAmount > 0) {
+                                setIsPaymentModalOpen(true);
+                            } else {
+                                showToast('Cart is empty. Please add items.', 'error');
+                            }
+                        }}
+                    >
+                        <DollarSign className="w-5 h-5 inline-block mr-2" /> Pay
+                    </button>
+                </div>
+            </div>
+        )}
          
         {/* Placeholder for scroll space on mobile (Hidden on desktop) */}
         <div className="h-4 md:hidden"></div>
       </div>
        
-      {/* STICKY FOOTER: Total and Payment Buttons - Rendered only when the cart has items (cart.length > 0) */}
+      {/* 🌟 MODIFIED STICKY FOOTER (Mobile Only - Reduced Height and Single Line Total) */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-4 z-20 md:static md:p-0 md:mt-6 md:border-0 md:shadow-none md:bg-transparent transition-colors duration-300">
-            <div className="p-3 bg-indigo-900/60 rounded-xl mb-3 border border-indigo-700">
-                <p className="text-xl font-bold text-white flex justify-between items-center">
-                    <span>TOTAL:</span>
-                    <span className="text-teal-400 text-4xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
-                </p>
-            </div>
+        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
+            <div className="flex items-stretch space-x-3">
+                
+                {/* Total Display: Key change is here - made it a single flex row */}
+                <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+                    <span className="text-lg font-bold text-white">TOTAL</span>
+                    <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
+                </div>
 
-            {/* NEW: Single button to open the Payment Modal */}
-            <div className="grid grid-cols-1 gap-3">
+                {/* Payment Button */}
                 <button 
-                    className="py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
+                    className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-lg shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
                     onClick={() => {
                         if (totalAmount > 0) {
                              setIsPaymentModalOpen(true);
@@ -558,30 +346,25 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
                         }
                     }}
                 >
-                    <DollarSign className="w-5 h-5 inline-block mr-2" /> Process Payment
+                    <DollarSign className="w-5 h-5 inline-block mr-2" /> Pay
                 </button>
             </div>
         </div>
       )}
 
-      {/* Payment Modal (Updated the styling inside the component definition above) */}
+      {/* Payment Modal */}
       <PaymentModal
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
           totalAmount={totalAmount}
           selectedCustomer={selectedCustomer}
-          processPayment={processPayment}
+          processPayment={processPayment} // Pass the sale finalization logic
           showToast={showToast}
       />
 
     </div>
   );
 };
-
-
-// Dummy components 
-const Dashboard = () => <div className="p-8"><h1 className="text-2xl font-bold">Dashboard Placeholder</h1></div>; 
-const Ledger = () => <div className="p-8"><h1 className="text-2xl font-bold">Khata/Ledger Placeholder</h1></div>; 
 
 
 export default BillingPOS;
