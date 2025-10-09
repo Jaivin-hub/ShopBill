@@ -12,7 +12,21 @@
     
     <title>Pocket POS</title>
     
-  </head>
+    <script>
+      // Checks for 'darkMode' in localStorage. If it's 'false', it means light mode.
+      // Otherwise (true/undefined/null), we default to dark mode.
+      const isDarkMode = localStorage.getItem('darkMode') !== 'false';
+      const html = document.documentElement;
+
+      if (isDarkMode) {
+        html.classList.add('dark');
+        html.style.colorScheme = 'dark';
+      } else {
+        html.classList.remove('dark');
+        html.style.colorScheme = 'light';
+      }
+    </script>
+    </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

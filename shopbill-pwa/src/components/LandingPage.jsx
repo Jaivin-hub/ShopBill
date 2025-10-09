@@ -8,7 +8,7 @@ const LandingPage = ({ onStartApp }) => {
     return (
         <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300 font-sans">
             {/* Custom Styles using a style block within the component */}
-            <style jsx global>{`
+            <style jsx="true" global="true">{`
                 :root {
                     --color-primary: #818cf8; /* indigo-400 for dark theme contrast */
                     --color-secondary: #2dd4bf; /* teal-400 for dark theme contrast */

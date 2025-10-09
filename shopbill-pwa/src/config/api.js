@@ -1,12 +1,14 @@
 // api.js
 
-const API_BASE_URL = 'https://shopbill-3le1.onrender.com/api'
-// const API_BASE_URL = 'http://localhost:5000/api';
+// const API_BASE_URL = 'https://shopbill-3le1.onrender.com/api'
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const API = {
     // New Authentication Endpoints
     login: API_BASE_URL + '/auth/login',
     signup: API_BASE_URL + '/auth/signup',
+    passwordchange: API_BASE_URL + '/auth/password/change',
+
     
     // Existing Business Endpoints
     inventory : API_BASE_URL + '/inventory',
@@ -14,6 +16,9 @@ const API = {
     sales : API_BASE_URL + '/sales',
     reportsSummary: API_BASE_URL + '/reports/summary',
     reportsChartData: API_BASE_URL + '/reports/chart-data',
+    notificationalert: API_BASE_URL + '/notifications/alerts',
+
+
 }
 
 export default API

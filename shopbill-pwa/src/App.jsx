@@ -46,7 +46,13 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // 👇 UPDATED: Initialize isDarkMode from localStorage, defaulting to true (dark)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const localMode = localStorage.getItem('darkMode');
+    // localMode will be 'true', 'false', or null/undefined.
+    return localMode === 'false' ? false : true;
+  });
+
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
   // *** REMOVED: inventory, customers, sales states ***
@@ -115,18 +121,25 @@ const App = () => {
   // *** REMOVED: Data Loading Effect (It's now component responsibility) ***
 
 
-  // --- Dark Mode Effect ---
+  // --- Dark Mode Effect (UPDATED) ---
   useEffect(() => {
+    // 👇 Store the current mode in localStorage
+    localStorage.setItem('darkMode', isDarkMode);
+
+    const html = document.documentElement;
     if (isDarkMode) {
-      document.documentElement.classList.add('dark');
+      html.classList.add('dark');
+      // Optional: Helps ensure browser respects the theme for scrollbars etc.
+      html.style.colorScheme = 'dark'; 
     } else {
-      document.documentElement.classList.remove('dark');
+      html.classList.remove('dark');
+      html.style.colorScheme = 'light';
     }
   }, [isDarkMode]);
 
-  const toggleDarkMode = () => {
+  const toggleDarkMode = useCallback(() => {
     setIsDarkMode(prev => !prev);
-  };
+  }, []); // Made useCallback for stability in props
 
   // 3. Action Functions (Simplified: components will handle the API interaction and local state updates)
   const addSale = useCallback(async (saleData) => {
@@ -164,8 +177,9 @@ const App = () => {
     
     if (isLoadingAuth) {
          return (
-             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-teal-400" />
+             // UPDATED: Use light background default
+             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-900 dark:text-gray-400 bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
+                <Loader className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
              </div>
         );
@@ -196,7 +210,10 @@ const App = () => {
       showToast,
       apiClient, // CRITICAL: Pass the configured axios instance for use in components
       API, // Pass the API constants object
-      onLogout:logout
+      onLogout:logout,
+      // 👇 ADDED: Dark Mode props for SettingsPage and Header
+      isDarkMode,
+      toggleDarkMode
     };
     
     switch (currentPage) {
@@ -211,7 +228,8 @@ const App = () => {
       case 'reports':
         return <Reports {...commonProps} />;
       case 'settings':
-        return <SettingsPage {...commonProps} />;
+        // 👇 PASS isDarkMode and toggleDarkMode to SettingsPage
+        return <SettingsPage {...commonProps} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
       case 'profile':
         return <Profile {...commonProps} />;
       case 'notifications':
@@ -223,29 +241,34 @@ const App = () => {
   };
 
   return (
-    // Main App Container
-    <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+    // 💥 UPDATED: Main App Container - Light mode default, Dark mode override
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {currentUser && (
             <Header
                 companyName="Pocket POS"
                 userRole={userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                 setCurrentPage={setCurrentPage}
-                isDarkMode={isDarkMode}
-                onToggleDarkMode={toggleDarkMode}
+                isDarkMode={isDarkMode} // Passed to Header
+                onToggleDarkMode={toggleDarkMode} // Passed to Header
                 onLogout={logout}
+                apiClient={apiClient}
+                API={API}
             />
         )}
         
         {currentUser && (
-            // Desktop Sidebar
-            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 transition-colors duration-300 border-r border-gray-800">
-                <div className="p-6 border-b border-gray-800">
+            // 💥 UPDATED: Desktop Sidebar - Light mode default, Dark mode override
+            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full 
+                 bg-white dark:bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 
+                 transition-colors duration-300 border-r border-gray-200 dark:border-gray-800"
+            >
+                <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                     {/* Header Text/Logo - Using Teal accent */}
-                    <h2 className="text-2xl font-extrabold text-teal-400">
-                        <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-400" /> Pocket POS
+                    <h2 className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">
+                        <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-600 dark:text-teal-400" /> Pocket POS
                     </h2>
-                    <p className="text-xs text-gray-500 mt-1 truncate">
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
                         User: {userRole.charAt(0).toUpperCase() + userRole.slice(1)} | MERN-Ready
                     </p>
                 </div>
@@ -254,9 +277,10 @@ const App = () => {
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
+                            // UPDATED: Text colors for dark mode
                             className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
-                                : 'text-gray-300 hover:bg-gray-800'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                             }`}
                         >
                             <item.icon className="w-5 h-5 mr-3" />
@@ -266,10 +290,11 @@ const App = () => {
                 </nav>
                 
                 {/* Dedicated Logout Button for Desktop Sidebar */}
-                <div className="p-4 border-t border-gray-800">
+                <div className="p-4 border-t border-gray-200 dark:border-gray-800">
                     <button
                         onClick={logout}
-                        className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-400 hover:bg-red-900/20"
+                        // UPDATED: Text/hover colors for dark mode
+                        className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
                     >
                         <LogOut className="w-5 h-5 mr-3" />
                         Logout
@@ -285,16 +310,20 @@ const App = () => {
         </main>
 
         {currentUser && (
-            // Mobile Navigation Bar
-            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 shadow-2xl md:hidden z-30 transition-colors duration-300">
+            // 💥 UPDATED: Mobile Navigation Bar - Light mode default, Dark mode override
+            <nav className="fixed bottom-0 left-0 right-0 h-16 
+                 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 
+                 shadow-2xl md:hidden z-30 transition-colors duration-300"
+            >
                 <div className="flex justify-around items-center h-full px-1">
                     {navItems.map(item => (
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
+                            // UPDATED: Text colors for dark mode
                             className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id
-                                ? 'text-indigo-400 font-bold'
-                                : 'text-gray-400 hover:text-indigo-300'
+                                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-300'
                             }`}
                         >
                             <item.icon className="w-5 h-5" />

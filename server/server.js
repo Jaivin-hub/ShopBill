@@ -13,6 +13,8 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const salesRoutes = require('./routes/salesRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+// 💥 NEW: Import the notification routes
+const notificationRoutes = require('./routes/notificationRoutes'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,9 +36,13 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
 
+// 💥 NEW: NOTIFICATION ROUTES: Mount the router at /api/notifications
+app.use('/api/notifications', notificationRoutes);
+
 // --- Server Initialization ---
 const startServer = async () => {
-    await connectDB();
+    // NOTE: This assumes you have created the db.js file as requested in the previous step.
+    await connectDB(); 
     
     app.listen(PORT, () => {
         console.log(`\n======================================================`);
