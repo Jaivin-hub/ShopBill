@@ -1,16 +1,53 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader } from 'lucide-react';
 // Import the PaymentModal and WALK_IN_CUSTOMER from the new file
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal'; 
 
 /**
  * Main POS component: Manages cart, customer selection, inventory search, and sale finalization.
+ * NOTE: Now fetches its own inventory and customer data.
  */
-const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
+// CRITICAL: Updated props to remove centralized data and use API client
+const BillingPOS = ({ apiClient, API, showToast }) => {
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(WALK_IN_CUSTOMER);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+  // 1. Component-level Data States
+  const [inventory, setInventory] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+
+  // --- Data Fetching and Lifecycle ---
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch data concurrently
+      const [invResponse, custResponse] = await Promise.all([
+        apiClient.get(API.inventory),
+        apiClient.get(API.customers),
+      ]);
+
+      setInventory(invResponse.data);
+      setCustomers(custResponse.data);
+      showToast('Inventory and Customer data ready.', 'info');
+    } catch (error) {
+      console.error("Failed to load POS data:", error);
+      showToast('Error loading POS data. Check network connection.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiClient, API.inventory, API.customers, showToast]);
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
+
+  // --- EXISTING CALCULATIONS (Data remains locally calculated) ---
 
   // 1. Total Amount Calculation
   const totalAmount = useMemo(() => {
@@ -21,7 +58,6 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
   const filteredInventory = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     
-    // Filter out 0 stock items AND apply search filter
     const inStockItems = inventory.filter(item => 
       item.quantity > 0 
     );
@@ -40,7 +76,7 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c.id !== WALK_IN_CUSTOMER.id)], [customers]);
 
 
-  // --- Cart Management Functions ---
+  // --- Cart Management Functions (Unchanged logic, just relies on local inventory state) ---
 
   const addItemToCart = useCallback((itemToAdd) => {
     if (itemToAdd.quantity <= 0) {
@@ -99,14 +135,14 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
     showToast('Item removed from cart.', 'error');
   }, [showToast]);
     
-  // Sale Finalization Logic (passed to PaymentModal)
+  // Sale Finalization Logic (UPDATED TO USE apiClient)
   const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod) => {
     if (totalAmount <= 0) {
       showToast('Cart is empty. Cannot process sale.', 'error');
       return;
     }
      
-    // Check credit limit before logging a credit sale
+    // 1. Check credit limit before logging a credit sale
     if (amountCredited > 0 && selectedCustomer.creditLimit > 0) {
         const potentialNewCredit = selectedCustomer.outstandingCredit + amountCredited;
         if (potentialNewCredit > selectedCustomer.creditLimit) {
@@ -115,9 +151,9 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
         }
     }
      
-    // Prepare items data for the server
+    // 2. Prepare data
     const saleItems = cart.map(item => ({
-        itemId: item._id || item.id, // Ensure we pass the MongoDB _id
+        itemId: item._id || item.id,
         name: item.name,
         quantity: item.quantity,
         price: item.price,
@@ -125,28 +161,58 @@ const BillingPOS = ({ inventory, customers, addSale, showToast }) => {
 
     const saleData = {
       totalAmount: totalAmount,
-      paymentMethod: paymentMethod, // 'Cash/UPI', 'Credit', or 'Mixed'
+      paymentMethod: paymentMethod,
       customer: selectedCustomer.name,
-      customerId: selectedCustomer._id || selectedCustomer.id, // Use MongoDB ID if available
+      customerId: selectedCustomer._id || selectedCustomer.id,
       items: saleItems,
-      // NEW FIELDS for detailed accounting
       amountPaid: amountPaid,
-      amountCredited: amountCredited, // The portion of the current bill added to Khata
+      amountCredited: amountCredited,
     };
      
-    // Log the sale (calls the mock API in App.js)
-    await addSale(saleData); 
+    try {
+      showToast('Processing sale...', 'info');
+      // 3. Log the sale via API (This should also update inventory stock on the backend)
+      await apiClient.post(API.sales, saleData); 
+       
+      // 4. Update customer credit on the server if necessary
+      if (amountCredited > 0 && selectedCustomer._id) {
+        // We assume the API has an endpoint for credit transactions/updates
+        await apiClient.put(`${API.customers}/${selectedCustomer._id}/credit`, {
+          // The backend should calculate the new outstandingCredit
+          amountChange: amountCredited, 
+          type: 'sale_credit',
+        });
+      }
+      
+      showToast('Sale successfully recorded!', 'success');
+
+      // 5. Clear cart and reset state
+      setCart([]);
+      setSelectedCustomer(WALK_IN_CUSTOMER);
+      setSearchTerm('');
+      setIsPaymentModalOpen(false);
+
+      // 6. Refresh data for POS view (to show updated stock/credit)
+      fetchData(); 
+
+    } catch (error) {
+      console.error("Sale processing failed:", error);
+      showToast('Error finalizing sale. Check server connection.', 'error');
+    }
      
-    // Clear the cart and reset the customer after successful transaction
-    setCart([]);
-    setSelectedCustomer(WALK_IN_CUSTOMER);
-    setSearchTerm(''); // Clear search term after sale
-    setIsPaymentModalOpen(false); // Close modal
-     
-  }, [totalAmount, selectedCustomer, cart, addSale, showToast]);
+  }, [totalAmount, selectedCustomer, cart, showToast, apiClient, API.sales, API.customers, fetchData]);
 
 
   // --- Component Render ---
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+        <Loader className="w-10 h-10 animate-spin text-teal-400" />
+        <p className='mt-3'>Loading inventory and customer data...</p>
+      </div>
+    );
+  }
 
   return (
     // Adjusted bottom padding on mobile (pb-24) to accommodate the sticky footer

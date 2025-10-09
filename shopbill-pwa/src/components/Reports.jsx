@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrendingUp, DollarSign, List, BarChart, CreditCard, Package } from 'lucide-react'; 
+import { TrendingUp, DollarSign, List, BarChart, CreditCard, Package, Loader } from 'lucide-react'; 
 import SalesChart from './SalesChart';
-import axios from 'axios';
-import API from '../config/api'; 
+// NOTE: Removed direct axios import
+// import axios from 'axios';
+// NOTE: Removed direct API import, now received via props
+// import API from '../config/api'; 
 
 // --- Constants ---
 const DATE_FILTERS = [
@@ -19,10 +21,8 @@ const VIEW_TYPES = ['Day', 'Week', 'Month'];
 
 // 1. Helper: Correctly formats any Date object to YYYY-MM-DD using LOCAL time components
 const getLocalFormattedDate = (date) => {
-    // We use local methods (getFullYear, getMonth, getDate) to ensure the date 
-    // corresponds to the local calendar day, avoiding UTC shift.
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0'); // +1 because getMonth() is 0-indexed
+    const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
@@ -33,27 +33,23 @@ const getTodayDateString = () => getLocalFormattedDate(new Date());
 // Helper to get a date string X days ago (including today)
 const getDateXDaysAgo = (days) => {
     const d = new Date();
-    // To include today (1st day), subtract (X - 1) days.
     d.setDate(d.getDate() - (days - 1)); 
-    return getLocalFormattedDate(d); // Use the new local formatter
+    return getLocalFormattedDate(d);
 };
 
 // 2. Utility function to format Date strings for the Server API
 const getFilterDateStrings = (filterId, startStr, endStr) => {
-    // Logic for fixed presets
     const filter = DATE_FILTERS.find(f => f.id === filterId);
 
     if (filter && filter.days !== 0) {
         if (filter.days === Infinity) return { startDate: '', endDate: '' }; 
         
-        // This now uses the local date string for both start and end
         return { 
             startDate: getDateXDaysAgo(filter.days), 
             endDate: getTodayDateString() 
         };
     }
     
-    // Logic for custom range
     if (filterId === 'custom' && startStr && endStr) {
         if (new Date(startStr).getTime() > new Date(endStr).getTime()) {
             console.warn("Start date is after end date. Sending no filter.");
@@ -62,12 +58,12 @@ const getFilterDateStrings = (filterId, startStr, endStr) => {
         return { startDate: startStr, endDate: endStr };
     }
     
-    // Default to a 7-day period if no valid selection is made
     return getFilterDateStrings('7d', null, null); 
 };
 
 
-const Reports = ({ sales, customers, showToast }) => {
+// CRITICAL: Updated props to accept apiClient and API
+const Reports = ({ apiClient, API, showToast }) => {
     // --- State Management ---
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
@@ -86,59 +82,55 @@ const Reports = ({ sales, customers, showToast }) => {
     const fetchReportData = useCallback(async () => {
         setIsLoading(true);
         
-        // --- AUTHENTICATION UPDATE ---
-        // 1. Get user token from localStorage
-        const userToken = localStorage.getItem('userToken'); 
+        // --- AUTHENTICATION REMOVAL: apiClient handles token/headers ---
+        // const userToken = localStorage.getItem('userToken'); 
+        // if (!userToken) { ... }
+        // const headers = { 'Authorization': `Bearer ${userToken}` };
+        // --- END AUTHENTICATION REMOVAL ---
 
-        if (!userToken) {
-             console.error("User token not found in localStorage. Cannot fetch reports.");
-             showToast({ message: "Authentication failed. Please log in.", type: 'error' });
-             setIsLoading(false);
-             return;
-        }
-
-        // 2. Prepare headers with Bearer token
-        const headers = {
-            'Authorization': `Bearer ${userToken}`
-        };
-        // --- END AUTHENTICATION UPDATE ---
-
-        // 3. Get formatted date strings based on current state
+        // 1. Get formatted date strings based on current state
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
 
-        // Prepare query parameters
+        // 2. Prepare query parameters
         const queryParams = {
             ...(startDate && { startDate }),
             ...(endDate && { endDate }),
         };
 
         try {
-            // --- Fetch Summary Metrics ---
-            const summaryResponse = await axios.get(API.reportsSummary, { 
+            // --- Fetch Summary Metrics using apiClient ---
+            const summaryResponse = await apiClient.get(API.reportsSummary, { 
                 params: queryParams,
-                headers: headers // Pass the headers here
+                // Removed headers: headers
             });
             setSummaryData(summaryResponse.data);
             
-            // --- Fetch Chart Data (requires viewType) ---
-            const chartResponse = await axios.get(API.reportsChartData, { 
+            // --- Fetch Chart Data using apiClient (requires viewType) ---
+            const chartResponse = await apiClient.get(API.reportsChartData, { 
                 params: { 
                     ...queryParams,
                     viewType: viewType // Add viewType to the chart query
                 },
-                headers: headers // Pass the headers here
+                // Removed headers: headers
             });
             setChartData(chartResponse.data);
 
         } catch (error) {
-            console.error("Failed to fetch report data:", error);
-            showToast({ message: "Failed to load reports. Please check server connection.", type: 'error' });
+            console.error("Failed to fetch report data:", error.response?.data || error.message);
+            
+            // Handle specific authentication error if the API client fails without showing a generic toast
+            if (error.response?.status === 401 || error.message.includes('token')) {
+                 showToast({ message: "Authentication expired. Please log in again.", type: 'error' });
+            } else {
+                 showToast({ message: "Failed to load reports. Please check server connection.", type: 'error' });
+            }
+            
             setSummaryData(null);
             setChartData(null);
         } finally {
             setIsLoading(false);
         }
-    }, [selectedFilter, customStartDate, customEndDate, viewType, showToast]); 
+    }, [selectedFilter, customStartDate, customEndDate, viewType, showToast, apiClient, API.reportsSummary, API.reportsChartData]); 
 
     // Re-fetch data whenever filters or viewType change
     useEffect(() => {
@@ -266,13 +258,11 @@ const Reports = ({ sales, customers, showToast }) => {
             <div className="flex-grow overflow-y-auto">
 
                 {/* --- 2. Key Metrics Grid (Responsive 2-column) --- */}
-                {/* MetricCard uses the 'data' derived from summaryData */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <MetricCard
                         title="Total Revenue"
                         value={formatCurrency(data.revenue)}
                         icon={DollarSign}
-                        // Indigo accent
                         colorClass="border-b-indigo-500 text-indigo-400" 
                         description={`Generated from bills`}
                     />
@@ -280,7 +270,6 @@ const Reports = ({ sales, customers, showToast }) => {
                         title="Bills Raised" 
                         value={data.billsRaised.toLocaleString()}
                         icon={List}
-                        // Teal accent
                         colorClass="border-b-teal-500 text-teal-400"
                         description={`Total sales bills in period`}
                     />
@@ -288,7 +277,6 @@ const Reports = ({ sales, customers, showToast }) => {
                         title="Avg. Bill Value"
                         value={formatCurrency(data.averageBillValue)}
                         icon={DollarSign}
-                        // Yellow/Amber accent
                         colorClass="border-b-amber-500 text-amber-400"
                         description={`Revenue / Bills Raised`}
                     />
@@ -296,7 +284,6 @@ const Reports = ({ sales, customers, showToast }) => {
                         title="Items Volume"
                         value={data.volume.toLocaleString()}
                         icon={Package}
-                        // Cyan/Sky accent
                         colorClass="border-b-sky-500 text-sky-400"
                         description={`Total units sold`}
                     />
@@ -354,7 +341,8 @@ const Reports = ({ sales, customers, showToast }) => {
                     </div>
                     
                     {isLoading ? (
-                         <div className="h-64 w-full bg-gray-800 rounded animate-pulse py-12">
+                         <div className="h-64 w-full bg-gray-800 rounded animate-pulse py-12 flex items-center justify-center">
+                             <Loader className="w-6 h-6 animate-spin mr-2 text-teal-400" />
                              <p className="text-center text-gray-400">Loading chart data...</p>
                          </div>
                     ) : chartDataToRender.length > 0 ? (

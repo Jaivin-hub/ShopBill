@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Loader } from 'lucide-react'; 
 import InventoryContent from './InventoryContent'; 
-import axios from 'axios';
-import API from '../config/api'
+// NOTE: Removed direct axios import
+// import axios from 'axios';
+// NOTE: Removed direct API import, will use API from props
+// import API from '../config/api'
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
@@ -17,55 +19,71 @@ const initialItemState = {
     hsn: ''
 };
 
-const InventoryManager = ({ inventory, userRole, refreshData, showToast }) => {
+// CRITICAL: Updated props to remove centralized data and use API client
+const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     const isOwner = userRole === USER_ROLES.OWNER;
+    
+    // --- New Data States ---
+    const [inventory, setInventory] = useState([]);
+    const [isLoadingInitial, setIsLoadingInitial] = useState(true); // For initial data load
+    
+    // --- UI/Form States ---
     const [isFormModalOpen, setIsFormModalOpen] = useState(false); 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false); // For CRUD transactions
     const [formData, setFormData] = useState(initialItemState); 
     const [isEditing, setIsEditing] = useState(false); 
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOption, setSortOption] = useState('default'); 
     const [showStickySearch, setShowStickySearch] = useState(false);
     
-    // --- Utility to get config with token ---
-    const getAuthHeaders = () => {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-            // In a real app, you might want to force a logout here
-            showToast('Authentication token missing. Please log in.', 'error');
-            return null;
+    
+    // --- Data Fetching Logic ---
+    const fetchInventory = useCallback(async () => {
+        setIsProcessing(true); // Use processing state for refresh too
+        try {
+            const response = await apiClient.get(API.inventory);
+            setInventory(response.data);
+            showToast('Inventory data refreshed.', 'info');
+        } catch (error) {
+            console.error("Failed to load inventory data:", error);
+            showToast('Error loading inventory data. Check network connection.', 'error');
+        } finally {
+            setIsProcessing(false);
+            setIsLoadingInitial(false);
         }
-        return {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        };
-    };
+    }, [apiClient, API.inventory, showToast]);
+
+    useEffect(() => {
+        if (isOwner) {
+            fetchInventory();
+        } else {
+             setIsLoadingInitial(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOwner]); // Run only on mount and when userRole changes
+
     
     // --- Sticky Search Scroll Effect (remains the same) ---
     useEffect(() => {
         if (!isOwner) return;
-        const mainContent = document.querySelector('main'); 
+        // Target the main scroll container in the application (might be `window` or a specific element)
+        const scrollTarget = document.querySelector('.scrollable-content') || window;
         
         const handleScroll = () => {
             const scrollThreshold = 100; 
-            setShowStickySearch(window.scrollY > scrollThreshold || (mainContent && mainContent.scrollTop > scrollThreshold));
+            const scrollTop = scrollTarget === window ? window.scrollY : scrollTarget.scrollTop;
+            setShowStickySearch(scrollTop > scrollThreshold);
         };
         
-        window.addEventListener('scroll', handleScroll);
-        if (mainContent) {
-            mainContent.addEventListener('scroll', handleScroll);
-        }
+        scrollTarget.addEventListener('scroll', handleScroll);
 
         return () => {
-            window.removeEventListener('scroll', handleScroll);
-            if (mainContent) {
-                mainContent.removeEventListener('scroll', handleScroll);
-            }
+            scrollTarget.removeEventListener('scroll', handleScroll);
         };
     }, [isOwner]);
+    
     
     // --- Modal & Form Handlers (remain the same) ---
     const handleInputChange = (e) => {
@@ -103,54 +121,50 @@ const InventoryManager = ({ inventory, userRole, refreshData, showToast }) => {
         setIsConfirmModalOpen(true);
     }
     
-    // --- CRUD Handlers (FIXED: Added Auth Headers) ---
+    // --- CRUD Handlers (UPDATED to use apiClient and call fetchInventory) ---
     const handleAddItem = async () => { 
-        const config = getAuthHeaders();
-        if (!config) return;
-
-        setLoading(true);
+        setIsProcessing(true);
         try {
             const dataToSend = { ...formData, _id: undefined, id: undefined }; 
-            // PASS CONFIG
-            await axios.post(`${API.inventory}`, dataToSend, config);
+            
+            await apiClient.post(API.inventory, dataToSend);
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
+
             showToast(`New item added: ${formData.name}`, 'success');
-            if (refreshData) { await refreshData(); }
+            await fetchInventory(); // Refresh data from server
             closeFormModal();
         } catch (error) {
-            console.error('Add Item Error:', error);
+            console.error('Add Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error adding item.';
             showToast(`Error adding item: ${errorMessage}`, 'error');
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     };
     
     const handleUpdateItem = async () => { 
-        const config = getAuthHeaders();
-        if (!config) return;
-
-        setLoading(true);
+        setIsProcessing(true);
         const itemId = formData._id || formData.id; 
 
         if (!itemId) {
-            setLoading(false);
+            setIsProcessing(false);
             return showToast('Error: Cannot update item without an ID.', 'error');
         }
         try {
             const { _id, id, ...dataToSend } = formData; 
-            // PASS CONFIG
-            await axios.put(`${API.inventory}/${itemId}`, dataToSend, config);
+            
+            await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
+
             showToast(`${formData.name} updated successfully!`, 'success');
-            if (refreshData) { await refreshData(); }
+            await fetchInventory(); // Refresh data from server
             closeFormModal();
         } catch (error) {
-            console.error('Update Item Error:', error);
+            console.error('Update Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error updating item.';
             showToast(`Error updating item: ${errorMessage}`, 'error');
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     }
 
@@ -165,25 +179,24 @@ const InventoryManager = ({ inventory, userRole, refreshData, showToast }) => {
     
     const confirmDeleteItem = async () => {
         if (!itemToDelete) return;
-        const config = getAuthHeaders();
-        if (!config) return;
 
         const { id: itemId, name: itemName } = itemToDelete;
         setIsConfirmModalOpen(false);
         setItemToDelete(null);
-        setLoading(true);
+        setIsProcessing(true);
         try {
-            // PASS CONFIG
-            await axios.delete(`${API.inventory}/${itemId}`, config);
+            
+            await apiClient.delete(`${API.inventory}/${itemId}`);
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
+
             showToast(`${itemName} deleted successfully.`, 'success');
-            if (refreshData) { await refreshData(); }
+            await fetchInventory(); // Refresh data from server
         } catch (error) {
-            console.error('Delete Item Error:', error);
+            console.error('Delete Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error deleting item.';
             showToast(`Error deleting item: ${errorMessage}`, 'error');
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     };
     
@@ -208,13 +221,25 @@ const InventoryManager = ({ inventory, userRole, refreshData, showToast }) => {
             });
     }, [inventory, searchTerm, sortOption]);
     
-    // --- Access Denied Component (remains the same) ---
+    // --- Access Denied / Loading Component ---
+    
     if (!isOwner) {
+        // Access Denied for Cashier/other roles
         return (
             <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300">
                 <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
                 <h2 className="text-xl font-semibold text-gray-200">Access Denied</h2>
                 <p className="text-gray-400">Only the Owner role has permission to manage the full inventory.</p>
+            </div>
+        );
+    }
+
+    if (isLoadingInitial) {
+        // Initial Loading screen for Owner
+         return (
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+                <Loader className="w-10 h-10 animate-spin text-teal-400" />
+                <p className='mt-3'>Loading Inventory data...</p>
             </div>
         );
     }
@@ -225,7 +250,7 @@ const InventoryManager = ({ inventory, userRole, refreshData, showToast }) => {
             // Data
             inventory={sortedAndFilteredInventory}
             // State
-            loading={loading}
+            loading={isProcessing} // Pass the processing state to the child for UI disabling
             isFormModalOpen={isFormModalOpen}
             isConfirmModalOpen={isConfirmModalOpen}
             formData={formData}

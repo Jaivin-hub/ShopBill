@@ -21,7 +21,7 @@ const USER_ROLES = {
   CASHIER: 'cashier',
 };
 
-// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR ---
+// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
 const apiClient = axios.create();
 
 apiClient.interceptors.request.use(
@@ -45,15 +45,12 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [dataLoadedInitial, setDataLoadedInitial] = useState(false);
   const [toast, setToast] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
-
-  const [inventory, setInventory] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [sales, setSales] = useState([]);
+  
+  // *** REMOVED: inventory, customers, sales states ***
+  // *** REMOVED: isLoadingData, dataLoadedInitial states ***
 
   const userRole = currentUser?.role || USER_ROLES.CASHIER;
 
@@ -70,61 +67,14 @@ const App = () => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
-    setInventory([]);
-    setCustomers([]);
-    setSales([]);
+    // *** REMOVED: Data state clearing is no longer needed here ***
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
     setIsLoadingAuth(false);
-    setIsLoadingData(false);
-    setDataLoadedInitial(false); // Reset data flag on logout
     showToast('Logged out successfully.', 'info');
   }, [showToast]);
 
-  // --- DATA FETCHING (Used by useEffect, Login, and Ledger component) ---
-  const loadInitialData = useCallback(async (tokenOverride = null) => {
-    const currentToken = tokenOverride || localStorage.getItem('userToken');
-    
-    // Bail out if token is missing or loading is already in progress
-    if (!currentToken || currentToken === 'undefined' || isLoadingData) {
-        return;
-    }
-
-    setIsLoadingData(true);
-    // showToast('Fetching latest shop data...', 'info'); // Commented out to reduce toast clutter
-
-    const config = tokenOverride ? {
-        headers: { Authorization: `Bearer ${tokenOverride}` }
-    } : {};
-
-    try {
-      // NOTE: We rely on the Axios Interceptor for auth unless tokenOverride is provided
-      const [invResponse, custResponse, salesResponse] = await Promise.all([
-        apiClient.get(`${API.inventory}`, config),
-        apiClient.get(`${API.customers}`, config),
-        apiClient.get(`${API.sales}`, config),
-      ]);
-
-      setInventory(invResponse.data);
-      // CRITICAL: Updating the customer state here is what automatically refreshes the Ledger
-      setCustomers(custResponse.data); 
-      setSales(salesResponse.data);
-      setDataLoadedInitial(true); 
-      // showToast('Shop data loaded successfully!', 'success'); // Commented out to reduce toast clutter
-
-    } catch (error) {
-      console.error("Failed to load MERN data:", error);
-      
-      if (error.response && error.response.status === 401) {
-          showToast('Session expired. Please log in again.', 'error');
-          logout(); 
-      } else {
-          showToast('Error loading shop data from MERN API. Check server connection.', 'error');
-      }
-    } finally {
-      setIsLoadingData(false);
-    }
-  }, [showToast, logout, isLoadingData]); // isLoadingData kept for the guard clause
+  // *** REMOVED: loadInitialData function ***
 
 
   // --- LOGIN HANDLER ---
@@ -137,18 +87,19 @@ const App = () => {
     setCurrentPage('dashboard');
     showToast('Welcome back!', 'success');
     
-    // Explicit call to load data after successful login
-    loadInitialData(token);
-  }, [showToast, loadInitialData]);
+    // *** REMOVED: loadInitialData(token) call. Data loading is now handled by components. ***
+  }, [showToast]);
 
 
-  // --- 1. INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
+  // --- INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
   useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
     
     if (token && userJson && token !== 'undefined' && token !== null) {
       try {
+        // We will make a small, quick API call here if needed for validation, 
+        // but for now, we trust localStorage and proceed.
         const user = JSON.parse(userJson);
         setCurrentUser(user);
       } catch (error) {
@@ -161,14 +112,7 @@ const App = () => {
   }, [logout]);
 
 
-  // --- 2. DATA LOADING EFFECT (Runs only after a user is set) ---
-  useEffect(() => {
-    // Load data ONLY if a user is set, auth check is complete, and data hasn't been loaded yet.
-    if (currentUser && !isLoadingAuth && !dataLoadedInitial) {
-        loadInitialData();
-    }
-    
-  }, [currentUser, isLoadingAuth, dataLoadedInitial, loadInitialData]);
+  // *** REMOVED: Data Loading Effect (It's now component responsibility) ***
 
 
   // --- Dark Mode Effect ---
@@ -184,28 +128,27 @@ const App = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  // 3. Action Functions
+  // 3. Action Functions (Simplified: components will handle the API interaction and local state updates)
   const addSale = useCallback(async (saleData) => {
     try {
-      // Logic for adding a sale via API should be here
+      // Logic for adding a sale via API should be here, e.g., apiClient.post(API.sales, saleData)
+      // NOTE: The component calling this (e.g., BillingPOS) will be responsible for re-fetching
+      // any specific data it needs (like inventory, if stock levels are affected).
       showToast('Sale successfully recorded!', 'success');
-      // Force refresh data after sale
-      await loadInitialData(); 
     } catch (error) {
       showToast('Error recording sale.', 'error');
     }
-  }, [loadInitialData, showToast]);
+  }, [showToast]);
 
   const updateCustomerCredit = useCallback(async (customerId, amountChange) => {
     try {
-      // Logic for updating credit via API should be here
+      // Logic for updating credit via API should be here, e.g., apiClient.put(`${API.customers}/${customerId}/credit`, { amountChange })
+      // NOTE: The component calling this (Ledger) will be responsible for re-fetching its data.
       showToast('Customer Khata updated successfully!', 'success');
-      // Force refresh data after credit update
-      await loadInitialData(); 
     } catch (error) {
       showToast('Error updating customer credit.', 'error');
     }
-  }, [loadInitialData, showToast]);
+  }, [showToast]);
 
   // Navigation Menu Items with Access Control
   const navItems = useMemo(() => ([
@@ -239,29 +182,20 @@ const App = () => {
             }
             // If no user and not viewing login, show landing page.
             return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
-        }
-    
-    if (isLoadingData) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
-          <Loader className="w-10 h-10 animate-spin text-teal-400" />
-          <p className='mt-3'>Loading shop data...</p>
-        </div>
-      );
     }
+    
+    // *** REMOVED: isLoadingData block - now we only wait for Auth ***
 
+    // The component is now responsible for fetching its own data.
     const commonProps = {
-      inventory,
-      customers,
-      sales,
+      // *** REMOVED: inventory, customers, sales props ***
       currentUser, 
       addSale,
       updateCustomerCredit,
       userRole,
       showToast,
-      // CRITICAL: Passing the data fetcher as 'refreshData' to Ledger
-      refreshData: loadInitialData, 
-      customerApiUrl: API.customers,
+      apiClient, // CRITICAL: Pass the configured axios instance for use in components
+      API, // Pass the API constants object
       onLogout:logout
     };
     
@@ -281,7 +215,8 @@ const App = () => {
       case 'profile':
         return <Profile {...commonProps} />;
       case 'notifications':
-        return <NotificationsPage />;  
+        // NotificationsPage can now use 'apiClient' to fetch notifications
+        return <NotificationsPage {...commonProps} />;  
       default:
         return <Dashboard {...commonProps} />;
     }

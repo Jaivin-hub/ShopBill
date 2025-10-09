@@ -1,42 +1,55 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
     List, MessageSquare, CheckCircle, XCircle, ArrowRight, UserPlus, 
-    CreditCard, X, TrendingUp, DollarSign, Phone, AlertTriangle 
+    CreditCard, X, TrendingUp, DollarSign, Phone, AlertTriangle, Loader 
 } from 'lucide-react';
-import axios from 'axios';
 
 // Initial state for the new customer form
 const initialNewCustomerState = {
     name: '',
     phone: '',
-    creditLimit: 0,
+    creditLimit: '',
 };
 
-const getAuthHeaders = (showToast) => {
-    // FIX: Removed the duplicate 'localStorage'
-    const token = localStorage.getItem('userToken'); 
-    
-    if (!token) {
-        // NOTE: We keep this toast for system-level errors like missing auth token
-        showToast('Authentication token missing. Please log in.', 'error');
-        return null;
-    }
-    return {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    };
-};
-
-const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, customerApiUrl }) => {
+// CRITICAL: Updated props to use API client and constants
+const Ledger = ({ apiClient, API, showToast }) => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAddCustomerModalOpen, setIsAddCustomerModalInOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
-  const [loading, setLoading] = useState(false);
-  // NEW STATE: To hold validation errors for the add customer form
+  
+  // UPDATED STATE: 'loading' is now specifically for the initial fetch
+  const [loading, setLoading] = useState(true); 
+  // NEW STATE: 'isProcessing' handles transactional loading (payment, add customer)
+  const [isProcessing, setIsProcessing] = useState(false); 
+
   const [validationErrors, setValidationErrors] = useState({}); 
+  const [customers, setCustomers] = useState([]);
+
+  // --- Data Fetching ---
+
+  const fetchCustomers = useCallback(async () => {
+    // Only set loading true if we are doing the initial fetch, not just a refresh
+    if (customers.length === 0) {
+        setLoading(true);
+    }
+    
+    try {
+      const response = await apiClient.get(API.customers);
+      setCustomers(response.data);
+    } catch (error) {
+      console.error("Failed to load customer data:", error);
+      showToast('Error loading Khata data. Check server connection.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiClient, API.customers, showToast, customers.length]); // Added customers.length to dependency
+
+  useEffect(() => {
+    fetchCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   // --- List & Calculation Setup ---
   
@@ -58,7 +71,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
   
   const getCustomerId = (cust) => cust._id || cust.id;
 
-  // --- Modal Logic ---
+  // --- Modal Logic & Handlers (Unchanged) ---
 
   const openPaymentModal = (cust) => {
     setSelectedCustomer(cust);
@@ -74,76 +87,92 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
 
   const openAddCustomerModal = () => {
     setNewCustomerData(initialNewCustomerState);
-    setValidationErrors({}); // Clear errors when opening
+    setValidationErrors({});
     setIsAddCustomerModalInOpen(true);
   };
 
   const closeAddCustomerModal = () => {
     setIsAddCustomerModalInOpen(false);
     setNewCustomerData(initialNewCustomerState);
-    setValidationErrors({}); // Clear errors when closing
+    setValidationErrors({});
   };
 
   const handleNewCustomerInputChange = (e) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     
-    // Update the data state
     setNewCustomerData(prev => ({
         ...prev,
         [name]: value
     }));
     
-    // Perform instant validation check for the current field
     const updatedData = { ...newCustomerData, [name]: value };
     const allErrors = validateCustomerForm(updatedData);
 
-    // Update errors, clearing the current field's error if now valid, 
-    // OR if the user is typing in a field that previously had a server error.
     setValidationErrors(prev => ({ ...prev, [name]: allErrors[name] }));
   };
 
   // --- Action Handlers ---
   
-  const handleRecordPayment = () => {
+  // UPDATED: Record Payment now uses isProcessing
+  const handleRecordPayment = async () => {
     const amount = parseFloat(paymentAmount);
-    if (amount <= 0 || isNaN(amount)) {
+    if (amount <= 0 || isNaN(amount) || !selectedCustomer) {
       showToast('Please enter a valid payment amount.', 'error');
       return;
     }
     
-    if (!selectedCustomer) return;
-
     const customerId = getCustomerId(selectedCustomer);
 
+    // This is the amount paid that reduces the credit (negative change)
     const amountChange = -Math.min(amount, selectedCustomer.outstandingCredit); 
     
-    updateCustomerCredit(customerId, amountChange);
-    showToast(`Payment of ₹${amount.toFixed(0)} recorded for ${selectedCustomer.name}`, 'success');
-    
-    closePaymentModal();
+    if (amountChange === 0) {
+        showToast('Outstanding credit is already zero.', 'info');
+        closePaymentModal();
+        return;
+    }
+
+    setIsProcessing(true); // Use processing state for transaction
+    try {
+        // Send a PUT request to update the customer's credit
+        await apiClient.put(`${API.customers}/${customerId}/credit`, {
+            amountChange: amountChange,
+            type: 'payment_received', // Context for the server
+            paymentAmount: amount,
+        });
+
+        showToast(`Payment of ₹${amount.toFixed(0)} recorded for ${selectedCustomer.name}`, 'success');
+        
+        // Refresh customer list to show updated outstanding balance
+        await fetchCustomers();
+
+        closePaymentModal();
+
+    } catch (error) {
+        console.error('Record Payment Error:', error.response?.data || error.message);
+        showToast(`Error recording payment: ${error.response?.data?.error || 'Failed to connect to server.'}`, 'error');
+    } finally {
+        setIsProcessing(false);
+    }
   };
   
-  // --- UPDATED VALIDATION FUNCTION ---
+  // --- Validation Function (Unchanged) ---
   const validateCustomerForm = (data) => {
     const errors = {};
     
-    // 1. Name validation (required, must not be only spaces)
     if (!data.name.trim()) {
       errors.name = 'Customer name is required.';
     }
 
-    // 2. Phone number validation (optional, but if provided, must be valid)
     const phone = String(data.phone).trim();
     if (phone) {
-        // Regex for 7 to 15 digits, allowing only digits.
         const cleanedPhone = phone.replace(/[^0-9]/g, ''); 
         
-        if (!/^\d{7,15}$/.test(cleanedPhone)) {
-            errors.phone = 'Phone number must be 7-15 digits long and contain only numbers.';
+        if (!/^\d{10}$/.test(cleanedPhone)) {
+            errors.phone = 'Must be 10 digits and numbers only.';
         }
     }
 
-    // 3. Credit Limit validation (must be a non-negative number)
     const creditLimitValue = String(data.creditLimit).trim();
     const creditLimit = parseFloat(creditLimitValue);
     
@@ -154,11 +183,10 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
     return errors;
   };
 
-  // --- CRITICAL UPDATE: Handle Server-Side Validation Errors Locally ---
+  // UPDATED: Handle Add New Customer now uses isProcessing
   const handleAddNewCustomer = async (e) => {
     e.preventDefault();
 
-    // 1. Client-side re-validation
     const errors = validateCustomerForm(newCustomerData);
     setValidationErrors(errors);
     
@@ -166,10 +194,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
       return;
     }
 
-    const config = getAuthHeaders(showToast);
-    if (!config) return;
-
-    setLoading(true);
+    setIsProcessing(true); // Use processing state for transaction
     try {
         const dataToSend = {
             name: newCustomerData.name.trim(),
@@ -178,12 +203,11 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
             outstandingCredit: 0
         };
 
-        await axios.post(customerApiUrl, dataToSend, config); 
+        // Post the new customer data
+        await apiClient.post(API.customers, dataToSend); 
 
-        // 2. Success path
-        if (refreshData) {
-             await refreshData();
-        }
+        // Success path: Refresh customer list (This is the logic you wanted to confirm)
+        await fetchCustomers();
         
         showToast(`New Khata Customer added: ${newCustomerData.name.trim()}`, 'success');
         closeAddCustomerModal();
@@ -193,25 +217,20 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
         
         const serverResponse = error.response?.data;
         
-        // 3. Check for the specific phone number conflict error from the server
-        if (serverResponse && serverResponse.field === 'phone' && serverResponse.existingCustomerName) {
-            
-            // Set the server error message directly to the validationErrors state
+        // Check for the specific phone number conflict error from the server
+        if (serverResponse && serverResponse.field === 'phone' && serverResponse.error) {
             setValidationErrors(prev => ({
                 ...prev,
-                phone: serverResponse.error // The server error message: "Phone number is already associated with customer: [Name]"
+                phone: serverResponse.error 
             }));
-            
-            // NOTE: Do not show toast for this error.
-            
         } else {
-            // 4. Handle other general API/server errors using toast (e.g., database connection fail)
+            // Handle other general API/server errors
             const serverError = serverResponse?.error || error.message;
             showToast(`Error adding customer: ${serverError || 'Failed to connect to server.'}`, 'error');
         }
         
     } finally {
-        setLoading(false);
+        setIsProcessing(false);
     }
 };
   
@@ -227,20 +246,14 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
       showToast(`Mock: Sending WhatsApp reminder to ${outstandingCustomersForReminders.length} customer(s): ${selectedNames.slice(0, 3).join(', ')}${outstandingCustomersForReminders.length > 3 ? ' and others' : ''}.`, 'info');
   }
 
-  // Determine if the form is valid (for submit button disabling)
-  // Check if there are any client-side validation errors AND ensure phone error is checked
+  // Determine if the form is valid 
   const isFormValid = useMemo(() => {
-    // Only check client-side validation errors for disabling the button
     const errors = validateCustomerForm(newCustomerData);
-    
-    // The server-side phone error will prevent submission via the catch block, 
-    // but the button should still be disabled if *client-side* rules (like required name) are broken.
     return Object.keys(errors).length === 0;
   }, [newCustomerData]);
 
 
-  // --- Utility Render (remains the same) ---
-
+  // --- Utility Render (Unchanged) ---
   const CustomerCard = ({ cust, onCardClick }) => {
     const customerId = getCustomerId(cust);
     const isNearLimit = cust.creditLimit > 0 && cust.outstandingCredit >= cust.creditLimit * 0.95;
@@ -248,7 +261,6 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
 
     let bgColor = 'bg-gray-800';
     let borderColor = 'border-gray-700';
-    let textColor = 'text-white';
     let dueColor = 'text-indigo-400';
     
     if (cust.outstandingCredit > 0) {
@@ -271,12 +283,10 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
         onClick={onCardClick}
       >
         
-        {/* Card Content */}
         <div className="flex flex-grow justify-between items-center text-left space-x-3">
             
-            {/* Customer Info */}
             <div className="flex flex-col flex-grow truncate">
-                <p className={`font-bold text-base ${textColor} flex items-center truncate`}>
+                <p className={`font-bold text-base text-white flex items-center truncate`}>
                     {cust.name}
                     {(isNearLimit || isOverdue) && (
                         <AlertTriangle className="w-4 h-4 ml-2 text-red-400 flex-shrink-0" title="High Risk" />
@@ -297,7 +307,6 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                 </div>
             </div>
             
-            {/* Outstanding Amount and Action Icon */}
             <div className="flex items-center space-x-3 flex-shrink-0">
                 <div className="text-right">
                     <span className={`text-2xl font-extrabold block ${cust.outstandingCredit > 0 ? dueColor : 'text-green-400'}`}>
@@ -311,8 +320,17 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
       </div>
     );
   };
+  
+  // --- Primary Render ---
 
-  // --- Component Render (remains the same) ---
+  if (loading && customers.length === 0) {
+      return (
+          <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+              <Loader className="w-10 h-10 animate-spin text-teal-400" />
+              <p className='mt-3'>Loading customer ledger...</p>
+          </div>
+      );
+  }
 
   return (
     <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
@@ -343,7 +361,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                 <button 
                     className="py-3 bg-teal-600 text-white rounded-xl font-extrabold text-sm shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] disabled:opacity-50"
                     onClick={openAddCustomerModal}
-                    disabled={loading}
+                    disabled={isProcessing}
                 >
                     <UserPlus className="w-4 h-4 mr-2" /> 
                     New Customer
@@ -357,7 +375,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                             : 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/50'
                     }`}
                     onClick={handleSendReminders}
-                    disabled={outstandingCustomersForReminders.length === 0 || loading}
+                    disabled={outstandingCustomersForReminders.length === 0 || isProcessing}
                 >
                     <MessageSquare className="w-4 h-4 mr-1" />
                     Remind All
@@ -385,6 +403,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                     <CustomerCard 
                         key={getCustomerId(cust)} 
                         cust={cust}
+                        // Only allow clicking if there's outstanding credit
                         onCardClick={cust.outstandingCredit > 0 ? () => openPaymentModal(cust) : null}
                     />
                 ))
@@ -403,7 +422,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
           <div className="bg-gray-800 w-full md:w-96 rounded-xl shadow-2xl border border-indigo-700 transform transition-transform duration-300">
             <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
               <h2 className="text-xl font-bold text-indigo-300">Record Payment</h2>
-              <button onClick={closePaymentModal} className="text-gray-400 hover:text-white p-1">
+              <button onClick={closePaymentModal} className="text-gray-400 hover:text-white p-1" disabled={isProcessing}>
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -430,15 +449,17 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   className="w-full p-4 border-2 border-teal-600 rounded-xl text-3xl font-extrabold text-right focus:ring-teal-500 focus:border-teal-500 transition-colors bg-gray-700 text-teal-400 shadow-xl"
                   autoFocus
+                  disabled={isProcessing}
                 />
               </div>
 
               <button 
                 className="w-full py-3 bg-teal-600 text-white rounded-xl font-extrabold text-lg shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] disabled:bg-gray-700 disabled:text-gray-400"
                 onClick={handleRecordPayment}
-                disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || loading}
+                disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || isProcessing}
               >
-                <CreditCard className="w-5 h-5 mr-2" /> Confirm Payment Received
+                {isProcessing ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <CreditCard className="w-5 h-5 mr-2" />} 
+                {isProcessing ? 'Processing...' : 'Confirm Payment Received'}
               </button>
             </div>
           </div>
@@ -453,7 +474,7 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
               <h2 className="text-xl font-bold text-indigo-300 flex items-center">
                 <UserPlus className="w-5 h-5 mr-2" /> New Khata Customer
               </h2>
-              <button type="button" onClick={closeAddCustomerModal} className="text-gray-400 hover:text-white p-1">
+              <button type="button" onClick={closeAddCustomerModal} className="text-gray-400 hover:text-white p-1" disabled={isProcessing}>
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -467,7 +488,8 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                     onChange={handleNewCustomerInputChange} 
                     required 
                     dark={true}
-                    error={validationErrors.name} // Pass error state
+                    error={validationErrors.name}
+                    disabled={isProcessing}
                 />
                 <InputField 
                     label="Phone Number (Optional)" 
@@ -477,7 +499,8 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                     onChange={handleNewCustomerInputChange} 
                     placeholder="e.g., 9876543210" 
                     dark={true}
-                    error={validationErrors.phone} // Pass error state
+                    error={validationErrors.phone}
+                    disabled={isProcessing}
                 />
                 <InputField 
                     label="Credit Limit (₹, Optional)" 
@@ -487,7 +510,8 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
                     onChange={handleNewCustomerInputChange} 
                     min="0"
                     dark={true}
-                    error={validationErrors.creditLimit} // Pass error state
+                    error={validationErrors.creditLimit}
+                    disabled={isProcessing}
                 />
             </div>
 
@@ -495,29 +519,34 @@ const Ledger = ({ customers, updateCustomerCredit, showToast, refreshData, custo
               <button 
                 type="submit"
                 className="w-full py-3 bg-indigo-600 text-white rounded-xl font-extrabold text-lg shadow-2xl shadow-indigo-900/50 hover:bg-indigo-700 transition flex items-center justify-center disabled:opacity-50"
-                // CRITICAL FIX: Ensure the button is disabled if loading OR if the form is NOT valid
-                disabled={loading || !isFormValid}
+                disabled={isProcessing || !isFormValid}
               >
-                {loading ? 'Adding...' : 'Confirm & Add Customer'}
+                {isProcessing ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+                {isProcessing ? 'Adding...' : 'Confirm & Add Customer'}
               </button>
             </div>
           </form>
         </div>
       )}
       
-      {/* Loading Overlay */}
-      {loading && (
+      {/* Transactional Loading Overlay - Only needed if you want a global indicator for processing, 
+          but the modal buttons now handle it. I'll keep the button indicators instead of this large overlay. 
+      */}
+      {/* {isProcessing && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-30 flex items-center justify-center z-40">
-            <div className="bg-gray-800 p-4 rounded-lg shadow-xl text-gray-200 border border-gray-700">Processing request...</div>
+            <div className="bg-gray-800 p-4 rounded-lg shadow-xl text-gray-200 border border-gray-700 flex items-center">
+                <Loader className="w-5 h-5 animate-spin mr-2 text-teal-400" />
+                Processing request...
+            </div>
         </div>
-      )}
+      )} */}
 
     </div>
   );
 };
 
-// Helper component for form inputs - UPDATED to receive and display error messages
-const InputField = ({ label, name, type, value, onChange, dark, error, ...props }) => (
+// Helper component for form inputs (Updated to include disabled prop)
+const InputField = ({ label, name, type, value, onChange, dark, error, disabled, ...props }) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
             {label}
@@ -528,16 +557,15 @@ const InputField = ({ label, name, type, value, onChange, dark, error, ...props 
             type={type}
             value={value}
             onChange={onChange}
-            // Dynamic border color based on error state
+            disabled={disabled} // Added disabled prop here
             className={`w-full p-3 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 ${
                 error ? 'border-2 border-red-500' : 'border border-gray-600'
-            }`}
+            } ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
             {...props}
         />
-        {/* Display the error message */}
         {error && (
             <p className="mt-1 text-xs text-red-400 flex items-center">
-                <XCircle className="w-3 h-3 mr-1" />{error}
+                <XCircle className="w-3 h-3 mr-1 flex-shrink-0" />{error}
             </p>
         )}
     </div>

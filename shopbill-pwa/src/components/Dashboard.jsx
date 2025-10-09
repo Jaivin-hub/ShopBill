@@ -1,15 +1,57 @@
-import React, {useMemo} from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import StatCard from './StatCard';
-import {DollarSign, CreditCard, Users, Package, AlertTriangle, List} from 'lucide-react'; 
+import {DollarSign, CreditCard, Users, Package, AlertTriangle, List, Loader} from 'lucide-react'; 
 
 const USER_ROLES = {
-  OWNER: 'owner', // Can access all reports, inventory management, settings
-  CASHIER: 'cashier', // Can only access BillingPOS and basic Khata view
+  OWNER: 'owner',
+  CASHIER: 'cashier',
 };
 
-const Dashboard = ({ inventory, sales, customers, userRole }) => {
+// CRITICAL: We now accept apiClient, API, and showToast from App.jsx
+const Dashboard = ({ userRole, apiClient, API, showToast }) => {
   const isOwner = userRole === USER_ROLES.OWNER;
   
+  // 1. Data States
+  const [inventory, setInventory] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 2. Data Fetching Function
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Use Promise.all to fetch all data concurrently for efficiency
+      const [invResponse, custResponse, salesResponse] = await Promise.all([
+        apiClient.get(API.inventory),
+        apiClient.get(API.customers),
+        apiClient.get(API.sales),
+      ]);
+
+      setInventory(invResponse.data);
+      setCustomers(custResponse.data);
+      setSales(salesResponse.data);
+      // Data loaded successfully
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+      // Use the showToast utility from App.jsx
+      showToast('Error loading dashboard data. Please check server connection.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiClient, API.inventory, API.customers, API.sales, showToast]);
+
+  // 3. Initial Data Loading Effect
+  useEffect(() => {
+    if (isOwner) {
+      fetchDashboardData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner]); // Only re-run if isOwner changes
+
+  
+  // --- EXISTING DATA CALCULATIONS (Now depend on local state) ---
+
   // Calculate Today's Report
   const today = useMemo(() => {
     const startOfDay = new Date();
@@ -20,7 +62,7 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
     const totalSales = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
     const totalCreditGiven = todaySales
       .filter(s => s.paymentMethod === 'Credit' || s.paymentMethod === 'Mixed')
-      .reduce((sum, sale) => sum + sale.amountCredited, 0); // Use amountCredited for accurate credit given
+      .reduce((sum, sale) => sum + sale.amountCredited, 0); 
     
     return { totalSales, totalCreditGiven };
   }, [sales]);
@@ -32,7 +74,6 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
 
   // Inventory Alerts
   const lowStockAlerts = useMemo(() => {
-    // Check if item.reorderLevel is defined, otherwise default to 0
     return inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0)).slice(0, 5);
   }, [inventory]);
 
@@ -43,7 +84,7 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
       .slice(0, 5); 
   }, [sales]);
 
-  // Utility to format time
+  // Utility to format time (Unchanged)
   const formatTimeAgo = (timestamp) => {
     const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
     let interval = seconds / 31536000;
@@ -59,9 +100,11 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
     return Math.floor(seconds) + " seconds ago";
   };
   
+  
+  // --- RENDER LOGIC ---
+
   if (!isOwner) {
     return (
-      // Updated styling for Access Denied
       <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300">
         <AlertTriangle className="w-12 h-12 text-indigo-400 mb-4" />
         <h2 className="text-xl font-semibold text-white">Access Denied</h2>
@@ -70,22 +113,27 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+        <Loader className="w-10 h-10 animate-spin text-teal-400" />
+        <p className='mt-3'>Loading dashboard summary data...</p>
+      </div>
+    );
+  }
+
   return (
-    // Updated background color to bg-gray-950
     <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
         
-        {/* FIXED HEADER SECTION (Caption and Description) */}
         <div className="pb-4 border-b border-gray-800">
             <h1 className="text-3xl font-extrabold text-white mb-2">Owner's Dashboard</h1>
             <p className="text-gray-400">Quick overview of your shop's health.</p>
         </div>
 
-        {/* SCROLLABLE CONTENT AREA */}
         <div className="flex-grow overflow-y-auto pt-6">
 
             {/* Today's Report - Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {/* Updated colors for dark theme contrast. Green/Teal for Sales, Indigo for Credit Given, Red for Outstanding */}
                 <StatCard 
                     title="Today's Total Sales" 
                     value={today.totalSales.toFixed(2)} 
@@ -124,7 +172,6 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
                     {lowStockAlerts.length > 0 ? (
                     <ul className="space-y-3 pt-2">
                         {lowStockAlerts.map((item) => (
-                        // Updated alert card style
                         <li key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-red-900/40 rounded-lg border border-red-700 shadow-sm">
                             <span className="font-medium text-red-300 truncate">{item.name}</span>
                             <span className="text-red-400 text-xs font-semibold whitespace-nowrap">Stock: {item.quantity} (Reorder: {item.reorderLevel})</span>
@@ -132,7 +179,6 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
                         ))}
                     </ul>
                     ) : (
-                    // Updated success message style
                     <p className="text-gray-400 p-4 bg-green-900/20 rounded-lg border border-green-700 text-center text-sm font-medium">All inventory levels look great!</p>
                     )}
                 </div>
@@ -159,7 +205,6 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
                             </li>
                         ))
                     ) : (
-                        // Updated message style
                         <p className="text-gray-400 text-sm p-4 bg-indigo-900/20 rounded-lg border border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
                     )}
                     </ul>
@@ -193,7 +238,6 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
                         </li>
                         ))
                     ) : (
-                        // Updated message style
                         <p className="text-gray-400 text-sm p-4 bg-gray-800 rounded-lg border border-gray-700 text-center font-medium">No sales recorded yet.</p>
                     )}
                     </ul>
@@ -205,4 +249,4 @@ const Dashboard = ({ inventory, sales, customers, userRole }) => {
   );
 };
 
-export default Dashboard
+export default Dashboard;
