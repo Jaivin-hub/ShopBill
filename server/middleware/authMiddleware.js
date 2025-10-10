@@ -23,11 +23,15 @@ const protect = async (req, res, next) => {
         const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findById(decoded.id).select('-password');
         
-        if (!user) {
+         if (!user) {
             return res.status(401).json({ error: 'Not authorized, user not found' });
         }
-
+        
+        // **CRITICAL FIX/UPDATE:** // Ensure req.user has an 'id' property by explicitly setting it from Mongoose's _id
+        // (This makes it compatible with your router logic: const userId = req.user?.id;)
         req.user = user;
+        req.user.id = user._id; // Attach the ID as 'id' for consistency
+
         next();
 
     } catch (error) {
