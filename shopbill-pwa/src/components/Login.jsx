@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
-import API from '../config/api';
+// IMPORTANT: Assuming the original API import is uncommented in a real environment
+import API from '../config/api' 
 
-// --- Sub-Component: Login Form ---
-// Updated to accept and display authError
-const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading, setIsSignup, authError }) => {
+
+// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
+const apiClient = axios.create();
+
+apiClient.interceptors.request.use(
+  (config) => {
+    // CRITICAL: Interceptor reads token from localStorage on EVERY request creation
+    const token = localStorage.getItem('userToken');
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+// --- END AXIOS CONFIG ---
+
+
+// --- Sub-Component: Login Form (NO CHANGES) ---
+const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading, setView, authError }) => {
     const [showPassword, setShowPassword] = useState(false);
 
     return (
@@ -21,7 +42,7 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
             <form className="space-y-4" onSubmit={handleAuth}>
                 {/* Email Input */}
                 <input
-                    type="email"
+                    type="text"
                     placeholder="Email Address"
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     onChange={(e) => setEmail(e.target.value)}
@@ -49,17 +70,21 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
                     </button>
                 </div>
 
-                {/* Forgot Password - Kept for UX */}
+                {/* Forgot Password - NOW FUNCTIONAL */}
                 <div className="flex justify-end pt-1">
-                    <a href="#" className="text-sm text-indigo-400 hover:text-indigo-300 transition duration-150">
+                    <button 
+                        type="button" 
+                        onClick={() => setView('forgotPassword')} 
+                        className="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300 transition duration-150"
+                    >
                         Forgot Password?
-                    </a>
+                    </button>
                 </div>
 
                 {/* Submit Button */}
                 <button
                     type="submit"
-                    className="w-full mt-6 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-indigo-400"
+                    className="cursor-pointer w-full mt-6 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-indigo-400"
                     disabled={loading}
                 >
                     {loading ? 'Logging In...' : 'Log In'}
@@ -70,8 +95,8 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
             <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
                 New to Pocket POS?
                 <button
-                    onClick={() => setIsSignup(true)}
-                    className="ml-2 text-teal-400 hover:text-teal-300 font-bold transition duration-150"
+                    onClick={() => setView('signup')}
+                    className="ml-2 cursor-pointer text-teal-400 hover:text-teal-300 font-bold transition duration-150"
                     disabled={loading}
                 >
                     Create Account
@@ -81,8 +106,8 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
     );
 };
 
-// --- Sub-Component: Signup Form ---
-const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone, setPhone, loading, setIsSignup, authError }) => {
+// --- Sub-Component: Signup Form (MODIFIED to accept and display validation errors) ---
+const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone, setPhone, loading, setView, authError, passwordError, phoneError }) => {
     const [showPassword, setShowPassword] = useState(false);
 
     return (
@@ -99,17 +124,21 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                 {/* Phone Number Input */}
                 <input
                     type="tel"
-                    placeholder="Phone Number"
-                    pattern="[0-9]{10,15}"
-                    title="Phone number must be between 10 and 15 digits"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                    placeholder="Phone Number (10-15 digits)"
+                    // Removed pattern/title to allow JS validation to handle feedback
+                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150 ${phoneError ? 'border-red-500' : 'border-gray-600'}`}
                     onChange={(e) => setPhone(e.target.value)}
                     value={phone}
                     required
                 />
+                {/* Phone Error Message */}
+                {phoneError && (
+                    <p className="text-red-400 text-sm mt-1">{phoneError}</p>
+                )}
+
                 {/* Email Input */}
                 <input
-                    type="email"
+                    type="text"
                     placeholder="Email Address"
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     onChange={(e) => setEmail(e.target.value)}
@@ -121,8 +150,8 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                 <div className="relative">
                     <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
-                        className="w-full pr-12 px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                        placeholder="Password (Min 8 characters)"
+                        className={`w-full pr-12 px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${passwordError ? 'border-red-500' : 'border-gray-600'}`}
                         onChange={(e) => setPassword(e.target.value)}
                         value={password}
                         required
@@ -136,12 +165,16 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                 </div>
+                {/* Password Error Message */}
+                {passwordError && (
+                    <p className="text-red-400 text-sm mt-1">{passwordError}</p>
+                )}
 
 
                 {/* Submit Button */}
                 <button
                     type="submit"
-                    className="w-full mt-6 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-indigo-400"
+                    className="cursor-pointer w-full mt-6 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-indigo-400"
                     disabled={loading}
                 >
                     {loading ? 'Creating Account...' : 'Create Account'}
@@ -155,8 +188,8 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
             <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
                 Already have an account?
                 <button
-                    onClick={() => setIsSignup(false)}
-                    className="ml-2 text-teal-400 hover:text-teal-300 font-bold transition duration-150"
+                    onClick={() => setView('login')}
+                    className="ml-2 cursor-pointer text-teal-400 hover:text-teal-300 font-bold transition duration-150"
                     disabled={loading}
                 >
                     Log In
@@ -166,104 +199,224 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
     );
 };
 
+// --- Sub-Component: Forgot Password Form (NO CHANGES) ---
+const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, setEmail, loading, setView, resetMessage }) => {
+    return (
+        <>
+            <h2 className="text-3xl font-extrabold text-white text-center mb-6">
+                Reset Password
+            </h2>
+            
+            {/* Success Message */}
+            {resetMessage && resetMessage.success && (
+                <div className="p-3 mb-4 text-sm text-green-100 bg-green-800 rounded-lg text-center" role="alert">
+                    <p>{resetMessage.success}</p>
+                    {/* Display DEV token if available (Backend sends this for testing) */}
+                    {resetMessage.devToken && (
+                        <p className="mt-2 text-xs font-mono break-all text-green-300">
+                           **DEV ONLY** Token: {resetMessage.devToken}
+                        </p>
+                    )}
+                </div>
+            )}
 
-// Main Login Component
+            {/* Error Message */}
+            {resetMessage && resetMessage.error && (
+                <div className="p-3 mb-4 text-sm text-red-100 bg-red-800 rounded-lg text-center" role="alert">
+                    {resetMessage.error}
+                </div>
+            )}
+
+            <form className="space-y-4" onSubmit={handleForgotPasswordRequest}>
+                <p className="text-gray-400 text-sm text-center pt-2">
+                    Enter your email address to receive a password reset link.
+                </p>
+                {/* Email Input */}
+                <input
+                    type="email"
+                    placeholder="Email Address"
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                    onChange={(e) => setEmail(e.target.value)}
+                    value={email}
+                    required
+                />
+                
+                {/* Submit Button */}
+                <button
+                    type="submit"
+                    className="w-full mt-6 py-3 bg-teal-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-teal-600/30 hover:bg-teal-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-teal-400"
+                    disabled={loading}
+                >
+                    {loading ? 'Sending Request...' : 'Send Reset Link'}
+                </button>
+            </form>
+
+            {/* Switch View */}
+            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
+                <button
+                    onClick={() => setView('login')}
+                    className="ml-2 cursor-pointer text-indigo-400 hover:text-indigo-300 font-bold transition duration-150"
+                    disabled={loading}
+                >
+                    ← Back to Log In
+                </button>
+            </p>
+        </>
+    );
+};
+
+
+// Main Login Component (MODIFIED to include validation states and logic)
 const Login = ({ onLogin, onBackToLanding }) => {
-    const [isSignup, setIsSignup] = useState(false);
+    const [view, setView] = useState('login'); // 'login', 'signup', 'forgotPassword'
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false); 
-    const [authError, setAuthError] = useState(null); // State for displaying errors
+    const [authError, setAuthError] = useState(null); 
+    const [resetMessage, setResetMessage] = useState(null); 
 
-    // Effect to clear error message when switching forms
+    // --- NEW VALIDATION STATES ---
+    const [passwordError, setPasswordError] = useState(null);
+    const [phoneError, setPhoneError] = useState(null);
+    // ----------------------------
+
+    // Helper to determine if we are in signup mode
+    const isSignup = view === 'signup'; 
+
+    // Effect to clear error messages when switching views
     useEffect(() => {
         setAuthError(null);
-    }, [isSignup]);
+        setResetMessage(null);
+        // Clear client validation errors too
+        setPasswordError(null);
+        setPhoneError(null);
+    }, [view]);
 
-
-    // Refactored to use real API calls with axios
-    const handleAuth = async (e) => {
+    // --- Forgot Password Request Handler (NO CHANGES) ---
+    const handleForgotPasswordRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setAuthError(null); // Clear previous errors before a new attempt
-        const formType = isSignup ? 'Signup' : 'Login';
-        const url = isSignup ? API.signup : API.login;
-        const authData = isSignup ? { email, password, phone } : { email, password };
+        setResetMessage(null);
+        setAuthError(null); 
+
+        if (!email) {
+            setResetMessage({ error: 'Please enter your email address.' });
+            setLoading(false);
+            return;
+        }
 
         try {
-            // Placeholder for API key which will be handled by the environment
-            const apiKey = ""; 
-            const fetchUrl = `${url}?key=${apiKey}`; 
+            const authData = { email };
+            
+            // Using apiClient (Axios) for POST request
+            const response = await apiClient.post(API.forgetpassword, authData);
+            const data = response.data;
 
-            // Use fetch with exponential backoff
-            const maxRetries = 3;
-            let response = null;
-            
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    response = await fetch(fetchUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(authData)
-                    });
-                    if (response.ok) break; // Exit loop on successful response
-                } catch (err) {
-                    console.error("Fetch attempt failed:", err);
-                }
-                
-                if (i < maxRetries - 1) {
-                    const delay = Math.pow(2, i) * 1000;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-            
-            if (!response || !response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
-            }
+            // Backend returns a generic message for security, regardless of user existence
+            setResetMessage({ 
+                success: data.message || 'If an account is associated with this email, a reset link has been sent.' 
+            });
 
-            const data = await response.json();
-            
-            // Expected response: { token, user: { id, email, role, shopId } }
-            if (data && data.token && data.user) {
-                
-                // CRITICAL UPDATE: Store the token in localStorage
-                // NOTE: In a production environment, this should ideally be secured, e.g., using HttpOnly cookies.
-                localStorage.setItem('userToken', data.token);
-                
-                // FIX: Pass the user object and the token as SEPARATE arguments
-                onLogin(data.user, data.token); 
-            } else {
-                 setAuthError(`${formType} failed. Unexpected response structure.`);
+            // Log and optionally show the DEV token returned by the backend for testing
+            if (data.devResetToken) {
+                 console.log("PASSWORD RESET DEV TOKEN:", data.devResetToken);
+                 setResetMessage((prev) => ({ 
+                    success: prev.success, 
+                    devToken: data.devResetToken 
+                 }));
             }
+            
         } catch (error) {
-            console.error(error);
-            // Attempt to extract a friendly error message
-            const errorMessage = error.message.includes('HTTP error') 
-                ? `Authentication failed. Please check your credentials.` 
-                : error.message;
+            console.error('Forgot Password Request Error:', error);
+            
+            // Extract error message from Axios error response
+            const errorMessage = error.response?.data?.error 
+                || error.response?.data?.message 
+                || error.message 
+                || 'An unexpected error occurred during password reset.';
 
-            setAuthError(errorMessage); // Set error state on API failure
+            setResetMessage({ error: errorMessage });
         } finally {
             setLoading(false);
         }
     };
 
 
-    // Main Login Component Layout
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
-            <div className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
+    // --- Auth Handler (Login/Signup - MODIFIED for Validation) ---
+    const handleAuth = async (e) => {
+        e.preventDefault();
+        
+        // Clear previous errors
+        setAuthError(null); 
+        setPasswordError(null); 
+        setPhoneError(null);    
 
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <DollarSign className="w-12 h-12 text-indigo-500 mx-auto mb-2" />
-                    <h1 className="text-3xl font-extrabold text-white">Pocket POS</h1>
-                </div>
+        const formType = isSignup ? 'Signup' : 'Login';
+        const url = isSignup ? API.signup : API.login;
+        const authData = isSignup ? { email, password, phone } : { email, password };
 
-                {/* Render the appropriate form, passing props and authError */}
-                {isSignup ? (
+        // --- CLIENT-SIDE VALIDATION FOR SIGNUP ---
+        if (isSignup) {
+            let hasError = false;
+
+            // 1. Password Validation: Must be more than 8 characters
+            if (password.length < 8) {
+                setPasswordError('Password must be at least 8 characters long.');
+                hasError = true;
+            }
+
+            // 2. Phone Number Validation: Basic check for digits (10-15 digits)
+            // This regex allows for optional leading '+' and optional spaces/dashes between digits
+            const phoneRegex = /^\+?(\d[\s-]?){10,15}$/; 
+            if (!phone || !phoneRegex.test(phone.trim())) {
+                 setPhoneError('Please enter a valid phone number (10-15 digits).');
+                 hasError = true;
+            }
+            
+            // Stop form submission if client-side validation fails
+            if (hasError) {
+                return; 
+            }
+        }
+        // --- END CLIENT-SIDE VALIDATION ---
+        
+        setLoading(true);
+
+        try {
+            // Using apiClient (Axios) for POST request.
+            const response = await apiClient.post(url, authData);
+            const data = response.data; 
+            
+            // Expected response: { token, user: { id, email, role, shopId } }
+            if (data && data.token && data.user) {
+                
+                localStorage.setItem('userToken', data.token);
+                onLogin(data.user, data.token); 
+            } else {
+                 setAuthError(`${formType} failed. Unexpected response structure.`);
+            }
+        } catch (error) {
+            console.error(error);
+            
+            // Extract error message from Axios error response
+            const errorMessage = error.response?.data?.error 
+                || error.response?.data?.message 
+                || error.message 
+                || `Connection or ${formType} failed. Please try again.`;
+
+            setAuthError(errorMessage); 
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    // --- Main Login Component Layout ---
+    const renderForm = () => {
+        switch (view) {
+            case 'signup':
+                return (
                     <SignupForm 
                         handleAuth={handleAuth}
                         email={email}
@@ -273,10 +426,28 @@ const Login = ({ onLogin, onBackToLanding }) => {
                         phone={phone}
                         setPhone={setPhone}
                         loading={loading}
-                        setIsSignup={setIsSignup}
-                        authError={authError} // Pass error state
+                        setView={setView}
+                        authError={authError}
+                        // --- NEW PROPS ---
+                        passwordError={passwordError} 
+                        phoneError={phoneError}
+                        // -----------------
                     />
-                ) : (
+                );
+            case 'forgotPassword':
+                return (
+                    <ForgotPasswordForm
+                        handleForgotPasswordRequest={handleForgotPasswordRequest}
+                        email={email}
+                        setEmail={setEmail}
+                        loading={loading}
+                        setView={setView}
+                        resetMessage={resetMessage}
+                    />
+                );
+            case 'login':
+            default:
+                return (
                     <LoginForm
                         handleAuth={handleAuth}
                         email={email}
@@ -284,16 +455,31 @@ const Login = ({ onLogin, onBackToLanding }) => {
                         password={password}
                         setPassword={setPassword}
                         loading={loading}
-                        setIsSignup={setIsSignup}
-                        authError={authError} // Pass error state
+                        setView={setView}
+                        authError={authError}
                     />
-                )}
+                );
+        }
+    };
 
-                {/* Back Button */}
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
+            <div className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
+
+                {/* Logo */}
+                <div className="text-center mb-4">
+                    <DollarSign className="w-12 h-12 text-indigo-500 mx-auto" />
+                    <h1 className="text-3xl font-extrabold text-white">Pocket POS</h1>
+                </div>
+
+                {/* Render the appropriate form */}
+                {renderForm()}
+
+                {/* Back Button to Landing Page */}
                 <div className="text-center text-sm mt-8">
                     <button
-                        onClick={onBackToLanding} // Call the function passed from App.js
-                        className="text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
+                        onClick={onBackToLanding}
+                        className="cursor-pointer text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
                         disabled={loading}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M19 12H5" /><polyline points="12 19 5 12 12 5" /></svg>

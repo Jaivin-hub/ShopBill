@@ -14,6 +14,7 @@ import Profile from './components/Profile';
 import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage'
+import ResetPassword from './components/ResetPassword';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
@@ -41,23 +42,27 @@ apiClient.interceptors.request.use(
 );
 // --- END AXIOS CONFIG ---
 
+// Helper to check the URL for the password reset route on initial load
+const checkResetPath = () => {
+    const path = window.location.pathname;
+    if (path.startsWith('/reset-password/')) {
+        return 'resetPassword'; 
+    }
+    return null; 
+};
+
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(checkResetPath() || 'dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
-  // 👇 UPDATED: Initialize isDarkMode from localStorage, defaulting to true (dark)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const localMode = localStorage.getItem('darkMode');
-    // localMode will be 'true', 'false', or null/undefined.
     return localMode === 'false' ? false : true;
   });
 
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
-  // *** REMOVED: inventory, customers, sales states ***
-  // *** REMOVED: isLoadingData, dataLoadedInitial states ***
-
   const userRole = currentUser?.role || USER_ROLES.CASHIER;
 
   const showToast = useCallback((message, type = 'info') => {
@@ -73,15 +78,11 @@ const App = () => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
-    // *** REMOVED: Data state clearing is no longer needed here ***
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
     setIsLoadingAuth(false);
     showToast('Logged out successfully.', 'info');
   }, [showToast]);
-
-  // *** REMOVED: loadInitialData function ***
-
 
   // --- LOGIN HANDLER ---
   const handleLoginSuccess = useCallback((user, token) => {
@@ -93,7 +94,6 @@ const App = () => {
     setCurrentPage('dashboard');
     showToast('Welcome back!', 'success');
     
-    // *** REMOVED: loadInitialData(token) call. Data loading is now handled by components. ***
   }, [showToast]);
 
 
@@ -104,10 +104,14 @@ const App = () => {
     
     if (token && userJson && token !== 'undefined' && token !== null) {
       try {
-        // We will make a small, quick API call here if needed for validation, 
-        // but for now, we trust localStorage and proceed.
         const user = JSON.parse(userJson);
         setCurrentUser(user);
+        
+        // If we found a user AND the page was resetPassword, redirect to dashboard
+        if (checkResetPath()) {
+            setCurrentPage('dashboard');
+        }
+
       } catch (error) {
         console.error("Error parsing user data from localStorage:", error);
         logout();
@@ -118,18 +122,12 @@ const App = () => {
   }, [logout]);
 
 
-  // *** REMOVED: Data Loading Effect (It's now component responsibility) ***
-
-
-  // --- Dark Mode Effect (UPDATED) ---
+  // --- Dark Mode Effect ---
   useEffect(() => {
-    // 👇 Store the current mode in localStorage
     localStorage.setItem('darkMode', isDarkMode);
-
     const html = document.documentElement;
     if (isDarkMode) {
       html.classList.add('dark');
-      // Optional: Helps ensure browser respects the theme for scrollbars etc.
       html.style.colorScheme = 'dark'; 
     } else {
       html.classList.remove('dark');
@@ -139,14 +137,11 @@ const App = () => {
 
   const toggleDarkMode = useCallback(() => {
     setIsDarkMode(prev => !prev);
-  }, []); // Made useCallback for stability in props
+  }, []); 
 
-  // 3. Action Functions (Simplified: components will handle the API interaction and local state updates)
+  // Action Functions (Simplified: components will handle the API interaction and local state updates)
   const addSale = useCallback(async (saleData) => {
     try {
-      // Logic for adding a sale via API should be here, e.g., apiClient.post(API.sales, saleData)
-      // NOTE: The component calling this (e.g., BillingPOS) will be responsible for re-fetching
-      // any specific data it needs (like inventory, if stock levels are affected).
       showToast('Sale successfully recorded!', 'success');
     } catch (error) {
       showToast('Error recording sale.', 'error');
@@ -155,8 +150,6 @@ const App = () => {
 
   const updateCustomerCredit = useCallback(async (customerId, amountChange) => {
     try {
-      // Logic for updating credit via API should be here, e.g., apiClient.put(`${API.customers}/${customerId}/credit`, { amountChange })
-      // NOTE: The component calling this (Ledger) will be responsible for re-fetching its data.
       showToast('Customer Khata updated successfully!', 'success');
     } catch (error) {
       showToast('Error updating customer credit.', 'error');
@@ -177,7 +170,6 @@ const App = () => {
     
     if (isLoadingAuth) {
          return (
-             // UPDATED: Use light background default
              <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-900 dark:text-gray-400 bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
@@ -185,24 +177,24 @@ const App = () => {
         );
     }
     
+    // NEW LOGIC: Handle the Password Reset deep link (unauthenticated page)
+    if (currentPage === 'resetPassword') {
+        return <ResetPassword />;
+    }
+
     if (!currentUser) {
             if (isViewingLogin) {
                 return <Login 
                     onLogin={handleLoginSuccess} 
                     showToast={showToast} 
                     onBackToLanding={() => setIsViewingLogin(false)} 
-                    apiUrl={API.login}
                 />;
             }
             // If no user and not viewing login, show landing page.
             return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
     }
     
-    // *** REMOVED: isLoadingData block - now we only wait for Auth ***
-
-    // The component is now responsible for fetching its own data.
     const commonProps = {
-      // *** REMOVED: inventory, customers, sales props ***
       currentUser, 
       addSale,
       updateCustomerCredit,
@@ -211,7 +203,6 @@ const App = () => {
       apiClient, // CRITICAL: Pass the configured axios instance for use in components
       API, // Pass the API constants object
       onLogout:logout,
-      // 👇 ADDED: Dark Mode props for SettingsPage and Header
       isDarkMode,
       toggleDarkMode
     };
@@ -228,43 +219,40 @@ const App = () => {
       case 'reports':
         return <Reports {...commonProps} />;
       case 'settings':
-        // 👇 PASS isDarkMode and toggleDarkMode to SettingsPage
         return <SettingsPage {...commonProps} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
       case 'profile':
         return <Profile {...commonProps} />;
       case 'notifications':
-        // NotificationsPage can now use 'apiClient' to fetch notifications
         return <NotificationsPage {...commonProps} />;  
       default:
         return <Dashboard {...commonProps} />;
     }
   };
 
+  const showAppUI = currentUser && currentPage !== 'resetPassword';
+
   return (
-    // 💥 UPDATED: Main App Container - Light mode default, Dark mode override
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
-        {currentUser && (
+        {showAppUI && (
             <Header
                 companyName="Pocket POS"
                 userRole={userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                 setCurrentPage={setCurrentPage}
-                isDarkMode={isDarkMode} // Passed to Header
-                onToggleDarkMode={toggleDarkMode} // Passed to Header
+                isDarkMode={isDarkMode} 
+                onToggleDarkMode={toggleDarkMode} 
                 onLogout={logout}
                 apiClient={apiClient}
                 API={API}
             />
         )}
         
-        {currentUser && (
-            // 💥 UPDATED: Desktop Sidebar - Light mode default, Dark mode override
+        {showAppUI && (
             <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full 
                  bg-white dark:bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 
                  transition-colors duration-300 border-r border-gray-200 dark:border-gray-800"
             >
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                    {/* Header Text/Logo - Using Teal accent */}
                     <h2 className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">
                         <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-600 dark:text-teal-400" /> Pocket POS
                     </h2>
@@ -277,7 +265,6 @@ const App = () => {
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
-                            // UPDATED: Text colors for dark mode
                             className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -289,11 +276,9 @@ const App = () => {
                     ))}
                 </nav>
                 
-                {/* Dedicated Logout Button for Desktop Sidebar */}
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800">
                     <button
                         onClick={logout}
-                        // UPDATED: Text/hover colors for dark mode
                         className="w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
                     >
                         <LogOut className="w-5 h-5 mr-3" />
@@ -305,12 +290,11 @@ const App = () => {
         )}
 
         {/* Main Content Area */}
-        <main className={`flex-1 ${currentUser ? 'md:ml-64 pt-16 pb-16 md:pb-0' : 'w-full'}`}>
+        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 pb-16 md:pb-0' : 'w-full'}`}>
             {renderContent()}
         </main>
 
-        {currentUser && (
-            // 💥 UPDATED: Mobile Navigation Bar - Light mode default, Dark mode override
+        {showAppUI && (
             <nav className="fixed bottom-0 left-0 right-0 h-16 
                  bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 
                  shadow-2xl md:hidden z-30 transition-colors duration-300"
@@ -320,7 +304,6 @@ const App = () => {
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
-                            // UPDATED: Text colors for dark mode
                             className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id
                                 ? 'text-indigo-600 dark:text-indigo-400 font-bold'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-300'
