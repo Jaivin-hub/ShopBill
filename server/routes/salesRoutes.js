@@ -3,6 +3,10 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
+const Inventory = require('../models/Inventory'); 
+const Customer = require('../models/Customer');
+const mongoose = require('mongoose');
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const router = express.Router();
 

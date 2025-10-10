@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CreditCard, DollarSign, X } from 'lucide-react';
 
-// Default Walk-in Customer for Cash/UPI sales (exported for use in BillingPOS)
+// Default Walk-in Customer for UPI sales (exported for use in BillingPOS)
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 
 /**
@@ -10,13 +10,13 @@ export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outst
 const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processPayment, showToast }) => {
     // Initialize amountPaid with the total due amount for quick full cash sale
     const [amountPaidInput, setAmountPaidInput] = useState(totalAmount.toFixed(2));
-    const [paymentType, setPaymentType] = useState('Cash/UPI'); // 'Cash/UPI', 'Credit'
+    const [paymentType, setPaymentType] = useState('UPI'); // 'UPI', 'Credit'
 
     // Reset state when modal opens/total changes
     useEffect(() => {
         if (isOpen) {
             setAmountPaidInput(totalAmount.toFixed(2));
-            setPaymentType('Cash/UPI');
+            setPaymentType('UPI');
         }
     }, [isOpen, totalAmount]);
 
@@ -30,7 +30,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processP
         amountCredited, // Amount of CURRENT bill added to khata (if paid < total or full credit selected)
         changeDue,      // Change to return (if paid > total)
         newKhataBalance, // The customer's total Khata due *after* this transaction
-        paymentMethod    // 'Cash/UPI', 'Credit', or 'Mixed'
+        paymentMethod    // 'UPI', 'Credit', or 'Mixed'
     } = useMemo(() => {
         const total = totalAmount;
 
@@ -47,13 +47,13 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processP
             if (amountPaid >= total) {
                 // Full payment or Overpayment
                 changeDue = amountPaid - total;
-                method = 'Cash/UPI';
+                method = 'UPI';
             } else if (amountPaid > 0 && amountPaid < total) {
                 // Partial payment: Remaining amount goes to Khata
                 amountCredited = total - amountPaid;
                 method = 'Mixed'; // Cash + Credit
             } else {
-                 // Paid 0 cash/UPI, meaning full amount must be credited
+                 // Paid 0 UPI, meaning full amount must be credited
                  amountCredited = total;
                  method = 'Credit';
             }
@@ -137,9 +137,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processP
                     {/* Payment Type Toggle (Full Credit vs Cash/Mixed) */}
                     <div className="flex rounded-xl overflow-hidden shadow-2xl">
                         <button
-                            onClick={() => setPaymentType('Cash/UPI')}
+                            onClick={() => setPaymentType('UPI')}
                             className={`flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
-                                paymentType === 'Cash/UPI' 
+                                paymentType === 'UPI' 
                                     ? 'bg-teal-600 text-white shadow-inner shadow-teal-900' 
                                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                             }`}
@@ -161,9 +161,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processP
                     </div>
 
                     {/* Amount Paid Input (Visible only for Cash/Mixed) */}
-                    {paymentType === 'Cash/UPI' && (
+                    {paymentType === 'UPI' && (
                         <div className="space-y-2">
-                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received (Cash/UPI)</label>
+                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received (UPI)</label>
                             <input
                                 id="amount-paid"
                                 type="number"
@@ -207,8 +207,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, selectedCustomer, processP
                             </p>
                         )}
                         
-                        {/* Status Message if paid 0 in Cash/UPI mode and not credit customer */}
-                        {paymentType === 'Cash/UPI' && amountCredited > 0 && !isCreditCustomer && (
+                        {/* Status Message if paid 0 in UPI mode and not credit customer */}
+                        {paymentType === 'UPI' && amountCredited > 0 && !isCreditCustomer && (
                              <p className="text-xs text-center text-yellow-400 p-2 bg-yellow-900/30 rounded-lg">
                                 This transaction requires selecting a saved customer to be recorded as Khata/Credit.
                             </p>
