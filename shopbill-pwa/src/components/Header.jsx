@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Smartphone, User, Moon, Sun, Bell, LogOut } from 'lucide-react'; 
+// Import 'Settings' icon from lucide-react
+import { Smartphone, User, Moon, Sun, Bell, Settings } from 'lucide-react'; 
+// Note: LogOut icon was removed from import, but its usage is commented out below
 
 // ----------------------------------------------------------------------
 // Integrated Header Component with State and API Logic
@@ -51,9 +53,17 @@ const Header = ({
     }, [fetchAlertCount]); // Re-run effect if fetchAlertCount changes (though useCallback prevents frequent changes)
 
 
+    // Common classes for action buttons (reused for readability)
+    const buttonClasses = `p-2 rounded-full 
+        bg-gray-100 dark:bg-gray-800 
+        text-gray-700 dark:text-gray-300 
+        hover:bg-gray-200 dark:hover:bg-gray-700 
+        transition-all duration-300 active:scale-95 transform`;
+
+
     return (
         <header
-            // FIX: Use dynamic Tailwind classes for light/dark mode header background and border
+            // Use dynamic Tailwind classes for light/dark mode header background and border
             className={`fixed top-0 left-0 right-0 
                    bg-white dark:bg-gray-900 
                    border-b border-gray-200 dark:border-gray-700 
@@ -72,13 +82,7 @@ const Header = ({
                 {/* Notification Icon */}
                 <button
                     onClick={() => setCurrentPage('notifications')} 
-                    // FIX: Use dynamic Tailwind classes for light/dark mode button styling
-                    className="p-2 rounded-full 
-                       bg-gray-100 dark:bg-gray-800 
-                       text-gray-700 dark:text-gray-300 
-                       hover:bg-gray-200 dark:hover:bg-gray-700 
-                       transition-all duration-300 active:scale-95 transform
-                       relative"
+                    className={`${buttonClasses} relative`}
                     title="Notifications"
                 >
                     <Bell className="w-5 h-5" />
@@ -90,35 +94,16 @@ const Header = ({
                     )}
                 </button>
 
-                {/* LOGOUT BUTTON - FIX: Styled for dark mode responsiveness */}
-                {/* <button
-                    onClick={onLogout} 
-                    className="p-2 rounded-full 
-                       bg-red-100 dark:bg-red-900/40
-                       text-red-600 dark:text-red-400
-                       hover:bg-red-200 dark:hover:bg-red-900/60
-                       transition-all duration-300 active:scale-95 transform"
-                    title="Logout"
+                {/* Settings Icon (New Addition) */}
+                <button
+                    onClick={() => setCurrentPage('settings')} 
+                    className={buttonClasses}
+                    title="Settings"
                 >
-                    <LogOut className="w-5 h-5" />
-                </button> */}
+                    <Settings className="w-5 h-5" />
+                </button>
 
-                {/* Dark Mode Toggle Button - FIX: Styled for dark mode responsiveness */}
-                {/* <button
-                    onClick={onToggleDarkMode}
-                    className="p-2 rounded-full 
-                       bg-gray-100 dark:bg-gray-800 
-                       text-gray-700 dark:text-gray-300
-                       hover:bg-gray-200 dark:hover:bg-gray-700
-                       transition-all duration-300 active:scale-95 transform"
-                    title={`Toggle ${isDarkMode ? 'Light' : 'Dark'} Mode`}
-                >
-                    {isDarkMode ? (
-                        <Sun className="w-5 h-5 text-yellow-400" />
-                    ) : (
-                        <Moon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    )}
-                </button> */}
+
 
                 {/* User Profile Button */}
                 <button

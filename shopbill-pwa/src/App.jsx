@@ -163,7 +163,6 @@ const App = () => {
     { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
     { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER] },
     { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
-    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER] },
   ].filter(item => item.roles.includes(userRole))), [userRole]);
 
   const renderContent = () => {
