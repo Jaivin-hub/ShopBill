@@ -15,31 +15,36 @@ router.get('/', protect, async (req, res) => {
 });
 
 router.post('/', protect, async (req, res) => {
-    const { name, phone, creditLimit } = req.body;
+    // UPDATED: Destructure the new field, initialDue
+    const { name, phone, creditLimit, initialDue } = req.body;
     console.log('req.body',req.body)
     console.log('req.user',req.user)
     
-    // --- Initial Validation (assuming this is done) ---
+    // --- Initial Validation ---
     if (!name || name.trim().length === 0) {
         return res.status(400).json({ error: 'Customer name is required.' });
     }
-    // ... other validation (like phone format, creditLimit type) ...
+    
+    // --- Validation and Parsing for initialDue ---
+    const parsedInitialDue = parseFloat(initialDue) || 0;
+    if (isNaN(parsedInitialDue) || parsedInitialDue < 0) {
+        return res.status(400).json({ error: 'Initial Due must be a non-negative number.', field: 'initialDue' });
+    }
+    // ----------------------------------------------------
+    
     
     // ----------------------------------------------------
-    // --- NEW: UNIQUE PHONE NUMBER VALIDATION ---
+    // --- UNIQUE PHONE NUMBER VALIDATION (UNCHANGED) ---
     // ----------------------------------------------------
     const trimmedPhone = phone ? String(phone).trim() : '';
 
     if (trimmedPhone) {
-        // 1. Check if a customer with this phone number already exists
-        //    CRITICAL: Also scope the search to the current shop (req.user.shopId)
         const existingCustomer = await Customer.findOne({ 
             phone: trimmedPhone, 
             shopId: req.user.shopId 
         });
 
         if (existingCustomer) {
-            // 2. If customer exists, return the specific error with the customer name
             return res.status(400).json({ 
                 error: `Phone number is already associated with customer: ${existingCustomer.name}`,
                 field: 'phone',
@@ -52,18 +57,13 @@ router.post('/', protect, async (req, res) => {
     try {
         const newCustomerData = {
             name: name.trim(),
-            // Use the trimmedPhone variable to ensure consistency
             phone: trimmedPhone, 
             creditLimit: Math.max(0, parseFloat(creditLimit) || 0), 
-            outstandingCredit: 0,
-            shopId: req.user.shopId, // CRITICAL: SCOPE THE NEW CUSTOMER
+            // CRUCIAL UPDATE: Use the validated and parsed initialDue value
+            outstandingCredit: parsedInitialDue, 
+            shopId: req.user.shopId,
         };
         console.log('newCustomerData',newCustomerData)
-        
-        // Ensure you don't create an index in MongoDB on 'phone' if it's not unique across the collection.
-        // If you *do* have a unique index on 'phone' but it's not a compound index with 'shopId', 
-        // the Mongoose/MongoDB code below might still hit the 11000 error for a different shop.
-        // The findOne check above is the most reliable way to enforce unique-per-shop.
         
         const customer = await Customer.create(newCustomerData);
         
@@ -71,8 +71,6 @@ router.post('/', protect, async (req, res) => {
     } catch (error) {
         console.error('Customer POST Error:', error);
 
-        // Your original 11000 check is now redundant for 'phone' but kept for safety 
-        // if other unique fields exist (or if the database index check is still needed)
         if (error.code === 11000) {
             const duplicateKey = Object.keys(error.keyValue)[0];
             

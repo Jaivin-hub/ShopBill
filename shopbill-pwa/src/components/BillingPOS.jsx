@@ -1,20 +1,20 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader } from 'lucide-react';
 // Import the PaymentModal and WALK_IN_CUSTOMER from the new file
-import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal'; 
+import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentModal'; 
 
 /**
  * Main POS component: Manages cart, customer selection, inventory search, and sale finalization.
- * NOTE: Now fetches its own inventory and customer data.
  */
-// CRITICAL: Updated props to remove centralized data and use API client
 const BillingPOS = ({ apiClient, API, showToast }) => {
   const [cart, setCart] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(WALK_IN_CUSTOMER);
+  
+  // NOTE: selectedCustomer state is removed as selection logic is now inside PaymentModal
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  // 1. Component-level Data States
+  // Component-level Data States
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +47,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount
 
-  // --- EXISTING CALCULATIONS (Data remains locally calculated) ---
+  // --- EXISTING CALCULATIONS ---
 
   // 1. Total Amount Calculation
   const totalAmount = useMemo(() => {
@@ -72,11 +72,11 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }, [inventory, searchTerm]);
 
 
-  // 3. Customer List
+  // 3. Customer List - Now includes WALK_IN_CUSTOMER for the modal
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c.id !== WALK_IN_CUSTOMER.id)], [customers]);
 
 
-  // --- Cart Management Functions (Unchanged logic, just relies on local inventory state) ---
+  // --- Cart Management Functions ---
 
   const addItemToCart = useCallback((itemToAdd) => {
     if (itemToAdd.quantity <= 0) {
@@ -135,18 +135,21 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     showToast('Item removed from cart.', 'error');
   }, [showToast]);
     
-  // Sale Finalization Logic (UPDATED TO USE apiClient)
-  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod) => {
+  // Sale Finalization Logic
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
     if (totalAmount <= 0) {
       showToast('Cart is empty. Cannot process sale.', 'error');
       return;
     }
+    
+    // Use the customer object passed from the modal
+    const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
      
     // 1. Check credit limit before logging a credit sale
-    if (amountCredited > 0 && selectedCustomer.creditLimit > 0) {
-        const potentialNewCredit = selectedCustomer.outstandingCredit + amountCredited;
-        if (potentialNewCredit > selectedCustomer.creditLimit) {
-            showToast(`Credit limit of ₹${selectedCustomer.creditLimit.toFixed(0)} exceeded! Cannot add ₹${amountCredited.toFixed(2)} to Khata.`, 'error');
+    if (amountCredited > 0 && customerToBill.creditLimit > 0) {
+        const potentialNewCredit = customerToBill.outstandingCredit + amountCredited;
+        if (potentialNewCredit > customerToBill.creditLimit) {
+            showToast(`Credit limit of ₹${customerToBill.creditLimit.toFixed(0)} exceeded! Cannot add ₹${amountCredited.toFixed(2)} to Khata.`, 'error');
             return;
         }
     }
@@ -162,8 +165,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     const saleData = {
       totalAmount: totalAmount,
       paymentMethod: paymentMethod,
-      customer: selectedCustomer.name,
-      customerId: selectedCustomer._id || selectedCustomer.id,
+      customer: customerToBill.name,
+      customerId: customerToBill._id || customerToBill.id,
       items: saleItems,
       amountPaid: amountPaid,
       amountCredited: amountCredited,
@@ -175,9 +178,9 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       await apiClient.post(API.sales, saleData); 
        
       // 4. Update customer credit on the server if necessary
-      if (amountCredited > 0 && selectedCustomer._id) {
+      if (amountCredited > 0 && customerToBill._id) {
         // We assume the API has an endpoint for credit transactions/updates
-        await apiClient.put(`${API.customers}/${selectedCustomer._id}/credit`, {
+        await apiClient.put(`${API.customers}/${customerToBill._id}/credit`, {
           // The backend should calculate the new outstandingCredit
           amountChange: amountCredited, 
           type: 'sale_credit',
@@ -188,7 +191,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
       // 5. Clear cart and reset state
       setCart([]);
-      setSelectedCustomer(WALK_IN_CUSTOMER);
+      // REMOVED: setSelectedCustomer(WALK_IN_CUSTOMER); 
       setSearchTerm('');
       setIsPaymentModalOpen(false);
 
@@ -200,7 +203,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       showToast('Error finalizing sale. Check server connection.', 'error');
     }
      
-  }, [totalAmount, selectedCustomer, cart, showToast, apiClient, API.sales, API.customers, fetchData]);
+  }, [totalAmount, cart, showToast, apiClient, API.sales, API.customers, fetchData]);
 
 
   // --- Component Render ---
@@ -215,8 +218,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }
 
   return (
-    // Adjusted bottom padding on mobile (pb-24) to accommodate the sticky footer
-    <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 text-gray-300 pb-24 md:pb-8 transition-colors duration-300">
+    <div className="p-4 md:p-8 bg-gray-950 text-gray-300 pb-24 md:pb-8 transition-colors duration-300">
       
       {/* 1. Main Heading and Description */}
       <h1 className="text-3xl font-extrabold text-white mb-1">Point of Sale (POS)</h1>
@@ -225,41 +227,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       {/* Main Content Area (Mobile Stacked) */}
       <div className="space-y-6">
              
-        {/* 1. Customer Selection Card - High Priority */}
-        <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition duration-300">
-            <h3 className="text-base font-bold flex items-center text-white mb-3">
-                <User className="w-5 h-5 inline-block mr-2 text-teal-400" /> Bill To Customer
-            </h3>
-            <div className="relative">
-                <select
-                    id="customer-select"
-                    value={selectedCustomer._id || selectedCustomer.id}
-                    onChange={(e) => {
-                    const customerId = e.target.value;
-                    const customer = allCustomers.find(c => (c._id || c.id) === customerId) || WALK_IN_CUSTOMER;
-                    setSelectedCustomer(customer);
-                    }}
-                    className="appearance-none w-full p-3.5 border border-indigo-600 bg-gray-700 text-white rounded-lg text-base font-semibold focus:ring-indigo-500 focus:border-indigo-500 pr-10 transition-colors shadow-inner"
-                >
-                    {allCustomers.map(c => (
-                    <option key={c._id || c.id} value={c._id || c.id}>
-                        {c.name} {c.outstandingCredit > 0 ? `(DUE: ₹${c.outstandingCredit.toFixed(0)})` : ''}
-                    </option>
-                    ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-400">
-                    <List className="w-5 h-5" />
-                </div>
-            </div>
-            {selectedCustomer.outstandingCredit > 0 && (
-                <div className="flex justify-end mt-3">
-                    <p className="text-sm text-red-400 font-bold p-2 bg-red-900/30 rounded-lg shadow-sm border border-red-700">
-                        <span className="opacity-80 font-medium text-gray-300">Khata Due:</span> ₹{selectedCustomer.outstandingCredit.toFixed(0)}
-                    </p>
-                </div>
-            )}
-        </div>
-
         {/* 2. Item Search/Scan Input (Simplified) */}
         <div className="relative flex items-center">
             <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
@@ -363,7 +330,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         {cart.length > 0 && (
             <div className="hidden md:block p-3 bg-gray-900 rounded-xl mb-3 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
                 <div className="flex justify-between items-stretch space-x-4">
-                    {/* Total Display: Desktop version was already correct */}
+                    {/* Total Display */}
                     <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
                         <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
                         <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
@@ -385,17 +352,14 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                 </div>
             </div>
         )}
-         
-        {/* Placeholder for scroll space on mobile (Hidden on desktop) */}
-        <div className="h-4 md:hidden"></div>
       </div>
        
-      {/* 🌟 MODIFIED STICKY FOOTER (Mobile Only - Reduced Height and Single Line Total) */}
+      {/* 🌟 MODIFIED STICKY FOOTER (Mobile Only) */}
       {cart.length > 0 && (
         <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
             <div className="flex items-stretch space-x-3">
                 
-                {/* Total Display: Key change is here - made it a single flex row */}
+                {/* Total Display */}
                 <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
                     <span className="text-lg font-bold text-white">TOTAL</span>
                     <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
@@ -423,9 +387,12 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
           totalAmount={totalAmount}
-          selectedCustomer={selectedCustomer}
+          // Pass the full list of customers (including WALK_IN_CUSTOMER)
+          allCustomers={allCustomers}
           processPayment={processPayment} // Pass the sale finalization logic
           showToast={showToast}
+          // Added a placeholder function for adding a new customer
+          onAddNewCustomer={() => showToast('Redirecting to Add Customer screen...', 'info')}
       />
 
     </div>
