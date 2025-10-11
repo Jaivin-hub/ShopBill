@@ -16,6 +16,10 @@ import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage'
 import ResetPassword from './components/ResetPassword';
 
+// NOTE: Assuming you have a component named SalesActivityPage.jsx for the full sales list.
+import SalesActivityPage from './components/SalesActivityPage'; 
+
+
 // --- Configuration and Constants ---
 const USER_ROLES = {
   OWNER: 'owner',
@@ -156,6 +160,23 @@ const App = () => {
     }
   }, [showToast]);
 
+  // --- NEW NAVIGATION HANDLERS ---
+  const handleViewAllSales = useCallback(() => {
+    setCurrentPage('salesActivity');
+  }, []);
+
+  // Set current page to Ledger view
+  const handleViewAllCredit = useCallback(() => {
+    setCurrentPage('khata'); 
+  }, []);
+
+  // Set current page to Inventory view
+  const handleViewAllInventory = useCallback(() => {
+    setCurrentPage('inventory'); 
+  }, []);
+  // --- END NEW NAVIGATION HANDLERS ---
+
+
   // Navigation Menu Items with Access Control
   const navItems = useMemo(() => ([
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
@@ -208,7 +229,15 @@ const App = () => {
     
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard {...commonProps} />;
+        return (
+            <Dashboard 
+                {...commonProps} 
+                // CRITICAL: Pass the handlers to Dashboard component
+                onViewAllSales={handleViewAllSales}
+                onViewAllCredit={handleViewAllCredit}
+                onViewAllInventory={handleViewAllInventory}
+            />
+        );
       case 'billing':
         return <BillingPOS {...commonProps} />;
       case 'khata':
@@ -217,6 +246,14 @@ const App = () => {
         return <InventoryManager {...commonProps} />;
       case 'reports':
         return <Reports {...commonProps} />;
+      // --- NEW CASE TO HANDLE "VIEW ALL SALES" ---
+      case 'salesActivity':
+        return <SalesActivityPage 
+            {...commonProps} 
+            // The SalesActivityPage should have a way to go back or is part of a flow.
+            // For now, we assume it's a full page component.
+        />;
+      // --- END NEW CASE ---
       case 'settings':
         return <SettingsPage {...commonProps} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
       case 'profile':
@@ -224,7 +261,12 @@ const App = () => {
       case 'notifications':
         return <NotificationsPage {...commonProps} />;  
       default:
-        return <Dashboard {...commonProps} />;
+        return <Dashboard 
+            {...commonProps}
+            onViewAllSales={handleViewAllSales}
+            onViewAllCredit={handleViewAllCredit}
+            onViewAllInventory={handleViewAllInventory}
+        />;
     }
   };
 

@@ -8,8 +8,7 @@ const CHART_CONFIG = {
         dataKey: 'revenue',
         name: 'Revenue (₹)',
         color: '#4f46e5', // indigo-600
-        formatter: (value) => `₹${value.toLocaleString('en-IN')}`,
-        // Using 'bills' from the sample response, but rename it to 'transactions' for clarity in the UI
+        formatter: (value) => `₹${value.toLocaleString('en-IN', { notation: 'compact' })}`, // Added compact notation for Y-axis
         transactionDataKey: 'bills',
         transactionName: 'Transactions',
         transactionColor: '#10b981' // green-600
@@ -19,19 +18,46 @@ const CHART_CONFIG = {
         dataKey: 'bills',
         name: 'Transactions',
         color: '#10b981', // green-600
-        formatter: (value) => value.toLocaleString(),
-        // We still include revenue as a secondary, smaller bar for context
+        formatter: (value) => value.toLocaleString('en-IN', { notation: 'compact' }),
         secondaryDataKey: 'revenue',
         secondaryName: 'Revenue (₹)',
         secondaryColor: '#9ca3af' // gray-400
     }
 };
 
+// --- NEW HELPER FUNCTION: Maps backend ID to a readable label ---
+const getChartLabel = (viewType, id) => {
+    if (viewType === 'Month') {
+        const date = new Date(2000, id - 1, 1); // Use a dummy year
+        return date.toLocaleString('en-US', { month: 'short' }); // e.g., '10' -> 'Oct'
+    } 
+    if (viewType === 'Week') {
+        return `Wk ${id}`; // e.g., '39' -> 'Wk 39'
+    }
+    // For 'Day' (which is actually dayOfYear in the backend)
+    // NOTE: If you pass actual dates to the backend, you should use that date string here.
+    // Since the backend returns dayOfYear, we'll just show the number for now.
+    // If your backend changes to return a formatted date string, this needs adjustment.
+    return id; // e.g., '278'
+};
 
 // Component receives the data, viewType, and the new yAxisKey from Reports.js
 const SalesChart = ({ data, viewType, yAxisKey }) => {
     const isMobile = window.innerWidth < 768; 
     
+    // Determine the dynamic X-Axis data key based on viewType
+    const xAxisDataKey = viewType; // Will be 'Day', 'Week', or 'Month'
+    
+    // Map the raw data to include a formatted label for the X-Axis
+    const processedData = data.map(d => ({
+        ...d,
+        // The label value is stored under the key name 'Day', 'Week', or 'Month'
+        labelValue: d[xAxisDataKey], 
+        // Create the user-friendly label for display
+        label: getChartLabel(viewType, d[xAxisDataKey]),
+    }));
+    
+
     // Determine which key is primary for the main visualization
     const primaryConfig = CHART_CONFIG[yAxisKey] || CHART_CONFIG.revenue;
     const secondaryConfig = yAxisKey === 'revenue' ? { 
@@ -55,18 +81,30 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
         return [value.toLocaleString(), name];
     };
     
-    // Filter out data points where both primary and secondary values are zero to prevent misleading charts (optional but good practice)
-    const filteredData = data.filter(d => d[primaryConfig.dataKey] > 0 || d[secondaryConfig.dataKey] > 0);
+    // Filter out data points where both primary and secondary values are zero
+    const filteredData = processedData.filter(d => d[primaryConfig.dataKey] > 0 || d[secondaryConfig.dataKey] > 0);
+    
     if (filteredData.length === 0) return <p className="text-center text-gray-500 py-12">No data available for the selected period.</p>;
 
     return (
         <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
             <RechartsBarChart
-                data={filteredData}
+                // Use the filtered and processed data
+                data={filteredData} 
                 margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
             >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" className="dark:stroke-gray-700" />
-                <XAxis dataKey="name" stroke="#6b7280" className="dark:text-gray-400 text-xs" />
+                
+                {/* CRITICAL FIX: Use the 'label' key (which we created) for the X-Axis
+                  The tickFormatter is not strictly needed anymore since we created the 'label' key.
+                */}
+                <XAxis 
+                    dataKey="label" 
+                    stroke="#6b7280" 
+                    className="dark:text-gray-400 text-xs" 
+                    // To handle many ticks (e.g., daily view)
+                    interval="preserveStartEnd" 
+                />
                 
                 {/* Primary Y-Axis (Left) */}
                 <YAxis 
@@ -86,13 +124,14 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                 
                 <Tooltip
                     contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-                        border: '1px solid #ccc', 
+                        backgroundColor: 'rgba(55, 65, 81, 0.9)', // Darker background
+                        border: '1px solid #4b5563', // Dark border
                         borderRadius: '8px',
                         padding: '8px',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)' 
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)' ,
+                        color: '#f9fafb' // Light text
                     }}
-                    labelStyle={{ fontWeight: 'bold', color: '#1f2937' }}
+                    labelStyle={{ fontWeight: 'bold', color: '#f9fafb' }} // Light label text
                     formatter={tooltipFormatter}
                 />
                 

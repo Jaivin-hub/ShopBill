@@ -8,6 +8,7 @@ const Inventory = require('../models/Inventory');
 
 const router = express.Router();
 
+// --- HELPER 1: Date Range Filter ---
 const getSalesDateFilter = (req) => {
     const { startDate, endDate } = req.query;
     let filter = {};
@@ -29,6 +30,36 @@ const getSalesDateFilter = (req) => {
     return (startDate || endDate) ? { timestamp: filter } : {};
 };
 
+// --- HELPER 2: Chart Aggregation Logic (NEW/UPDATED) ---
+const getChartAggregation = (viewType) => {
+    const defaultAggregation = { $dayOfYear: "$timestamp" };
+    const defaultLabel = "Day";
+    const defaultSortKey = "timestamp";
+
+    switch (viewType) {
+        case 'monthly':
+            return { 
+                id: { $month: "$timestamp" }, // Group by month number
+                label: "Month", 
+                sortKey: "_id" // Sort by the month number
+            };
+        case 'weekly':
+            return { 
+                id: { $week: "$timestamp" }, // Group by week number
+                label: "Week", 
+                sortKey: "_id" // Sort by the week number
+            };
+        case 'daily': // Fallthrough or explicit
+        default:
+            return { 
+                id: { $dayOfYear: "$timestamp" }, // Group by day of year
+                label: "Day", 
+                sortKey: "_id" // Sort by the day number
+            };
+    }
+};
+
+// --- API ENDPOINT: SUMMARY ---
 router.get('/summary', protect, async (req, res) => {
     try {
         const dateFilter = getSalesDateFilter(req);
@@ -43,8 +74,6 @@ router.get('/summary', protect, async (req, res) => {
             Inventory.find({ shopId: req.user.shopId }), // Scoped
             Sale.find({ shopId: req.user.shopId }), // Scoped for all-time stats
         ]);
-        
-        // ... (The rest of the calculation logic remains the same, but now uses the scoped data) ...
         
         // Create a quick lookup map for current inventory names and prices
         const inventoryMap = new Map();
@@ -66,10 +95,12 @@ router.get('/summary', protect, async (req, res) => {
             revenue += sale.totalAmount;
             
             (sale.items || []).forEach(item => {
-                const key = item.itemId.toString(); 
+                // Ensure itemId is always treated as a string for Map key
+                const key = item.itemId ? item.itemId.toString() : 'Unknown'; 
                 
+                // Use fallback item.name if current inventory item is missing (deleted)
                 const currentInventoryData = inventoryMap.get(key);
-                const itemName = currentInventoryData ? currentInventoryData.name : item.name;
+                const itemName = currentInventoryData ? currentInventoryData.name : (item.name || 'Unknown Item');
 
                 const current = itemVolumeMap.get(key) || { name: itemName, quantity: 0 };
                 
@@ -89,8 +120,7 @@ router.get('/summary', protect, async (req, res) => {
             
         const totalCreditOutstanding = customers.reduce((sum, cust) => sum + (cust.outstandingCredit || 0), 0);
         
-        // Step 3: Fetch all-time stats for the Financial Summary block
-        // const allTimeSales = await Sale.find({ shopId: req.user.shopId }); // Already fetched in Promise.all
+        // Step 3: All-time stats for the Financial Summary block
         const totalAllTimeRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
         const totalAllTimeBills = allTimeSales.length;
 
@@ -112,16 +142,20 @@ router.get('/summary', protect, async (req, res) => {
     }
 });
 
+
+// --- API ENDPOINT: CHART DATA ---
 router.get('/chart-data', protect, async (req, res) => {
     try {
         const dateFilter = getSalesDateFilter(req);
+        const { viewType} = req.query; 
         
-        let aggregationId;
-        // The aggregationId logic would be defined here based on viewType (e.g., $dayOfYear, $week, $month)
-        // Since it wasn't provided, we'll assume it exists or is simple.
-        
+        const { id: aggregationId, label: labelName, sortKey } = getChartAggregation(viewType);
+
         // SCOPED QUERY: Add shopId to the initial $match stage
-        const matchStage = { $match: { ...dateFilter, shopId: req.user.shopId } }; 
+        const matchStage = { $match: { 
+            ...dateFilter, 
+            shopId: req.user.shopId 
+        } }; 
 
         const chartData = await Sale.aggregate([
             // 1. Filter by Date Range AND Shop ID
@@ -130,14 +164,26 @@ router.get('/chart-data', protect, async (req, res) => {
             // 2. Group and Aggregate
             {
                 $group: {
-                    _id: aggregationId, // aggregationId must be defined based on viewType (e.g., $dayOfYear, $month)
+                    _id: aggregationId, 
                     revenue: { $sum: "$totalAmount" },
                     bills: { $sum: 1 }
                 }
             },
             
-            // 3. Project and 4. Sort would typically follow here
-            // ...
+            // 3. Project for final output (rename _id and include label)
+            {
+                $project: {
+                    _id: 0,
+                    [labelName]: "$_id", // e.g., 'Day': 278, 'Month': 10
+                    revenue: 1,
+                    bills: 1
+                }
+            },
+            
+            // 4. Sort the data chronologically (by the aggregated key)
+            {
+                $sort: { [labelName]: 1 }
+            }
         ]);
 
         res.json(chartData);

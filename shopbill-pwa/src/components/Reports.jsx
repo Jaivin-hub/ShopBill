@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrendingUp, DollarSign, List, BarChart, CreditCard, Package, Loader } from 'lucide-react'; 
+import { TrendingUp, DollarSign, IndianRupee, List, BarChart, CreditCard, Package, Loader } from 'lucide-react'; 
 import SalesChart from './SalesChart';
 // NOTE: Removed direct axios import
 // import axios from 'axios';
@@ -262,7 +262,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                     <MetricCard
                         title="Total Revenue"
                         value={formatCurrency(data.revenue)}
-                        icon={DollarSign}
+                        icon={IndianRupee}
                         colorClass="border-b-indigo-500 text-indigo-400" 
                         description={`Generated from bills`}
                     />
@@ -276,7 +276,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                     <MetricCard
                         title="Avg. Bill Value"
                         value={formatCurrency(data.averageBillValue)}
-                        icon={DollarSign}
+                        icon={IndianRupee}
                         colorClass="border-b-amber-500 text-amber-400"
                         description={`Revenue / Bills Raised`}
                     />

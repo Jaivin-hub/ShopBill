@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import StatCard from './StatCard';
-import { IndianRupee, CreditCard, Users, Package, AlertTriangle, List, Loader } from 'lucide-react';
+import { IndianRupee, CreditCard, Users, Package, AlertTriangle, List, Loader, ArrowRight } from 'lucide-react';
 
 const USER_ROLES = {
   OWNER: 'owner',
   CASHIER: 'cashier',
 };
 
-// CRITICAL: We now accept apiClient, API, and showToast from App.jsx
-const Dashboard = ({ userRole, apiClient, API, showToast }) => {
+// CRITICAL: Added onViewAllInventory and onViewAllCredit props
+const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit }) => {
   const isOwner = userRole === USER_ROLES.OWNER;
 
   // 1. Data States
@@ -67,15 +67,33 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
     return { totalSales, totalCreditGiven };
   }, [sales]);
 
+  // Credit/Khata Filtered List
+  const customersWithCredit = useMemo(() => {
+    return customers.filter(cust => cust.outstandingCredit > 0);
+  }, [customers]);
+
   // Calculate Khata/Credit Summary
   const totalOutstandingCredit = useMemo(() => {
     return customers.reduce((sum, cust) => sum + cust.outstandingCredit, 0);
   }, [customers]);
+  
+  // Top 5 Credit Holders
+  const topCreditHolders = useMemo(() => {
+    return customersWithCredit
+      .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
+      .slice(0, 5);
+  }, [customersWithCredit]);
+
 
   // Inventory Alerts
-  const lowStockAlerts = useMemo(() => {
-    return inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0)).slice(0, 5);
+  const allLowStockAlerts = useMemo(() => {
+    return inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0));
   }, [inventory]);
+  
+  // Inventory Alerts (capped at 5 for dashboard view)
+  const lowStockAlerts = useMemo(() => {
+    return allLowStockAlerts.slice(0, 5);
+  }, [allLowStockAlerts]);
 
   // Get the most recent 5 sales
   const recentSales = useMemo(() => {
@@ -105,7 +123,6 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
 
   if (!isOwner) {
     return (
-      // 💥 UPDATED: Use light/dark colors
       <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
         <AlertTriangle className="w-12 h-12 text-indigo-600 dark:text-indigo-400 mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Access Denied</h2>
@@ -116,7 +133,6 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
 
   if (isLoading) {
     return (
-      // 💥 UPDATED: Use light/dark colors
       <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
         <Loader className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400" />
         <p className='mt-3'>Loading dashboard summary data...</p>
@@ -125,10 +141,8 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
   }
 
   return (
-    // 💥 UPDATED: Use light/dark colors for the main container (usually covered by App.jsx)
     <div className="p-4 md:p-8 h-full flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
 
-      {/* 💥 UPDATED: Border and Text Colors */}
       <div className="pb-4 border-b border-gray-200 dark:border-gray-800">
         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Owner's Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400">Quick overview of your shop's health.</p>
@@ -138,15 +152,12 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
 
         {/* Today's Report - Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* NOTE: StatCard should handle its own bg/text colors based on the dark class */}
           <StatCard
             title="Today's Total Sales"
             value={today.totalSales.toFixed(2)}
             unit="₹"
             icon={IndianRupee}
             colorClass="text-teal-600 dark:text-teal-400"
-            // 💥 UPDATED: Removed hardcoded dark background. StatCard should determine its background.
-            // For now, pass a neutral color to be safe.
             bgColor="bg-white dark:bg-gray-900"
           />
           <StatCard
@@ -171,11 +182,25 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
           {/* Inventory Health Card */}
-          {/* 💥 UPDATED: Background, Border, Text Colors */}
           <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-              <Package className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Inventory Alerts ({lowStockAlerts.length})
-            </h2>
+            {/* 💥 Conditional View All Button for Inventory */}
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Inventory Alerts ({allLowStockAlerts.length})
+                </h2>
+                {/* Logic: Only show if there are more than 5 alerts */}
+                {allLowStockAlerts.length > 5 && (
+                    <button
+                        onClick={onViewAllInventory}
+                        className="flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                        title="View Full Inventory Report"
+                    >
+                        View All
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                    </button>
+                )}
+            </div>
+            
             <div className="flex-grow">
               {lowStockAlerts.length > 0 ? (
                 <ul className="space-y-3 pt-2">
@@ -193,19 +218,29 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
           </div>
 
           {/* Khata (Credit) Status Card */}
-          {/* 💥 UPDATED: Background, Border, Text Colors */}
           <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-              <Users className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> Top Credit Holders
-            </h2>
+            {/* 💥 Conditional View All Button for Credit Holders */}
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                    <Users className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> Top Credit Holders
+                </h2>
+                {/* Logic: Only show if there are more than 5 credit holders */}
+                {customersWithCredit.length > 5 && (
+                    <button
+                        onClick={onViewAllCredit}
+                        className="flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                        title="View Full Credit Ledger"
+                    >
+                        View All
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                    </button>
+                )}
+            </div>
+            
             <div className="flex-grow">
               <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
-                {customers.length > 0 ? (
-                  customers
-                    .filter(cust => cust.outstandingCredit > 0)
-                    .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
-                    .slice(0, 5)
-                    .map((cust) => (
+                {topCreditHolders.length > 0 ? (
+                  topCreditHolders.map((cust) => (
                       <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
                         <span className="truncate w-1/2 font-medium text-gray-700 dark:text-gray-300">{cust.name}</span>
                         <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
@@ -221,11 +256,24 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
           </div>
 
           {/* Recent Sales Activity Card */}
-          {/* 💥 UPDATED: Background, Border, Text Colors */}
           <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-              <List className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Recent Sales Activity
-            </h2>
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                <List className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Recent Sales Activity
+              </h2>
+              {/* Conditional View All Button for Sales */}
+              {sales.length > 5 && ( // Logic: Only show if total sales records are more than 5
+                  <button
+                    // onClick={onViewAllSales}
+                    className="flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                    title="View Full Sales Report"
+                  >
+                    View All
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </button>
+              )}
+            </div>
+            
             <div className="flex-grow">
               <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
                 {recentSales.length > 0 ? (
