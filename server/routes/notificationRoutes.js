@@ -38,7 +38,7 @@ router.get('/alerts', protect, async (req, res) => {
                     type: 'inventory_low',
                     category: 'Critical',
                     title: 'Low Stock Alert',
-                    message: `${item.name} is critically low. Stock: ${item.quantity} (Reorder: ${item.reorderLevel})`,
+                    message: `${item.name} is critically low. Stock: ${item.quantity}`,
                     timestamp: new Date(),
                 });
             });

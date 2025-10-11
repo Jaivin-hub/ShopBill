@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import StatCard from './StatCard';
-import {DollarSign, CreditCard, Users, Package, AlertTriangle, List, Loader} from 'lucide-react'; 
+import { IndianRupee, CreditCard, Users, Package, AlertTriangle, List, Loader } from 'lucide-react';
 
 const USER_ROLES = {
   OWNER: 'owner',
@@ -10,7 +10,7 @@ const USER_ROLES = {
 // CRITICAL: We now accept apiClient, API, and showToast from App.jsx
 const Dashboard = ({ userRole, apiClient, API, showToast }) => {
   const isOwner = userRole === USER_ROLES.OWNER;
-  
+
   // 1. Data States
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -49,7 +49,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwner]); // Only re-run if isOwner changes
 
-  
+
   // --- EXISTING DATA CALCULATIONS (Now depend on local state) ---
 
   // Calculate Today's Report
@@ -62,8 +62,8 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
     const totalSales = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
     const totalCreditGiven = todaySales
       .filter(s => s.paymentMethod === 'Credit' || s.paymentMethod === 'Mixed')
-      .reduce((sum, sale) => sum + sale.amountCredited, 0); 
-    
+      .reduce((sum, sale) => sum + sale.amountCredited, 0);
+
     return { totalSales, totalCreditGiven };
   }, [sales]);
 
@@ -81,7 +81,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
   const recentSales = useMemo(() => {
     return sales
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 5); 
+      .slice(0, 5);
   }, [sales]);
 
   // Utility to format time (Unchanged)
@@ -99,8 +99,8 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
     if (interval > 1) return Math.floor(interval) + " minutes ago";
     return Math.floor(seconds) + " seconds ago";
   };
-  
-  
+
+
   // --- RENDER LOGIC ---
 
   if (!isOwner) {
@@ -127,134 +127,163 @@ const Dashboard = ({ userRole, apiClient, API, showToast }) => {
   return (
     // 💥 UPDATED: Use light/dark colors for the main container (usually covered by App.jsx)
     <div className="p-4 md:p-8 h-full flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-        
-        {/* 💥 UPDATED: Border and Text Colors */}
-        <div className="pb-4 border-b border-gray-200 dark:border-gray-800">
-            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Owner's Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400">Quick overview of your shop's health.</p>
+
+      {/* 💥 UPDATED: Border and Text Colors */}
+      <div className="pb-4 border-b border-gray-200 dark:border-gray-800">
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Owner's Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400">Quick overview of your shop's health.</p>
+      </div>
+
+      <div className="flex-grow overflow-y-auto pt-6">
+
+        {/* Today's Report - Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* NOTE: StatCard should handle its own bg/text colors based on the dark class */}
+          <StatCard
+            title="Today's Total Sales"
+            value={today.totalSales.toFixed(2)}
+            unit="₹"
+            icon={IndianRupee}
+            colorClass="text-teal-600 dark:text-teal-400"
+            // 💥 UPDATED: Removed hardcoded dark background. StatCard should determine its background.
+            // For now, pass a neutral color to be safe.
+            bgColor="bg-white dark:bg-gray-900"
+          />
+          <StatCard
+            title="Today's New Credit Given"
+            value={today.totalCreditGiven.toFixed(2)}
+            unit="₹"
+            icon={CreditCard}
+            colorClass="text-indigo-600 dark:text-indigo-400"
+            bgColor="bg-white dark:bg-gray-900"
+          />
+          <StatCard
+            title="Total Credit Outstanding"
+            value={totalOutstandingCredit.toFixed(2)}
+            unit="₹"
+            icon={Users}
+            colorClass="text-red-600 dark:text-red-400"
+            bgColor="bg-white dark:bg-gray-900"
+          />
         </div>
 
-        <div className="flex-grow overflow-y-auto pt-6">
+        {/* Main Content: 3-column layout for detailed views */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-            {/* Today's Report - Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {/* NOTE: StatCard should handle its own bg/text colors based on the dark class */}
-                <StatCard 
-                    title="Today's Total Sales" 
-                    value={today.totalSales.toFixed(2)} 
-                    unit="₹" 
-                    icon={DollarSign} 
-                    colorClass="text-teal-600 dark:text-teal-400" 
-                    // 💥 UPDATED: Removed hardcoded dark background. StatCard should determine its background.
-                    // For now, pass a neutral color to be safe.
-                    bgColor="bg-white dark:bg-gray-900" 
-                />
-                <StatCard 
-                    title="Today's New Credit Given" 
-                    value={today.totalCreditGiven.toFixed(2)} 
-                    unit="₹" 
-                    icon={CreditCard} 
-                    colorClass="text-indigo-600 dark:text-indigo-400" 
-                    bgColor="bg-white dark:bg-gray-900"
-                />
-                <StatCard 
-                    title="Total Credit Outstanding" 
-                    value={totalOutstandingCredit.toFixed(2)} 
-                    unit="₹" 
-                    icon={Users} 
-                    colorClass="text-red-600 dark:text-red-400" 
-                    bgColor="bg-white dark:bg-gray-900"
-                />
+          {/* Inventory Health Card */}
+          {/* 💥 UPDATED: Background, Border, Text Colors */}
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <Package className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Inventory Alerts ({lowStockAlerts.length})
+            </h2>
+            <div className="flex-grow">
+              {lowStockAlerts.length > 0 ? (
+                <ul className="space-y-3 pt-2">
+                  {lowStockAlerts.map((item) => (
+                    <li key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-red-100 dark:bg-red-900/40 rounded-lg border border-red-300 dark:border-red-700 shadow-sm">
+                      <span className="font-medium text-red-600 dark:text-red-300 truncate">{item.name}</span>
+                      <span className="text-red-600 dark:text-red-400 text-xs font-semibold whitespace-nowrap">Stock: {item.quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-300 dark:border-green-700 text-center font-medium">All inventory levels look great!</p>
+              )}
             </div>
+          </div>
 
-            {/* Main Content: 3-column layout for detailed views */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-                {/* Inventory Health Card */}
-                {/* 💥 UPDATED: Background, Border, Text Colors */}
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-                    <Package className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Inventory Alerts ({lowStockAlerts.length})
-                </h2>
-                <div className="flex-grow">
-                    {lowStockAlerts.length > 0 ? (
-                    <ul className="space-y-3 pt-2">
-                        {lowStockAlerts.map((item) => (
-                        <li key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-red-100 dark:bg-red-900/40 rounded-lg border border-red-300 dark:border-red-700 shadow-sm">
-                            <span className="font-medium text-red-600 dark:text-red-300 truncate">{item.name}</span>
-                            <span className="text-red-600 dark:text-red-400 text-xs font-semibold whitespace-nowrap">Stock: {item.quantity} (Reorder: {item.reorderLevel})</span>
-                        </li>
-                        ))}
-                    </ul>
-                    ) : (
-                    <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-300 dark:border-green-700 text-center font-medium">All inventory levels look great!</p>
-                    )}
-                </div>
-                </div>
-
-                {/* Khata (Credit) Status Card */}
-                {/* 💥 UPDATED: Background, Border, Text Colors */}
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-                    <Users className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> Top Credit Holders
-                </h2>
-                <div className="flex-grow">
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
-                    {customers.length > 0 ? (
-                        customers
-                        .filter(cust => cust.outstandingCredit > 0)
-                        .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
-                        .slice(0, 5)
-                        .map((cust) => (
-                            <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
-                            <span className="truncate w-1/2 font-medium text-gray-700 dark:text-gray-300">{cust.name}</span>
-                            <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                                ₹{cust.outstandingCredit.toFixed(2)}
-                            </span>
-                            </li>
-                        ))
-                    ) : (
-                        <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg border border-indigo-300 dark:border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
-                    )}
-                    </ul>
-                </div>
-                </div>
-                
-                {/* Recent Sales Activity Card */}
-                {/* 💥 UPDATED: Background, Border, Text Colors */}
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
-                    <List className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Recent Sales Activity
-                </h2>
-                <div className="flex-grow">
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
-                    {recentSales.length > 0 ? (
-                        recentSales.map((sale) => (
-                        <li key={sale._id || sale.id} className="py-3 flex justify-between items-center text-sm">
-                            <div className="flex items-center space-x-3">
-                            <span className="font-bold text-teal-600 dark:text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                    sale.paymentMethod === 'Credit' ? 'bg-red-100 text-red-600 border border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700' : 
-                                    sale.paymentMethod === 'Cash/UPI' ? 'bg-green-100 text-green-600 border border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700' : 
-                                    sale.paymentMethod === 'Mixed' ? 'bg-indigo-100 text-indigo-600 border border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700' : 
-                                    'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-                                }`}>
-                                {sale.paymentMethod}
-                            </span>
-                            </div>
-                            <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {formatTimeAgo(sale.timestamp)}
-                            </span>
-                        </li>
-                        ))
-                    ) : (
-                        <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-gray-200 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 text-center font-medium">No sales recorded yet.</p>
-                    )}
-                    </ul>
-                </div>
-                </div>
+          {/* Khata (Credit) Status Card */}
+          {/* 💥 UPDATED: Background, Border, Text Colors */}
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <Users className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> Top Credit Holders
+            </h2>
+            <div className="flex-grow">
+              <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
+                {customers.length > 0 ? (
+                  customers
+                    .filter(cust => cust.outstandingCredit > 0)
+                    .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
+                    .slice(0, 5)
+                    .map((cust) => (
+                      <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
+                        <span className="truncate w-1/2 font-medium text-gray-700 dark:text-gray-300">{cust.name}</span>
+                        <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                          ₹{cust.outstandingCredit.toFixed(2)}
+                        </span>
+                      </li>
+                    ))
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg border border-indigo-300 dark:border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
+                )}
+              </ul>
             </div>
+          </div>
+
+          {/* Recent Sales Activity Card */}
+          {/* 💥 UPDATED: Background, Border, Text Colors */}
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <List className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Recent Sales Activity
+            </h2>
+            <div className="flex-grow">
+              <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
+                {recentSales.length > 0 ? (
+                  recentSales.map((sale) => {
+
+                    let paymentDisplay = sale.paymentMethod;
+                    let colorClass = 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-400';
+
+                    // --- Standard Logic for UPI/Cash/Full Credit ---
+                    if (sale.paymentMethod === 'Credit') {
+                      paymentDisplay = `Due`;
+                      colorClass = 'bg-red-100 text-red-600 border border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700';
+                    } else if (sale.paymentMethod === 'UPI' || sale.paymentMethod === 'Cash') {
+                      paymentDisplay = 'Paid';
+                      colorClass = 'bg-green-100 text-green-600 border border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700';
+                    }
+
+                    // --- START RENDER ---
+                    return (
+                      <li key={sale._id || sale.id} className="py-3 flex justify-between items-center text-sm">
+                        <div className="flex items-center space-x-3">
+                          {/* Display Total Amount */}
+                          <span className="font-bold text-teal-600 dark:text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
+
+                          {/* Conditional Rendering for Payment Tags */}
+                          {sale.paymentMethod === 'Mixed' ? (
+                            <>
+                              {/* Tag 1: Paid/Cash Portion (Green Theme) */}
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-green-100 text-green-600 border border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700">
+                                Paid: ₹{sale.amountPaid.toFixed(0)}
+                              </span>
+                              {/* Tag 2: Credit/Due Portion (Red Theme) */}
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-red-100 text-red-600 border border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700">
+                                Due: ₹{sale.amountCredited.toFixed(0)}
+                              </span>
+                            </>
+                          ) : (
+                            /* Single Tag for UPI/Cash/Full Credit */
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${colorClass}`}>
+                              {paymentDisplay}
+                            </span>
+                          )}
+
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {formatTimeAgo(sale.timestamp)}
+                        </span>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-gray-200 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 text-center font-medium">No sales recorded yet.</p>
+                )}
+              </ul>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
   );
 };

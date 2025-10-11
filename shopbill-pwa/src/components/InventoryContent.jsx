@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader } from 'lucide-react'; 
 
-// Helper component for form inputs (Moved from original file)
+// Helper component for form inputs
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
@@ -13,13 +13,14 @@ const InputField = ({ label, name, type, value, onChange, ...props }) => (
             type={type}
             value={value}
             onChange={onChange}
-            className="w-full p-3 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-gray-200 placeholder-gray-500"
+            // 🔥 CORRECTED INPUT STYLING
+            className="w-full p-3 border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 placeholder-gray-500"
             {...props}
         />
     </div>
 );
 
-// Inventory List Card Component (Moved from original file)
+// Inventory List Card Component
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }) => {
     const itemId = item._id || item.id;
     const isLowStock = item.quantity <= item.reorderLevel;
@@ -101,6 +102,36 @@ const InventoryContent = ({
     setIsConfirmModalOpen,
 }) => {
     
+    // --- New State and Ref for Custom Dropdown ---
+    const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+    const sortDropdownRef = useRef(null);
+
+    // Effect to close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+                setIsSortDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleSortSelect = (optionValue) => {
+        setSortOption(optionValue);
+        setIsSortDropdownOpen(false);
+    };
+
+    // Define the options once
+    const sortOptions = [
+        { value: 'default', label: 'Sort: Name (A-Z)' },
+        { value: 'low-stock', label: 'Sort: Low Stock / Out of Stock' },
+    ];
+    
+    const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
+    // --- End New State and Ref ---
+
+
     // --- Main Render ---
     return (
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
@@ -140,17 +171,34 @@ const InventoryContent = ({
                             </button>
                         )}
                     </div>
-                    {/* Sticky Sort Dropdown */}
-                    <div className="relative">
-                        <select
-                            value={sortOption}
-                            onChange={(e) => setSortOption(e.target.value)}
-                            className="appearance-none w-full pl-3 pr-8 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-md text-sm font-medium h-full"
+                    {/* Sticky Custom Sort Dropdown (FIXED) */}
+                    <div className="relative" ref={sortDropdownRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                            className="w-full pl-3 pr-8 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-md text-sm font-medium flex items-center h-full"
                         >
-                            <option value="default">Sort: Name (A-Z)</option>
-                            <option value="low-stock">Sort: Low Stock / Out of Stock</option>
-                        </select>
-                        <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                            {currentSortLabel}
+                            <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        </button>
+                        
+                        {isSortDropdownOpen && (
+                            <div className="absolute right-0 z-30 w-56 mt-1 rounded-lg shadow-2xl bg-gray-800 border border-indigo-500 overflow-hidden">
+                                {sortOptions.map(option => (
+                                    <div
+                                        key={option.value}
+                                        onClick={() => handleSortSelect(option.value)}
+                                        className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
+                                            ${option.value === sortOption 
+                                                ? 'bg-indigo-600 text-white' 
+                                                : 'text-gray-200 hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        {option.label}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -166,17 +214,34 @@ const InventoryContent = ({
                         <Package className="w-5 h-5 mr-2" /> Total Inventory Items ({inventory.length})
                     </h3>
                     <div className="flex space-x-4">
-                        {/* Desktop Sort Dropdown */}
-                        <div className="relative hidden xl:block">
-                            <select
-                                value={sortOption}
-                                onChange={(e) => setSortOption(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-gray-200 text-sm font-medium"
+                        {/* Desktop Custom Sort Dropdown (FIXED) */}
+                        <div className="relative hidden xl:block" ref={sortDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                className="w-full pl-3 pr-8 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-gray-200 text-sm font-medium flex items-center"
                             >
-                                <option value="default">Sort: Name (A-Z)</option>
-                                <option value="low-stock">Sort: Low Stock / Out of Stock</option>
-                            </select>
-                            <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                                {currentSortLabel}
+                                <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            </button>
+                            
+                            {isSortDropdownOpen && (
+                                <div className="absolute right-0 z-30 w-56 mt-1 rounded-lg shadow-2xl bg-gray-800 border border-indigo-500 overflow-hidden">
+                                    {sortOptions.map(option => (
+                                        <div
+                                            key={option.value}
+                                            onClick={() => handleSortSelect(option.value)}
+                                            className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
+                                                ${option.value === sortOption 
+                                                    ? 'bg-indigo-600 text-white' 
+                                                    : 'text-gray-200 hover:bg-gray-700'
+                                                }`}
+                                        >
+                                            {option.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         {/* Add Item Button */}
                         <button 
@@ -269,9 +334,10 @@ const InventoryContent = ({
                     </button>
                 </div>
                 
-                {/* Non-sticky Search and Sort Bar for initial view on mobile */}
+                {/* Non-sticky Search and Custom Sort Bar for initial view on mobile (FIXED) */}
                 {!showStickySearch && (
-                    <div className="flex space-x-4 mb-4">
+                    // MOBILE OPTIMIZATION: Use gap-3 and smaller padding/text size
+                    <div className="flex gap-3 mb-4">
                         <div className="relative flex-grow">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
                             <input
@@ -279,7 +345,8 @@ const InventoryContent = ({
                                 placeholder="Search items..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm"
+                                // Smaller vertical padding: py-2 instead of py-2.5
+                                className="w-full pl-10 pr-4 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm"
                             />
                             {searchTerm && (
                                 <button 
@@ -292,16 +359,34 @@ const InventoryContent = ({
                                 </button>
                             )}
                         </div>
-                        <div className="relative">
-                            <select
-                                value={sortOption}
-                                onChange={(e) => setSortOption(e.target.value)}
-                                className="appearance-none w-full pl-3 pr-8 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm font-medium h-full"
+                        {/* Mobile Custom Sort Dropdown */}
+                        <div className="relative" ref={sortDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                className="w-full pl-3 pr-8 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm font-medium flex items-center h-full whitespace-nowrap"
                             >
-                                <option value="default">Sort: A-Z</option>
-                                <option value="low-stock">Low Stock</option>
-                            </select>
-                            <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                                {currentSortLabel.replace('Sort: ', '')} {/* Use shorter label for mobile */}
+                                <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            </button>
+                            
+                            {isSortDropdownOpen && (
+                                <div className="absolute right-0 z-30 w-56 mt-1 rounded-lg shadow-2xl bg-gray-800 border border-indigo-500 overflow-hidden">
+                                    {sortOptions.map(option => (
+                                        <div
+                                            key={option.value}
+                                            onClick={() => handleSortSelect(option.value)}
+                                            className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
+                                                ${option.value === sortOption 
+                                                    ? 'bg-indigo-600 text-white' 
+                                                    : 'text-gray-200 hover:bg-gray-700'
+                                                }`}
+                                        >
+                                            {option.label.replace('Sort: ', '')}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -320,11 +405,17 @@ const InventoryContent = ({
                 </div>
             </div>
             
-            {/* Item Form Modal */}
+            {/* Item Form Modal - RE-CENTERED FOR MOBILE */}
             {isFormModalOpen && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-end md:items-center justify-center z-50 p-0 md:p-4 transition-opacity">
-                    <form onSubmit={handleFormSubmit} className="bg-gray-900 w-full md:max-w-xl rounded-t-xl md:rounded-xl shadow-2xl transform transition-transform duration-300 translate-y-0 max-h-full overflow-y-auto border border-gray-700">
-                        <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/20 rounded-t-xl sticky top-0 z-10">
+                // 🔥 FIX: Changed outer flex alignment to 'items-center' and ensured padding is applied on mobile.
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+                    <form onSubmit={handleFormSubmit} 
+                        // 🔥 FIX: Simplified form classes to use 'rounded-xl' consistently and set 'max-w' for better mobile centering appearance.
+                        className="bg-gray-800 w-full max-w-sm sm:max-w-md md:max-w-xl rounded-xl shadow-2xl transform transition-transform duration-300 translate-y-0 max-h-[90vh] overflow-y-auto border border-indigo-700">
+                        
+                        {/* Modal Header */}
+                        {/* FIX: Removed 'rounded-t-xl' from the header as the form now has it */}
+                        <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl sticky top-0 z-10">
                             <h2 className="text-xl font-bold text-indigo-300 flex items-center">
                                 {isEditing ? <Edit className="w-5 h-5 mr-2" /> : <Plus className="w-5 h-5 mr-2" />} 
                                 {isEditing ? `Edit Item: ${formData.name}` : 'Add New Inventory Item'}
@@ -333,6 +424,8 @@ const InventoryContent = ({
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
+                        
+                        {/* Form Body */}
                         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InputField label="Product Name" name="name" type="text" value={formData.name} onChange={handleInputChange} required />
                             <InputField label="Selling Price (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} min="0" required />
@@ -340,10 +433,17 @@ const InventoryContent = ({
                             <InputField label="Reorder Level" name="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleInputChange} min="0" required />
                             <InputField label="HSN/SAC Code (Optional)" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} placeholder="e.g., 0401" />
                         </div>
+                        
+                        {/* Modal Footer (Action Button) */}
                         <div className="p-5 border-t border-gray-700">
                             <button 
                                 type="submit"
-                                className={`w-full py-3 text-white rounded-lg font-bold text-lg shadow-md transition flex items-center justify-center disabled:opacity-50 ${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'}`}
+                                // CONDITIONAL BUTTON STYLING
+                                className={`w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl hover:bg-teal-700 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99] ${
+                                    isEditing 
+                                        ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/50' 
+                                        : 'bg-teal-600 hover:bg-teal-700 shadow-teal-900/50'
+                                }`}
                                 disabled={loading || !formData.name || formData.price <= 0 || formData.quantity < 0}
                             >
                                 {loading 
@@ -356,7 +456,7 @@ const InventoryContent = ({
                 </div>
             )}
             
-            {/* Delete Confirmation Modal */}
+            {/* Delete Confirmation Modal (Unchanged) */}
             {isConfirmModalOpen && itemToDelete && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity">
                     <div className="bg-gray-900 w-full max-w-sm rounded-xl shadow-2xl transform transition-transform duration-300 border border-red-700">
@@ -391,7 +491,7 @@ const InventoryContent = ({
                     </div>
                 </div>
             )}
-            {/* Loading Overlay */}
+            {/* Loading Overlay (Unchanged) */}
             {loading && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-gray-900 p-6 rounded-xl shadow-2xl text-indigo-400 flex items-center border border-gray-700">

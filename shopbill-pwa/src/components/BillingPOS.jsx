@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { DollarSign, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader } from 'lucide-react';
+import { DollarSign, IndianRupee, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader } from 'lucide-react';
 // Import the PaymentModal and WALK_IN_CUSTOMER from the new file
 import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentModal'; 
 
@@ -146,6 +146,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
      
     // 1. Check credit limit before logging a credit sale
+    // NOTE: This check should ideally also be implemented on the server side
+    // to prevent race conditions, but keeping it here for immediate feedback.
     if (amountCredited > 0 && customerToBill.creditLimit > 0) {
         const potentialNewCredit = customerToBill.outstandingCredit + amountCredited;
         if (potentialNewCredit > customerToBill.creditLimit) {
@@ -166,32 +168,31 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       totalAmount: totalAmount,
       paymentMethod: paymentMethod,
       customer: customerToBill.name,
-      customerId: customerToBill._id || customerToBill.id,
+      // Ensure we pass the MongoDB ID if it exists for the server update
+      customerId: customerToBill._id, // Only send the real MongoDB ID
       items: saleItems,
       amountPaid: amountPaid,
-      amountCredited: amountCredited,
+      // CRITICAL: This calculated value handles Full Khata, Mixed Payment Khata, or 0 Khata
+      amountCredited: amountCredited, 
     };
+
+    console.log('saleData----',saleData)
      
     try {
       showToast('Processing sale...', 'info');
-      // 3. Log the sale via API (This should also update inventory stock on the backend)
+      
+      // 3. Log the sale via API.
+      // THE /sales ENDPOINT MUST HANDLE INVENTORY UPDATE AND KHATA UPDATE IF amountCredited > 0.
       await apiClient.post(API.sales, saleData); 
        
-      // 4. Update customer credit on the server if necessary
-      if (amountCredited > 0 && customerToBill._id) {
-        // We assume the API has an endpoint for credit transactions/updates
-        await apiClient.put(`${API.customers}/${customerToBill._id}/credit`, {
-          // The backend should calculate the new outstandingCredit
-          amountChange: amountCredited, 
-          type: 'sale_credit',
-        });
-      }
+      // 4. REMOVE THE REDUNDANT CREDIT API CALL HERE!
+      // The Khata update is now fully contained within the /sales endpoint logic.
+      // (The /customers/:id/credit endpoint is reserved for Khata PAYMENTS ONLY, not sales).
       
       showToast('Sale successfully recorded!', 'success');
 
       // 5. Clear cart and reset state
       setCart([]);
-      // REMOVED: setSelectedCustomer(WALK_IN_CUSTOMER); 
       setSearchTerm('');
       setIsPaymentModalOpen(false);
 
@@ -200,10 +201,11 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
     } catch (error) {
       console.error("Sale processing failed:", error);
-      showToast('Error finalizing sale. Check server connection.', 'error');
+      const errorMessage = error.response?.data?.error || 'Error finalizing sale. Check server connection.';
+      showToast(errorMessage, 'error');
     }
      
-  }, [totalAmount, cart, showToast, apiClient, API.sales, API.customers, fetchData]);
+  }, [totalAmount, cart, showToast, apiClient, API.sales, fetchData]);
 
 
   // --- Component Render ---
@@ -347,7 +349,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                             }
                         }}
                     >
-                        <DollarSign className="w-5 h-5 inline-block mr-2" /> Pay
+                        <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
                     </button>
                 </div>
             </div>
@@ -376,7 +378,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                         }
                     }}
                 >
-                    <DollarSign className="w-5 h-5 inline-block mr-2" /> Pay
+                    <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
                 </button>
             </div>
         </div>
@@ -393,6 +395,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           showToast={showToast}
           // Added a placeholder function for adding a new customer
           onAddNewCustomer={() => showToast('Redirecting to Add Customer screen...', 'info')}
+          apiClient={apiClient}
       />
 
     </div>

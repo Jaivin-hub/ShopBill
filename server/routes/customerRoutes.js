@@ -8,6 +8,7 @@ router.get('/', protect, async (req, res) => {
     try {
         // SCOPED QUERY: ONLY fetch customers for the user's shopId
         const customers = await Customer.find({ shopId: req.user.shopId });
+        console.log('customers',customers)
         res.json(customers);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch customers.' });
@@ -15,30 +16,31 @@ router.get('/', protect, async (req, res) => {
 });
 
 router.post('/', protect, async (req, res) => {
-    // UPDATED: Destructure the new field, initialDue
+    // UPDATED: Destructure all fields
     const { name, phone, creditLimit, initialDue } = req.body;
-    console.log('req.body',req.body)
-    console.log('req.user',req.user)
     
     // --- Initial Validation ---
     if (!name || name.trim().length === 0) {
         return res.status(400).json({ error: 'Customer name is required.' });
     }
     
-    // --- Validation and Parsing for initialDue ---
+    // --- Validation and Parsing for initialDue and creditLimit ---
+    // Ensure initialDue is treated as a number. Safely default to 0.
     const parsedInitialDue = parseFloat(initialDue) || 0;
     if (isNaN(parsedInitialDue) || parsedInitialDue < 0) {
         return res.status(400).json({ error: 'Initial Due must be a non-negative number.', field: 'initialDue' });
     }
-    // ----------------------------------------------------
     
-    
+    // Ensure creditLimit is treated as a number. Safely default to 0 (or a high number depending on business logic).
+    const parsedCreditLimit = Math.max(0, parseFloat(creditLimit) || 0);
+
     // ----------------------------------------------------
     // --- UNIQUE PHONE NUMBER VALIDATION (UNCHANGED) ---
     // ----------------------------------------------------
     const trimmedPhone = phone ? String(phone).trim() : '';
 
     if (trimmedPhone) {
+        // ... (existing phone validation logic) ...
         const existingCustomer = await Customer.findOne({ 
             phone: trimmedPhone, 
             shopId: req.user.shopId 
@@ -53,17 +55,17 @@ router.post('/', protect, async (req, res) => {
         }
     }
     // ----------------------------------------------------
-
+    console.log('parsedInitialDue',parsedInitialDue)
     try {
         const newCustomerData = {
             name: name.trim(),
             phone: trimmedPhone, 
-            creditLimit: Math.max(0, parseFloat(creditLimit) || 0), 
-            // CRUCIAL UPDATE: Use the validated and parsed initialDue value
+            // Use the parsed and validated limit
+            creditLimit: parsedCreditLimit, 
+            // CRUCIAL: Use the validated and parsed initialDue value for the outstanding credit
             outstandingCredit: parsedInitialDue, 
             shopId: req.user.shopId,
         };
-        console.log('newCustomerData',newCustomerData)
         
         const customer = await Customer.create(newCustomerData);
         
