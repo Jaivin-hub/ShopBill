@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, Calendar, TrendingUp, Eye, X, User, ArrowDownWideNarrow, Clock } from 'lucide-react'; 
+import { IndianRupee, AlertTriangle, Calendar, TrendingUp, Eye, X, User, ArrowDownWideNarrow, Clock } from 'lucide-react'; 
 import API from '../config/api';
 
-
-// --- Date Range Picker Component (Simplified) ---
+const getLocalDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+// -------------------------------------------------------------------
 
 const DateRangeFilter = ({ dateRange, onDateRangeChange }) => {
     return (
@@ -26,7 +31,7 @@ const DateRangeFilter = ({ dateRange, onDateRangeChange }) => {
     );
 };
 
-// --- Helper function to format relative time ---
+// --- Helper function to format relative time (Unchanged) ---
 const formatTimeAgo = (timestamp) => {
     const now = new Date();
     const past = new Date(timestamp);
@@ -43,9 +48,9 @@ const formatTimeAgo = (timestamp) => {
     return past.toLocaleDateString();
 };
 
-
 // --- Bill Modal Component ---
 const BillModal = ({ sale, onClose, isLoading }) => {
+    // --- Loading and Initial Check ---
     if (!sale && isLoading) {
         return (
              <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
@@ -58,84 +63,121 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 
     if (!sale) return null;
 
+    // --- Data Processing ---
     const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer'; 
     const isCredit = sale.amountCredited > 0;
     const paidAmount = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - sale.amountCredited); 
-    
+    const saleDate = new Date(sale.timestamp).toLocaleDateString();
+    const saleTime = new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const billId = sale._id ? sale._id.substring(0, 8).toUpperCase() : 'N/A';
+
+
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full transform transition-all overflow-hidden">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full transform transition-all overflow-hidden border border-gray-100 dark:border-gray-700">
                 
-                {/* Modal Header */}
-                <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Sale Bill (ID: {sale._id ? sale._id.substring(0, 8) : 'N/A'})</h3>
+                {/* Modal Header/Title Section */}
+                <div className="p-6 bg-indigo-500/10 dark:bg-indigo-900/20 text-center border-b border-indigo-500/30 dark:border-indigo-700/50 relative">
                     <button 
                         onClick={onClose} 
-                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        className="absolute top-3 right-3 text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white transition-colors p-1 rounded-full bg-transparent hover:bg-indigo-100/50 dark:hover:bg-indigo-800/50"
                         aria-label="Close Bill"
                     >
-                        <X className="w-6 h-6" />
+                        <X className="w-5 h-5" />
                     </button>
+                    <IndianRupee className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
+                    <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white">SALE RECEIPT</h3>
+                    <p className="text-xs font-mono text-gray-600 dark:text-gray-400 mt-1">
+                        Transaction ID: <span className="font-semibold">{billId}</span>
+                    </p>
                 </div>
 
-                {/* Modal Body (Item List) */}
-                <div className="p-5 max-h-[70vh] overflow-y-auto">
-                    <div className="mb-4 space-y-1">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Customer: <span className="font-semibold text-indigo-600 dark:text-indigo-400">{customerName}</span></p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Time: {new Date(sale.timestamp).toLocaleString()}</p>
+                {/* Bill Metadata */}
+                <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                        <span className="flex items-center text-gray-500 dark:text-gray-400">
+                            <Clock className="w-4 h-4 mr-2" />
+                            Date & Time
+                        </span>
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">{saleDate} at {saleTime}</span>
                     </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="flex items-center text-gray-500 dark:text-gray-400">
+                            <User className="w-4 h-4 mr-2" />
+                            Customer
+                        </span>
+                        <span className={`font-bold ${isCredit ? 'text-red-500 dark:text-red-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{customerName}</span>
+                    </div>
+                </div>
 
-                    <h4 className="font-semibold text-gray-700 dark:text-gray-200 mb-2 border-t pt-3 border-gray-200 dark:border-gray-700">Products Purchased:</h4>
-                    <ul className="space-y-2 pb-3">
+
+                {/* Modal Body (Item List) */}
+                <div className="p-6 max-h-[60vh] overflow-y-auto border-b border-dashed border-gray-300 dark:border-gray-700">
+                    <h4 className="font-bold text-lg text-gray-700 dark:text-gray-300 mb-3">Order Summary</h4>
+                    <ul className="space-y-3">
                         {sale.items && sale.items.length > 0 ? (
                             sale.items.map((item, index) => (
-                                <li key={index} className="flex justify-between text-sm text-gray-700 dark:text-gray-300">
-                                    <span className="truncate pr-2">
-                                        {item.quantity} x {(item.itemId?.name || item.name || 'Product')}
-                                        <span className='ml-2 text-gray-400 dark:text-gray-500'>(@ ₹{item.price.toFixed(2)} each)</span>
+                                <li key={index} className="flex justify-between items-start text-sm border-b border-gray-100 dark:border-gray-800 pb-2 last:border-b-0">
+                                    <div className='flex flex-col'>
+                                        <span className="font-medium text-gray-800 dark:text-gray-200">
+                                            {(item.itemId?.name || item.name || 'Unknown Product')}
+                                        </span>
+                                        <span className='text-xs text-gray-500 dark:text-gray-400 mt-0.5'>
+                                            {item.quantity} units @ ₹{item.price.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                        ₹{(item.quantity * item.price).toFixed(2)}
                                     </span>
-                                    <span className="font-medium whitespace-nowrap">₹{(item.quantity * item.price).toFixed(2)}</span>
                                 </li>
                             ))
                         ) : (
-                            <li className="text-gray-500 italic">No item details available.</li>
+                            <li className="text-gray-500 italic text-center">No item details available.</li>
                         )}
                     </ul>
-
-                    {/* Totals Section */}
-                    <div className="mt-4 space-y-2 border-t border-gray-300 dark:border-gray-700 pt-3">
-                        <div className="flex justify-between font-medium text-base text-gray-800 dark:text-gray-100">
-                            <span>SUBTOTAL</span>
-                            <span>₹{sale.totalAmount.toFixed(2)}</span>
-                        </div>
-                        
-                        <div className="flex justify-between font-bold text-xl text-indigo-600 dark:text-indigo-400 border-t border-dashed border-gray-300 dark:border-gray-700 pt-2">
-                            <span>GRAND TOTAL</span>
-                            <span>₹{sale.totalAmount.toFixed(2)}</span>
-                        </div>
-                        
-                        {isCredit && (
-                            <div className="space-y-1 pt-2">
-                                <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                                    <span>Amount Paid</span>
-                                    <span>₹{paidAmount.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between font-semibold text-base text-red-600 dark:text-red-400">
-                                    <span>Credit Due</span>
-                                    <span>₹{sale.amountCredited.toFixed(2)}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
 
-                {/* Modal Footer */}
-                <div className="p-5 bg-gray-50 dark:bg-gray-700 text-right">
+                {/* Totals Section */}
+                <div className="p-6 space-y-3">
+                    {/* Subtotal/Total */}
+                    <div className="flex justify-between font-medium text-lg text-gray-700 dark:text-gray-300">
+                        <span>SUBTOTAL</span>
+                        <span>₹{sale.totalAmount.toFixed(2)}</span>
+                    </div>
+                    
+                    {/* Grand Total - Highlighted */}
+                    <div className="flex justify-between font-extrabold text-2xl text-indigo-700 dark:text-indigo-400 border-t border-dashed border-gray-400 dark:border-gray-600 pt-3">
+                        <span>TOTAL AMOUNT</span>
+                        <span>₹{sale.totalAmount.toFixed(2)}</span>
+                    </div>
+
+                    {/* Credit Status */}
+                    {isCredit ? (
+                         <div className="space-y-1 pt-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                            <div className="flex justify-between text-base font-semibold text-green-700 dark:text-green-400">
+                                <span>Amount Paid</span>
+                                <span>₹{paidAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-extrabold text-xl text-red-700 dark:text-red-400">
+                                <span className='flex items-center'><AlertTriangle className='w-5 h-5 mr-2' />CREDIT DUE</span>
+                                <span>₹{sale.amountCredited.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ) : (
+                         <div className="flex items-center justify-center pt-3 text-lg font-bold text-green-700 dark:text-green-400">
+                            <CheckCircle className='w-6 h-6 mr-2' />
+                            Payment Completed
+                        </div>
+                    )}
+                </div>
+
+                {/* Modal Footer (Action) */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 text-center border-t border-gray-200 dark:border-gray-700">
                     <button 
                         onClick={onClose} 
-                        className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors"
+                        className="w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-[1.01]"
                     >
-                        Done
+                        Close Receipt
                     </button>
                 </div>
             </div>
@@ -144,63 +186,32 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 };
 
 
+
 // --- Main Sales Activity Component ---
 
 const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
-    
-    // MOCK API Client Structure (Needed for standalone runnability)
-    const mockApiClient = {
-        get: async (endpoint) => {
-            console.warn(`[MOCK API] GET ${endpoint}`);
-            // Mock data structure matching the expected format
-            const baseData = [
-                { _id: 'sale_a123', timestamp: Date.now() - 3600000, totalAmount: 550.00, amountCredited: 0, customerName: 'Rajesh Sharma', amountPaid: 550.00 },
-                { _id: 'sale_b456', timestamp: Date.now() - 10800000, totalAmount: 1200.50, amountCredited: 200.00, customerName: 'Priya Singh', amountPaid: 1000.50 },
-                { _id: 'sale_c789', timestamp: Date.now() - 86400000, totalAmount: 75.25, amountCredited: 0, customerName: 'Walk-in Customer', amountPaid: 75.25 },
-                { _id: 'sale_d012', timestamp: Date.now() - 172800000, totalAmount: 3450.00, amountCredited: 1500.00, customerName: 'Akash Patel', amountPaid: 1950.00 },
-                { _id: 'sale_e345', timestamp: Date.now() - 259200000, totalAmount: 150.00, amountCredited: 0, customerName: 'Rajesh Sharma', amountPaid: 150.00 },
-                { _id: 'sale_f678', timestamp: Date.now() - 360000000, totalAmount: 880.00, amountCredited: 880.00, customerName: 'Zoya Khan', amountPaid: 0.00 },
-            ];
-
-            if (endpoint.includes(API.sales) && !endpoint.includes('/sale_')) {
-                return { data: baseData };
-            } else if (endpoint.includes('/sale_a123')) {
-                 return {
-                    data: {
-                        _id: 'sale_a123', timestamp: Date.now() - 3600000, totalAmount: 550.00, amountCredited: 0, customerName: 'Rajesh Sharma', amountPaid: 550.00,
-                        items: [
-                            { name: 'T-Shirt (Blue)', quantity: 2, price: 200.00 },
-                            { name: 'Jeans (Black)', quantity: 1, price: 150.00 },
-                        ]
-                    }
-                };
-            }
-             return { data: baseData.find(s => endpoint.includes(s._id)) || {} };
-        }
-    };
-    
-    const activeApiClient = apiClient || mockApiClient;
-    
+    const activeApiClient = apiClient;
     const [sales, setSales] = useState(salesData || []); 
     const [isLoadingSales, setIsLoadingSales] = useState(false); 
-    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
-
     const [searchQuery, setSearchQuery] = useState(''); 
-    // State to toggle between showing no controls, the search bar, or the sort dropdown
-    // 'none': shows icons. 'search': shows search bar. 'sort': shows sort dropdown.
     const [activeControl, setActiveControl] = useState('none'); 
     
-    // Default date range state
-    const today = new Date().toISOString().split('T')[0]; 
-    const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
+    // --- UPDATED DATE INITIALIZATION ---
+    const todayDate = new Date();
+    const today = getLocalDateString(todayDate); // e.g., '2025-10-13'
+    
+    const sevenDaysAgoDate = new Date(todayDate);
+    sevenDaysAgoDate.setDate(todayDate.getDate() - 7);
+    const last7Days = getLocalDateString(sevenDaysAgoDate);
+    
     const [dateRange, setDateRange] = useState({
         startDate: last7Days,
-        endDate: today,
+        endDate: today, // Correctly set to the local date string for today
     });
+    // -----------------------------------
 
     // State for sorting option, default to newest first
     const [sortOption, setSortOption] = useState('timeDesc'); 
@@ -220,9 +231,11 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                 // Construct query parameters for the date range
                 const params = new URLSearchParams();
                 if (dateRange.startDate) {
+                    // Send start date as the beginning of that day in UTC
                     params.append('startDate', new Date(dateRange.startDate).toISOString());
                 }
                 if (dateRange.endDate) {
+                    // Send end date as the end of that day (23:59:59.999) in UTC
                     const endDate = new Date(dateRange.endDate);
                     endDate.setHours(23, 59, 59, 999);
                     params.append('endDate', endDate.toISOString());
@@ -247,7 +260,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
         };
 
         fetchSales();
-    }, [dateRange, activeApiClient, showToast]); 
+    }, [dateRange, activeApiClient, showToast, salesData]); // Added salesData as dependency
     
     
     // Function to fetch full sale details when 'View' is clicked
@@ -502,7 +515,10 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                             const key = sale._id; 
                             const amountCreditedSafe = sale.amountCredited || 0;
                             const isCredit = amountCreditedSafe > 0;
-                            const amountPaid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - amountCreditedSafe);
+                            
+                            const calculatedAmountPaid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - amountCreditedSafe);
+                            const amountPaidForDisplay = Math.max(0, calculatedAmountPaid); 
+                            
                             const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer';
 
                             return (
@@ -542,9 +558,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                                                     <span className="font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 whitespace-nowrap">
                                                         Due: ₹{amountCreditedSafe.toFixed(0)}
                                                     </span>
-                                                    {amountPaid > 0 && (
+                                                    {amountPaidForDisplay > 0 && (
                                                         <span className="font-semibold px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 whitespace-nowrap">
-                                                            Paid: ₹{amountPaid.toFixed(0)}
+                                                            Paid: ₹{amountPaidForDisplay.toFixed(0)}
                                                         </span>
                                                     )}
                                                 </>
@@ -576,8 +592,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                     </div>
                 )}
             </div>
-            
-            {/* Bill Modal */}
+            {/* BillModal component is assumed to be available here */}
             {isModalOpen && (
                 <BillModal 
                     sale={selectedSaleDetail} 

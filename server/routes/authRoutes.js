@@ -18,12 +18,60 @@ const generateToken = (id, shopId, role) => {
 
 // --- Existing Routes ---
 
-// Login User
+/**
+ * @route POST /api/auth/login
+ * @desc Authenticate user by email OR phone and password.
+ * @access Public
+ */
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body; // Use 'identifier' to accept email or phone
     
+    // Basic validation
+    if (!identifier || !password) {
+        return res.status(400).json({ error: 'Email/Phone and password are required.' });
+    }
+
     try {
-        const user = await User.findOne({ email });
+        // --- NEW NORMALIZATION LOGIC ---
+        let searchIdentifiers = [];
+        const isEmail = identifier.includes('@');
+        
+        // 1. If it looks like an email, search only by email
+        if (isEmail) {
+            searchIdentifiers.push(identifier.toLowerCase());
+        } 
+        // 2. If it looks like a phone number (no '@'), generate potential matches
+        else {
+            // Clean up the identifier: remove spaces, dashes, parentheses
+            const cleanedIdentifier = identifier.replace(/[\s\-\(\)]/g, '');
+            
+            // A. Full identifier (Assumes user provided country code, e.g., "+91...")
+            searchIdentifiers.push(cleanedIdentifier);
+
+            // B. Check against common/default country codes if it's a number without '+'
+            // IMPORTANT: You MUST configure your primary/expected country code(s) here.
+            // Assuming your primary market is India (+91)
+            const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91'; 
+
+            // If the cleaned identifier does not start with a '+' (i.e., local number only)
+            if (!cleanedIdentifier.startsWith('+')) {
+                // Add the default country code prefix for search
+                searchIdentifiers.push(defaultCountryCode + cleanedIdentifier);
+            }
+
+            // Optional: If you support multiple major countries, you can add more checks here
+            // Example: searchIdentifiers.push('+1' + cleanedIdentifier); 
+        }
+
+        // 3. Construct the Mongoose $or query using the generated identifiers
+        const orQuery = searchIdentifiers.flatMap(id => [
+            { email: id },
+            // Phone numbers are typically stored with the '+' and country code
+            { phone: id } 
+        ]);
+        // --- END NORMALIZATION LOGIC ---
+
+        const user = await User.findOne({ $or: orQuery });
 
         if (user && (await user.matchPassword(password))) {
             const token = generateToken(user._id, user.shopId, user.role);
@@ -38,7 +86,7 @@ router.post('/login', async (req, res) => {
                 }
             });
         } else {
-            res.status(401).json({ error: 'Invalid email or password.' });
+            res.status(401).json({ error: 'Invalid email/phone or password.' });
         }
     } catch (error) {
         console.error('Login Error:', error);
@@ -55,9 +103,10 @@ router.post('/signup', async (req, res) => {
     }
 
     try {
-        const userExists = await User.findOne({ email });
+        // Check if user exists by email OR phone number
+        const userExists = await User.findOne({ $or: [{ email }, { phone }] });
         if (userExists) {
-            return res.status(400).json({ error: 'User already exists with this email.' });
+            return res.status(400).json({ error: 'User already exists with this email or phone number.' });
         }
 
         const newUser = await User.create({
@@ -99,6 +148,7 @@ router.post('/signup', async (req, res) => {
  * @route POST /api/auth/forgot-password
  * @desc Accepts an email, generates a token, stores hash, and sends reset email.
  * @access Public
+ * * NOTE: This route typically still uses email to send the link.
  */
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;

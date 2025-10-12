@@ -34,7 +34,7 @@ const validatePhoneNumber = (inputPhone) => {
 };
 
 // --- Sub-Component: Login Form (Unchanged) ---
-const LoginForm = ({ handleAuth, email, handleEmailChange, handleEmailBlur, password, setPassword, loading, setView, authError, emailError }) => {
+const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError }) => {
     const [showPassword, setShowPassword] = useState(false);
 
     return (
@@ -48,22 +48,19 @@ const LoginForm = ({ handleAuth, email, handleEmailChange, handleEmailBlur, pass
                 </div>
             )}
             <form className="space-y-4" onSubmit={handleAuth}>
-                {/* Email Input */}
+                {/* Identifier Input (Email OR Phone) */}
                 <input
                     type="text"
-                    placeholder="Email Address"
-                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-600'}`}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    onBlur={handleEmailBlur}
-                    value={email}
+                    placeholder="Email Address or Phone Number"
+                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 border-gray-600`}
+                    // Use identifier state and setIdentifier handler
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    value={identifier}
                     required
-                    autoComplete="email"
+                    // Note: Removed 'autoComplete="email"' as it might be phone number
+                    autoComplete="username" 
                 />
-                {/* Email Error Message */}
-                {emailError && (
-                    <p className="text-red-400 text-sm mt-1">{emailError}</p>
-                )}
-
+                
                 {/* Password Input with Toggle */}
                 <div className="relative">
                     <input
@@ -498,7 +495,8 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
 // Main Login Component
 const Login = ({ onLogin, onBackToLanding }) => {
     const [view, setView] = useState('login'); // 'login', 'signup', 'forgotPassword'
-    const [email, setEmailState] = useState('');
+    // RENAMED STATE: 'email' is now 'identifier' for generality
+    const [identifier, setIdentifier] = useState(''); 
     const [password, setPassword] = useState('');
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
@@ -506,14 +504,14 @@ const Login = ({ onLogin, onBackToLanding }) => {
     const [resetMessage, setResetMessage] = useState(null);
     const [passwordError, setPasswordError] = useState(null);
     const [phoneError, setPhoneError] = useState(null);
-    const [emailError, setEmailError] = useState(null);
+    const [emailError, setEmailError] = useState(null); // Kept for Signup and Forgot Password forms
 
     // NEW: State for dynamically loaded country codes
     const [countryCodes, setCountryCodes] = useState([]);
 
     const isSignup = view === 'signup';
 
-    // --- Data Fetching Function ---
+    // --- Data Fetching Function (Unchanged) ---
     const fetchCountryCodes = useCallback(async () => {
         try {
             // Using REST Countries API (public, no key required for basic data)
@@ -562,13 +560,14 @@ const Login = ({ onLogin, onBackToLanding }) => {
         }
     }, []);
 
-    // --- Initial Data Loading Effect ---
+    // --- Initial Data Loading Effect (Unchanged) ---
     useEffect(() => {
         fetchCountryCodes();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // --- Validation Functions (Unchanged) ---
+    // NOTE: This is for signup/forgot password where email is strictly required.
     const validateEmail = (inputEmail) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (/\s/.test(inputEmail)) return 'Email cannot contain spaces.';
@@ -577,23 +576,31 @@ const Login = ({ onLogin, onBackToLanding }) => {
         return null;
     };
 
-    // Updated Email Change Handler: Updates state and clears error while typing
+    // Updated Email Change Handler (Used only for Signup/Forgot Password email field)
     const handleEmailChange = useCallback((newEmail) => {
         const sanitizedEmail = newEmail.toLowerCase().trim();
-        setEmailState(sanitizedEmail);
-        // Clear error immediately when user starts typing
+        // Since we removed the 'email' state, we need to adapt this,
+        // or re-introduce a separate state for the signup/forgot password email.
+        // Easiest is to use 'identifier' for login, but 'email' for signup/forgot password.
+        // For simplicity, I will use a local state variable in the Signup/ForgotPassword forms 
+        // if they strictly need email validation, and use 'identifier' only for the login form.
+        // HOWEVER, based on the original component structure, 'email' was used for everything.
+        // Let's keep the 'identifier' state for the input, and ensure the signup/forgot password logic is robust.
+        setIdentifier(sanitizedEmail);
         if (emailError) setEmailError(null);
     }, [emailError]);
 
-    // New Email Blur Handler: Validates and sets error only when field loses focus
+
+    // New Email Blur Handler (Used only for Signup/Forgot Password email field)
     const handleEmailBlur = useCallback(() => {
-        if (email) {
-            setEmailError(validateEmail(email));
+        // Only validate if in a view that strictly requires email (Signup/ForgotPassword)
+        if (view !== 'login' && identifier) {
+            setEmailError(validateEmail(identifier));
         }
-    }, [email]);
+    }, [identifier, view]);
 
 
-    // --- Other Effects and Handlers (omitted for brevity, they remain as they were in the previous iteration) ---
+    // --- Other Effects and Handlers (Updated) ---
     useEffect(() => {
         setAuthError(null);
         setResetMessage(null);
@@ -608,15 +615,17 @@ const Login = ({ onLogin, onBackToLanding }) => {
         }
     }, [view]);
 
+    // **UPDATED** - This now uses 'identifier' but validates it as an email because
+    // the Forgot Password process requires an email address.
     const handleForgotPasswordRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
         setResetMessage(null);
         setAuthError(null);
-        setEmailError(null); // Clear error before final submission check
+        setEmailError(null); 
 
-        // Final validation before sending request
-        const emailValidation = validateEmail(email);
+        // Final validation before sending request: MUST be a valid email for this feature
+        const emailValidation = validateEmail(identifier); 
 
         if (emailValidation) {
             setResetMessage({ error: emailValidation });
@@ -626,7 +635,8 @@ const Login = ({ onLogin, onBackToLanding }) => {
         }
 
         try {
-            const authData = { email };
+            // Note: The backend expects an 'email' field for this route
+            const authData = { email: identifier };
 
             const response = await apiClient.post(API.forgetpassword, authData);
             const data = response.data;
@@ -657,31 +667,44 @@ const Login = ({ onLogin, onBackToLanding }) => {
         }
     };
 
+    // **UPDATED** - Simplified Login logic to remove client-side validation
     const handleAuth = async (e) => {
         e.preventDefault();
 
         setAuthError(null);
         setPasswordError(null);
         setPhoneError(null);
-        setEmailError(null); // Clear errors before final validation
+        setEmailError(null); 
 
         let hasError = false;
 
-        // Re-run all validation checks on submit
-        const emailValidation = validateEmail(email);
-        if (emailValidation) {
-            setEmailError(emailValidation);
-            hasError = true;
+        // **LOGIN VIEW:** Skip client-side email/phone validation. Let the backend handle the identifier check.
+        if (view === 'login') {
+            if (!identifier) {
+                setAuthError('Email or Phone Number is required.');
+                hasError = true;
+            }
+            if (!password) {
+                setAuthError('Password is required.');
+                hasError = true;
+            }
         }
-
+        
+        // **SIGNUP VIEW:** Keep client-side validation for the individual required fields
         if (isSignup) {
-            // Check if country codes are loaded before proceeding with signup attempt
+            // Identifier is expected to be the email in the signup form flow
+            const emailValidation = validateEmail(identifier);
+            if (emailValidation) {
+                setEmailError(emailValidation);
+                hasError = true;
+            }
+            
             if (countryCodes.length === 0) {
                 setAuthError('Country codes are still loading. Please wait a moment and try again.');
                 hasError = true;
             }
 
-            const currentPassword = password; // use current state password
+            const currentPassword = password; 
             if (currentPassword.length < 8) {
                 setPasswordError('Password must be 8 or more characters long.');
                 hasError = true;
@@ -704,9 +727,10 @@ const Login = ({ onLogin, onBackToLanding }) => {
         const url = isSignup ? API.signup : API.login;
         const formType = isSignup ? 'Signup' : 'Login';
 
+        // **CRITICAL CHANGE:** Login sends 'identifier' instead of 'email'
         const authData = isSignup
-            ? { email, password, phone: phone }
-            : { email, password };
+            ? { email: identifier, password, phone: phone }
+            : { identifier, password }; // Match the new backend identifier field
 
 
         try {
@@ -739,8 +763,10 @@ const Login = ({ onLogin, onBackToLanding }) => {
     const renderForm = () => {
         // Props shared by all forms
         const commonProps = {
-            email,
-            handleEmailChange,
+            // 'email' prop is now 'identifier'
+            identifier,
+            // 'handleEmailChange' is now just setting the identifier state
+            setIdentifier: handleEmailChange, 
             handleEmailBlur,
             loading,
             setView,
@@ -758,11 +784,14 @@ const Login = ({ onLogin, onBackToLanding }) => {
                         phone={phone}
                         setPhone={setPhone}
                         passwordError={passwordError}
-                        setPasswordError={setPasswordError} // Passing setter
+                        setPasswordError={setPasswordError} 
                         phoneError={phoneError}
-                        setPhoneError={setPhoneError} // Passing setter
+                        setPhoneError={setPhoneError} 
                         countryCodes={countryCodes}
                         {...commonProps}
+                        // For Signup, we rename 'identifier' back to 'email' if the SignupForm expects it:
+                        email={identifier}
+                        handleEmailChange={handleEmailChange}
                     />
                 );
             case 'forgotPassword':
@@ -771,6 +800,10 @@ const Login = ({ onLogin, onBackToLanding }) => {
                         handleForgotPasswordRequest={handleForgotPasswordRequest}
                         resetMessage={resetMessage}
                         {...commonProps}
+                        // For ForgotPassword, we rename 'identifier' back to 'email' if the ForgotPasswordForm expects it:
+                        email={identifier}
+                        handleEmailChange={handleEmailChange}
+                        handleEmailBlur={handleEmailBlur}
                     />
                 );
             case 'login':
@@ -778,9 +811,15 @@ const Login = ({ onLogin, onBackToLanding }) => {
                 return (
                     <LoginForm
                         handleAuth={handleAuth}
+                        // Pass identifier state and setter
+                        identifier={identifier}
+                        setIdentifier={setIdentifier} 
                         password={password}
                         setPassword={setPassword}
-                        {...commonProps}
+                        authError={authError} // Explicitly pass authError
+                        loading={loading} // Explicitly pass loading
+                        setView={setView} // Explicitly pass setView
+                        // Other props are not needed in the simplified LoginForm
                     />
                 );
         }

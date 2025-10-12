@@ -3,7 +3,6 @@ import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Sear
 // NOTE: Ensure your API config path is correct
 import API from '../config/api'; 
 
-
 // Default Walk-in Customer for UPI sales
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" option
@@ -87,17 +86,22 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         amountCredited, 
         changeDue,      
         newKhataBalance, 
-        paymentMethod    
+        paymentMethod,
+        effectiveAmountPaid // <--- ADDED: The actual amount to record as paid
     } = useMemo(() => {
         const total = totalAmount;
 
         let amountCredited = 0; // Amount of the CURRENT SALE to be added to Khata
         let changeDue = 0;
+        let effectiveAmountPaid = amountPaid; // Default: use the value from the input
         let method = paymentType;
         
+        // --- FIX APPLIED HERE ---
         if (paymentType === 'Credit') {
             // SCENARIO 1: Full sale amount is explicitly put on credit (Full Khata button)
             amountCredited = total;
+            // FIX: When full Khata is selected, the amount paid must be ZERO, regardless of input field value.
+            effectiveAmountPaid = 0; 
             method = 'Credit';
         }
         else { // UPI / Mixed
@@ -118,7 +122,13 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         // New Outstanding = Old Outstanding + (Portion of CURRENT SALE put on credit)
         const newKhataBalance = khataDue + amountCredited;
 
-        return { amountCredited, changeDue, newKhataBalance, paymentMethod: method };
+        return { 
+            amountCredited, 
+            changeDue, 
+            newKhataBalance, 
+            paymentMethod: method,
+            effectiveAmountPaid // Return the corrected value
+        };
         
     }, [amountPaid, totalAmount, paymentType, khataDue]);
 
@@ -242,7 +252,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             return;
         }
 
-        if (amountPaid < 0) {
+        // FIX APPLIED: Use the effectively paid amount calculated in useMemo
+        if (effectiveAmountPaid < 0) {
              showToast('Amount paid cannot be negative.', 'error');
              return;
         }
@@ -250,8 +261,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         setIsSubmitting(true);
         
         try {
-             // Pass the calculated (and now corrected) amountCredited to the parent
-             await processPayment(amountPaid, amountCredited, paymentMethod, localSelectedCustomer);
+             // FIX APPLIED HERE: Pass effectiveAmountPaid instead of the raw amountPaid
+             await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer);
         } catch (e) {
             showToast('Payment processing failed. Please try again.', 'error');
             setIsSubmitting(false); 
@@ -520,7 +531,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     {/* Amount Paid Input (Visible only for Cash/Mixed) */}
                     {paymentType === 'UPI' && (
                         <div className="space-y-2">
-                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received (UPI)</label>
+                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received</label>
                             <input
                                 id="amount-paid"
                                 type="number"
@@ -558,7 +569,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
                         {/* New Khata Balance */}
                         {/* Show New Khata Balance if a credit customer is selected and the transaction affects the Khata (credit added OR full payment). Note: >= 0 is used to show the balance even if credit is 0. */}
-                        {isCreditCustomerSelected && amountCredited >= 0 && (
+                        {isCreditCustomerSelected && (khataDue > 0 || amountCredited > 0) && (
                             <p className="flex justify-between text-sm text-gray-400 pt-3 border-t border-gray-700 mt-2">
                                 <span><strong>New</strong> Total Outstanding Khata Balance:</span>
                                 <span className="font-semibold text-white text-base">₹{newKhataBalance.toFixed(2)}</span>
@@ -591,7 +602,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         ) : (
                             <CheckCircle className="w-6 h-6 mr-2" />
                         )}
-                        {isSubmitting ? 'Processing Transaction...' : `Confirm ${paymentMethod} Transaction`}
+                        {isSubmitting ? 'Processing Transaction...' : paymentMethod == 'Credit' ? `Confirm ${paymentMethod} Transaction` : `Confirm Transaction`}
                     </button>
                 </div>
             </div>
