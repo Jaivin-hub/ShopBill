@@ -17,7 +17,7 @@ CustomerSchema.index(
     { phone: 1, shopId: 1 }, 
     { 
         unique: true, 
-        partialFilterExpression: { phone: { $exists: true, $ne: '' } }
+        partialFilterExpression: { phone: { $exists: true, $ne: null, $ne: '' }  }
     }
 );
 

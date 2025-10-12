@@ -7,8 +7,8 @@ const USER_ROLES = {
   CASHIER: 'cashier',
 };
 
-// CRITICAL: Added onViewAllInventory and onViewAllCredit props
-const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit }) => {
+// UPDATED: Added onViewSaleDetails prop for viewing a single bill
+const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, onViewSaleDetails }) => {
   const isOwner = userRole === USER_ROLES.OWNER;
 
   // 1. Data States
@@ -31,10 +31,8 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
       setInventory(invResponse.data);
       setCustomers(custResponse.data);
       setSales(salesResponse.data);
-      // Data loaded successfully
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
-      // Use the showToast utility from App.jsx
       showToast('Error loading dashboard data. Please check server connection.', 'error');
     } finally {
       setIsLoading(false);
@@ -47,10 +45,10 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
       fetchDashboardData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwner]); // Only re-run if isOwner changes
+  }, [isOwner]);
 
 
-  // --- EXISTING DATA CALCULATIONS (Now depend on local state) ---
+  // --- DATA CALCULATIONS ---
 
   // Calculate Today's Report
   const today = useMemo(() => {
@@ -76,7 +74,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
   const totalOutstandingCredit = useMemo(() => {
     return customers.reduce((sum, cust) => sum + cust.outstandingCredit, 0);
   }, [customers]);
-  
+
   // Top 5 Credit Holders
   const topCreditHolders = useMemo(() => {
     return customersWithCredit
@@ -89,7 +87,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
   const allLowStockAlerts = useMemo(() => {
     return inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0));
   }, [inventory]);
-  
+
   // Inventory Alerts (capped at 5 for dashboard view)
   const lowStockAlerts = useMemo(() => {
     return allLowStockAlerts.slice(0, 5);
@@ -187,22 +185,22 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
           <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col transition-colors duration-300">
             {/* Conditional View All Button for Inventory */}
             <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-                <h2 className="text-xl font-semibold text-white flex items-center">
-                    <Package className="w-5 h-5 mr-2 text-teal-400" /> Inventory Alerts ({allLowStockAlerts.length})
-                </h2>
-                {/* Logic: Only show if there are more than 5 alerts */}
-                {allLowStockAlerts.length > 5 && (
-                    <button
-                        onClick={onViewAllInventory}
-                        className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                        title="View Full Inventory Report"
-                    >
-                        View All
-                        <ArrowRight className="w-4 h-4 ml-1" />
-                    </button>
-                )}
+              <h2 className="text-xl font-semibold text-white flex items-center">
+                <Package className="w-5 h-5 mr-2 text-teal-400" /> Inventory Alerts
+              </h2>
+              {/* Logic: Only show if there are more than 5 alerts */}
+              {allLowStockAlerts.length > 0 && (
+                <button
+                  onClick={onViewAllInventory}
+                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  title={allLowStockAlerts.length > 1 ? "View Full Inventory Report" : "View Inventory Alert"}
+                >
+                  {allLowStockAlerts.length > 1 ? 'View All' : 'View'}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              )}
             </div>
-            
+
             <div className="flex-grow">
               {lowStockAlerts.length > 0 ? (
                 <ul className="space-y-3 pt-2">
@@ -223,33 +221,33 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
           <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col transition-colors duration-300">
             {/* Conditional View All Button for Credit Holders */}
             <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-                <h2 className="text-xl font-semibold text-white flex items-center">
-                    <Users className="w-5 h-5 mr-2 text-indigo-400" /> Top Credit Holders
-                </h2>
-                {/* Logic: Only show if there are more than 5 credit holders */}
-                {customersWithCredit.length > 5 && (
-                    <button
-                        onClick={onViewAllCredit}
-                        className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                        title="View Full Credit Ledger"
-                    >
-                        View All
-                        <ArrowRight className="w-4 h-4 ml-1" />
-                    </button>
-                )}
+              <h2 className="text-xl font-semibold text-white flex items-center">
+                <Users className="w-5 h-5 mr-2 text-indigo-400" /> Top Credit Holders
+              </h2>
+              {/* Logic: Only show if there are more than 5 credit holders */}
+              {customersWithCredit.length > 0 && (
+                <button
+                  onClick={onViewAllCredit}
+                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  title={customersWithCredit.length > 1 ? "View Full Credit Ledger" : "View Customer Credit"}
+                >
+                  {customersWithCredit.length > 1 ? 'View All' : 'View'}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              )}
             </div>
-            
+
             <div className="flex-grow">
               <ul className="divide-y divide-gray-800 pt-2">
                 {topCreditHolders.length > 0 ? (
                   topCreditHolders.map((cust) => (
-                      <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
-                        <span className="truncate w-1/2 font-medium text-gray-300">{cust.name}</span>
-                        <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-400' : 'text-yellow-400'}`}>
-                          ₹{cust.outstandingCredit.toFixed(2)}
-                        </span>
-                      </li>
-                    ))
+                    <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
+                      <span className="truncate w-1/2 font-medium text-gray-300">{cust.name}</span>
+                      <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-400' : 'text-yellow-400'}`}>
+                        ₹{cust.outstandingCredit.toFixed(2)}
+                      </span>
+                    </li>
+                  ))
                 ) : (
                   <p className="text-gray-400 text-sm p-4 bg-indigo-900/20 rounded-lg border border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
                 )}
@@ -264,25 +262,25 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                 <List className="w-5 h-5 mr-2 text-teal-400" /> Recent Sales Activity
               </h2>
               {/* Conditional View All Button for Sales */}
-              {sales.length > 5 && ( // Logic: Only show if total sales records are more than 5
-                  <button
-                    onClick={onViewAllSales}
-                    className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                    title="View Full Sales Report"
-                  >
-                    View All
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </button>
+              {sales.length > 0 && (
+                <button
+                  onClick={onViewAllSales}
+                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  title={sales.length > 1 ? "View Full Sales Report" : "View Recent Sales"}
+                >
+                  {sales.length > 1 ? 'View All' : 'View'}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
               )}
             </div>
-            
+
             <div className="flex-grow">
               <ul className="divide-y divide-gray-800 pt-2">
                 {recentSales.length > 0 ? (
                   recentSales.map((sale) => {
 
                     let paymentDisplay = sale.paymentMethod;
-                    let colorClass = 'bg-gray-700 text-gray-400'; // Default dark mode style
+                    let colorClass = 'bg-gray-700 text-gray-400';
 
                     // --- Standard Logic for UPI/Cash/Full Credit (Dark Mode Only) ---
                     if (sale.paymentMethod === 'Credit') {
@@ -296,33 +294,53 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                     // --- START RENDER ---
                     return (
                       <li key={sale._id || sale.id} className="py-3 flex justify-between items-center text-sm">
-                        <div className="flex items-center space-x-3">
-                          {/* Display Total Amount */}
-                          <span className="font-bold text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
 
-                          {/* Conditional Rendering for Payment Tags */}
-                          {sale.paymentMethod === 'Mixed' ? (
-                            <>
-                              {/* Tag 1: Paid/Cash Portion (Green Theme) */}
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
-                                Paid: ₹{sale.amountPaid.toFixed(0)}
+                        {/* Wrapper for Sale Details and Time Ago/View Button */}
+                        <div className="flex flex-grow justify-between items-center">
+
+                          {/* Left side: Sale Summary Details */}
+                          <div className="flex items-center space-x-3">
+                            {/* Display Total Amount */}
+                            <span className="font-bold text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
+
+                            {/* Conditional Rendering for Payment Tags */}
+                            {sale.paymentMethod === 'Mixed' ? (
+                              <>
+                                {/* Tag 1: Paid/Cash Portion (Green Theme) */}
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
+                                  Paid: ₹{sale.amountPaid.toFixed(0)}
+                                </span>
+                                {/* Tag 2: Credit/Due Portion (Red Theme) */}
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-red-900/40 text-red-300 border border-red-700">
+                                  Due: ₹{sale.amountCredited.toFixed(0)}
+                                </span>
+                              </>
+                            ) : (
+                              /* Single Tag for UPI/Cash/Full Credit */
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${colorClass}`}>
+                                {paymentDisplay}
                               </span>
-                              {/* Tag 2: Credit/Due Portion (Red Theme) */}
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-red-900/40 text-red-300 border border-red-700">
-                                Due: ₹{sale.amountCredited.toFixed(0)}
-                              </span>
-                            </>
-                          ) : (
-                            /* Single Tag for UPI/Cash/Full Credit */
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${colorClass}`}>
-                              {paymentDisplay}
+                            )}
+                          </div>
+
+                          {/* Right side: Time Ago and View Button */}
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                              {formatTimeAgo(sale.timestamp)}
                             </span>
-                          )}
 
+                            {/* --- CORRECTED VIEW BILL BUTTON: Uses ArrowRight icon --- */}
+                            {onViewSaleDetails && (
+                              <button
+                                onClick={() => onViewSaleDetails(sale)}
+                                className="p-1 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-600 transition-colors duration-200"
+                                title={`View Bill for Sale ID: ${sale._id}`}
+                              >
+                                <ArrowRight className="w-4 h-4" /> {/* Changed from List to ArrowRight */}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
-                          {formatTimeAgo(sale.timestamp)}
-                        </span>
                       </li>
                     );
                   })

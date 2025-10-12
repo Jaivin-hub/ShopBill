@@ -24,26 +24,34 @@ router.post('/', protect, async (req, res) => {
         return res.status(400).json({ error: 'Customer name is required.' });
     }
     
-    // --- Validation and Parsing for initialDue and creditLimit ---
-    // Ensure initialDue is treated as a number. Safely default to 0.
-    const parsedInitialDue = parseFloat(initialDue) || 0;
+    // -----------------------------------------------------------------------------------------
+    // --- Validation and Parsing for initialDue and creditLimit (MODIFIED FOR OPTIONAL initialDue) ---
+    // -----------------------------------------------------------------------------------------
+    
+    // Safely default initialDue to 0 if missing/null/undefined/empty string.
+    // Then parse it as a number.
+    const rawInitialDue = initialDue === undefined || initialDue === null || initialDue === '' 
+                          ? 0 : initialDue;
+    
+    const parsedInitialDue = parseFloat(rawInitialDue);
+
     if (isNaN(parsedInitialDue) || parsedInitialDue < 0) {
         return res.status(400).json({ error: 'Initial Due must be a non-negative number.', field: 'initialDue' });
     }
     
-    // Ensure creditLimit is treated as a number. Safely default to 0 (or a high number depending on business logic).
+    // Ensure creditLimit is treated as a number. Safely default to 0.
     const parsedCreditLimit = Math.max(0, parseFloat(creditLimit) || 0);
 
     // ----------------------------------------------------
-    // --- UNIQUE PHONE NUMBER VALIDATION (UNCHANGED) ---
+    // --- UNIQUE PHONE NUMBER VALIDATION ---
     // ----------------------------------------------------
     const trimmedPhone = phone ? String(phone).trim() : '';
 
     if (trimmedPhone) {
-        // ... (existing phone validation logic) ...
+        // We only check for duplicates if a phone number is actually provided.
         const existingCustomer = await Customer.findOne({ 
             phone: trimmedPhone, 
-            shopId: req.user.shopId 
+            shopId: req.user.shopId  // SCOPED TO CURRENT SHOP
         });
 
         if (existingCustomer) {
@@ -55,14 +63,13 @@ router.post('/', protect, async (req, res) => {
         }
     }
     // ----------------------------------------------------
-    console.log('parsedInitialDue',parsedInitialDue)
+    
     try {
         const newCustomerData = {
             name: name.trim(),
             phone: trimmedPhone, 
-            // Use the parsed and validated limit
             creditLimit: parsedCreditLimit, 
-            // CRUCIAL: Use the validated and parsed initialDue value for the outstanding credit
+            // Use the validated and parsed initialDue value (which is 0 if optional/empty)
             outstandingCredit: parsedInitialDue, 
             shopId: req.user.shopId,
         };

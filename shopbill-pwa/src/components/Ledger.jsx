@@ -411,7 +411,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
                 
                 {/* NEW FIELD: Initial Due Amount */}
                 <InputField 
-                    label="Initial Due Amount (₹, Optional - For Existing Dues)" 
+                    label="Initial Due Amount (Optional)" 
                     name="initialDue" 
                     type="number" 
                     value={newCustomerData.initialDue} 

@@ -43,3 +43,8 @@
     -moz-appearance: none;
     appearance: none;
 }
+
+.dark-input::placeholder {
+    color: #e0e0e0; /* Light gray color */
+    opacity: 1; /* Override default browser opacity if necessary */
+}

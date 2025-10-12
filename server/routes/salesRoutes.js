@@ -8,13 +8,65 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const router = express.Router();
 
+// GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
+    // Extract date range from query parameters
+    const { startDate, endDate } = req.query;
+    
+    // Build the query filter object
+    const filter = { shopId: req.user.shopId };
+    
+    // Add date range filtering if parameters are provided
+    if (startDate || endDate) {
+        filter.timestamp = {};
+        if (startDate) {
+            // Find sales with timestamp >= startDate
+            filter.timestamp.$gte = new Date(startDate);
+        }
+        if (endDate) {
+            // Find sales with timestamp <= endDate
+            filter.timestamp.$lte = new Date(endDate);
+        }
+    }
+
     try {
-        // SCOPED QUERY: ONLY fetch sales for the user's shopId
-        const sales = await Sale.find({ shopId: req.user.shopId }).sort({ timestamp: -1 });
+        // SCOPED QUERY: fetch sales for the user's shopId, applying date filters
+        const sales = await Sale.find(filter) // Use the constructed filter object
+            .populate('customerId', 'name') // Populate customerId, only retrieving the 'name' field
+            .sort({ timestamp: -1 });
+            
+        // Sales objects will now look like: 
+        // { ..., customerId: { _id: '...', name: 'Customer Name' }, ... }
         res.json(sales);
     } catch (error) {
+        console.error('Failed to fetch sales data with date filter:', error);
         res.status(500).json({ error: 'Failed to fetch sales data.' });
+    }
+});
+
+// GET a single sale detail by ID (VIEW BILL MODAL)
+router.get('/:id', protect, async (req, res) => {
+    const saleId = req.params.id;
+
+    if (!isValidObjectId(saleId)) {
+        return res.status(400).json({ error: 'Invalid Sale ID.' });
+    }
+
+    try {
+        // Fetch the sale, ensuring it belongs to the user's shop
+        // Populate item details AND customer details for the detailed view
+        const sale = await Sale.findOne({ _id: saleId, shopId: req.user.shopId })
+            .populate('items.itemId') // Product details for the bill items
+            .populate('customerId', 'name'); // Customer name for the bill header
+
+        if (!sale) {
+            return res.status(404).json({ error: 'Sale not found or unauthorized.' });
+        }
+
+        res.json(sale);
+    } catch (error) {
+        console.error('Sale GET by ID Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch sale detail.' });
     }
 });
 
