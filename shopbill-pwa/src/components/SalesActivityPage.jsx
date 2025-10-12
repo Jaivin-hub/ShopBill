@@ -378,7 +378,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                     <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Gross Sales Value</p>
                     <div className="flex items-center mt-1">
                         <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-teal-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">₹{summaryMetrics.totalSalesValue.toFixed(2)}</span>
+                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{summaryMetrics.totalSalesValue.toFixed(2)}</span>
                     </div>
                 </div>
 
@@ -387,7 +387,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                     <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Credit Given</p>
                     <div className="flex items-center mt-1">
                         <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-red-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">₹{summaryMetrics.totalCreditGiven.toFixed(2)}</span>
+                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{summaryMetrics.totalCreditGiven.toFixed(2)}</span>
                     </div>
                 </div>
             </div>

@@ -1,177 +1,189 @@
-// CustomerList.jsx (Confirmed with the robust scrolling logic)
-import React from 'react';
+import React, { useState, useMemo } from 'react'; 
 import { 
-    List, MessageSquare, ArrowRight, UserPlus, 
-    TrendingUp, Phone, AlertTriangle 
+    List, CreditCard, IndianRupee, DollarSign, History, AlertTriangle, Phone, Search, Loader 
 } from 'lucide-react';
 
-// Utility Function (Helper for card)
-const getCustomerId = (cust) => cust._id || cust.id;
-
-
-// --- Utility Render (Customer Card) ---
-const CustomerCard = ({ cust, onCardClick }) => {
-    // ... (CustomerCard implementation remains unchanged)
-    const customerId = getCustomerId(cust);
-    const isNearLimit = cust.creditLimit > 0 && cust.outstandingCredit >= cust.creditLimit * 0.95;
-    const isOverdue = cust.outstandingCredit > 5000; 
-
-    let bgColor = 'bg-gray-800';
-    let borderColor = 'border-gray-700';
-    let dueColor = 'text-indigo-400';
-    
-    if (cust.outstandingCredit > 0) {
-        if (isNearLimit || isOverdue) {
-            bgColor = 'bg-red-900/20'; 
-            borderColor = 'border-red-700';
-            dueColor = 'text-red-400';
-        } else {
-            bgColor = 'bg-indigo-900/20';
-            borderColor = 'border-indigo-700';
-        }
-    }
-
-    return (
-      <div 
-        key={customerId}
-        className={`w-full p-4 rounded-xl shadow-xl shadow-indigo-900/10 transition duration-200 border ${borderColor} ${bgColor} 
-                    flex items-center space-x-3 cursor-pointer hover:border-teal-500`}
-        onClick={onCardClick}
-      >
-        
-        <div className="flex flex-grow justify-between items-center text-left space-x-3">
-            
-            <div className="flex flex-col flex-grow truncate">
-                <p className={`font-bold text-base text-white flex items-center truncate`}>
-                    {cust.name}
-                    {(isNearLimit || isOverdue) && (
-                        <AlertTriangle className="w-4 h-4 ml-2 text-red-400 flex-shrink-0" title="High Risk" />
-                    )}
-                </p>
-                
-                <div className="flex items-center text-xs mt-1 space-x-3">
-                    {cust.phone && (
-                        <span className="text-gray-500 flex items-center">
-                            <Phone className="w-3 h-3 mr-1" />{cust.phone}
-                        </span>
-                    )}
-                    {cust.creditLimit > 0 && (
-                        <span className="text-teal-400 font-medium hidden sm:block">
-                            Limit: ₹{cust.creditLimit.toFixed(0)}
-                        </span>
-                    )}
-                </div>
-            </div>
-            
-            <div className="flex items-center space-x-3 flex-shrink-0">
-                <div className="text-right">
-                    <span className={`text-2xl font-extrabold block ${cust.outstandingCredit > 0 ? dueColor : 'text-green-400'}`}>
-                        ₹{cust.outstandingCredit.toFixed(0)}
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">{cust.outstandingCredit > 0 ? 'DUE' : 'CLEAR'}</span>
-                </div>
-                <ArrowRight className="w-5 h-5 text-teal-400 flex-shrink-0" />
-            </div>
-        </div>
-      </div>
-    );
-};
-
-
+/**
+ * CustomerList Component: Renders the actual list of Khata customers.
+ */
 const CustomerList = ({ 
     sortedCustomers, 
-    totalOutstanding, 
-    outstandingCustomersForReminders,
-    openPaymentModal,
-    openAddCustomerModal,
-    handleSendReminders,
-    isProcessing
+    openPaymentModal, 
+    isProcessing,
+    openHistoryModal
 }) => {
-  return (
-    <>
-      <h1 className="text-3xl font-extrabold text-white mb-2">
-        Khata Manager
-      </h1>
-      <p className="text-gray-400 mb-6">Track customer dues and easily record payments.</p>
-      
-      {/* 🌟 ACTION BAR SECTION (UNCHANGED) */}
-      <div className="p-4 mb-6 bg-gray-900 rounded-xl shadow-2xl shadow-indigo-900/20 border border-indigo-700 transition-colors duration-300">
-        <div className="max-w-xl mx-auto space-y-3">
-            
-            {/* 1. Total Outstanding Due */}
-            <div className="flex items-center justify-between px-2 py-2 bg-gray-800 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2 text-indigo-400" />
-                    <span className="text-lg font-bold text-gray-400">TOTAL KHATA DUE:</span>
+    // 1. Search State
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Use a safe reference for the customer list array
+    const customersList = sortedCustomers || [];
+
+    // 2. Filtered List Logic
+    const filteredCustomers = useMemo(() => {
+        if (!searchTerm) {
+            return customersList;
+        }
+        const lowerCaseSearch = searchTerm.toLowerCase();
+        return customersList.filter(customer => 
+            customer.name.toLowerCase().includes(lowerCaseSearch) ||
+            (customer.phone && customer.phone.includes(searchTerm))
+        );
+    }, [customersList, searchTerm]);
+
+
+    const renderCustomerCard = (customer) => {
+        // Ensure outstandingCredit is safely accessed and defaulted to 0 for rendering
+        const outstandingAmount = customer.outstandingCredit || 0;
+        
+        // Determine status classes and message
+        const isOverLimit = customer.creditLimit > 0 && 
+                            outstandingAmount > customer.creditLimit;
+        
+        const cardBorderClass = isOverLimit 
+            ? 'border-red-600 ring-red-500/30' // Overdue & Overlimit
+            : outstandingAmount > 0 
+                ? 'border-yellow-600 ring-yellow-500/30' // Just Due
+                : 'border-gray-700 ring-indigo-500/30'; // Cleared or No Due
+
+        const statusText = isOverLimit 
+            ? 'OVER LIMIT'
+            : outstandingAmount > 0
+                ? 'DUE'
+                : 'CLEARED';
+        
+        const statusClass = isOverLimit 
+            ? 'bg-red-700 text-red-100' 
+            : outstandingAmount > 0
+                ? 'bg-yellow-600 text-gray-900' 
+                : 'bg-teal-700 text-teal-100';
+
+        return (
+            <div 
+                key={customer._id} 
+                className={`bg-gray-800 p-4 rounded-xl shadow-lg transition-all duration-300 transform 
+                            border ${cardBorderClass} ring-1 hover:shadow-xl hover:-translate-y-0.5`}
+            >
+                {/* 1. HEADER & AMOUNT (Condensed) */}
+                <div className="flex flex-col mb-3">
+                    <div className="flex justify-between items-start mb-2">
+                        {/* Name & Status */}
+                        <h3 className="text-lg sm:text-xl font-black text-white truncate max-w-[65%]">
+                            {customer.name}
+                        </h3>
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full flex-shrink-0 mt-0.5 ${statusClass}`}>
+                            {statusText}
+                        </span>
+                    </div>
+
+                    {/* MAIN AMOUNT & INFO (New Condensed Row) */}
+                    <div className="flex justify-between items-end border-t border-gray-700 pt-2">
+                        
+                        {/* Outstanding Khata */}
+                        <div className="flex flex-col">
+                            <span className="text-xs font-medium text-gray-500 block">Outstanding:</span>
+                            <span className={`text-2xl sm:text-3xl font-black ${isOverLimit ? 'text-red-400' : outstandingAmount > 0 ? 'text-yellow-400' : 'text-teal-400'}`}>
+                                ₹{outstandingAmount.toFixed(0)}
+                            </span>
+                        </div>
+
+                        {/* Limit & Phone (COMPACTED) */}
+                        <div className="flex flex-col items-end space-y-0.5 text-xs text-gray-400">
+                            {customer.phone && (
+                                <div className="flex items-center">
+                                    <Phone className="w-3 h-3 mr-1" />
+                                    <span>{customer.phone}</span>
+                                </div>
+                            )}
+                            {customer.creditLimit > 0 && (
+                                <div className="flex items-center">
+                                    <CreditCard className="w-3 h-3 mr-1" />
+                                    <span>Limit: ₹{customer.creditLimit.toFixed(0)}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-                <span className="text-3xl font-extrabold block text-teal-400">
-                    ₹{totalOutstanding.toFixed(0)}
-                </span>
-            </div>
 
-            {/* 2. Action Buttons (New Customer & Remind All) */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-                
-                {/* Primary Action: New Customer (Teal) */}
-                <button 
-                    className="py-3 bg-teal-600 text-white rounded-xl font-extrabold text-sm shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] disabled:opacity-50"
-                    onClick={openAddCustomerModal}
+                {/* 2. ACTIONS (Mobile Focus: Taller, clearer buttons) */}
+                <div className="flex gap-2 pt-2 border-t border-gray-700">
+                    
+                    {/* View History Button */}
+                    <button 
+                        onClick={() => openHistoryModal(customer)} 
+                        className="flex-1 py-2 text-xs sm:text-sm font-semibold text-indigo-300 bg-indigo-900/40 rounded-lg hover:bg-indigo-900/60 transition disabled:opacity-50 flex items-center justify-center"
+                        disabled={isProcessing}
+                        title="View Transaction History"
+                    >
+                        <History className="w-4 h-4 mr-1 sm:mr-2" /> History
+                    </button>
+                    
+                    {/* Record Payment Button (FIXED DESIGN - Corrected icon usage and alignment) */}
+                    <button 
+                        onClick={() => openPaymentModal(customer)} 
+                        className="flex-1 py-2 text-xs sm:text-sm font-bold text-white bg-teal-600 rounded-lg shadow-md shadow-teal-900/50 hover:bg-teal-500 transition disabled:opacity-50 disabled:bg-gray-700 disabled:text-gray-400 flex items-center justify-center" // Ensure flex classes are here
+                        disabled={isProcessing || outstandingAmount <= 0}
+                        title="Record Payment Received"
+                    >
+                        <IndianRupee className="w-4 h-4 mr-1 sm:mr-2" /> Pay Now
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    const displayCount = filteredCustomers.length;
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+            
+            {/* --- 1. Search Bar --- */}
+            <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                    type="text"
+                    placeholder="Search by name or phone..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full py-3 pl-10 pr-4 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition"
                     disabled={isProcessing}
-                >
-                    <UserPlus className="w-4 h-4 mr-2" /> 
-                    New Customer
-                </button>
-                
-                {/* Secondary Action: Remind All (Red/Accent) */}
-                <button 
-                    className={`py-3 rounded-xl font-bold text-sm shadow-xl transition flex items-center justify-center active:scale-[0.99] ${
-                        outstandingCustomersForReminders.length === 0 
-                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                            : 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/50'
-                    }`}
-                    onClick={handleSendReminders}
-                    disabled={outstandingCustomersForReminders.length === 0 || isProcessing}
-                >
-                    <MessageSquare className="w-4 h-4 mr-1" />
-                    Remind All
-                </button>
+                />
             </div>
-        </div>
-      </div>
-      {/* --- END ACTION BAR --- */}
-
-
-      {/* 1. Main Ledger Card with List */}
-      <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition-colors duration-300">
-        
-        {/* Header (Customer List Caption) */}
-        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-4">
-            <h3 className="text-xl font-bold flex items-center text-white">
-                <List className="w-5 h-5 mr-2 text-indigo-400" /> Customer List ({sortedCustomers.length})
-            </h3>
-        </div>
-        
-        {/* 🔥 SCROLLABLE AREA WRAPPER - This is the crucial area */}
-        <div className="space-y-3 **max-h-[60vh] overflow-y-auto pb-2 pr-2**">
-            {sortedCustomers.length > 0 ? (
-                sortedCustomers.map(cust => (
-                    <CustomerCard 
-                        key={getCustomerId(cust)} 
-                        cust={cust}
-                        // Only allow clicking if there's outstanding credit
-                        onCardClick={cust.outstandingCredit > 0 ? () => openPaymentModal(cust) : null}
-                    />
-                ))
-            ) : (
-                <div className="text-center py-10 text-gray-400 text-lg bg-indigo-900/30 rounded-xl border border-indigo-700">
-                    <AlertTriangle className="w-6 h-6 text-indigo-400 mx-auto mb-2" />
-                    <p>No customers found yet. Click 'New Customer' to begin.</p>
+            
+            {/* --- 2. Customer List Header --- */}
+            <div className="flex justify-between items-center text-gray-400 font-semibold pb-2 mt-2 border-b border-gray-700">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-300 flex items-center">
+                    <List className="w-5 h-5 mr-2 text-indigo-400" />
+                    {displayCount} Result{displayCount !== 1 ? 's' : ''} ({customersList.length} total)
+                </h2>
+                <span className="text-xs sm:text-sm hidden sm:block text-gray-500">Sorted by Highest Due</span>
+            </div>
+            
+            {/* --- 3. Customer List (Grid Layout) --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {filteredCustomers.length > 0 ? (
+                    filteredCustomers.map(renderCustomerCard)
+                ) : (
+                    <div className="sm:col-span-2 p-10 text-center bg-gray-800 rounded-xl border border-gray-700 text-gray-400">
+                        <Search className="w-8 h-8 mx-auto mb-3" />
+                        <p className="font-semibold">
+                            {searchTerm ? `No results found for "${searchTerm}".` : 'No customers found in the Khata ledger.'}
+                        </p>
+                        <p className="text-sm mt-1">Check your search term or add a new customer.</p>
+                    </div>
+                )}
+            </div>
+            
+            {/* Loader overlay for processing actions */}
+            {isProcessing && (
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-[60]">
+                    <div className="p-4 bg-gray-800 rounded-lg shadow-xl flex items-center text-white">
+                        <Loader className="w-6 h-6 animate-spin text-teal-400 mr-3" />
+                        <span className="font-semibold">Processing action...</span>
+                    </div>
                 </div>
             )}
         </div>
-      </div>
-    </>
-  );
+    );
 };
 
 export default CustomerList;
