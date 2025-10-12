@@ -89,7 +89,7 @@ const CustomerList = ({
 }) => {
   return (
     <>
-      <h1 className="text-3xl font-extrabold text-white mb-2 flex items-center">
+      <h1 className="text-3xl font-extrabold text-white mb-2">
         Khata Manager
       </h1>
       <p className="text-gray-400 mb-6">Track customer dues and easily record payments.</p>

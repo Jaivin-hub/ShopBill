@@ -202,7 +202,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode }) {
     const renderHeader = () => {
         if (currentView === 'main') {
             return (
-                <header className="mb-8 pt-4 md:pt-0 max-w-xl mx-auto">
+                <header className="mb-8 pt-1 md:pt-0 max-w-xl mx-auto">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                         Settings
                     </h1>

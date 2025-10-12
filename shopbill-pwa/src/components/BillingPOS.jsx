@@ -211,10 +211,10 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-950 text-gray-300 pb-24 md:pb-8 transition-colors duration-300">
+    <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
       
       {/* 1. Main Heading and Description */}
-      <h1 className="text-3xl font-extrabold text-white mb-1">Point of Sale (POS)</h1>
+      <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
       <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
        
       {/* Main Content Area (Mobile Stacked) */}
