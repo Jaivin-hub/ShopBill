@@ -12,9 +12,11 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",
     "axios": "^1.12.2",
+    "libphonenumber-js": "^1.12.24",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-phone-number-input": "^3.4.12",
     "recharts": "^3.2.1",
     "tailwindcss": "^4.1.13"
   },

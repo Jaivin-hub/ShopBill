@@ -1,42 +1,33 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Custom CSS to fix the flag size within PhoneInput */
+
+/* Target the wrapper that holds the flag and dial code */
+.PhoneInputCountry {
+    /* Ensures the flag area is contained and vertically centered */
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem; /* Equivalent to px-2, adjust as needed */
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Target the flag image itself */
+.PhoneInputCountryIcon {
+    /* Set a fixed size for the flag container */
+    width: 20px !important; /* Adjust to your preferred width */
+    height: 15px !important; /* Adjust to your preferred height */
+    overflow: hidden; /* Important to crop any oversized flags */
+    border-radius: 2px; /* Optional: adds a slight corner radius */
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Target the actual SVG/Image element inside the icon container */
+.PhoneInputCountryIcon img, 
+.PhoneInputCountryIcon svg {
+    /* Ensure the image fills its container without stretching too much */
+    max-width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures the image covers the area, cropping if necessary */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+/* Optional: Adjust the dial code text for better vertical alignment */
+.PhoneInputCountrySelectArrow {
+    /* Small adjustment to move the arrow down slightly */
+    transform: translateY(2px);
 }

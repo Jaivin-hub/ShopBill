@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // Import 'Settings' icon from lucide-react
-import { Smartphone, User, Moon, Sun, Bell, Settings } from 'lucide-react'; 
-// Note: LogOut icon was removed from import, but its usage is commented out below
+import { Smartphone, User, Bell, Settings } from 'lucide-react'; 
+// NOTE: Moon and Sun icons are no longer needed as the toggle is removed.
 
 // ----------------------------------------------------------------------
 // Integrated Header Component with State and API Logic
@@ -11,8 +11,8 @@ const Header = ({
     companyName, 
     userRole, 
     setCurrentPage, 
-    isDarkMode, 
-    onToggleDarkMode, 
+    // REMOVED: isDarkMode, 
+    // REMOVED: onToggleDarkMode, 
     onLogout, 
     apiClient,  
     API         
@@ -50,29 +50,30 @@ const Header = ({
 
         // Cleanup the interval when the component unmounts
         return () => clearInterval(intervalId);
-    }, [fetchAlertCount]); // Re-run effect if fetchAlertCount changes (though useCallback prevents frequent changes)
+    }, [fetchAlertCount]); // Re-run effect if fetchAlertCount changes
 
 
     // Common classes for action buttons (reused for readability)
     const buttonClasses = `p-2 rounded-full 
-        bg-gray-100 dark:bg-gray-800 
-        text-gray-700 dark:text-gray-300 
-        hover:bg-gray-200 dark:hover:bg-gray-700 
+        bg-gray-800 
+        text-gray-300 
+        hover:bg-gray-700 
         transition-all duration-300 active:scale-95 transform`;
+    // NOTE: Simplified classes to only use dark mode variants (e.g., removed dark:bg-gray-800 from initial state as it's the only state now).
 
 
     return (
         <header
-            // Use dynamic Tailwind classes for light/dark mode header background and border
+            // Use only dark mode classes for the header background and border
             className={`fixed top-0 left-0 right-0 
-                   bg-white dark:bg-gray-900 
-                   border-b border-gray-200 dark:border-gray-700 
+                   bg-gray-900 
+                   border-b border-gray-700 
                    shadow-lg dark:shadow-indigo-900/20
                    md:hidden 
                    z-30 p-4 flex justify-between items-center transition-colors duration-300`}
         >
-            {/* Company Name/Logo - Responsive to dark mode */}
-            <h1 className="text-xl font-extrabold text-indigo-700 dark:text-indigo-400 truncate flex items-center">
+            {/* Company Name/Logo - Fixed for dark mode */}
+            <h1 className="text-xl font-extrabold text-indigo-400 truncate flex items-center">
                 <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
                 {companyName}
             </h1>
@@ -88,7 +89,7 @@ const Header = ({
                     <Bell className="w-5 h-5" />
                     {/* Dynamic Notification Badge */}
                     {notificationCount > 0 && (
-                        <span className="absolute top-0 right-0 block h-5 w-5 rounded-full ring-2 ring-white dark:ring-gray-900 bg-red-600 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1.5">
+                        <span className="absolute top-0 right-0 block h-5 w-5 rounded-full ring-2 ring-gray-900 bg-red-600 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1.5">
                             {notificationCount > 9 ? '9+' : notificationCount}
                         </span>
                     )}
@@ -104,13 +105,12 @@ const Header = ({
                 </button>
 
 
-
                 {/* User Profile Button */}
                 <button
                     onClick={() => setCurrentPage('profile')} 
                     className="p-2 rounded-full 
                        bg-indigo-600 
-                       text-white dark:text-indigo-200 
+                       text-indigo-200 
                        hover:bg-indigo-700 
                        transition-colors duration-300 active:scale-95 transform 
                        flex items-center"

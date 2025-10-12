@@ -60,10 +60,9 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const localMode = localStorage.getItem('darkMode');
-    return localMode === 'false' ? false : true;
-  });
+  
+  // REMOVED: isDarkMode state and local storage check. Dark mode is now enforced.
+  // const [isDarkMode, setIsDarkMode] = useState(() => { ... });
 
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
@@ -81,6 +80,8 @@ const App = () => {
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
+    // NOTE: We could also clear the 'darkMode' setting here, but since it's now
+    // enforced, we don't need to.
     setCurrentUser(null);
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
@@ -126,22 +127,17 @@ const App = () => {
   }, [logout]);
 
 
-  // --- Dark Mode Effect ---
+  // --- Dark Mode Enforcement Effect (MODIFIED) ---
+  // This useEffect now runs once on mount to enforce dark mode.
   useEffect(() => {
-    localStorage.setItem('darkMode', isDarkMode);
     const html = document.documentElement;
-    if (isDarkMode) {
-      html.classList.add('dark');
-      html.style.colorScheme = 'dark'; 
-    } else {
-      html.classList.remove('dark');
-      html.style.colorScheme = 'light';
-    }
-  }, [isDarkMode]);
+    // Enforce dark mode:
+    html.classList.add('dark');
+    html.style.colorScheme = 'dark'; 
+    // REMOVED: localStorage.setItem('darkMode', isDarkMode); and logic for light mode.
+  }, []); // Empty dependency array means it runs only once on mount.
 
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode(prev => !prev);
-  }, []); 
+  // REMOVED: toggleDarkMode function.
 
   // Action Functions (Simplified: components will handle the API interaction and local state updates)
   const addSale = useCallback(async (saleData) => {
@@ -189,9 +185,10 @@ const App = () => {
   const renderContent = () => {
     
     if (isLoadingAuth) {
+         // IMPORTANT: Use dark mode classes for the loading state as well
          return (
-             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-900 dark:text-gray-400 bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400" />
+             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+                <Loader className="w-10 h-10 animate-spin text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
              </div>
         );
@@ -223,8 +220,7 @@ const App = () => {
       apiClient, // CRITICAL: Pass the configured axios instance for use in components
       API, // Pass the API constants object
       onLogout:logout,
-      isDarkMode,
-      toggleDarkMode
+      // REMOVED: isDarkMode, toggleDarkMode
     };
     
     switch (currentPage) {
@@ -255,7 +251,8 @@ const App = () => {
         />;
       // --- END NEW CASE ---
       case 'settings':
-        return <SettingsPage {...commonProps} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
+        // REMOVED isDarkMode and toggleDarkMode from props
+        return <SettingsPage {...commonProps} />; 
       case 'profile':
         return <Profile {...commonProps} />;
       case 'notifications':
@@ -273,6 +270,7 @@ const App = () => {
   const showAppUI = currentUser && currentPage !== 'resetPassword';
 
   return (
+    // IMPORTANT: Main div already uses dark classes like dark:bg-gray-950
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {showAppUI && (
@@ -280,8 +278,7 @@ const App = () => {
                 companyName="Pocket POS"
                 userRole={userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                 setCurrentPage={setCurrentPage}
-                isDarkMode={isDarkMode} 
-                onToggleDarkMode={toggleDarkMode} 
+                // REMOVED: isDarkMode, onToggleDarkMode
                 onLogout={logout}
                 apiClient={apiClient}
                 API={API}

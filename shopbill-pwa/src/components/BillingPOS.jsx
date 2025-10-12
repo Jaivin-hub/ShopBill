@@ -9,8 +9,6 @@ import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentMo
 const BillingPOS = ({ apiClient, API, showToast }) => {
   const [cart, setCart] = useState([]);
   
-  // NOTE: selectedCustomer state is removed as selection logic is now inside PaymentModal
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
@@ -73,7 +71,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
 
   // 3. Customer List - Now includes WALK_IN_CUSTOMER for the modal
-  const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c.id !== WALK_IN_CUSTOMER.id)], [customers]);
+  const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c._id !== WALK_IN_CUSTOMER._id)], [customers]);
 
 
   // --- Cart Management Functions ---
@@ -145,20 +143,14 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     // Use the customer object passed from the modal
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
      
-    // 1. Check credit limit before logging a credit sale
-    // NOTE: This check should ideally also be implemented on the server side
-    // to prevent race conditions, but keeping it here for immediate feedback.
-    if (amountCredited > 0 && customerToBill.creditLimit > 0) {
-        const potentialNewCredit = customerToBill.outstandingCredit + amountCredited;
-        if (potentialNewCredit > customerToBill.creditLimit) {
-            showToast(`Credit limit of ₹${customerToBill.creditLimit.toFixed(0)} exceeded! Cannot add ₹${amountCredited.toFixed(2)} to Khata.`, 'error');
-            return;
-        }
-    }
+    // 1. --- REMOVED CLIENT-SIDE CREDIT LIMIT CHECK ---
+    // This validation MUST be handled on the server to prevent security and race condition issues.
+    // The existing error handling block below will catch the server's response if the limit is exceeded.
      
     // 2. Prepare data
     const saleItems = cart.map(item => ({
-        itemId: item._id || item.id,
+        // Use MongoDB ID if present, fallback to a local/temp ID if the item is newly created (unlikely in this flow, but safe)
+        itemId: item._id || item.id, 
         name: item.name,
         quantity: item.quantity,
         price: item.price,
@@ -168,8 +160,9 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       totalAmount: totalAmount,
       paymentMethod: paymentMethod,
       customer: customerToBill.name,
-      // Ensure we pass the MongoDB ID if it exists for the server update
-      customerId: customerToBill._id, // Only send the real MongoDB ID
+      // Ensure we pass the MongoDB ID if it exists for the server update.
+      // WALK_IN_CUSTOMER should have a null or specific ID that the server ignores/handles.
+      customerId: customerToBill._id, 
       items: saleItems,
       amountPaid: amountPaid,
       // CRITICAL: This calculated value handles Full Khata, Mixed Payment Khata, or 0 Khata
@@ -185,22 +178,20 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
       // THE /sales ENDPOINT MUST HANDLE INVENTORY UPDATE AND KHATA UPDATE IF amountCredited > 0.
       await apiClient.post(API.sales, saleData); 
        
-      // 4. REMOVE THE REDUNDANT CREDIT API CALL HERE!
-      // The Khata update is now fully contained within the /sales endpoint logic.
-      // (The /customers/:id/credit endpoint is reserved for Khata PAYMENTS ONLY, not sales).
-      
       showToast('Sale successfully recorded!', 'success');
 
-      // 5. Clear cart and reset state
+      // 4. Clear cart and reset state
       setCart([]);
       setSearchTerm('');
       setIsPaymentModalOpen(false);
 
-      // 6. Refresh data for POS view (to show updated stock/credit)
+      // 5. Refresh data for POS view (to show updated stock/credit)
+      // This is necessary to show the new stock levels and potentially new customer credit.
       fetchData(); 
 
     } catch (error) {
       console.error("Sale processing failed:", error);
+      // Extracts the specific error message from the server response
       const errorMessage = error.response?.data?.error || 'Error finalizing sale. Check server connection.';
       showToast(errorMessage, 'error');
     }

@@ -41,7 +41,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     
     // --- Data Fetching Logic ---
     const fetchInventory = useCallback(async () => {
-        setIsProcessing(true); // Use processing state for refresh too
+        setIsProcessing(true); // Start processing/loading indicator
         try {
             const response = await apiClient.get(API.inventory);
             setInventory(response.data);
@@ -50,7 +50,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             console.error("Failed to load inventory data:", error);
             showToast('Error loading inventory data. Check network connection.', 'error');
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(false); // Stop processing/loading indicator
             setIsLoadingInitial(false);
         }
     }, [apiClient, API.inventory, showToast]);
@@ -121,7 +121,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         setIsConfirmModalOpen(true);
     }
     
-    // --- CRUD Handlers (UPDATED to use apiClient and call fetchInventory) ---
+    // --- CRUD Handlers (UPDATED to remove redundant setIsProcessing(false) in finally) ---
     const handleAddItem = async () => { 
         setIsProcessing(true);
         try {
@@ -131,15 +131,15 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
 
             showToast(`New item added: ${formData.name}`, 'success');
-            await fetchInventory(); // Refresh data from server
+            await fetchInventory(); // Refresh data, which handles setting isProcessing(false)
             closeFormModal();
         } catch (error) {
             console.error('Add Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error adding item.';
             showToast(`Error adding item: ${errorMessage}`, 'error');
-        } finally {
-            setIsProcessing(false);
-        }
+            // IMPORTANT: If API fails and fetchInventory wasn't called, we must stop loading here.
+            setIsProcessing(false); 
+        } 
     };
     
     const handleUpdateItem = async () => { 
@@ -157,15 +157,15 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
 
             showToast(`${formData.name} updated successfully!`, 'success');
-            await fetchInventory(); // Refresh data from server
+            await fetchInventory(); // Refresh data, which handles setting isProcessing(false)
             closeFormModal();
         } catch (error) {
             console.error('Update Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error updating item.';
             showToast(`Error updating item: ${errorMessage}`, 'error');
-        } finally {
-            setIsProcessing(false);
-        }
+            // IMPORTANT: If API fails and fetchInventory wasn't called, we must stop loading here.
+            setIsProcessing(false); 
+        } 
     }
 
     const handleFormSubmit = (e) => {
@@ -190,13 +190,13 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             await new Promise(resolve => setTimeout(resolve, 500)); // Mock delay
 
             showToast(`${itemName} deleted successfully.`, 'success');
-            await fetchInventory(); // Refresh data from server
+            await fetchInventory(); // Refresh data, which handles setting isProcessing(false)
         } catch (error) {
             console.error('Delete Item Error:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.error || error.message || 'Unknown error deleting item.';
             showToast(`Error deleting item: ${errorMessage}`, 'error');
-        } finally {
-            setIsProcessing(false);
+            // IMPORTANT: If API fails and fetchInventory wasn't called, we must stop loading here.
+            setIsProcessing(false); 
         }
     };
     

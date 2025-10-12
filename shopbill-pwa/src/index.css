@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+/* 1. Target the main country selector wrapper */
+.PhoneInputCountry {
+    /* **CRITICAL FIX:** Use Flexbox to ensure vertical centering */
+    display: flex !important; 
+    align-items: center !important; /* Vertically center all children */
+    
+    /* Ensure there is a fixed/expected height for centering to work against */
+    height: 100%; 
+    padding-left: 0.5rem; 
+    
+    /* The country code text is inside this, and is what the flag should align to */
+}
+
+/* 2. Target the flag icon container (Keep sizing) */
+.PhoneInputCountryIcon {
+    width: 20px !important; 
+    height: 15px !important; 
+    overflow: hidden; 
+    border-radius: 2px;
+    
+    /* Optional: Slight margin to separate flag from the code */
+    margin-right: 4px; 
+    
+    /* Ensure the icon itself respects the Flex container */
+    flex-shrink: 0; 
+}
+
+/* 3. Target the actual image element */
+.PhoneInputCountryIcon img, 
+.PhoneInputCountryIcon svg {
+    max-width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 4. Target the Country Select Dropdown (Optional but often needed) */
+/* This targets the actual hidden <select> that controls the code/flag display */
+.PhoneInputCountrySelect {
+    /* Remove default appearance that might break alignment */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}

@@ -144,7 +144,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
         setIsLoading(true);
         // Clear any previous server errors before submission
         setErrors(prevErrors => {
-            const { currentPassword, ...rest } = prevErrors;
+            const { currentPassword: _, ...rest } = prevErrors;
             return rest;
         });
 
@@ -155,27 +155,24 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                 newPassword,
             });
 
-            if (response.message) {
-                 showToast(response.message, 'success');
+            // *** ADJUSTMENT HERE: Check response.data for message, as is common with Axios. ***
+            const successMessage = response.data?.message || "Password updated successfully.";
+
+            showToast(successMessage, 'success');
                  
-                 // Clear form
-                 setCurrentPassword('');
-                 setNewPassword('');
-                 setConfirmNewPassword('');
+            // Clear form
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmNewPassword('');
                  
-                 // CRITICAL SECURITY STEP: Log the user out after successful password change
-                 // This ensures all previous sessions are invalidated.
-                 if (onLogout) {
-                     onLogout();
-                 } else {
-                     // Fallback if onLogout isn't provided (should handle navigation back)
-                     onBack(); 
-                 }
+            // CRITICAL SECURITY STEP: Log the user out after successful password change
+            if (onLogout) {
+                onLogout();
             } else {
-                 showToast("Password updated, but response was unexpected.", 'success');
-                 // Still navigate back or log out as a safety measure
-                 if (onLogout) { onLogout(); } else { onBack(); } 
+                // Fallback if onLogout isn't provided (should handle navigation back)
+                onBack(); 
             }
+            // *** END ADJUSTMENT ***
 
         } catch (error) {
             console.error("Password change failed:", error);

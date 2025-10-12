@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
-// IMPORTANT: Assuming the original API import is uncommented in a real environment
-import API from '../config/api' 
+import API from '../config/api'
+// NOTE: Removed 'react-phone-number-input' due to environment restrictions. Using custom input.
 
-
-// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
+// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR ---
 const apiClient = axios.create();
-
 apiClient.interceptors.request.use(
   (config) => {
-    // CRITICAL: Interceptor reads token from localStorage on EVERY request creation
     const token = localStorage.getItem('userToken');
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,12 +20,26 @@ apiClient.interceptors.request.use(
 );
 // --- END AXIOS CONFIG ---
 
+// --- Custom Phone Number Validation ---
+/**
+ * Basic validation for E.164 format (starts with +, followed by 1 to 15 digits).
+ * This replaces the functionality of isValidPhoneNumber from the external library.
+ */
+const validatePhoneNumber = (inputPhone) => {
+    if (!inputPhone) return 'Phone number is required.';
+    // Basic regex for E.164 format: starts with +, followed by 1 to 15 digits
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(inputPhone)) {
+        return 'Please enter a valid international phone number format (e.g., +12223334444).';
+    }
+    return null;
+};
 
-// --- Sub-Component: Login Form (NO CHANGES) ---
-const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading, setView, authError }) => {
+// --- Sub-Component: Login Form (UPDATED with email blur validation) ---
+const LoginForm = ({ handleAuth, email, handleEmailChange, handleEmailBlur, password, setPassword, loading, setView, authError, emailError }) => {
     const [showPassword, setShowPassword] = useState(false);
-
-    return (
+    
+     return (
         <>
             <h2 className="text-3xl font-extrabold text-white text-center mb-6">
                 Welcome Back
@@ -44,11 +54,17 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
                 <input
                     type="text"
                     placeholder="Email Address"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-600'}`}
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    onBlur={handleEmailBlur}
                     value={email}
                     required
+                    autoComplete="email"
                 />
+                {/* Email Error Message */}
+                {emailError && (
+                    <p className="text-red-400 text-sm mt-1">{emailError}</p>
+                )}
                 
                 {/* Password Input with Toggle */}
                 <div className="relative">
@@ -59,6 +75,7 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
                         onChange={(e) => setPassword(e.target.value)}
                         value={password}
                         required
+                        autoComplete="current-password" 
                     />
                     <button
                         type="button"
@@ -70,7 +87,7 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
                     </button>
                 </div>
 
-                {/* Forgot Password - NOW FUNCTIONAL */}
+                {/* Forgot Password */}
                 <div className="flex justify-end pt-1">
                     <button 
                         type="button" 
@@ -106,9 +123,88 @@ const LoginForm = ({ handleAuth, email, setEmail, password, setPassword, loading
     );
 };
 
-// --- Sub-Component: Signup Form (MODIFIED to accept and display validation errors) ---
-const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone, setPhone, loading, setView, authError, passwordError, phoneError }) => {
+// Available country codes for the custom input
+const countryCodes = [
+    { code: '+1', flag: '🇺🇸', name: 'United States' },
+    { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
+    { code: '+91', flag: '🇮🇳', name: 'India' },
+    { code: '+61', flag: '🇦🇺', name: 'Australia' },
+    { code: '+49', flag: '🇩🇪', name: 'Germany' },
+    { code: '+81', flag: '🇯🇵', name: 'Japan' },
+    { code: '+33', flag: '🇫🇷', name: 'France' },
+];
+
+// --- Sub-Component: Signup Form (UPDATED with blur validation) ---
+const SignupForm = ({ 
+    handleAuth, 
+    email, 
+    handleEmailChange, // Updated prop name
+    handleEmailBlur,   // New prop
+    password, 
+    setPassword, 
+    phone, 
+    setPhone, 
+    loading, 
+    setView, 
+    authError, 
+    passwordError, 
+    phoneError, 
+    emailError 
+}) => {
     const [showPassword, setShowPassword] = useState(false);
+    
+    // Split the parent's phone state into code and number for display
+    const initialDialCode = countryCodes.find(c => phone.startsWith(c.code))?.code || '+1';
+    const initialLocalNumber = phone.startsWith(initialDialCode) ? phone.substring(initialDialCode.length) : '';
+
+    const [dialCode, setDialCode] = useState(initialDialCode);
+    const [localNumber, setLocalNumber] = useState(initialLocalNumber);
+
+    // Effect to update parent phone state in E.164 format
+    useEffect(() => {
+        const fullNumber = dialCode + localNumber;
+        // Only update if the combined number is different from the parent state to avoid loops
+        if (fullNumber !== phone) {
+            setPhone(fullNumber);
+        }
+    }, [dialCode, localNumber, phone, setPhone]);
+
+
+    const handleCodeChange = (e) => {
+        setDialCode(e.target.value);
+        // Clearing error if dial code changes, expecting user to check number next
+        if (phoneError) setPhoneError(null); 
+    };
+
+    const handleNumberChange = (e) => {
+        // Simple sanitization to only allow digits and remove non-digit characters
+        const sanitizedNumber = e.target.value.replace(/\D/g, '');
+        setLocalNumber(sanitizedNumber);
+        // Clear phone error while typing
+        if (phoneError) setPhoneError(null);
+    };
+
+    const handleNumberBlur = () => {
+        // Use the combined phone state for validation on blur
+        if (phone) {
+            setPhoneError(validatePhoneNumber(phone));
+        }
+    };
+
+    const handlePasswordBlur = (e) => {
+        // Check password length on blur
+        if (e.target.value && e.target.value.length < 8) {
+            setPasswordError('Password must be 8 or more characters long.');
+        } else {
+            setPasswordError(null);
+        }
+    };
+    
+    const handlePasswordChange = (e) => {
+        setPassword(e.target.value);
+        // Clear password error when user starts typing again
+        if (passwordError) setPasswordError(null);
+    };
 
     return (
         <>
@@ -121,16 +217,38 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                 </div>
             )}
             <form className="space-y-4" onSubmit={handleAuth}>
-                {/* Phone Number Input */}
-                <input
-                    type="tel"
-                    placeholder="Phone Number (10-15 digits)"
-                    // Removed pattern/title to allow JS validation to handle feedback
-                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500 transition duration-150 ${phoneError ? 'border-red-500' : 'border-gray-600'}`}
-                    onChange={(e) => setPhone(e.target.value)}
-                    value={phone}
-                    required
-                />
+                
+                {/* 1. Phone Input (Custom Implementation) */}
+                <div className={`
+                    w-full flex rounded-lg transition duration-150 bg-gray-700
+                    ${phoneError ? 'border border-red-500' : 'border border-gray-600'}
+                    focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500
+                `}>
+                    {/* Country Code Dropdown */}
+                    <select
+                        value={dialCode}
+                        onChange={handleCodeChange}
+                        className="bg-transparent text-gray-200 py-3 pl-3 border-r border-gray-600 focus:outline-none rounded-l-lg appearance-none w-20 sm:w-24 md:w-28 cursor-pointer"
+                    >
+                        {countryCodes.map(({ code, flag, name }) => (
+                            <option key={code} value={code} className="bg-gray-700 text-gray-200">
+                                {flag} {code}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Phone Number Input */}
+                    <input
+                        type="tel"
+                        placeholder="Enter phone number"
+                        value={localNumber}
+                        onChange={handleNumberChange}
+                        onBlur={handleNumberBlur} // Added blur validation
+                        className="w-full px-4 py-3 bg-transparent text-gray-200 placeholder-gray-400 focus:outline-none rounded-r-lg"
+                        required
+                        autoComplete="tel"
+                    />
+                </div>
                 {/* Phone Error Message */}
                 {phoneError && (
                     <p className="text-red-400 text-sm mt-1">{phoneError}</p>
@@ -139,12 +257,18 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                 {/* Email Input */}
                 <input
                     type="text"
-                    placeholder="Email Address"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email Address (Lowercase, no spaces)"
+                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-600'}`}
+                    onChange={(e) => handleEmailChange(e.target.value)} // Updated to change handler
+                    onBlur={handleEmailBlur} // Added blur validation
                     value={email}
                     required
+                    autoComplete="email"
                 />
+                {/* Email Error Message */}
+                {emailError && (
+                    <p className="text-red-400 text-sm mt-1">{emailError}</p>
+                )}
                 
                 {/* Password Input with Toggle */}
                 <div className="relative">
@@ -152,9 +276,11 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Password (Min 8 characters)"
                         className={`w-full pr-12 px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${passwordError ? 'border-red-500' : 'border-gray-600'}`}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={handlePasswordChange} // Using local change handler to clear errors
+                        onBlur={handlePasswordBlur}     // Added blur validation for length
                         value={password}
                         required
+                        autoComplete="new-password"
                     />
                     <button
                         type="button"
@@ -199,9 +325,9 @@ const SignupForm = ({ handleAuth, email, setEmail, password, setPassword, phone,
     );
 };
 
-// --- Sub-Component: Forgot Password Form (NO CHANGES) ---
-const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, setEmail, loading, setView, resetMessage }) => {
-    return (
+// --- Sub-Component: Forgot Password Form (UPDATED with email blur validation) ---
+const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailChange, handleEmailBlur, loading, setView, resetMessage, emailError }) => {
+     return (
         <>
             <h2 className="text-3xl font-extrabold text-white text-center mb-6">
                 Reset Password
@@ -235,17 +361,23 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, setEmail, load
                 <input
                     type="email"
                     placeholder="Email Address"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-600'}`}
+                    onChange={(e) => handleEmailChange(e.target.value)} // Updated to change handler
+                    onBlur={handleEmailBlur} // Added blur validation
                     value={email}
                     required
+                    autoComplete="email"
                 />
+                {/* Email Error Message */}
+                {emailError && (
+                    <p className="text-red-400 text-sm mt-1">{emailError}</p>
+                )}
                 
                 {/* Submit Button */}
                 <button
                     type="submit"
                     className="w-full mt-6 py-3 bg-teal-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-teal-600/30 hover:bg-teal-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-teal-400"
-                    disabled={loading}
+                    disabled={loading || !!emailError}
                 >
                     {loading ? 'Sending Request...' : 'Send Reset Link'}
                 </button>
@@ -266,42 +398,73 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, setEmail, load
 };
 
 
-// Main Login Component (MODIFIED to include validation states and logic)
+// Main Login Component
 const Login = ({ onLogin, onBackToLanding }) => {
     const [view, setView] = useState('login'); // 'login', 'signup', 'forgotPassword'
-    const [email, setEmail] = useState('');
+    const [email, setEmailState] = useState('');
     const [password, setPassword] = useState('');
-    const [phone, setPhone] = useState('');
+    const [phone, setPhone] = useState(''); 
     const [loading, setLoading] = useState(false); 
     const [authError, setAuthError] = useState(null); 
     const [resetMessage, setResetMessage] = useState(null); 
-
-    // --- NEW VALIDATION STATES ---
     const [passwordError, setPasswordError] = useState(null);
-    const [phoneError, setPhoneError] = useState(null);
-    // ----------------------------
-
-    // Helper to determine if we are in signup mode
+    const [phoneError, setPhoneError] = useState(null); 
+    const [emailError, setEmailError] = useState(null); 
     const isSignup = view === 'signup'; 
+    
+    // --- Validation Functions ---
+    const validateEmail = (inputEmail) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
+        if (/\s/.test(inputEmail)) return 'Email cannot contain spaces.';
+        if (inputEmail !== inputEmail.toLowerCase()) return 'Email must be entirely lowercase.';
+        if (!emailRegex.test(inputEmail)) return 'Please enter a valid email address.';
+        return null;
+    };
+    
+    // Updated Email Change Handler: Updates state and clears error while typing
+    const handleEmailChange = useCallback((newEmail) => {
+        const sanitizedEmail = newEmail.toLowerCase().trim();
+        setEmailState(sanitizedEmail);
+        // Clear error immediately when user starts typing
+        if (emailError) setEmailError(null);
+    }, [emailError]);
 
-    // Effect to clear error messages when switching views
+    // New Email Blur Handler: Validates and sets error only when field loses focus
+    const handleEmailBlur = useCallback(() => {
+        if (email) {
+            setEmailError(validateEmail(email));
+        }
+    }, [email]);
+
+
+    // --- Effects and Handlers (omitted for brevity, they remain as they were in the previous iteration) ---
     useEffect(() => {
         setAuthError(null);
         setResetMessage(null);
-        // Clear client validation errors too
         setPasswordError(null);
-        setPhoneError(null);
+        setPhoneError(null); 
+        setEmailError(null); 
+        
+        // Reset sensitive inputs when switching away from signup
+        if (view !== 'signup') {
+            setPassword('');
+            setPhone(''); 
+        }
     }, [view]);
 
-    // --- Forgot Password Request Handler (NO CHANGES) ---
     const handleForgotPasswordRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
         setResetMessage(null);
         setAuthError(null); 
+        setEmailError(null); // Clear error before final submission check
 
-        if (!email) {
-            setResetMessage({ error: 'Please enter your email address.' });
+        // Final validation before sending request
+        const emailValidation = validateEmail(email);
+
+        if (emailValidation) {
+            setResetMessage({ error: emailValidation });
+            setEmailError(emailValidation);
             setLoading(false);
             return;
         }
@@ -309,16 +472,13 @@ const Login = ({ onLogin, onBackToLanding }) => {
         try {
             const authData = { email };
             
-            // Using apiClient (Axios) for POST request
             const response = await apiClient.post(API.forgetpassword, authData);
             const data = response.data;
 
-            // Backend returns a generic message for security, regardless of user existence
             setResetMessage({ 
                 success: data.message || 'If an account is associated with this email, a reset link has been sent.' 
             });
 
-            // Log and optionally show the DEV token returned by the backend for testing
             if (data.devResetToken) {
                  console.log("PASSWORD RESET DEV TOKEN:", data.devResetToken);
                  setResetMessage((prev) => ({ 
@@ -330,7 +490,6 @@ const Login = ({ onLogin, onBackToLanding }) => {
         } catch (error) {
             console.error('Forgot Password Request Error:', error);
             
-            // Extract error message from Axios error response
             const errorMessage = error.response?.data?.error 
                 || error.response?.data?.message 
                 || error.message 
@@ -342,55 +501,58 @@ const Login = ({ onLogin, onBackToLanding }) => {
         }
     };
 
-
-    // --- Auth Handler (Login/Signup - MODIFIED for Validation) ---
     const handleAuth = async (e) => {
         e.preventDefault();
         
-        // Clear previous errors
         setAuthError(null); 
         setPasswordError(null); 
-        setPhoneError(null);    
+        setPhoneError(null);
+        setEmailError(null); // Clear errors before final validation
 
-        const formType = isSignup ? 'Signup' : 'Login';
-        const url = isSignup ? API.signup : API.login;
-        const authData = isSignup ? { email, password, phone } : { email, password };
+        let hasError = false;
 
-        // --- CLIENT-SIDE VALIDATION FOR SIGNUP ---
+        // Re-run all validation checks on submit
+        const emailValidation = validateEmail(email);
+        if (emailValidation) {
+            setEmailError(emailValidation);
+            hasError = true;
+        }
+
         if (isSignup) {
-            let hasError = false;
-
-            // 1. Password Validation: Must be more than 8 characters
-            if (password.length < 8) {
-                setPasswordError('Password must be at least 8 characters long.');
+            const currentPassword = password; // use current state password
+            if (currentPassword.length < 8) {
+                setPasswordError('Password must be 8 or more characters long.');
                 hasError = true;
             }
 
-            // 2. Phone Number Validation: Basic check for digits (10-15 digits)
-            // This regex allows for optional leading '+' and optional spaces/dashes between digits
-            const phoneRegex = /^\+?(\d[\s-]?){10,15}$/; 
-            if (!phone || !phoneRegex.test(phone.trim())) {
-                 setPhoneError('Please enter a valid phone number (10-15 digits).');
+            const phoneValidation = validatePhoneNumber(phone);
+            if (phoneValidation) {
+                 setPhoneError(phoneValidation);
                  hasError = true;
             }
-            
-            // Stop form submission if client-side validation fails
-            if (hasError) {
-                return; 
-            }
         }
-        // --- END CLIENT-SIDE VALIDATION ---
         
+        if (hasError) {
+             setLoading(false);
+             return; 
+        }
+
         setLoading(true);
 
+        const url = isSignup ? API.signup : API.login;
+        const formType = isSignup ? 'Signup' : 'Login';
+        
+        const authData = isSignup 
+            ? { email, password, phone: phone }
+            : { email, password };
+
+
         try {
-            // Using apiClient (Axios) for POST request.
             const response = await apiClient.post(url, authData);
             const data = response.data; 
             
-            // Expected response: { token, user: { id, email, role, shopId } }
             if (data && data.token && data.user) {
-                
+                localStorage.removeItem('userToken');
                 localStorage.setItem('userToken', data.token);
                 onLogin(data.user, data.token); 
             } else {
@@ -399,7 +561,6 @@ const Login = ({ onLogin, onBackToLanding }) => {
         } catch (error) {
             console.error(error);
             
-            // Extract error message from Axios error response
             const errorMessage = error.response?.data?.error 
                 || error.response?.data?.message 
                 || error.message 
@@ -414,35 +575,37 @@ const Login = ({ onLogin, onBackToLanding }) => {
 
     // --- Main Login Component Layout ---
     const renderForm = () => {
+        // Props shared by all forms
+        const commonProps = {
+            email,
+            handleEmailChange,
+            handleEmailBlur,
+            loading,
+            setView,
+            emailError,
+            authError,
+        };
+
         switch (view) {
             case 'signup':
                 return (
                     <SignupForm 
                         handleAuth={handleAuth}
-                        email={email}
-                        setEmail={setEmail}
                         password={password}
                         setPassword={setPassword}
                         phone={phone}
                         setPhone={setPhone}
-                        loading={loading}
-                        setView={setView}
-                        authError={authError}
-                        // --- NEW PROPS ---
                         passwordError={passwordError} 
-                        phoneError={phoneError}
-                        // -----------------
+                        phoneError={phoneError} 
+                        {...commonProps}
                     />
                 );
             case 'forgotPassword':
                 return (
                     <ForgotPasswordForm
                         handleForgotPasswordRequest={handleForgotPasswordRequest}
-                        email={email}
-                        setEmail={setEmail}
-                        loading={loading}
-                        setView={setView}
                         resetMessage={resetMessage}
+                        {...commonProps}
                     />
                 );
             case 'login':
@@ -450,13 +613,9 @@ const Login = ({ onLogin, onBackToLanding }) => {
                 return (
                     <LoginForm
                         handleAuth={handleAuth}
-                        email={email}
-                        setEmail={setEmail}
                         password={password}
                         setPassword={setPassword}
-                        loading={loading}
-                        setView={setView}
-                        authError={authError}
+                        {...commonProps}
                     />
                 );
         }
