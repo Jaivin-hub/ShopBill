@@ -1,24 +1,25 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { DollarSign, IndianRupee, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader } from 'lucide-react';
-// Import the PaymentModal and WALK_IN_CUSTOMER from the new file
-import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentModal'; 
+import { DollarSign, IndianRupee, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader, Camera } from 'lucide-react';
+import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentModal';
+import BarcodeScannerModal from './BarcodeScannerModal';
 
-/**
- * Main POS component: Manages cart, customer selection, inventory search, and sale finalization.
- */
 const BillingPOS = ({ apiClient, API, showToast }) => {
   const [cart, setCart] = useState([]);
   
-  const [searchTerm, setSearchTerm] = useState('');
+  // 🌟 NEW STATE: To store the value read from a scanner (hardware or camera)
+  const [searchTerm, setSearchTerm] = useState(''); 
+  const [scannedBarcode, setScannedBarcode] = useState(''); 
+  
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  // 🌟 NEW STATE: To control the visibility of the camera scanner modal
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false); 
 
   // Component-level Data States
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-
-  // --- Data Fetching and Lifecycle ---
+  // --- Data Fetching and Lifecycle (No Change) ---
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -47,14 +48,15 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
   // --- EXISTING CALCULATIONS ---
 
-  // 1. Total Amount Calculation
+  // 1. Total Amount Calculation (No Change)
   const totalAmount = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
-  // 2. Filtered Inventory: exclude 0 stock and apply search filter
+  // 2. Filtered Inventory: Use searchTerm OR a freshly scanned barcode for filtering
   const filteredInventory = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
+    // 🌟 MODIFICATION: Prioritize the immediate scannedBarcode for search if available
+    const term = (scannedBarcode || searchTerm).toLowerCase().trim();
     
     const inStockItems = inventory.filter(item => 
       item.quantity > 0 
@@ -67,14 +69,14 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     return inStockItems.filter(item => 
       item.name.toLowerCase().includes(term) || (item.barcode && item.barcode.includes(term))
     ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, searchTerm]);
+  }, [inventory, searchTerm, scannedBarcode]); // 🌟 DEPENDENCY ADDED: scannedBarcode
 
 
-  // 3. Customer List - Now includes WALK_IN_CUSTOMER for the modal
+  // 3. Customer List (No Change)
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c._id !== WALK_IN_CUSTOMER._id)], [customers]);
 
 
-  // --- Cart Management Functions ---
+  // --- Cart Management Functions (No Change) ---
 
   const addItemToCart = useCallback((itemToAdd) => {
     if (itemToAdd.quantity <= 0) {
@@ -133,7 +135,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     showToast('Item removed from cart.', 'error');
   }, [showToast]);
     
-  // Sale Finalization Logic
+  // Sale Finalization Logic (No Change)
   const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
     if (totalAmount <= 0) {
       showToast('Cart is empty. Cannot process sale.', 'error');
@@ -198,6 +200,46 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
      
   }, [totalAmount, cart, showToast, apiClient, API.sales, fetchData]);
 
+  // 🌟 NEW EFFECT: To automatically add item to cart after a successful barcode scan.
+  useEffect(() => {
+    if (scannedBarcode) {
+        // Find the item matching the scanned barcode (or name, as defined in filteredInventory logic)
+        const item = inventory.find(i => i.barcode === scannedBarcode || i.name.toLowerCase() === scannedBarcode.toLowerCase());
+        
+        if (item) {
+            addItemToCart(item);
+            // Clear the scanned barcode after processing
+            setScannedBarcode('');
+        } else {
+             // If no item is found, treat the barcode as a manual search term temporarily
+             setSearchTerm(scannedBarcode);
+             showToast(`Item with barcode ${scannedBarcode} not found.`, 'error');
+             // Also clear the barcode after showing error
+             setScannedBarcode('');
+        }
+    }
+  }, [scannedBarcode, inventory, addItemToCart, showToast]);
+
+  // 🌟 NEW HANDLER: For when the camera scanner successfully reads a code
+  const handleScanSuccess = useCallback((barcodeValue) => {
+    setIsCameraScannerOpen(false); // Close the scanner modal
+    setScannedBarcode(barcodeValue); // Set the state, which triggers the useEffect above
+  }, []);
+
+  // 🌟 NEW HANDLER: For the physical barcode scanner input (fires on 'Enter' or fast typing)
+  const handlePhysicalScannerInput = (e) => {
+    // Check if the input value looks like a barcode scan
+    // Barcode scanners often send the code and then an 'Enter' key press (keyCode 13)
+    if (e.key === 'Enter' && searchTerm) {
+        // Immediately treat the current searchTerm as a barcode and process it
+        setScannedBarcode(searchTerm);
+        // Clear the input field after processing a physical scan
+        setSearchTerm('');
+        e.preventDefault(); // Prevent form submission or other default behavior
+    }
+    // Note: The hardware scanner typically fills the input very fast, 
+    // and setting searchTerm via onChange is still required for the value to be present.
+  }
 
   // --- Component Render ---
 
@@ -213,23 +255,38 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   return (
     <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
       
-      {/* 1. Main Heading and Description */}
+      {/* 1. Main Heading and Description (No Change) */}
       <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
       <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
        
       {/* Main Content Area (Mobile Stacked) */}
       <div className="space-y-6">
              
-        {/* 2. Item Search/Scan Input (Simplified) */}
+        {/* 2. Item Search/Scan Input (Modified) */}
         <div className="relative flex items-center">
             <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
             <input 
                 type="text" 
-                placeholder="Search Item by Name or Barcode..." 
+                placeholder="Search Item by Name or Scan Barcode..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
+                // 🌟 NEW HANDLER: For physical barcode scanners (fires on 'Enter')
+                onKeyDown={handlePhysicalScannerInput} 
+                // 🌟 MODIFICATION: Increased right padding to accommodate the camera button
+                className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
+                autoFocus // Keep focus on the search box for quick scanning/typing
             />
+             
+            {/* 🌟 NEW ELEMENT: Camera Scan Button */}
+            <button
+                onClick={() => setIsCameraScannerOpen(true)}
+                className="absolute right-12 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
+                title="Scan Barcode with Camera"
+            >
+                <Camera className="w-5 h-5" />
+            </button>
+
+             {/* Clear Search Button (Modified position) */}
              {searchTerm && (
                 <button
                     onClick={() => setSearchTerm('')}
@@ -241,7 +298,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             )}
         </div>
          
-        {/* 3. Quick Buttons (Filtered by Search Term and Stock > 0) */}
+        {/* 3. Quick Buttons (Filtered by Search Term and Stock > 0) - No Change */}
         <div className="max-h-96 overflow-y-auto p-3 border border-gray-700 rounded-xl bg-gray-900 shadow-inner">
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {filteredInventory.map(item => ( 
@@ -259,8 +316,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                 {filteredInventory.length === 0 && (
                     <div className="col-span-4 sm:col-span-5 md:col-span-6 lg:col-span-8 text-center py-4 text-gray-500">
                         <Search className="w-5 h-5 mx-auto mb-1 text-gray-600" />
-                        {searchTerm 
-                            ? `No items match "${searchTerm}" or they are out of stock.`
+                        {searchTerm || scannedBarcode
+                            ? `No items match the search/scan term: "${searchTerm || scannedBarcode}" or they are out of stock.`
                             : 'No items are currently in stock.'}
                     </div>
                 )}
@@ -268,7 +325,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         </div>
 
 
-        {/* 4. Cart Display - Mid Priority */}
+        {/* 4. Cart Display - Mid Priority (No Change) */}
+        {/* ... (Cart JSX is unchanged) ... */}
         <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition duration-300">
             <h3 className="text-lg font-bold flex items-center text-white mb-3 pb-2 border-b border-gray-700">
                 <ShoppingCart className="w-5 h-5 mr-2 text-teal-400" /> Cart Items ({cart.length})
@@ -318,8 +376,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                 )}
             </div>
         </div>
-
-        {/* 🌟 MODIFIED POSITION FOR TOTAL DISPLAY & BUTTON (Desktop/In-Scroll - md:block) */}
+        
+        {/* Total Display & Button (Desktop/In-Scroll - md:block) - No Change */}
         {cart.length > 0 && (
             <div className="hidden md:block p-3 bg-gray-900 rounded-xl mb-3 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
                 <div className="flex justify-between items-stretch space-x-4">
@@ -347,7 +405,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         )}
       </div>
        
-      {/* 🌟 MODIFIED STICKY FOOTER (Mobile Only) */}
+      {/* STICKY FOOTER (Mobile Only) - No Change */}
       {cart.length > 0 && (
         <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
             <div className="flex items-stretch space-x-3">
@@ -375,7 +433,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         </div>
       )}
 
-      {/* Payment Modal */}
+      {/* Payment Modal (No Change) */}
       <PaymentModal
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
@@ -388,6 +446,14 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           onAddNewCustomer={() => showToast('Redirecting to Add Customer screen...', 'info')}
           apiClient={apiClient}
       />
+      
+      {/* 🌟 NEW ELEMENT: Conceptual Barcode Scanner Modal */}
+      <BarcodeScannerModal 
+          isOpen={isCameraScannerOpen}
+          onClose={() => setIsCameraScannerOpen(false)}
+          onScan={handleScanSuccess} // The function to call when a barcode is successfully read
+          showToast={showToast}
+      />
 
     </div>
   );
@@ -395,3 +461,4 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
 
 export default BillingPOS;
+

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, AlertTriangle, Calendar, TrendingUp, Eye, X, User, ArrowDownWideNarrow, Clock } from 'lucide-react'; 
+import { IndianRupee, AlertTriangle, Calendar, TrendingUp, Eye, X, User, ArrowDownWideNarrow, Clock, CheckCircle } from 'lucide-react';
 import API from '../config/api';
 
 const getLocalDateString = (date) => {
@@ -44,7 +44,7 @@ const formatTimeAgo = (timestamp) => {
     if (hours < 24) return `${hours} hours ago`;
     const days = Math.floor(hours / 24);
     if (days < 30) return `${days} days ago`;
-    
+
     return past.toLocaleDateString();
 };
 
@@ -53,7 +53,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
     // --- Loading and Initial Check ---
     if (!sale && isLoading) {
         return (
-             <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full transform transition-all overflow-hidden p-8 text-center">
                     <p className="text-lg text-indigo-600 dark:text-indigo-400">Loading bill details...</p>
                 </div>
@@ -64,29 +64,33 @@ const BillModal = ({ sale, onClose, isLoading }) => {
     if (!sale) return null;
 
     // --- Data Processing ---
-    const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer'; 
+    const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer';
     const isCredit = sale.amountCredited > 0;
-    const paidAmount = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - sale.amountCredited); 
+    const paidAmount = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - sale.amountCredited);
     const saleDate = new Date(sale.timestamp).toLocaleDateString();
-    const saleTime = new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const saleTime = new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const billId = sale._id ? sale._id.substring(0, 8).toUpperCase() : 'N/A';
 
 
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full transform transition-all overflow-hidden border border-gray-100 dark:border-gray-700">
-                
+
                 {/* Modal Header/Title Section */}
                 <div className="p-6 bg-indigo-500/10 dark:bg-indigo-900/20 text-center border-b border-indigo-500/30 dark:border-indigo-700/50 relative">
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="absolute top-3 right-3 text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white transition-colors p-1 rounded-full bg-transparent hover:bg-indigo-100/50 dark:hover:bg-indigo-800/50"
                         aria-label="Close Bill"
                     >
                         <X className="w-5 h-5" />
                     </button>
-                    <IndianRupee className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
-                    <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white">SALE RECEIPT</h3>
+                    {/* MODIFICATION START */}
+                    <div className="flex items-center justify-center mb-2">
+                        <IndianRupee className="w-8 h-4 text-indigo-600 dark:text-indigo-400 mr-1" />
+                        <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white">SALE RECEIPT</h3>
+                    </div>
+                    {/* MODIFICATION END */}
                     <p className="text-xs font-mono text-gray-600 dark:text-gray-400 mt-1">
                         Transaction ID: <span className="font-semibold">{billId}</span>
                     </p>
@@ -144,7 +148,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
                         <span>SUBTOTAL</span>
                         <span>₹{sale.totalAmount.toFixed(2)}</span>
                     </div>
-                    
+
                     {/* Grand Total - Highlighted */}
                     <div className="flex justify-between font-extrabold text-2xl text-indigo-700 dark:text-indigo-400 border-t border-dashed border-gray-400 dark:border-gray-600 pt-3">
                         <span>TOTAL AMOUNT</span>
@@ -153,7 +157,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 
                     {/* Credit Status */}
                     {isCredit ? (
-                         <div className="space-y-1 pt-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="space-y-1 pt-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
                             <div className="flex justify-between text-base font-semibold text-green-700 dark:text-green-400">
                                 <span>Amount Paid</span>
                                 <span>₹{paidAmount.toFixed(2)}</span>
@@ -164,7 +168,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
                             </div>
                         </div>
                     ) : (
-                         <div className="flex items-center justify-center pt-3 text-lg font-bold text-green-700 dark:text-green-400">
+                        <div className="flex items-center justify-center pt-3 text-lg font-bold text-green-700 dark:text-green-400">
                             <CheckCircle className='w-6 h-6 mr-2' />
                             Payment Completed
                         </div>
@@ -173,8 +177,8 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 
                 {/* Modal Footer (Action) */}
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 text-center border-t border-gray-200 dark:border-gray-700">
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-[1.01]"
                     >
                         Close Receipt
@@ -191,22 +195,22 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 
 const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
     const activeApiClient = apiClient;
-    const [sales, setSales] = useState(salesData || []); 
-    const [isLoadingSales, setIsLoadingSales] = useState(false); 
+    const [sales, setSales] = useState(salesData || []);
+    const [isLoadingSales, setIsLoadingSales] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
-    const [searchQuery, setSearchQuery] = useState(''); 
-    const [activeControl, setActiveControl] = useState('none'); 
-    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeControl, setActiveControl] = useState('none');
+
     // --- UPDATED DATE INITIALIZATION ---
     const todayDate = new Date();
     const today = getLocalDateString(todayDate); // e.g., '2025-10-13'
-    
+
     const sevenDaysAgoDate = new Date(todayDate);
     sevenDaysAgoDate.setDate(todayDate.getDate() - 7);
     const last7Days = getLocalDateString(sevenDaysAgoDate);
-    
+
     const [dateRange, setDateRange] = useState({
         startDate: last7Days,
         endDate: today, // Correctly set to the local date string for today
@@ -214,9 +218,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
     // -----------------------------------
 
     // State for sorting option, default to newest first
-    const [sortOption, setSortOption] = useState('timeDesc'); 
-    
-    
+    const [sortOption, setSortOption] = useState('timeDesc');
+
+
     // Effect to fetch sales data when component mounts or dateRange changes
     useEffect(() => {
         if (!activeApiClient || !API.sales) {
@@ -243,9 +247,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
 
                 const endpoint = `${API.sales}?${params.toString()}`;
                 const response = await activeApiClient.get(endpoint);
-                
+
                 if (response.data && Array.isArray(response.data)) {
-                    setSales(response.data); 
+                    setSales(response.data);
                 } else {
                     console.error('Invalid sales data format received:', response.data);
                     setSales([]);
@@ -261,11 +265,11 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
 
         fetchSales();
     }, [dateRange, activeApiClient, showToast, salesData]); // Added salesData as dependency
-    
-    
+
+
     // Function to fetch full sale details when 'View' is clicked
     const fetchSaleDetail = async (saleId) => {
-        
+
         if (!activeApiClient || !API.sales) {
             showToast && showToast('API client is not configured.', 'error');
             return;
@@ -275,9 +279,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
         setSelectedSaleDetail(null);
         setIsModalOpen(true);
         try {
-            const endpoint = `${API.sales}/${saleId}`; 
+            const endpoint = `${API.sales}/${saleId}`;
             const response = await activeApiClient.get(endpoint);
-            
+
             if (response.data) {
                 setSelectedSaleDetail(response.data);
             } else {
@@ -304,7 +308,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                 // Check against customer name (or fallback) and sale ID
                 const customerName = (sale.customerName || sale.customerId?.name || 'Walk-in Customer').toLowerCase();
                 const saleId = sale._id ? sale._id.toLowerCase() : '';
-                
+
                 return customerName.includes(query) || saleId.includes(query);
             });
         }
@@ -334,7 +338,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                 sortedSales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 break;
         }
-        
+
         return sortedSales;
     }, [sales, sortOption, searchQuery]); // Added searchQuery as dependency
 
@@ -342,7 +346,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
     const summaryMetrics = useMemo(() => {
         const totalSalesValue = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
         const totalCredit = filteredSales.reduce((sum, sale) => sum + (sale.amountCredited || 0), 0);
-        
+
         return {
             totalSalesCount: filteredSales.length,
             totalSalesValue: totalSalesValue,
@@ -353,13 +357,13 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
 
     return (
         <div className="p-4 md:p-8 h-full flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-            
+
             {/* Header and Filters Section */}
             <div className="pb-4 border-b border-gray-200 dark:border-gray-800 mb-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-4 flex items-center">
                     Sales Activity Report
                 </h1>
-                
+
                 {/* Filters Controls - Date Range Filter remains */}
                 <div className="flex flex-col gap-4">
                     {/* Date Range Filter */}
@@ -367,9 +371,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                         {/* <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center mb-3">
                             <Calendar className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Date Range
                         </h2> */}
-                        <DateRangeFilter 
-                            dateRange={dateRange} 
-                            onDateRangeChange={setDateRange} 
+                        <DateRangeFilter
+                            dateRange={dateRange}
+                            onDateRangeChange={setDateRange}
                         />
                     </div>
                 </div>
@@ -408,10 +412,10 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
 
             {/* Sales List */}
             <div className="flex-grow overflow-y-auto bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800">
-                
+
                 {/* Integrated List Header, Search, and Sort Control (Expanded/Collapsed) */}
                 <div className="flex justify-between items-center mb-4">
-                    
+
                     {/* Caption - Hides on small screens when a control is active */}
                     <h2 className={`text-xl font-semibold text-gray-900 dark:text-white transition-opacity duration-200 ${activeControl !== 'none' ? 'hidden sm:block sm:opacity-50 sm:flex-shrink' : 'flex-shrink-0'}`}>
                         Sales History ({filteredSales.length} {filteredSales.length === 1 ? 'Entry' : 'Entries'})
@@ -419,7 +423,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
 
                     {/* Controls Container */}
                     <div className={`flex items-center space-x-3 transition-all duration-300 ease-in-out ${activeControl !== 'none' ? 'w-full sm:w-auto ml-0 sm:ml-auto' : 'ml-auto flex-shrink-0'}`}>
-                        
+
                         {/* Default Icons View (Shows only if activeControl is 'none') */}
                         {activeControl === 'none' && (
                             <div className="flex space-x-3">
@@ -468,7 +472,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                                 </button>
                             </div>
                         )}
-                        
+
                         {/* Sorting Dropdown View (Shows only if activeControl is 'sort') */}
                         {activeControl === 'sort' && (
                             <div className="flex items-center space-x-2 flex-grow max-w-lg w-full justify-end">
@@ -495,107 +499,104 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                         )}
                     </div>
                 </div>
-                
+
                 {isLoadingSales ? (
-                     <div className="py-12 text-center text-lg text-indigo-600 dark:text-indigo-400">
-                        <svg className="animate-spin h-8 w-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Loading sales data...
-                    </div>
-                ) : filteredSales.length === 0 ? (
-                         <div className="py-12 text-center text-lg text-gray-500 dark:text-gray-400">
-                            No sales records found for the current filter/search.
+    <div className="py-12 text-center text-lg text-teal-400">
+        <svg className="animate-spin h-8 w-8 text-teal-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Loading sales data...
+    </div>
+) : filteredSales.length === 0 ? (
+    <div className="py-12 text-center text-lg text-gray-500">
+        No sales records found for the current filter/search.
+    </div>
+) : (
+    /* List Container */
+    <div className="space-y-3">
+        {filteredSales.map((sale) => {
+            const key = sale._id;
+            const amountCreditedSafe = sale.amountCredited || 0;
+            const isCredit = amountCreditedSafe > 0;
+
+            const calculatedAmountPaid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - amountCreditedSafe);
+            const amountPaidForDisplay = Math.max(0, calculatedAmountPaid);
+
+            const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer';
+
+            return (
+                <div
+                    key={key}
+                    // UPDATED: No explicit background color, relying on border and hover for emphasis
+                    className="p-4 rounded-xl shadow-lg shadow-gray-900/10 transition-all duration-200 border border-gray-700 hover:border-indigo-600 hover:bg-gray-800/50 cursor-pointer" // Adjusted shadow and hover bg
+                    onClick={() => fetchSaleDetail(key)}
+                >
+                    {/* TOP ROW: Customer Name and Time Ago */}
+                    <div className="flex justify-between items-center mb-2">
+                        {/* <div className="flex items-center">
+                            <User className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                            <span className="text-sm sm:text-base font-bold text-white truncate max-w-[calc(100vw-200px)] sm:max-w-none">
+                                {customerName}
+                            </span>
+                        </div> */}
+                        <div className="flex items-center space-x-1 text-xs text-gray-500 flex-shrink-0">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatTimeAgo(sale.timestamp)}</span>
                         </div>
-                ) : (
-                    /* List Container */
-                    <div className="space-y-3">
-                        {filteredSales.map((sale) => {
-                            const key = sale._id; 
-                            const amountCreditedSafe = sale.amountCredited || 0;
-                            const isCredit = amountCreditedSafe > 0;
-                            
-                            const calculatedAmountPaid = sale.amountPaid !== undefined ? sale.amountPaid : (sale.totalAmount - amountCreditedSafe);
-                            const amountPaidForDisplay = Math.max(0, calculatedAmountPaid); 
-                            
-                            const customerName = sale.customerName || sale.customerId?.name || 'Walk-in Customer';
-
-                            return (
-                                <div 
-                                    key={key} 
-                                    // UPDATED: Removed border-l-4 and added border border-transparent for a subtle hover outline
-                                    className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl shadow-lg transition-all duration-200 border border-transparent hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                                    onClick={() => fetchSaleDetail(key)}
-                                >
-                                    {/* TOP ROW: Customer Name and Time Ago */}
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center">
-                                            <User className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0" />
-                                            <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate max-w-[calc(100vw-200px)] sm:max-w-none">
-                                                {customerName}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-                                            <Clock className="w-3 h-3"/>
-                                            <span>{formatTimeAgo(sale.timestamp)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* BOTTOM ROW: Amount, Badges, and View Action */}
-                                    <div className="flex justify-between items-center">
-                                        
-                                        {/* Amount */}
-                                        <div className={`text-2xl font-extrabold flex items-center ${isCredit ? 'text-red-600 dark:text-red-400' : 'text-teal-600 dark:text-teal-400'}`}>
-                                            <IndianRupee className="w-5 h-5 mr-1 translate-y-[1px]"/>
-                                            {sale.totalAmount.toFixed(2)}
-                                        </div>
-                                        
-                                        {/* Financial Status Badges */}
-                                        <div className="flex items-center space-x-2 text-xs">
-                                            {isCredit ? (
-                                                <>
-                                                    <span className="font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 whitespace-nowrap">
-                                                        Due: ₹{amountCreditedSafe.toFixed(0)}
-                                                    </span>
-                                                    {amountPaidForDisplay > 0 && (
-                                                        <span className="font-semibold px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 whitespace-nowrap">
-                                                            Paid: ₹{amountPaidForDisplay.toFixed(0)}
-                                                        </span>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <span className="font-semibold px-3 py-1 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 whitespace-nowrap">
-                                                    Payment Complete
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* View Button */}
-                                        <button
-                                            // Since the entire div is clickable, this button is less prominent
-                                            // but serves as a clear visual anchor for the action.
-                                            className="p-1 rounded-full text-indigo-500 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
-                                            title="View Bill Details"
-                                            onClick={(e) => {
-                                                // Prevent the outer div click event from triggering twice
-                                                e.stopPropagation(); 
-                                                fetchSaleDetail(key);
-                                            }}
-                                        >
-                                            <Eye className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
                     </div>
-                )}
+
+                    {/* BOTTOM ROW: Amount, Badges, and View Action */}
+                    <div className="flex justify-between items-center">
+
+                        {/* Amount */}
+                        <div className={`text-2xl font-extrabold flex items-center text-teal-400`}>
+                            <IndianRupee className="w-5 h-5 mr-1 translate-y-[1px]" />
+                            {sale.totalAmount.toFixed(2)}
+                        </div>
+
+                        {/* Financial Status Badges */}
+                        <div className="flex items-center space-x-2 text-xs">
+                            {isCredit ? (
+                                <>
+                                    <span className="font-semibold px-2 py-1 rounded-full whitespace-nowrap bg-red-900/40 text-red-300 border border-red-700">
+                                        Due: ₹{amountCreditedSafe.toFixed(0)}
+                                    </span>
+                                    {amountPaidForDisplay > 0 && (
+                                        <span className="font-semibold px-2 py-1 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
+                                            Paid: ₹{amountPaidForDisplay.toFixed(0)}
+                                        </span>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="font-semibold px-3 py-1 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
+                                    Payment Complete
+                                </span>
+                            )}
+                        </div>
+
+                        {/* View Button */}
+                        <button
+                            className="p-1 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-600 transition-colors flex-shrink-0"
+                            title="View Bill Details"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                fetchSaleDetail(key);
+                            }}
+                        >
+                            <Eye className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            );
+        })}
+    </div>
+)}
             </div>
             {/* BillModal component is assumed to be available here */}
             {isModalOpen && (
-                <BillModal 
-                    sale={selectedSaleDetail} 
+                <BillModal
+                    sale={selectedSaleDetail}
                     onClose={() => setIsModalOpen(false)}
                     isLoading={isFetchingDetail}
                 />

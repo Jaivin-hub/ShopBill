@@ -15,6 +15,7 @@ const salesRoutes = require('./routes/salesRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 // 💥 NEW: Import the notification routes
 const notificationRoutes = require('./routes/notificationRoutes'); 
+const staffRoutes = require('./routes/staffRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/staff', staffRoutes);
 
 // 💥 NEW: NOTIFICATION ROUTES: Mount the router at /api/notifications
 app.use('/api/notifications', notificationRoutes);

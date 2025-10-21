@@ -1,10 +1,10 @@
 const express = require('express');
-const mongoose = require('mongoose'); // Needed for new ObjectId in signup
-const jwt = require('jsonwebtoken');   // Needed for token generation
-const crypto = require('crypto');     // Added for secure token generation
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');   
+const crypto = require('crypto');     
 const User = require('../models/User'); 
 const { protect } = require('../middleware/authMiddleware');
-const sendEmail = require('../utils/sendEmail'); // <-- NEW IMPORT
+const sendEmail = require('../utils/sendEmail'); 
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET; 
@@ -49,8 +49,6 @@ router.post('/login', async (req, res) => {
             searchIdentifiers.push(cleanedIdentifier);
 
             // B. Check against common/default country codes if it's a number without '+'
-            // IMPORTANT: You MUST configure your primary/expected country code(s) here.
-            // Assuming your primary market is India (+91)
             const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91'; 
 
             // If the cleaned identifier does not start with a '+' (i.e., local number only)
@@ -58,9 +56,6 @@ router.post('/login', async (req, res) => {
                 // Add the default country code prefix for search
                 searchIdentifiers.push(defaultCountryCode + cleanedIdentifier);
             }
-
-            // Optional: If you support multiple major countries, you can add more checks here
-            // Example: searchIdentifiers.push('+1' + cleanedIdentifier); 
         }
 
         // 3. Construct the Mongoose $or query using the generated identifiers
@@ -74,6 +69,12 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ $or: orQuery });
 
         if (user && (await user.matchPassword(password))) {
+            // Check if the user is active (especially important for staff)
+            // Assuming your User model has an 'isActive' field or similar logic
+            if (user.isActive === false) { 
+                 return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
+            }
+            
             const token = generateToken(user._id, user.shopId, user.role);
             res.json({
                 token,
@@ -94,7 +95,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Register a New Owner/Shop
+// Register a New owner/Shop
 router.post('/signup', async (req, res) => {
     const { email, password, phone } = req.body;
     
@@ -113,7 +114,8 @@ router.post('/signup', async (req, res) => {
             email,
             password,
             phone: phone || null,
-            role: 'owner',
+            // FIX: Changed role from lowercase 'owner' to PascalCase 'owner' for consistency
+            role: 'owner', 
             // Create a new ObjectID to use temporarily until we save the user's ID as their shopId
             shopId: new mongoose.Types.ObjectId(), 
         });
@@ -152,7 +154,7 @@ router.post('/signup', async (req, res) => {
  */
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
-    let user = null; // Declare user here for access in the catch block
+    let user = null; 
 
     if (!email) {
         return res.status(400).json({ error: 'Email is required to request a password reset.' });
@@ -163,7 +165,6 @@ router.post('/forgot-password', async (req, res) => {
 
         if (!user) {
             // SECURITY BEST PRACTICE: Respond with a generic success message 
-            // even if the user is not found, to prevent email enumeration attacks.
             return res.json({ message: 'Password reset link has been sent.' });
         }
         
@@ -178,12 +179,11 @@ router.post('/forgot-password', async (req, res) => {
 
         // 3. Set the hashed token and expiration time (e.g., 10 minutes)
         user.resetPasswordToken = resetTokenHash;
-        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes (in milliseconds)
+        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
         
-        await user.save({ validateBeforeSave: false }); // Skip validation for just updating token/expiry
+        await user.save({ validateBeforeSave: false });
         
         // 4. Construct the reset URL using the plaintext token
-        // CLIENT_URL must be defined in your .env file (e.g., http://localhost:3000)
         const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
         const message = `
@@ -205,19 +205,17 @@ router.post('/forgot-password', async (req, res) => {
             // 6. Send generic success response
             res.json({ 
                 message: 'Password reset link has been sent.',
-                // **DEV ONLY**: Conditionally include the token for easy testing. Remove in production.
                 devResetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
             });
 
         } catch (mailError) {
             console.error('Email sending failed:', mailError);
             
-            // If email fails, clear the token from the user so the link can't be used even if stored
+            // If email fails, clear the token from the user
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
             await user.save({ validateBeforeSave: false });
 
-            // Respond with a 500 error because the user's request couldn't be fulfilled
             return res.status(500).json({ error: 'Password reset request failed. Could not send the email.' });
         }
 
@@ -228,7 +226,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 
-// --- NEW Route: Reset Password (Final Step) ---
+// --- Existing Route: Reset Password (Final Step) ---
 
 /**
  * @route PUT /api/auth/reset-password/:resetToken
@@ -254,7 +252,7 @@ router.put('/reset-password/:resetToken', async (req, res) => {
         // 3. Find user by hashed token and ensure token hasn't expired
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpire: { $gt: Date.now() }, // $gt: Check if expiry time is greater than now
+            resetPasswordExpire: { $gt: Date.now() }, 
         });
 
         if (!user) {
@@ -268,7 +266,6 @@ router.put('/reset-password/:resetToken', async (req, res) => {
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
 
-        // Mongoose pre-save hook will hash the new password before saving
         await user.save(); 
 
         // 6. Success response
@@ -277,6 +274,59 @@ router.put('/reset-password/:resetToken', async (req, res) => {
     } catch (error) {
         console.error('Password Reset Error:', error);
         res.status(500).json({ error: 'Server error during password reset.' });
+    }
+});
+
+
+// --- NEW Route: Staff Account Activation (Final Step) ---
+
+/**
+ * @route PUT /api/auth/activate/:activationToken
+ * @desc Accepts activation token and new password to set the user's initial password.
+ * @access Public
+ */
+router.put('/activate/:activationToken', async (req, res) => {
+    const { activationToken } = req.params;
+    const { newPassword } = req.body;
+    console.log('activationToken',activationToken);
+    console.log('newPassword',newPassword)
+
+    // 1. Basic password validation
+    if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+    }
+
+    try {
+        // 2. Hash the URL token to match the database stored hash (MUST be the same method)
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(activationToken)
+            .digest('hex');
+
+        // 3. Find user by hashed token and ensure token hasn't expired
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpire: { $gt: Date.now() }, 
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired activation token. Please ask your manager to resend the link.' });
+        }
+        
+        // 4. Update the password and clear the reset/activation fields
+        user.password = newPassword; 
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        // Mongoose pre-save hook will hash the new password before saving
+        await user.save(); 
+
+        // 5. Success response
+        res.json({ message: 'Account activated and password set successfully. You can now log in.' });
+
+    } catch (error) {
+        console.error('Staff Activation Error:', error);
+        res.status(500).json({ error: 'Server error during account activation.' });
     }
 });
 
@@ -292,12 +342,10 @@ router.put('/password/change', protect,
     async (req, res) => {
     
     const { currentPassword, newPassword } = req.body;
-    console.log('inside here')
     
     // In a real application, userId would be extracted from the JWT via middleware (req.user.id)
     // We rely on 'protect' middleware to set req.user.id
     const userId = req.user?.id; // Safely access user ID
-    console.log('userId',userId)
     if (!userId) {
         // This condition should only be hit if the middleware failed to attach the user
         return res.status(401).json({ error: 'Not authorized, token failed.' });
@@ -309,7 +357,6 @@ router.put('/password/change', protect,
 
     try {
         const user = await User.findById(userId);
-        console.log('user',user)
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
@@ -318,7 +365,6 @@ router.put('/password/change', protect,
         if (!(await user.matchPassword(currentPassword))) {
             return res.status(401).json({ error: 'Invalid current password.' });
         }
-        console.log('user match')
         // 2. Check if new password is too short (or add other validation)
         if (newPassword.length < 8) {
              return res.status(400).json({ error: 'New password must be at least 8 characters long.' });

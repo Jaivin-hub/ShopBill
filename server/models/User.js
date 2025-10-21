@@ -1,18 +1,31 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto'); // <-- Import crypto here to define the method
+const crypto = require('crypto');
 
 const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    password: { type: String, required: true },
+    // NOTE: Password should NOT be required if a user is created via the Staff POST route (until they activate).
+    // The pre-save hook handles this by hashing only if 'password' is modified. We will keep 'required: true'
+    // for owner signup, but be mindful when creating staff users without an initial password.
+    password: { type: String, required: false }, // CHANGED to required: false, but signup ensures it is present.
     phone: { type: String, trim: true },
-    role: { type: String, enum: ['owner', 'cashier'], required: true },
+    
+    // FIX: Update role enum to include all possible roles, and use PascalCase for consistency
+    role: { type: String, enum: ['owner', 'Manager', 'Cashier'], required: true }, 
+    
     shopId: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
+        ref: 'User', // This should probably be 'Shop' or the primary User model if no Shop model exists
         required: true 
     }, 
-    // === NEW FIELDS FOR PASSWORD RESET ===
+    
+    // NEW FIELD: Used by PUT /api/staff/:id/toggle to immediately block/allow login
+    isActive: { 
+        type: Boolean, 
+        default: true 
+    },
+
+    // === NEW FIELDS FOR PASSWORD RESET / ACTIVATION ===
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     // ===================================
@@ -20,7 +33,8 @@ const UserSchema = new mongoose.Schema({
 
 // Pre-save hook to hash password before saving
 UserSchema.pre('save', async function (next) {
-    if (this.isModified('password')) {
+    // FIX: Only hash if the password field exists AND is modified
+    if (this.isModified('password') && this.password) { 
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
     }
@@ -38,8 +52,9 @@ UserSchema.methods.getResetPasswordToken = function () {
         .update(resetToken)
         .digest('hex');
 
-    // Set token expiration time (e.g., 10 minutes from now)
-    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    // Set token expiration time (e.g., 10 minutes for reset, 24 hours for staff activation)
+    // NOTE: This generic method should be kept, and staff activation should set expiry directly.
+    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
 
     // Return the UNHASHED token to be sent in the email/link
     return resetToken;

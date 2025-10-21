@@ -234,7 +234,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode }) {
             case 'password':
                 return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} showToast={showToast} />;
             case 'staff':
-                return <StaffPermissionsManager onBack={() => setCurrentView('main')} showToast={showToast} setConfirmModal={setConfirmModal} />;
+                return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} showToast={showToast} setConfirmModal={setConfirmModal} />;
             case 'main':
             default:
                 return renderSettingsList();

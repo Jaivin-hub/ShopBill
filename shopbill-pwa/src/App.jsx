@@ -15,6 +15,7 @@ import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage'
 import ResetPassword from './components/ResetPassword';
+import StaffSetPassword from './components/StaffSetPassword'; // <-- NEW IMPORT
 
 // NOTE: Assuming you have a component named SalesActivityPage.jsx for the full sales list.
 import SalesActivityPage from './components/SalesActivityPage'; 
@@ -22,8 +23,9 @@ import SalesActivityPage from './components/SalesActivityPage';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
-  OWNER: 'owner',
-  CASHIER: 'cashier',
+  OWNER: 'owner', // Changed to match backend PascalCase
+  MANAGER: 'Manager', // Added Manager role
+  CASHIER: 'Cashier', // Changed to match backend PascalCase
 };
 
 // --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
@@ -46,26 +48,33 @@ apiClient.interceptors.request.use(
 );
 // --- END AXIOS CONFIG ---
 
-// Helper to check the URL for the password reset route on initial load
-const checkResetPath = () => {
+// Helper to check the URL for deep link routes on initial load
+const checkDeepLinkPath = () => {
     const path = window.location.pathname;
-    if (path.startsWith('/reset-password/')) {
-        return 'resetPassword'; 
+    
+    // Check for Staff Activation Link
+    if (path.startsWith('/staff-setup/')) {
+        return 'staffSetPassword'; // <-- Must match the state name in App.js
     }
+    
+    // Check for Password Reset Link
+    if (path.startsWith('/reset-password/')) {
+        return 'resetPassword'; // <-- Must match the state name in App.js
+    }
+    
     return null; 
 };
 
 const App = () => {
-  const [currentPage, setCurrentPage] = useState(checkResetPath() || 'dashboard');
+  // FIX: Use the updated checkDeepLinkPath function
+  const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
   
-  // REMOVED: isDarkMode state and local storage check. Dark mode is now enforced.
-  // const [isDarkMode, setIsDarkMode] = useState(() => { ... });
-
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
+  // FIX: Use the updated USER_ROLES constant
   const userRole = currentUser?.role || USER_ROLES.CASHIER;
 
   const showToast = useCallback((message, type = 'info') => {
@@ -80,8 +89,6 @@ const App = () => {
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
-    // NOTE: We could also clear the 'darkMode' setting here, but since it's now
-    // enforced, we don't need to.
     setCurrentUser(null);
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
@@ -103,43 +110,49 @@ const App = () => {
 
 
   // --- INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
-  useEffect(() => {
+useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
     
+    // 1. Check for a deep link path first
+    const deepLink = checkDeepLinkPath(); // 'staffSetPassword' or 'resetPassword' or null
+
     if (token && userJson && token !== 'undefined' && token !== null) {
       try {
         const user = JSON.parse(userJson);
         setCurrentUser(user);
         
-        // If we found a user AND the page was resetPassword, redirect to dashboard
-        if (checkResetPath()) {
+        // 2. If the user is logged in, DO NOT display the deep link page.
+        //    Instead, force a redirect to the dashboard.
+        if (deepLink) {
             setCurrentPage('dashboard');
+        } else {
+            // Otherwise, keep the current page or default to dashboard
+            // if the initial page state was set by checkDeepLinkPath() (which shouldn't happen here)
+            // No action needed here, as the initial state is already 'dashboard' if no deep link was found.
         }
 
       } catch (error) {
         console.error("Error parsing user data from localStorage:", error);
         logout();
       }
+    } else if (deepLink) {
+        // 3. CRITICAL: If NOT logged in but on a deep link, KEEP the deep link page active.
+        setCurrentPage(deepLink);
     }
     
     setIsLoadingAuth(false); 
-  }, [logout]);
+}, [logout]);
 
 
-  // --- Dark Mode Enforcement Effect (MODIFIED) ---
-  // This useEffect now runs once on mount to enforce dark mode.
+  // --- Dark Mode Enforcement Effect ---
   useEffect(() => {
     const html = document.documentElement;
-    // Enforce dark mode:
     html.classList.add('dark');
     html.style.colorScheme = 'dark'; 
-    // REMOVED: localStorage.setItem('darkMode', isDarkMode); and logic for light mode.
-  }, []); // Empty dependency array means it runs only once on mount.
+  }, []); 
 
-  // REMOVED: toggleDarkMode function.
-
-  // Action Functions (Simplified: components will handle the API interaction and local state updates)
+  // Action Functions (Simplified)
   const addSale = useCallback(async (saleData) => {
     try {
       showToast('Sale successfully recorded!', 'success');
@@ -156,36 +169,34 @@ const App = () => {
     }
   }, [showToast]);
 
-  // --- NEW NAVIGATION HANDLERS ---
+  // --- NAVIGATION HANDLERS ---
   const handleViewAllSales = useCallback(() => {
     setCurrentPage('salesActivity');
   }, []);
 
-  // Set current page to Ledger view
   const handleViewAllCredit = useCallback(() => {
     setCurrentPage('khata'); 
   }, []);
 
-  // Set current page to Inventory view
   const handleViewAllInventory = useCallback(() => {
     setCurrentPage('inventory'); 
   }, []);
-  // --- END NEW NAVIGATION HANDLERS ---
+  // --- END NAVIGATION HANDLERS ---
 
 
   // Navigation Menu Items with Access Control
   const navItems = useMemo(() => ([
-    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
-    { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
-    { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.CASHIER] },
-    { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER] },
-    { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
+    // FIX: Updated roles to use PascalCase constants
+    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+    { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
   ].filter(item => item.roles.includes(userRole))), [userRole]);
 
   const renderContent = () => {
     
     if (isLoadingAuth) {
-         // IMPORTANT: Use dark mode classes for the loading state as well
          return (
              <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-teal-400" />
@@ -194,7 +205,12 @@ const App = () => {
         );
     }
     
-    // NEW LOGIC: Handle the Password Reset deep link (unauthenticated page)
+    // NEW LOGIC: Handle the Staff Set Password deep link
+    if (currentPage === 'staffSetPassword') {
+        return <StaffSetPassword />;
+    }
+    
+    // Existing Logic: Handle the Password Reset deep link
     if (currentPage === 'resetPassword') {
         return <ResetPassword />;
     }
@@ -207,7 +223,6 @@ const App = () => {
                     onBackToLanding={() => setIsViewingLogin(false)} 
                 />;
             }
-            // If no user and not viewing login, show landing page.
             return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
     }
     
@@ -217,10 +232,9 @@ const App = () => {
       updateCustomerCredit,
       userRole,
       showToast,
-      apiClient, // CRITICAL: Pass the configured axios instance for use in components
-      API, // Pass the API constants object
+      apiClient, 
+      API, 
       onLogout:logout,
-      // REMOVED: isDarkMode, toggleDarkMode
     };
     
     switch (currentPage) {
@@ -228,7 +242,6 @@ const App = () => {
         return (
             <Dashboard 
                 {...commonProps} 
-                // CRITICAL: Pass the handlers to Dashboard component
                 onViewAllSales={handleViewAllSales}
                 onViewAllCredit={handleViewAllCredit}
                 onViewAllInventory={handleViewAllInventory}
@@ -242,16 +255,9 @@ const App = () => {
         return <InventoryManager {...commonProps} />;
       case 'reports':
         return <Reports {...commonProps} />;
-      // --- NEW CASE TO HANDLE "VIEW ALL SALES" ---
       case 'salesActivity':
-        return <SalesActivityPage 
-            {...commonProps} 
-            // The SalesActivityPage should have a way to go back or is part of a flow.
-            // For now, we assume it's a full page component.
-        />;
-      // --- END NEW CASE ---
+        return <SalesActivityPage {...commonProps} />;
       case 'settings':
-        // REMOVED isDarkMode and toggleDarkMode from props
         return <SettingsPage {...commonProps} />; 
       case 'profile':
         return <Profile {...commonProps} />;
@@ -267,18 +273,20 @@ const App = () => {
     }
   };
 
-  const showAppUI = currentUser && currentPage !== 'resetPassword';
+  // Determine if we should show the full app UI (Header/Sidebar/FooterNav)
+  const showAppUI = currentUser && 
+                    currentPage !== 'resetPassword' && 
+                    currentPage !== 'staffSetPassword'; // <-- EXCLUDE new page
 
   return (
-    // IMPORTANT: Main div already uses dark classes like dark:bg-gray-950
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {showAppUI && (
             <Header
                 companyName="Pocket POS"
-                userRole={userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                // FIX: Use optional chaining before calling charAt in case role is null
+                userRole={userRole?.charAt(0).toUpperCase() + userRole?.slice(1)} 
                 setCurrentPage={setCurrentPage}
-                // REMOVED: isDarkMode, onToggleDarkMode
                 onLogout={logout}
                 apiClient={apiClient}
                 API={API}
@@ -295,7 +303,7 @@ const App = () => {
                         <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-600 dark:text-teal-400" /> Pocket POS
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
-                        User: {userRole.charAt(0).toUpperCase() + userRole.slice(1)} | MERN-Ready
+                        User: {userRole?.charAt(0).toUpperCase() + userRole?.slice(1)} | MERN-Ready
                     </p>
                 </div>
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

@@ -1,5 +1,3 @@
-// middleware/authMiddleware.js
-
 const jwt = require('jsonwebtoken');
 const User = require('../models/User'); // Assuming path to User model
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev'; // Get from env
