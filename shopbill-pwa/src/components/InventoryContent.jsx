@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader } from 'lucide-react'; 
+// Added new icons for the theme update
+import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader, ScanLine, Upload } from 'lucide-react'; 
+import ScannerModal from './ScannerModal';
+// NEW IMPORT: ScannerModal
 
 // Helper component for form inputs
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
@@ -13,14 +16,14 @@ const InputField = ({ label, name, type, value, onChange, ...props }) => (
             type={type}
             value={value}
             onChange={onChange}
-            // 🔥 CORRECTED INPUT STYLING
+            // THEME MATCH: Focus ring is Indigo
             className="w-full p-3 border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 placeholder-gray-500"
             {...props}
         />
     </div>
 );
 
-// Inventory List Card Component
+// Inventory List Card Component (No changes needed here)
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }) => {
     const itemId = item._id || item.id;
     const isLowStock = item.quantity <= item.reorderLevel;
@@ -38,6 +41,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                     <span className="text-xs text-gray-400 flex items-center mt-0.5">HSN: {item.hsn}</span>
                 </div>
                 <div className="text-right">
+                    {/* THEME MATCH: Price uses the secondary theme color (Teal) */}
                     <span className="text-lg font-bold text-teal-400 whitespace-nowrap">
                         ₹{item.price ? item.price.toFixed(2) : '0.00'}
                     </span>
@@ -49,6 +53,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                 </div>
             </div>
             <div className="flex justify-between items-center pt-2">
+                {/* THEME MATCH: Stock text uses primary theme color (Indigo) */}
                 <p className={`text-sm font-medium ${isLowStock ? 'text-red-300' : 'text-indigo-400'}`}>
                     Stock: <span className="font-bold">{item.quantity}</span>
                     {isLowStock && (
@@ -58,6 +63,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                 
                 <div className="flex space-x-2">
                     <button 
+                        // THEME MATCH: Edit button uses Indigo
                         className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
                         title="Edit Item"
                         onClick={() => handleEditClick(item)}
@@ -100,9 +106,51 @@ const InventoryContent = ({
     handleFormSubmit,
     confirmDeleteItem,
     setIsConfirmModalOpen,
+    // New handlers for Bulk/Scan
+    openBulkUploadModal, 
+    // openScannerModal is now managed internally
 }) => {
     
-    // --- New State and Ref for Custom Dropdown ---
+    // 🌟 NEW STATE for Scanner Modal
+    const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+
+    // 🌟 NEW HANDLERS for Scanner Modal
+    const openScannerModal = () => setIsScannerModalOpen(true);
+    const closeScannerModal = () => setIsScannerModalOpen(false);
+
+    // Handler called when ScannerModal successfully finds an item
+    const handleScannedItemSuccess = (scannedItem) => {
+        // Here you would check if the item is new or existing in your inventory
+        const existingItem = inventory.find(item => item.hsn === scannedItem.hsn);
+
+        // For simplicity, we'll open the form modal pre-filled, 
+        // ready for the user to edit (if existing) or save (if new but found via code)
+        if (existingItem) {
+            handleEditClick(existingItem);
+        } else {
+            // Pre-fill the add form with the scanned item details
+            openAddModal(); // Open the form in 'add' mode
+            // Manually set form data (assuming openAddModal resets it first)
+            // NOTE: This logic should ideally be inside the external openAddModal handler 
+            // if you need a clean reset. Here we override immediately after.
+            // This assumes setFormData is available or passed down. Since it's not here,
+            // we'll assume the component managing the form state handles this logic.
+            
+            // *** SIMULATION: In a real app, you would dispatch an action here: ***
+            // setFormData({ ...scannedItem, isEditing: false });
+            // For now, we'll just close the scanner and let the user know.
+            alert(`Scanned new item: ${scannedItem.name}. Please manually add/edit form.`);
+        }
+        closeScannerModal();
+    };
+
+    const handleScannedItemError = (errorMessage) => {
+        console.error("Scanning Error:", errorMessage);
+        // Display a toast/notification to the user (not implemented here)
+    };
+
+
+    // --- State and Ref for Custom Dropdown (Unchanged) ---
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const sortDropdownRef = useRef(null);
 
@@ -129,16 +177,17 @@ const InventoryContent = ({
     ];
     
     const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
-    // --- End New State and Ref ---
+    // --- End State and Ref ---
 
 
     // --- Main Render ---
     return (
+        // THEME MATCH: Main background is gray-950
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
             <h1 className="text-3xl font-extrabold text-white mb-2">Inventory Management</h1>
             <p className="text-gray-400 mb-6">Detailed product configuration and stock levels.</p>
             
-            {/* Sticky Search and Sort Bar */}
+            {/* Sticky Search and Sort Bar (No changes) */}
             <div className={`
                 fixed top-16 left-0 right-0 z-20 
                 md:ml-64 
@@ -158,6 +207,7 @@ const InventoryContent = ({
                             placeholder="Search items by name or HSN code..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            // THEME MATCH: Input focus/border color
                             className="w-full pl-10 pr-4 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-md"
                         />
                         {searchTerm && (
@@ -171,7 +221,7 @@ const InventoryContent = ({
                             </button>
                         )}
                     </div>
-                    {/* Sticky Custom Sort Dropdown (FIXED) */}
+                    {/* Sticky Custom Sort Dropdown (THEME MATCH: Focus/Border) */}
                     <div className="relative" ref={sortDropdownRef}>
                         <button
                             type="button"
@@ -190,7 +240,7 @@ const InventoryContent = ({
                                         onClick={() => handleSortSelect(option.value)}
                                         className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
                                             ${option.value === sortOption 
-                                                ? 'bg-indigo-600 text-white' 
+                                                ? 'bg-indigo-600 text-white' // THEME MATCH: Primary selection background
                                                 : 'text-gray-200 hover:bg-gray-700'
                                             }`}
                                     >
@@ -210,11 +260,14 @@ const InventoryContent = ({
             <div className="hidden lg:block bg-gray-900 rounded-xl shadow-2xl shadow-indigo-900/10 border border-gray-800">  
                 
                  <div className="p-4 md:p-6 flex justify-between items-center border-b border-gray-700">
+                    {/* THEME MATCH: Section title uses primary theme color (Indigo) */}
                     <h3 className="text-xl font-bold flex items-center text-indigo-400">
                         <Package className="w-5 h-5 mr-2" /> Total Inventory Items ({inventory.length})
                     </h3>
-                    <div className="flex space-x-4">
-                        {/* Desktop Custom Sort Dropdown (FIXED) */}
+                    
+                    {/* 🌟 DESKTOP ACTIONS GROUP: Add, Bulk Upload, Scan */}
+                    <div className="flex space-x-3">
+                        {/* Desktop Custom Sort Dropdown (Unchanged) */}
                         <div className="relative hidden xl:block" ref={sortDropdownRef}>
                             <button
                                 type="button"
@@ -243,7 +296,29 @@ const InventoryContent = ({
                                 </div>
                             )}
                         </div>
-                        {/* Add Item Button */}
+                        
+                        {/* 🌟 Scan QR/Barcode Button - Cyan shade for distinct utility */}
+                        <button 
+                            // 🌟 UPDATED: Use internal openScannerModal
+                            className="bg-cyan-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-cyan-700 transition flex items-center disabled:opacity-50"
+                            onClick={openScannerModal} 
+                            disabled={loading}
+                            title="Scan Item Barcode/QR"
+                        >
+                            <ScanLine className="w-4 h-4" />
+                            <span className="ml-2">Scan</span>
+                        </button>
+
+                        {/* 🌟 Bulk Upload Button - Teal shade (secondary theme color) */}
+                        <button 
+                            className="bg-teal-700 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-teal-800 transition flex items-center disabled:opacity-50"
+                            onClick={openBulkUploadModal}
+                            disabled={loading}
+                        >
+                            <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+                        </button>
+                        
+                        {/* Add Item Button (Primary action button is Indigo) */}
                         <button 
                             className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-indigo-700 transition flex items-center disabled:opacity-50"
                             onClick={openAddModal}
@@ -254,7 +329,7 @@ const InventoryContent = ({
                     </div>
                 </div>
                 
-                {/* Scrollable Table Area */}
+                {/* Scrollable Table Area (No changes) */}
                 <div className="max-h-[60vh] overflow-y-auto">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-700">
@@ -287,12 +362,14 @@ const InventoryContent = ({
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-200">
                                             {item.quantity}
                                         </td>
+                                        {/* THEME MATCH: Price color */}
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-center text-teal-400 font-semibold">
                                             ₹{item.price ? item.price.toFixed(2) : '0.00'}
                                         </td>
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-2">
                                                 <button 
+                                                    // THEME MATCH: Edit button color
                                                     className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition"
                                                     title="Edit Item"
                                                     onClick={() => handleEditClick(item)}
@@ -321,22 +398,48 @@ const InventoryContent = ({
             <div className="lg:hidden">
                 {/* Header for mobile view */}
                 <div className="flex justify-between items-center mb-4">
+                    {/* THEME MATCH: Section title uses primary theme color (Indigo) */}
                     <h3 className="text-lg font-bold flex items-center text-indigo-400">
                         <Package className="w-4 h-4 mr-2" /> Inventory List ({inventory.length})
                     </h3>
-                    {/* Add Item Button */}
-                    <button 
-                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-md hover:bg-indigo-700 transition flex items-center text-sm disabled:opacity-50"
-                        onClick={openAddModal}
-                        disabled={loading}
-                        title="Add New Item">
-                        <Plus className="w-4 h-4" /> <span className="hidden sm:inline ml-1">Add Item</span>
-                    </button>
+                    
+                    {/* 🌟 MOBILE ACTIONS GROUP: Add, Bulk Upload, Scan (right side) */}
+                    <div className="flex space-x-2">
+                        
+                        {/* 🌟 Scan QR/Barcode Button - Cyan shade */}
+                        <button 
+                            // 🌟 UPDATED: Use internal openScannerModal
+                            className="bg-cyan-600 text-white px-2 py-1.5 rounded-lg shadow-md hover:bg-cyan-700 transition flex items-center text-sm disabled:opacity-50"
+                            onClick={openScannerModal}
+                            disabled={loading}
+                            title="Scan Item"
+                        >
+                            <ScanLine className="w-4 h-4" />
+                        </button>
+                        
+                        {/* 🌟 Bulk Upload Button - Teal shade */}
+                        <button 
+                            className="bg-teal-700 text-white px-2 py-1.5 rounded-lg shadow-md hover:bg-teal-800 transition flex items-center text-sm disabled:opacity-50"
+                            onClick={openBulkUploadModal}
+                            disabled={loading}
+                            title="Bulk Upload"
+                        >
+                            <Upload className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Add Item Button (Primary action button is Indigo) */}
+                        <button 
+                            className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-md hover:bg-indigo-700 transition flex items-center text-sm disabled:opacity-50"
+                            onClick={openAddModal}
+                            disabled={loading}
+                            title="Add New Item">
+                            <Plus className="w-4 h-4" /> <span className="hidden sm:inline ml-1">Add Item</span>
+                        </button>
+                    </div>
                 </div>
                 
-                {/* Non-sticky Search and Custom Sort Bar for initial view on mobile (FIXED) */}
+                {/* Non-sticky Search and Custom Sort Bar for initial view on mobile (Unchanged) */}
                 {!showStickySearch && (
-                    // MOBILE OPTIMIZATION: Use gap-3 and smaller padding/text size
                     <div className="flex gap-3 mb-4">
                         <div className="relative flex-grow">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
@@ -345,7 +448,7 @@ const InventoryContent = ({
                                 placeholder="Search items..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                // Smaller vertical padding: py-2 instead of py-2.5
+                                // THEME MATCH: Input focus/border color
                                 className="w-full pl-10 pr-4 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm"
                             />
                             {searchTerm && (
@@ -359,7 +462,7 @@ const InventoryContent = ({
                                 </button>
                             )}
                         </div>
-                        {/* Mobile Custom Sort Dropdown */}
+                        {/* Mobile Custom Sort Dropdown (THEME MATCH: Focus/Border) */}
                         <div className="relative" ref={sortDropdownRef}>
                             <button
                                 type="button"
@@ -391,7 +494,7 @@ const InventoryContent = ({
                     </div>
                 )}
                 
-                {/* Scrollable list of cards */}
+                {/* Scrollable list of cards (Unchanged) */}
                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pb-4"> 
                     {inventory.map(item => (
                         <InventoryListCard 
@@ -405,16 +508,13 @@ const InventoryContent = ({
                 </div>
             </div>
             
-            {/* Item Form Modal - RE-CENTERED FOR MOBILE */}
+            {/* Item Form Modal (No changes) */}
             {isFormModalOpen && (
-                // 🔥 FIX: Changed outer flex alignment to 'items-center' and ensured padding is applied on mobile.
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
                     <form onSubmit={handleFormSubmit} 
-                        // 🔥 FIX: Simplified form classes to use 'rounded-xl' consistently and set 'max-w' for better mobile centering appearance.
                         className="bg-gray-800 w-full max-w-sm sm:max-w-md md:max-w-xl rounded-xl shadow-2xl transform transition-transform duration-300 translate-y-0 max-h-[90vh] overflow-y-auto border border-indigo-700">
                         
-                        {/* Modal Header */}
-                        {/* FIX: Removed 'rounded-t-xl' from the header as the form now has it */}
+                        {/* Modal Header (THEME MATCH: Header BG and Title color) */}
                         <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl sticky top-0 z-10">
                             <h2 className="text-xl font-bold text-indigo-300 flex items-center">
                                 {isEditing ? <Edit className="w-5 h-5 mr-2" /> : <Plus className="w-5 h-5 mr-2" />} 
@@ -425,7 +525,7 @@ const InventoryContent = ({
                             </button>
                         </div>
                         
-                        {/* Form Body */}
+                        {/* Form Body (Unchanged) */}
                         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InputField label="Product Name" name="name" type="text" value={formData.name} onChange={handleInputChange} required />
                             <InputField label="Selling Price (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} min="0" required />
@@ -434,11 +534,11 @@ const InventoryContent = ({
                             <InputField label="HSN/SAC Code (Optional)" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} placeholder="e.g., 0401" />
                         </div>
                         
-                        {/* Modal Footer (Action Button) */}
+                        {/* Modal Footer (Action Button - THEME MATCH) */}
                         <div className="p-5 border-t border-gray-700">
                             <button 
                                 type="submit"
-                                // CONDITIONAL BUTTON STYLING
+                                // CONDITIONAL BUTTON STYLING: Edit is Indigo (primary), Add is Teal (secondary/success)
                                 className={`w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl hover:bg-teal-700 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99] ${
                                     isEditing 
                                         ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/50' 
@@ -456,7 +556,7 @@ const InventoryContent = ({
                 </div>
             )}
             
-            {/* Delete Confirmation Modal (Unchanged) */}
+            {/* Delete Confirmation Modal (No changes) */}
             {isConfirmModalOpen && itemToDelete && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity">
                     <div className="bg-gray-900 w-full max-w-sm rounded-xl shadow-2xl transform transition-transform duration-300 border border-red-700">
@@ -491,7 +591,8 @@ const InventoryContent = ({
                     </div>
                 </div>
             )}
-            {/* Loading Overlay (Unchanged) */}
+            
+            {/* Loading Overlay (No changes) */}
             {loading && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-gray-900 p-6 rounded-xl shadow-2xl text-indigo-400 flex items-center border border-gray-700">
@@ -499,6 +600,14 @@ const InventoryContent = ({
                     </div>
                 </div>
             )}
+
+            {/* 🌟 NEW: Scanner Modal Component */}
+            <ScannerModal 
+                isOpen={isScannerModalOpen}
+                onClose={closeScannerModal}
+                onScanSuccess={handleScannedItemSuccess}
+                onScanError={handleScannedItemError}
+            />
         </div>
     );
 };
