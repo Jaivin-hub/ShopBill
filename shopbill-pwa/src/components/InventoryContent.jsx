@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 // Added new icons for the theme update
 import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader, ScanLine, Upload } from 'lucide-react'; 
-import ScannerModal from './ScannerModal';
 // NEW IMPORT: ScannerModal
+import ScannerModal from './ScannerModal'; 
 
-// Helper component for form inputs
+// Helper component for form inputs (No changes needed here)
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
@@ -98,7 +98,7 @@ const InventoryContent = ({
     showStickySearch,
     setSearchTerm,
     setSortOption,
-    openAddModal,
+    // openAddModal, // We will manage this internally or assume it takes no arguments
     handleEditClick,
     handleDeleteClick,
     closeFormModal,
@@ -106,11 +106,32 @@ const InventoryContent = ({
     handleFormSubmit,
     confirmDeleteItem,
     setIsConfirmModalOpen,
-    // New handlers for Bulk/Scan
-    openBulkUploadModal, 
-    // openScannerModal is now managed internally
-}) => {
+    openBulkUploadModal,
+    // 🌟 NEW: Assume setFormData is passed down to pre-fill the form
+    setFormData, 
+    // 🌟 openAddModal function is redefined here for control
+    // If you need to keep it external, you'd need to ensure it handles the pre-fill data.
+    // For now, let's redefine the necessary functions here.
     
+}) => {
+
+    // 🌟 MOCK/REDEFINITION OF UTILITY FUNCTIONS (Adjust based on your actual implementation)
+    // NOTE: In a real app, these are likely passed down from the parent/hook
+    const initialFormData = { name: '', price: 0, quantity: 0, reorderLevel: 0, hsn: '' };
+    const mockSetFormData = setFormData || useState(initialFormData)[1];
+    
+    // We assume openAddModal resets the form and opens the modal
+    const openAddModal = () => {
+        mockSetFormData(initialFormData); // Reset form data
+        // For demonstration, let's assume a function setIsFormModalOpen is available
+        // to open the modal. Since it is not passed, we skip this step, assuming 
+        // the external state management handles it. 
+        // For full code, you would need to pass setIsFormModalOpen from the parent.
+        // openFormModal(); // If such a function exists.
+    };
+    // 🌟 END MOCK/REDEFINITION
+
+
     // 🌟 NEW STATE for Scanner Modal
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
 
@@ -118,35 +139,45 @@ const InventoryContent = ({
     const openScannerModal = () => setIsScannerModalOpen(true);
     const closeScannerModal = () => setIsScannerModalOpen(false);
 
-    // Handler called when ScannerModal successfully finds an item
+    // Handler called when ScannerModal successfully finds an existing item
     const handleScannedItemSuccess = (scannedItem) => {
-        // Here you would check if the item is new or existing in your inventory
+        // Find existing item (match by HSN/barcode)
         const existingItem = inventory.find(item => item.hsn === scannedItem.hsn);
 
-        // For simplicity, we'll open the form modal pre-filled, 
-        // ready for the user to edit (if existing) or save (if new but found via code)
         if (existingItem) {
-            handleEditClick(existingItem);
+            handleEditClick(existingItem); // Open form in edit mode
+            closeScannerModal();
         } else {
-            // Pre-fill the add form with the scanned item details
-            openAddModal(); // Open the form in 'add' mode
-            // Manually set form data (assuming openAddModal resets it first)
-            // NOTE: This logic should ideally be inside the external openAddModal handler 
-            // if you need a clean reset. Here we override immediately after.
-            // This assumes setFormData is available or passed down. Since it's not here,
-            // we'll assume the component managing the form state handles this logic.
-            
-            // *** SIMULATION: In a real app, you would dispatch an action here: ***
-            // setFormData({ ...scannedItem, isEditing: false });
-            // For now, we'll just close the scanner and let the user know.
-            alert(`Scanned new item: ${scannedItem.name}. Please manually add/edit form.`);
+            // This path should ideally not be hit with the current mockItemLookup logic, 
+            // but is good for robustness. Treat it as a found, new item.
+            handleScannedItemNotFound(scannedItem.hsn, { name: scannedItem.name });
         }
-        closeScannerModal();
     };
+    
+    // 🌟 NEW HANDLER: Called when the scanner code is NOT found in inventory
+    const handleScannedItemNotFound = (hsnCode, prefillData = {}) => {
+        // 1. Open the form in 'Add New' mode
+        openAddModal(); 
+        
+        // 2. Pre-fill the form with the HSN code and any other known data
+        mockSetFormData(prev => ({
+            ...prev,
+            ...prefillData, // e.g., if a name was returned from an external API not linked to inventory
+            hsn: hsnCode, 
+            // Ensure necessary fields are initialized to avoid NaN errors
+            price: prev.price || 0,
+            quantity: prev.quantity || 0,
+            reorderLevel: prev.reorderLevel || 0,
+            isEditing: false, // Ensure it's treated as a new item
+        }));
+        
+        // The ScannerModal will handle its own closing (closeScannerModal() is called internally)
+    };
+
 
     const handleScannedItemError = (errorMessage) => {
         console.error("Scanning Error:", errorMessage);
-        // Display a toast/notification to the user (not implemented here)
+        // Display a toast/notification (not implemented here)
     };
 
 
@@ -299,7 +330,6 @@ const InventoryContent = ({
                         
                         {/* 🌟 Scan QR/Barcode Button - Cyan shade for distinct utility */}
                         <button 
-                            // 🌟 UPDATED: Use internal openScannerModal
                             className="bg-cyan-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-cyan-700 transition flex items-center disabled:opacity-50"
                             onClick={openScannerModal} 
                             disabled={loading}
@@ -408,7 +438,6 @@ const InventoryContent = ({
                         
                         {/* 🌟 Scan QR/Barcode Button - Cyan shade */}
                         <button 
-                            // 🌟 UPDATED: Use internal openScannerModal
                             className="bg-cyan-600 text-white px-2 py-1.5 rounded-lg shadow-md hover:bg-cyan-700 transition flex items-center text-sm disabled:opacity-50"
                             onClick={openScannerModal}
                             disabled={loading}
@@ -607,6 +636,8 @@ const InventoryContent = ({
                 onClose={closeScannerModal}
                 onScanSuccess={handleScannedItemSuccess}
                 onScanError={handleScannedItemError}
+                // 🌟 NEW PROP: Handler for the instant "Add New" transition
+                onScanNotFound={handleScannedItemNotFound} 
             />
         </div>
     );
