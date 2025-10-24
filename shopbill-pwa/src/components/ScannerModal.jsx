@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, ScanLine, Loader } from 'lucide-react';
-import { Html5QrcodeScanner } from 'html5-qrcode'; 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, CheckCircle, AlertTriangle, ScanLine, Loader, QrCode } from 'lucide-react';
 
-// Mock function (No changes)
+// --- MOCK API CALL (Unchanged) ---
 const mockItemLookup = (code) => {
     return new Promise(resolve => {
         setTimeout(() => {
@@ -13,11 +12,11 @@ const mockItemLookup = (code) => {
             } else {
                 resolve({ success: false, error: "No code scanned." });
             }
-        }, 500);
+        }, 800);
     });
 };
 
-
+// --- SCANNER MODAL COMPONENT ---
 const ScannerModal = ({ 
     isOpen, 
     onClose, 
@@ -26,42 +25,64 @@ const ScannerModal = ({
     onScanNotFound 
 }) => {
     
+    const ZXing = window.ZXing;
+    
     const qrcodeRegionId = "qr-code-full-region"; 
-    const html5QrcodeScannerRef = useRef(null);
-    const containerRef = useRef(null); // 🌟 NEW REF to check if the modal is mounted
+    const videoRef = useRef(null); 
+    const codeReaderRef = useRef(null); 
+    const containerRef = useRef(null); 
 
     const [result, setResult] = useState(null);
+    // idle | initializing | scanning | lookingUp | found | notFound | loadingLib
     const [lookupStatus, setLookupStatus] = useState('idle'); 
     const [lookupError, setLookupError] = useState(null);
-    const [lastScannedCode, setLastScannedCode] = useState(null); 
+    const lastScannedCodeRef = useRef(null); 
+    const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
 
-
-    // Effect to handle the instant action after lookup completes (No changes)
-    useEffect(() => {
-        if (lookupStatus === 'notFound' && lastScannedCode) {
-             setTimeout(() => {
-                onScanNotFound(lastScannedCode);
-                onClose();
-             }, 700);
+    // --- Core Cleanup Logic ---
+    // Moved to a simple function that can be called directly.
+    const resetScannerState = () => {
+        if (codeReaderRef.current) {
+            // NOTE: The scanner is also reset inside handleScanResult upon a successful read.
+            codeReaderRef.current.reset();
         }
-    }, [lookupStatus, lastScannedCode, onScanNotFound, onClose]);
+        codeReaderRef.current = null; 
+        isProcessingRef.current = false;
+        lastScannedCodeRef.current = null;
+        setIsScannerInitialized(false);
+        setResult(null);
+        setLookupStatus('idle');
+        setLookupError(null);
+    };
 
-    // CORE SCANNING LOGIC (No changes)
-    const handleScanResult = (decodedText) => {
-        if (decodedText === lastScannedCode || lookupStatus !== 'idle') {
+    // Handles the core scanning result and subsequent item lookup
+    const handleScanResult = useCallback((decodedText) => {
+        
+        if (isProcessingRef.current) {
             return;
         }
 
-        setLastScannedCode(decodedText);
+        if (decodedText === lastScannedCodeRef.current) {
+            return;
+        }
+        
+        isProcessingRef.current = true; // Block further scans
+        lastScannedCodeRef.current = decodedText; 
+        
         setResult(decodedText);
         setLookupStatus('lookingUp');
         
-        // 1. Stop the scanner feed immediately to prevent rescanning
-        html5QrcodeScannerRef.current.pause(true);
+        // Stop the camera feed after successful scan to prevent immediate re-scan
+        if (codeReaderRef.current) {
+            codeReaderRef.current.reset(); 
+            codeReaderRef.current = null; // Mark as dead
+        }
 
-        // 2. Start lookup
+        // Start lookup
         mockItemLookup(decodedText).then(response => {
+            isProcessingRef.current = false; 
+            
             if (response.success) {
                 setLookupStatus('found');
                 onScanSuccess(response.item);
@@ -71,182 +92,270 @@ const ScannerModal = ({
                 onScanError(response.error); 
             }
         }).catch(err => {
+            isProcessingRef.current = false; 
             setLookupStatus('notFound');
-            setLookupError("An error occurred during lookup.");
-            onScanError("An error occurred during lookup.");
+            setLookupError("An unknown error occurred during lookup.");
+            onScanError("An unknown error occurred during lookup.");
         });
-    };
+    }, [onScanSuccess, onScanError]);
 
-    // ----------------------------------------------------
-    // 🌟 UPDATED INITIALIZATION & CLEANUP EFFECT 🌟
-    // ----------------------------------------------------
+
+    // Effect to handle auto-closing after lookup completes
     useEffect(() => {
-        // 1. Check if the modal is open AND the container element is ready
-        if (isOpen && containerRef.current && !html5QrcodeScannerRef.current) {
-            
-            // Check if the target element exists before initializing
-            if (document.getElementById(qrcodeRegionId)) {
-                
-                const config = {
-                    fps: 15,
-                    qrbox: { width: 250, height: 150 },
-                    aspectRatio: 1.777778, 
-                    disableFlip: false,
-                    rememberLastUsedCamera: true
-                };
+        let timer;
+        if (lookupStatus === 'notFound' && lastScannedCodeRef.current) {
+             timer = setTimeout(() => {
+                onScanNotFound(lastScannedCodeRef.current);
+                onClose(); 
+             }, 1500);
+        }
+        if (lookupStatus === 'found') {
+            timer = setTimeout(() => {
+                onClose(); 
+            }, 1000); 
+        }
+        return () => clearTimeout(timer);
+    }, [lookupStatus, onScanNotFound, onClose]);
 
-                const scanner = new Html5QrcodeScanner(
-                    qrcodeRegionId, 
-                    config, 
-                    false 
-                );
-                
-                const onScanSuccess = (decodedText, decodedResult) => {
-                    handleScanResult(decodedText);
-                };
-
-                const onScanError = (errorMessage) => {
-                    // This is usually a continuous warning and can be ignored for success logic
-                };
-
-                // 🌟 The critical part: Safely handle the render promise
-                const renderPromise = scanner.render(onScanSuccess, onScanError);
-                
-                // 🌟 Check if renderPromise is a Promise before chaining
-                if (renderPromise && typeof renderPromise.then === 'function') {
-                    renderPromise.then(() => {
-                        html5QrcodeScannerRef.current = scanner;
-                        setIsScannerInitialized(true);
-                        setLookupStatus('idle');
-                    })
-                    .catch(err => {
-                        console.error("Failed to initialize scanner:", err);
-                        setLookupStatus('notFound');
-                        setLookupError("Camera access denied or device unsupported.");
-                        html5QrcodeScannerRef.current = null;
-                    });
-                } else {
-                    // Fallback for immediate non-Promise return (where the original error might occur)
-                    console.error("html5-qrcode render did not return a valid promise.");
-                    setLookupStatus('notFound');
-                    setLookupError("Failed to start scanner (Element issue).");
-                }
-            }
+    // CORE SCANNER INITIALIZATION & CLEANUP EFFECT
+    useEffect(() => {
+        
+        // If the modal is closed, we don't start initialization.
+        if (!isOpen) {
+             // CRITICAL FIX: Explicitly reset all state when `isOpen` becomes false.
+             resetScannerState(); 
+             return; 
         }
         
-        // Cleanup function for when the modal is closed or component unmounts
-        return () => {
-             if (html5QrcodeScannerRef.current) {
-                // Shut down the camera stream gracefully
-                html5QrcodeScannerRef.current.stop().finally(() => {
-                    html5QrcodeScannerRef.current = null;
-                    setIsScannerInitialized(false);
-                }).catch(err => {
-                    console.warn("Failed to stop scanner cleanly:", err);
-                    html5QrcodeScannerRef.current = null;
-                    setIsScannerInitialized(false);
-                });
-            }
-        };
-    }, [isOpen]); 
-
-    // Reset state on close
-    useEffect(() => {
-        if (!isOpen) {
-            setResult(null);
-            setLookupStatus('idle');
-            setLookupError(null);
-            setLastScannedCode(null);
-            // We rely on the cleanup function in the main effect for stopping the camera
+        // Prevent re-initialization if already scanning or busy/initialized
+        if (isScannerInitialized || isProcessingRef.current || lookupStatus !== 'idle') {
+            return;
         }
-    }, [isOpen]);
+
+        // Check for library presence
+        if (!ZXing) {
+            setLookupStatus('loadingLib');
+            setLookupError("ZXing library not found. Please ensure the CDN script is loaded in index.html.");
+            console.error("ZXing not found on window object.");
+            return; 
+        }
+        
+        // --- Start Initialization ---
+        if (isOpen && containerRef.current && ZXing && !isScannerInitialized) {
+            
+            setLookupStatus('initializing');
+            setLookupError(null);
+
+            codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
+
+            const hints = new Map();
+            const decodeFormats = [
+                ZXing.BarcodeFormat.QR_CODE,
+                ZXing.BarcodeFormat.EAN_13,
+                ZXing.BarcodeFormat.CODE_128,
+                ZXing.BarcodeFormat.DATA_MATRIX
+            ];
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
+            
+            codeReaderRef.current.decodeFromConstraints({ 
+                video: { facingMode: "environment" } 
+            }, videoRef.current, (result, err) => {
+                if (result) {
+                    handleScanResult(result.getText());
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error("ZXing Decode Error:", err);
+                }
+            })
+            .then(() => {
+                setIsScannerInitialized(true);
+                setLookupStatus('scanning');
+                console.log("Scanner: ZXing stream started successfully.");
+            })
+            .catch(err => {
+                console.error("ZXing Initialization Failed:", err);
+                resetScannerState(); // Reset if startup fails
+                setLookupStatus('notFound'); 
+                setLookupError("Camera access denied or device unsupported. Please check permissions.");
+            });
+        } 
+
+        // 5. RETURN CLEANUP FUNCTION
+        // This function guarantees the stream is stopped if the component unmounts.
+        return () => {
+             // CRITICAL FIX: Re-integrate the cleanup logic into the return. 
+             // This runs when the component unmounts OR before the effect re-runs 
+             // (which only happens when dependencies change).
+             if (codeReaderRef.current) {
+                console.log("Scanner: Stream stopped via useEffect return.");
+                codeReaderRef.current.reset();
+             }
+        };
+        // Dependencies are the minimum required to re-run the effect when necessary
+    }, [isOpen, ZXing, handleScanResult, isScannerInitialized, lookupStatus]); 
 
     if (!isOpen) return null;
 
-    // UI RENDERING LOGIC (No changes)
-    let statusIcon = <ScanLine className="w-8 h-8 text-cyan-400" />;
-    let statusText = isScannerInitialized 
-        ? "Point camera at a barcode or QR code..."
-        : "Initializing camera...";
-    let statusColor = "text-gray-300";
+    // --- UI LOGIC (Unchanged) ---
+    let statusIcon, statusText, statusColor, statusBg;
 
-    if (lookupStatus === 'lookingUp') {
+    if (lookupStatus === 'loadingLib') {
+        statusIcon = <Loader className="w-8 h-8 text-yellow-400 animate-spin" />;
+        statusText = "Awaiting ZXing library load. Please check index.html...";
+        statusColor = "text-yellow-300";
+        statusBg = "bg-yellow-900/40";
+    }
+    else if (lookupStatus === 'initializing') {
+        statusIcon = <Loader className="w-8 h-8 text-cyan-400 animate-spin" />;
+        statusText = "Requesting camera access & starting feed...";
+        statusColor = "text-cyan-300";
+        statusBg = "bg-cyan-900/40";
+    } else if (lookupStatus === 'scanning') {
+        statusIcon = <ScanLine className="w-8 h-8 text-cyan-400" />;
+        statusText = "Point camera at a barcode or QR code...";
+        statusColor = "text-gray-300";
+        statusBg = "bg-gray-700/40";
+    } else if (lookupStatus === 'lookingUp') {
         statusIcon = <Loader className="w-8 h-8 text-indigo-400 animate-spin" />;
         statusText = "Code scanned! Looking up item in inventory...";
         statusColor = "text-indigo-300";
+        statusBg = "bg-indigo-900/40";
     } else if (lookupStatus === 'found') {
         statusIcon = <CheckCircle className="w-8 h-8 text-teal-400" />;
-        statusText = `Item found: ${result}!`;
+        statusText = `Success! Item found.`;
         statusColor = "text-teal-300";
+        statusBg = "bg-teal-900/40";
     } else if (lookupStatus === 'notFound') {
         statusIcon = <AlertTriangle className="w-8 h-8 text-red-400" />;
-        statusText = `Item not found! Opening 'Add New' form now...`; 
+        statusText = lookupError || `Item not found. Check console for details.`; 
         statusColor = "text-red-300";
+        statusBg = "bg-red-900/40";
+    } else { // idle 
+        statusIcon = <Loader className="w-8 h-8 text-gray-400 animate-spin" />;
+        statusText = "Initializing...";
+        statusColor = "text-gray-300";
+        statusBg = "bg-gray-700/40";
     }
 
+    const isBusy = lookupStatus === 'lookingUp' || lookupStatus === 'initializing' || lookupStatus === 'loadingLib';
+    const isAutoClosing = lookupStatus === 'notFound' || lookupStatus === 'found';
+
     return (
-        <div ref={containerRef} className="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-opacity">
-            <div className="bg-gray-800 w-full max-w-lg rounded-xl shadow-2xl border border-cyan-700/50">
+        <div 
+            ref={containerRef} 
+            className="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-[60] p-4 font-inter"
+            onClick={isAutoClosing ? null : onClose} 
+        >
+            <div 
+                className="bg-gray-800 w-full max-w-xl rounded-2xl shadow-2xl border border-gray-700 transition-all transform"
+                onClick={(e) => e.stopPropagation()} 
+            >
                 
                 {/* Modal Header */}
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-cyan-900/40 rounded-t-xl">
-                    <h2 className="text-xl font-bold text-cyan-300 flex items-center">
-                        <ScanLine className="w-5 h-5 mr-2" /> Fast Barcode/QR Scanner
+                <div className="p-5 flex justify-between items-center rounded-t-2xl border-b border-gray-700/50">
+                    <h2 className="text-2xl font-extrabold text-white flex items-center">
+                        <QrCode className="w-6 h-6 mr-3 text-cyan-500" /> Inventory Scanner
                     </h2>
                     <button 
                         type="button" 
                         onClick={onClose} 
-                        className="text-gray-400 hover:text-white p-1"
-                        disabled={lookupStatus === 'notFound' || lookupStatus === 'lookingUp'}
+                        className="text-gray-400 hover:text-white p-2 rounded-full transition hover:bg-gray-700"
+                        disabled={isBusy || isAutoClosing}
                     >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                {/* Camera Feed Area */}
-                <div className="p-4">
+                {/* Camera Feed Area - Core Focus */}
+                <div className="p-6 pb-4">
                     <div 
                         id={qrcodeRegionId}
-                        className="aspect-video w-full bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-700 relative"
-                        style={{ minHeight: '300px' }}
+                        className="aspect-video w-full bg-gray-900 rounded-xl overflow-hidden shadow-inner shadow-gray-950 relative border-4 border-cyan-900"
+                        style={{ minHeight: '320px' }}
                     >
-                        {!isScannerInitialized && (
-                             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
-                                <Loader className="w-8 h-8 text-cyan-400 animate-spin" />
-                                <span className="ml-3 text-gray-400">Loading Camera...</span>
+                        {/* The video element is where ZXing renders the camera feed */}
+                        <video ref={videoRef} id="scanner-video" className="w-full h-full object-cover" playsInline />
+                        
+                        {/* Viewfinder Overlay - Corner Brackets (Styling over the video) */}
+                        <div className="absolute inset-0 pointer-events-none">
+                             <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-cyan-400 opacity-80" />
+                            <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-cyan-400 opacity-80" />
+                            <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-cyan-400 opacity-80" />
+                            <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-cyan-400 opacity-80" />
+                            
+                            {/* Scanning Line Indicator */}
+                            {lookupStatus === 'scanning' && (
+                                <div className="absolute top-1/2 left-1/2 w-4/5 h-px bg-cyan-400 shadow-[0_0_10px_2px_rgba(40,200,255,0.7)] -translate-x-1/2 animate-pulse-line" style={{ transform: 'translateY(-50%)' }} />
+                            )}
+                        </div>
+                        
+                        {/* Custom CSS for the scanning line animation */}
+                        <style>{`
+                            @keyframes pulse-line {
+                                0% { opacity: 0.2; }
+                                50% { opacity: 1.0; }
+                                100% { opacity: 0.2; }
+                            }
+                        `}</style>
+                        
+
+                        {/* Initialization/Error Overlay */}
+                        {lookupStatus === 'initializing' || lookupStatus === 'notFound' || lookupStatus === 'loadingLib' ? (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-4 text-center">
+                                {lookupStatus === 'initializing' || lookupStatus === 'loadingLib' ? (
+                                    <Loader className="w-10 h-10 text-cyan-400 animate-spin mb-4" />
+                                ) : (
+                                    <AlertTriangle className="w-10 h-10 text-red-400 mb-4" />
+                                )}
+                                <span className="text-xl text-gray-300 font-bold mb-2">
+                                    {lookupStatus === 'initializing' ? "Starting Camera..." : lookupStatus === 'loadingLib' ? "Loading Library..." : "Scanner Failed"}
+                                </span>
+                                {lookupError && (
+                                    <p className="text-sm text-red-400 px-4 mt-1">
+                                        {lookupError}
+                                    </p>
+                                )}
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
                 
-                {/* Status/Result Area */}
-                <div className="p-5 pt-3 text-center border-t border-gray-700/50">
-                    <div className="flex items-center justify-center space-x-3 mb-2">
-                        {statusIcon}
-                        <p className={`text-lg font-semibold ${statusColor}`}>
+                {/* Status & Actions Area - Combined */}
+                <div className={`p-6 pt-5 text-center transition-colors duration-300 ${statusBg} rounded-b-2xl`}>
+                    
+                    {/* Status Display */}
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="p-3 rounded-full bg-gray-900/50 shadow-inner">
+                            {statusIcon}
+                        </div>
+                        <p className={`text-lg font-bold ${statusColor}`}>
                             {statusText}
                         </p>
                     </div>
-                    {result && (lookupStatus === 'idle' || lookupStatus === 'lookingUp') && (
-                         <p className="text-sm text-gray-400 mt-2">
-                             Decoded: <span className="font-mono text-white bg-gray-700 px-2 py-0.5 rounded text-xs">{result}</span>
-                         </p>
-                    )}
-                </div>
 
-                {/* Footer Actions */}
-                <div className="p-5 border-t border-gray-700 flex justify-end">
+                    {/* Decoded Result */}
+                    {lastScannedCodeRef.current && (lookupStatus === 'lookingUp' || lookupStatus === 'found' || lookupStatus === 'notFound') && (
+                         <div className="mt-4 pt-4 border-t border-gray-700/50">
+                             <p className="text-sm text-gray-400 mb-1">Scanned:</p>
+                             <p className="font-mono text-xl text-white bg-gray-700 px-3 py-1.5 inline-block rounded-lg shadow-md">
+                                {lastScannedCodeRef.current}
+                             </p>
+                         </div>
+                    )}
+
+                    {/* Close Button */}
                     <button 
                         onClick={onClose}
-                        className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition font-medium disabled:opacity-50"
-                        disabled={lookupStatus === 'notFound' || lookupStatus === 'lookingUp'}
+                        className="mt-6 w-full py-3 bg-cyan-600 text-white font-semibold rounded-xl hover:bg-cyan-700 transition shadow-lg shadow-cyan-900/50 disabled:opacity-50 disabled:bg-gray-600"
+                        disabled={isBusy || isAutoClosing}
                     >
-                        Close Scanner
+                        {isAutoClosing ? `Closing in ${lookupStatus === 'found' ? '1s' : '1.5s'}...` : isBusy ? 'Scanning in Progress...' : 'Close Scanner'}
                     </button>
                 </div>
             </div>
         </div>
     );
 };
+
 
 export default ScannerModal;
