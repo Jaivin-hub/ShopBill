@@ -25,7 +25,8 @@ const ScannerModal = ({
     onScanNotFound 
 }) => {
     
-    const ZXing = window.ZXing;
+    // NOTE: It is critical that ZXing is available globally on the window object
+    const ZXing = window.ZXing; 
     
     const qrcodeRegionId = "qr-code-full-region"; 
     const videoRef = useRef(null); 
@@ -40,12 +41,16 @@ const ScannerModal = ({
     const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
 
-    // --- Core Cleanup Logic ---
-    // Moved to a simple function that can be called directly.
-    const resetScannerState = () => {
+    // --- Core Cleanup Logic (Refactored for clarity and completeness) ---
+    const resetScannerState = useCallback(() => {
         if (codeReaderRef.current) {
-            // NOTE: The scanner is also reset inside handleScanResult upon a successful read.
-            codeReaderRef.current.reset();
+            try {
+                // IMPORTANT: Stop the video stream cleanly
+                codeReaderRef.current.reset(); 
+                console.log("Scanner: Stream stopped.");
+            } catch (e) {
+                console.warn("Scanner: Failed to reset stream. May already be stopped.", e);
+            }
         }
         codeReaderRef.current = null; 
         isProcessingRef.current = false;
@@ -54,7 +59,7 @@ const ScannerModal = ({
         setResult(null);
         setLookupStatus('idle');
         setLookupError(null);
-    };
+    }, []); // No dependencies needed for state reset logic
 
     // Handles the core scanning result and subsequent item lookup
     const handleScanResult = useCallback((decodedText) => {
@@ -73,22 +78,28 @@ const ScannerModal = ({
         setResult(decodedText);
         setLookupStatus('lookingUp');
         
-        // Stop the camera feed after successful scan to prevent immediate re-scan
+        // CRITICAL FIX: Stop the camera feed immediately after successful scan
         if (codeReaderRef.current) {
-            codeReaderRef.current.reset(); 
-            codeReaderRef.current = null; // Mark as dead
+             try {
+                codeReaderRef.current.reset();
+                codeReaderRef.current = null; // Mark as dead until next open/re-init
+             } catch (e) {
+                 console.warn("Scanner: Failed to reset stream after scan.", e);
+             }
         }
-
+        
         // Start lookup
         mockItemLookup(decodedText).then(response => {
             isProcessingRef.current = false; 
             
             if (response.success) {
                 setLookupStatus('found');
+                // The onScanSuccess handler is responsible for closing the modal
                 onScanSuccess(response.item);
             } else {
                 setLookupStatus('notFound'); 
                 setLookupError(response.error);
+                // onScanError is kept for potential client-side logging/toasts
                 onScanError(response.error); 
             }
         }).catch(err => {
@@ -105,6 +116,7 @@ const ScannerModal = ({
         let timer;
         if (lookupStatus === 'notFound' && lastScannedCodeRef.current) {
              timer = setTimeout(() => {
+                // If not found, call onScanNotFound which triggers modal closing logic
                 onScanNotFound(lastScannedCodeRef.current);
                 onClose(); 
              }, 1500);
@@ -117,22 +129,22 @@ const ScannerModal = ({
         return () => clearTimeout(timer);
     }, [lookupStatus, onScanNotFound, onClose]);
 
-    // CORE SCANNER INITIALIZATION & CLEANUP EFFECT
+    // CORE SCANNER INITIALIZATION & CLEANUP EFFECT (Simplified logic)
     useEffect(() => {
         
-        // If the modal is closed, we don't start initialization.
+        // 1. Initial State Check / Modal Closed
         if (!isOpen) {
-             // CRITICAL FIX: Explicitly reset all state when `isOpen` becomes false.
+             // CRITICAL FIX: Ensure full reset when the modal closes
              resetScannerState(); 
              return; 
         }
         
-        // Prevent re-initialization if already scanning or busy/initialized
+        // 2. Prevent re-initialization if already initialized or busy
         if (isScannerInitialized || isProcessingRef.current || lookupStatus !== 'idle') {
             return;
         }
-
-        // Check for library presence
+        
+        // 3. Check for library presence
         if (!ZXing) {
             setLookupStatus('loadingLib');
             setLookupError("ZXing library not found. Please ensure the CDN script is loaded in index.html.");
@@ -140,59 +152,56 @@ const ScannerModal = ({
             return; 
         }
         
-        // --- Start Initialization ---
-        if (isOpen && containerRef.current && ZXing && !isScannerInitialized) {
-            
-            setLookupStatus('initializing');
-            setLookupError(null);
+        // 4. --- Start Initialization ---
+        setLookupStatus('initializing');
+        setLookupError(null);
 
-            codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
+        codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
 
-            const hints = new Map();
-            const decodeFormats = [
-                ZXing.BarcodeFormat.QR_CODE,
-                ZXing.BarcodeFormat.EAN_13,
-                ZXing.BarcodeFormat.CODE_128,
-                ZXing.BarcodeFormat.DATA_MATRIX
-            ];
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
-            
-            codeReaderRef.current.decodeFromConstraints({ 
-                video: { facingMode: "environment" } 
-            }, videoRef.current, (result, err) => {
-                if (result) {
-                    handleScanResult(result.getText());
-                }
-                if (err && !(err instanceof ZXing.NotFoundException)) {
-                    console.error("ZXing Decode Error:", err);
-                }
-            })
-            .then(() => {
-                setIsScannerInitialized(true);
-                setLookupStatus('scanning');
-                console.log("Scanner: ZXing stream started successfully.");
-            })
-            .catch(err => {
-                console.error("ZXing Initialization Failed:", err);
-                resetScannerState(); // Reset if startup fails
-                setLookupStatus('notFound'); 
-                setLookupError("Camera access denied or device unsupported. Please check permissions.");
-            });
-        } 
-
+        const hints = new Map();
+        const decodeFormats = [
+            ZXing.BarcodeFormat.QR_CODE,
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.DATA_MATRIX
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
+        
+        // Start decoding from the camera stream
+        codeReaderRef.current.decodeFromConstraints({ 
+            video: { facingMode: "environment" } 
+        }, videoRef.current, (result, err) => {
+            if (result) {
+                // Pass the result to the main handler which also stops the stream
+                handleScanResult(result.getText());
+            }
+            if (err && !(err instanceof ZXing.NotFoundException)) {
+                console.error("ZXing Decode Error:", err);
+            }
+        })
+        .then(() => {
+            // Stream started successfully
+            setIsScannerInitialized(true);
+            setLookupStatus('scanning');
+            console.log("Scanner: ZXing stream started successfully.");
+        })
+        .catch(err => {
+            // Initialization failed (e.g., camera permission denied)
+            console.error("ZXing Initialization Failed:", err);
+            setLookupStatus('notFound'); 
+            setLookupError("Camera access denied or device unsupported. Please check permissions.");
+            // Don't call resetScannerState here as it's cleaner to keep the error state visible
+        });
+        
         // 5. RETURN CLEANUP FUNCTION
-        // This function guarantees the stream is stopped if the component unmounts.
+        // This runs when the component unmounts OR when 'isOpen' becomes false.
         return () => {
-             // CRITICAL FIX: Re-integrate the cleanup logic into the return. 
-             // This runs when the component unmounts OR before the effect re-runs 
-             // (which only happens when dependencies change).
-             if (codeReaderRef.current) {
-                console.log("Scanner: Stream stopped via useEffect return.");
-                codeReaderRef.current.reset();
-             }
+             // CRITICAL: Call the reset function on cleanup to guarantee stream stop
+             resetScannerState(); 
         };
-        // Dependencies are the minimum required to re-run the effect when necessary
-    }, [isOpen, ZXing, handleScanResult, isScannerInitialized, lookupStatus]); 
+        // Dependencies: Added resetScannerState to ensure the cleanup function is up-to-date
+        // Removed `isScannerInitialized` and `lookupStatus` to ensure initialization only runs on `isOpen` change
+    }, [isOpen, ZXing, handleScanResult, resetScannerState]); 
 
     if (!isOpen) return null;
 
@@ -201,7 +210,7 @@ const ScannerModal = ({
 
     if (lookupStatus === 'loadingLib') {
         statusIcon = <Loader className="w-8 h-8 text-yellow-400 animate-spin" />;
-        statusText = "Awaiting ZXing library load. Please check index.html...";
+        statusText = "Awaiting ZXing library load. Please ensure the CDN script is loaded in index.html.";
         statusColor = "text-yellow-300";
         statusBg = "bg-yellow-900/40";
     }

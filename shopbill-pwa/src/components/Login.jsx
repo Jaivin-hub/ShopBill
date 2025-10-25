@@ -434,7 +434,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                     {/* Display DEV token if available (Backend sends this for testing) */}
                     {resetMessage.devToken && (
                         <p className="mt-2 text-xs font-mono break-all text-green-300">
-                            **DEV ONLY** Token: {resetMessage.devToken}
+                            <strong>DEV ONLY</strong> Token: {resetMessage.devToken}
                         </p>
                     )}
                 </div>

@@ -362,12 +362,12 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         {/* Denied Read Access State */}
                         {!hasReadAccess && (
                             <p className="text-red-400 p-4 bg-gray-800 rounded-xl border border-red-700/50">
-                                Access denied. You do not have permission to view the staff list with the **{currentUserRole}** role.
+                                Access denied. You do not have permission to view the staff list with the <strong>{currentUserRole}</strong> role.
                             </p>
                         )}
                         {/* No Staff Found State */}
                         {hasReadAccess && staff.length === 0 ? (
-                             <p className="text-gray-400 p-4 bg-gray-800 rounded-xl">No staff members found. Click "Add New Staff" to get started.</p>
+                             <p className="text-gray-400 p-4 bg-gray-800 rounded-xl">No staff members found.</p>
                         ) : (
                             // Render Staff List
                             staff.map((s) => {

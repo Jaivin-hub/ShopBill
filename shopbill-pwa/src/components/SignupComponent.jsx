@@ -41,7 +41,7 @@ const SignupComponent = ({ onSwitchToLogin, onBackToHome }) => (
                 Create Account
             </button>
             <p className="text-xs text-gray-400 pt-2 text-center">
-                By clicking Create Account, you agree to our **Terms and Conditions**.
+                By clicking Create Account, you agree to our <strong>Terms and Conditions</strong>.
             </p>
         </form>
 

@@ -128,7 +128,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
                     </button>
                 </div>
                 <div className="p-5 space-y-4">
-                    <p className="text-gray-300 text-sm">Upload a CSV file or paste the data below. **Required columns: name, price, quantity**. Optional: reorderLevel, hsn.</p>
+                    <p className="text-gray-300 text-sm">Upload a CSV file or paste the data below. <strong>Required columns: name, price, quantity</strong>. Optional: reorderLevel, hsn.</p>
                     
                     <div>
                         <label htmlFor="csv-file" className="block text-sm font-medium text-gray-300 mb-1">
