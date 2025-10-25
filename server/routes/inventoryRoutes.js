@@ -81,7 +81,7 @@ router.put('/:id', protect, async (req, res) => {
 
 // 5. POST Bulk upload
 router.post('/bulk', protect, async (req, res) => {
-    const items = req.body; // Expecting an array of items: [{name: '', price: 0, ...}, ...]
+    const items = req.body; 
     const shopId = req.user.shopId;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -89,43 +89,95 @@ router.post('/bulk', protect, async (req, res) => {
     }
 
     try {
-        // Prepare items: Inject shopId and clean up extraneous fields before insert
-        const itemsToInsert = items.map(item => ({
+        // --- 1. Pre-process and clean the incoming items ---
+        const cleanedItems = items.map(item => ({
             ...item,
             shopId: shopId,
             // Ensure mandatory fields are present and safe defaults are applied
             name: item.name ? String(item.name).trim() : undefined,
+            // We use || 0 or || 5 for defaults if the data is missing or invalid
             price: parseFloat(item.price) || 0,
             quantity: parseInt(item.quantity) || 0,
             reorderLevel: parseInt(item.reorderLevel) || 5,
-        })).filter(item => item.name); // Filter out items with no name (basic validation)
+            hsn: item.hsn ? String(item.hsn).trim() : ''
+        })).filter(item => item.name); // Filter out items with no name
 
-        if (itemsToInsert.length === 0) {
+        if (cleanedItems.length === 0) {
              return res.status(400).json({ error: 'No valid items found to insert.' });
         }
+        
+        // --- 2. Identify all names and HSNs to check (for existing duplicates) ---
+        // Use case-insensitive check by querying with $in and converting to lowercase for the Set
+        const namesToCheck = cleanedItems.map(item => item.name).filter(Boolean);
+        const hsnsToCheck = cleanedItems.map(item => item.hsn).filter(h => h.length > 0);
+        
+        // --- 3. Query existing items based on name OR HSN (scoped to shopId) ---
+        const existingItems = await Inventory.find({
+            shopId: shopId,
+            $or: [
+                { name: { $in: namesToCheck } },
+                { hsn: { $in: hsnsToCheck } }
+            ]
+        }).select('name hsn');
 
-        // Use insertMany for efficient bulk insertion
+        // --- 4. Create sets of existing identifiers for quick lookup (case-insensitive) ---
+        const existingNames = new Set(existingItems.map(item => item.name.toLowerCase()));
+        const existingHsns = new Set(existingItems.map(item => item.hsn).filter(h => h && h.length > 0).map(h => h.toLowerCase()));
+
+        // --- 5. Filter duplicates and prepare final list for insertion ---
+        const itemsToInsert = [];
+        const skippedItems = [];
+
+        cleanedItems.forEach(item => {
+            const isNameDuplicate = existingNames.has(item.name.toLowerCase());
+            const isHsnDuplicate = item.hsn && existingHsns.has(item.hsn.toLowerCase());
+            
+            if (isNameDuplicate || isHsnDuplicate) {
+                skippedItems.push({ 
+                    item: item.name, 
+                    reason: isNameDuplicate ? 'Duplicate Name' : 'Duplicate HSN', 
+                    hsn: item.hsn 
+                });
+            } else {
+                itemsToInsert.push(item);
+                // IMPORTANT: Add to the sets to prevent duplicates WITHIN the bulk upload itself
+                existingNames.add(item.name.toLowerCase());
+                if(item.hsn) existingHsns.add(item.hsn.toLowerCase());
+            }
+        });
+
+        if (itemsToInsert.length === 0) {
+            return res.status(200).json({ 
+                message: `No new items added. ${skippedItems.length} items skipped due to duplication.`,
+                insertedCount: 0,
+                skippedCount: skippedItems.length,
+                skippedDetails: skippedItems
+            });
+        }
+        
+        // --- 6. Use insertMany for efficient bulk insertion of unique items ---
         const result = await Inventory.insertMany(itemsToInsert, { ordered: false }); 
         
-        // This will return an array of inserted documents
+        // --- 7. Return comprehensive response ---
         res.status(201).json({ 
-            message: `${result.length} items added successfully.`,
+            message: `${result.length} new items added successfully. ${skippedItems.length} items skipped.`,
             insertedCount: result.length,
-            items: result 
+            skippedCount: skippedItems.length,
+            items: result,
+            skippedDetails: skippedItems
         });
 
     } catch (error) {
         console.error('Inventory BULK POST Error:', error);
 
         // Handle specific MongoDB errors like validation failures in bulk inserts
-        if (error.code === 11000) { // Example: Duplicate key error (if unique indexes existed)
-             return res.status(400).json({ error: 'One or more items failed due to data constraints (e.g., duplicate unique field or missing data).', details: error.writeErrors });
+        if (error.code === 11000) { 
+             return res.status(400).json({ error: 'One or more items failed due to unique constraints or validation errors in database. Check server logs.', details: error.writeErrors });
         }
 
         res.status(500).json({ error: 'Failed to process bulk inventory upload.' });
     }
 });
-
 
 // NOTE: Other CRUD routes for Inventory would also be added here (POST, PUT, DELETE)
 
