@@ -1,10 +1,187 @@
 import React, { useState, useRef, useEffect } from 'react';
-// Added new icons for the theme update
 import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader, ScanLine, Upload } from 'lucide-react'; 
-// NEW IMPORT: ScannerModal
 import ScannerModal from './ScannerModal'; 
 
-// Helper component for form inputs (No changes needed here)
+// =========================================================================
+// UPDATED: BulkUploadModal Component
+// =========================================================================
+const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
+    const [csvData, setCsvData] = useState('');
+    const [file, setFile] = useState(null);
+    const [error, setError] = useState(null);
+
+    // ONLY name, price, and quantity are REQUIRED. 
+    // reorderLevel and hsn are OPTIONAL in the parsing logic.
+    const requiredHeaders = ["name", "price", "quantity"];
+    const allExpectedHeaders = ["name", "price", "quantity", "reorderLevel", "hsn"];
+
+    useEffect(() => {
+        if (!isOpen) {
+            setCsvData('');
+            setFile(null);
+            setError(null);
+        }
+    }, [isOpen]);
+
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile && selectedFile.name.endsWith('.csv')) {
+            setFile(selectedFile);
+            setError(null);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setCsvData(event.target.result);
+            };
+            reader.readAsText(selectedFile);
+        } else {
+            setFile(null);
+            setCsvData('');
+            setError('Please select a valid CSV file.');
+        }
+    };
+
+    const parseCSV = (text) => {
+        const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            setError('CSV must contain a header row and at least one data row.');
+            return null;
+        }
+
+        const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+        
+        // --- UPDATED VALIDATION LOGIC ---
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+            setError(`Missing required CSV columns: ${missingHeaders.join(', ')}. Please ensure the first row contains: ${requiredHeaders.join(', ')}`);
+            return null;
+        }
+
+        const result = [];
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            const item = {};
+            
+            // Map values to the appropriate header key
+            for (let j = 0; j < headers.length; j++) {
+                // Use the lowercase, trimmed header
+                item[headers[j]] = values[j] ? values[j].trim() : ''; 
+            }
+            
+            // Get values using the expected keys, falling back to defaults
+            const name = item.name;
+            // Use logical OR for safe defaults if column is missing or value is empty
+            const price = parseFloat(item.price || 0);
+            const quantity = parseInt(item.quantity || 0);
+            const reorderLevel = parseInt(item.reorderlevel || 5); // Use 5 as default if not present or invalid
+            const hsn = item.hsn || '';
+
+            // Final validation: Ensure name is present and numbers are valid
+            if (name && !isNaN(price) && !isNaN(quantity) && price >= 0 && quantity >= 0) {
+                 result.push({
+                    name,
+                    price,
+                    quantity,
+                    reorderLevel,
+                    hsn,
+                 });
+            } else {
+                 // Log or track invalid rows if needed
+                 console.warn(`Skipping invalid row ${i+1} due to bad data: ${lines[i]}`);
+            }
+        }
+        
+        if (result.length === 0) {
+            setError('No valid product data found in the CSV file. Check if name, price, and quantity are valid for all rows.');
+            return null;
+        }
+
+        return result;
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setError(null);
+
+        if (!csvData) {
+            return setError('Please upload a CSV file or paste data.');
+        }
+
+        const items = parseCSV(csvData);
+
+        if (items) {
+            onSubmit(items);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+             <form onSubmit={handleSubmit} 
+                className="bg-gray-800 w-full max-w-lg md:max-w-xl rounded-xl shadow-2xl transform transition-transform duration-300 translate-y-0 max-h-[90vh] overflow-y-auto border border-teal-700">
+                <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-teal-900/40 rounded-t-xl sticky top-0 z-10">
+                    <h2 className="text-xl font-bold text-teal-300 flex items-center">
+                        <Upload className="w-5 h-5 mr-2" /> Bulk Inventory Upload (CSV)
+                    </h2>
+                    <button type="button" onClick={onClose} className="text-gray-400 hover:text-white p-1">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-5 space-y-4">
+                    <p className="text-gray-300 text-sm">Upload a CSV file or paste the data below. **Required columns: name, price, quantity**. Optional: reorderLevel, hsn.</p>
+                    
+                    <div>
+                        <label htmlFor="csv-file" className="block text-sm font-medium text-gray-300 mb-1">
+                            Select CSV File
+                        </label>
+                        <input
+                            id="csv-file"
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileChange}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 bg-gray-700 p-2 rounded-lg border border-gray-600"
+                        />
+                    </div>
+
+                    <label htmlFor="csv-data" className="block text-sm font-medium text-gray-300 mb-1">
+                        Or Paste CSV Data Directly
+                    </label>
+                    <textarea
+                        id="csv-data"
+                        value={csvData}
+                        onChange={(e) => { setCsvData(e.target.value); setError(null); setFile(null); }}
+                        placeholder={allExpectedHeaders.join(', ') + '\nProduct A, 10.50, 100, 10, 8421'}
+                        rows="6"
+                        className="w-full p-3 border border-gray-600 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition-colors bg-gray-700 text-gray-200 placeholder-gray-500 font-mono text-xs"
+                    ></textarea>
+
+                    {error && (
+                        <div className="p-3 bg-red-900/30 text-red-300 rounded-lg flex items-start">
+                            <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />
+                            <span className='text-sm'>{error}</span>
+                        </div>
+                    )}
+                </div>
+                <div className="p-5 border-t border-gray-700">
+                    <button 
+                        type="submit"
+                        className="w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl bg-teal-600 hover:bg-teal-700 shadow-teal-900/50 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99]"
+                        disabled={loading || !csvData}
+                    >
+                        {loading 
+                            ? <Loader className='w-5 h-5 mr-2 animate-spin' />
+                            : 'Upload & Add Items'
+                        }
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+// =========================================================================
+// InventoryListCard and InputField (Remain the same)
+// =========================================================================
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
@@ -16,14 +193,11 @@ const InputField = ({ label, name, type, value, onChange, ...props }) => (
             type={type}
             value={value}
             onChange={onChange}
-            // THEME MATCH: Focus ring is Indigo
             className="w-full p-3 border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 placeholder-gray-500"
             {...props}
         />
     </div>
 );
-
-// Inventory List Card Component (No changes needed here)
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }) => {
     const itemId = item._id || item.id;
     const isLowStock = item.quantity <= item.reorderLevel;
@@ -41,7 +215,6 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                     <span className="text-xs text-gray-400 flex items-center mt-0.5">HSN: {item.hsn}</span>
                 </div>
                 <div className="text-right">
-                    {/* THEME MATCH: Price uses the secondary theme color (Teal) */}
                     <span className="text-lg font-bold text-teal-400 whitespace-nowrap">
                         ₹{item.price ? item.price.toFixed(2) : '0.00'}
                     </span>
@@ -53,7 +226,6 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                 </div>
             </div>
             <div className="flex justify-between items-center pt-2">
-                {/* THEME MATCH: Stock text uses primary theme color (Indigo) */}
                 <p className={`text-sm font-medium ${isLowStock ? 'text-red-300' : 'text-indigo-400'}`}>
                     Stock: <span className="font-bold">{item.quantity}</span>
                     {isLowStock && (
@@ -63,7 +235,6 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
                 
                 <div className="flex space-x-2">
                     <button 
-                        // THEME MATCH: Edit button uses Indigo
                         className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
                         title="Edit Item"
                         onClick={() => handleEditClick(item)}
@@ -83,13 +254,15 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
         </div>
     );
 };
-
-
+// =========================================================================
+// InventoryContent Component (Updated with Bulk Upload Props)
+// =========================================================================
 const InventoryContent = ({
     inventory,
     loading,
     isFormModalOpen,
     isConfirmModalOpen,
+    isBulkUploadModalOpen, 
     formData,
     isEditing,
     itemToDelete,
@@ -98,7 +271,6 @@ const InventoryContent = ({
     showStickySearch,
     setSearchTerm,
     setSortOption,
-    // openAddModal, // We will manage this internally or assume it takes no arguments
     handleEditClick,
     handleDeleteClick,
     closeFormModal,
@@ -106,86 +278,56 @@ const InventoryContent = ({
     handleFormSubmit,
     confirmDeleteItem,
     setIsConfirmModalOpen,
-    openBulkUploadModal,
-    // 🌟 NEW: Assume setFormData is passed down to pre-fill the form
+    openAddModal, 
+    openBulkUploadModal, 
+    closeBulkUploadModal, 
+    handleBulkUpload, 
     setFormData, 
-    // 🌟 openAddModal function is redefined here for control
-    // If you need to keep it external, you'd need to ensure it handles the pre-fill data.
-    // For now, let's redefine the necessary functions here.
-    
 }) => {
-
-    // 🌟 MOCK/REDEFINITION OF UTILITY FUNCTIONS (Adjust based on your actual implementation)
-    // NOTE: In a real app, these are likely passed down from the parent/hook
-    const initialFormData = { name: '', price: 0, quantity: 0, reorderLevel: 0, hsn: '' };
-    const mockSetFormData = setFormData || useState(initialFormData)[1];
+    const mockSetFormData = setFormData;
     
-    // We assume openAddModal resets the form and opens the modal
-    const openAddModal = () => {
-        mockSetFormData(initialFormData); // Reset form data
-        // For demonstration, let's assume a function setIsFormModalOpen is available
-        // to open the modal. Since it is not passed, we skip this step, assuming 
-        // the external state management handles it. 
-        // For full code, you would need to pass setIsFormModalOpen from the parent.
-        // openFormModal(); // If such a function exists.
-    };
-    // 🌟 END MOCK/REDEFINITION
-
-
-    // 🌟 NEW STATE for Scanner Modal
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
-
-    // 🌟 NEW HANDLERS for Scanner Modal
     const openScannerModal = () => setIsScannerModalOpen(true);
     const closeScannerModal = () => setIsScannerModalOpen(false);
-
-    // Handler called when ScannerModal successfully finds an existing item
+    
+    // --- Scanning Handlers (Remain the same from last update) ---
     const handleScannedItemSuccess = (scannedItem) => {
-        // Find existing item (match by HSN/barcode)
-        const existingItem = inventory.find(item => item.hsn === scannedItem.hsn);
+        const uniqueCode = scannedItem.hsn || scannedItem.barcode; 
+        
+        const existingItem = inventory.find(item => (item.hsn && item.hsn === uniqueCode) || (item.barcode && item.barcode === uniqueCode));
+        
+        closeScannerModal(); 
 
         if (existingItem) {
-            handleEditClick(existingItem); // Open form in edit mode
-            closeScannerModal();
+            handleEditClick(existingItem); 
         } else {
-            // This path should ideally not be hit with the current mockItemLookup logic, 
-            // but is good for robustness. Treat it as a found, new item.
-            handleScannedItemNotFound(scannedItem.hsn, { name: scannedItem.name });
+            handleScannedItemNotFound(uniqueCode, scannedItem);
         }
     };
-    
-    // 🌟 NEW HANDLER: Called when the scanner code is NOT found in inventory
-    const handleScannedItemNotFound = (hsnCode, prefillData = {}) => {
-        // 1. Open the form in 'Add New' mode
+
+    const handleScannedItemNotFound = (uniqueCode, prefillData = {}) => {
         openAddModal(); 
         
-        // 2. Pre-fill the form with the HSN code and any other known data
         mockSetFormData(prev => ({
             ...prev,
-            ...prefillData, // e.g., if a name was returned from an external API not linked to inventory
-            hsn: hsnCode, 
-            // Ensure necessary fields are initialized to avoid NaN errors
-            price: prev.price || 0,
-            quantity: prev.quantity || 0,
-            reorderLevel: prev.reorderLevel || 0,
-            isEditing: false, // Ensure it's treated as a new item
+            ...prefillData, 
+            hsn: prefillData.hsn || uniqueCode || '', 
+            price: prefillData.price || prev.price || 0,
+            quantity: prefillData.quantity || prev.quantity || 0,
+            reorderLevel: prefillData.reorderLevel || prev.reorderLevel || 5, 
         }));
         
-        // The ScannerModal will handle its own closing (closeScannerModal() is called internally)
+        closeScannerModal(); 
     };
-
 
     const handleScannedItemError = (errorMessage) => {
         console.error("Scanning Error:", errorMessage);
-        // Display a toast/notification (not implemented here)
+        closeScannerModal();
     };
+    // --- End Scanning Handlers ---
 
-
-    // --- State and Ref for Custom Dropdown (Unchanged) ---
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const sortDropdownRef = useRef(null);
-
-    // Effect to close dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
@@ -195,30 +337,20 @@ const InventoryContent = ({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
     const handleSortSelect = (optionValue) => {
         setSortOption(optionValue);
         setIsSortDropdownOpen(false);
     };
-
-    // Define the options once
     const sortOptions = [
         { value: 'default', label: 'Sort: Name (A-Z)' },
         { value: 'low-stock', label: 'Sort: Low Stock / Out of Stock' },
     ];
-    
     const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
-    // --- End State and Ref ---
-
-
-    // --- Main Render ---
     return (
-        // THEME MATCH: Main background is gray-950
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
             <h1 className="text-3xl font-extrabold text-white mb-2">Inventory Management</h1>
             <p className="text-gray-400 mb-6">Detailed product configuration and stock levels.</p>
-            
-            {/* Sticky Search and Sort Bar (No changes) */}
+            {/* Sticky Search Bar (remains the same) */}
             <div className={`
                 fixed top-16 left-0 right-0 z-20 
                 md:ml-64 
@@ -238,7 +370,6 @@ const InventoryContent = ({
                             placeholder="Search items by name or HSN code..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            // THEME MATCH: Input focus/border color
                             className="w-full pl-10 pr-4 py-2.5 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-md"
                         />
                         {searchTerm && (
@@ -252,7 +383,6 @@ const InventoryContent = ({
                             </button>
                         )}
                     </div>
-                    {/* Sticky Custom Sort Dropdown (THEME MATCH: Focus/Border) */}
                     <div className="relative" ref={sortDropdownRef}>
                         <button
                             type="button"
@@ -271,7 +401,7 @@ const InventoryContent = ({
                                         onClick={() => handleSortSelect(option.value)}
                                         className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
                                             ${option.value === sortOption 
-                                                ? 'bg-indigo-600 text-white' // THEME MATCH: Primary selection background
+                                                ? 'bg-indigo-600 text-white' 
                                                 : 'text-gray-200 hover:bg-gray-700'
                                             }`}
                                     >
@@ -283,22 +413,15 @@ const InventoryContent = ({
                     </div>
                 </div>
             </div>
-            
-            {/* Margin to prevent content jump when sticky bar appears */}
             <div className={`${showStickySearch ? 'mb-16' : ''}`}></div> 
             
-            {/* Desktop Table View (lg screens and up) */}
+            {/* Desktop View */}
             <div className="hidden lg:block bg-gray-900 rounded-xl shadow-2xl shadow-indigo-900/10 border border-gray-800">  
-                
                  <div className="p-4 md:p-6 flex justify-between items-center border-b border-gray-700">
-                    {/* THEME MATCH: Section title uses primary theme color (Indigo) */}
                     <h3 className="text-xl font-bold flex items-center text-indigo-400">
                         <Package className="w-5 h-5 mr-2" /> Total Inventory Items ({inventory.length})
                     </h3>
-                    
-                    {/* 🌟 DESKTOP ACTIONS GROUP: Add, Bulk Upload, Scan */}
                     <div className="flex space-x-3">
-                        {/* Desktop Custom Sort Dropdown (Unchanged) */}
                         <div className="relative hidden xl:block" ref={sortDropdownRef}>
                             <button
                                 type="button"
@@ -308,7 +431,6 @@ const InventoryContent = ({
                                 {currentSortLabel}
                                 <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
                             </button>
-                            
                             {isSortDropdownOpen && (
                                 <div className="absolute right-0 z-30 w-56 mt-1 rounded-lg shadow-2xl bg-gray-800 border border-indigo-500 overflow-hidden">
                                     {sortOptions.map(option => (
@@ -327,8 +449,6 @@ const InventoryContent = ({
                                 </div>
                             )}
                         </div>
-                        
-                        {/* 🌟 Scan QR/Barcode Button - Cyan shade for distinct utility */}
                         <button 
                             className="bg-cyan-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-cyan-700 transition flex items-center disabled:opacity-50"
                             onClick={openScannerModal} 
@@ -338,8 +458,6 @@ const InventoryContent = ({
                             <ScanLine className="w-4 h-4" />
                             <span className="ml-2">Scan</span>
                         </button>
-
-                        {/* 🌟 Bulk Upload Button - Teal shade (secondary theme color) */}
                         <button 
                             className="bg-teal-700 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-teal-800 transition flex items-center disabled:opacity-50"
                             onClick={openBulkUploadModal}
@@ -347,8 +465,6 @@ const InventoryContent = ({
                         >
                             <Upload className="w-4 h-4 mr-2" /> Bulk Upload
                         </button>
-                        
-                        {/* Add Item Button (Primary action button is Indigo) */}
                         <button 
                             className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-indigo-700 transition flex items-center disabled:opacity-50"
                             onClick={openAddModal}
@@ -358,12 +474,10 @@ const InventoryContent = ({
                         </button>
                     </div>
                 </div>
-                
-                {/* Scrollable Table Area (No changes) */}
+                {/* Table View (remains the same) */}
                 <div className="max-h-[60vh] overflow-y-auto">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-700">
-                            {/* Sticky table header */}
                             <thead className="bg-gray-800 sticky top-0 z-10 shadow-lg shadow-gray-900/10">
                                 <tr>
                                     <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Item Name/HSN</th>
@@ -392,14 +506,12 @@ const InventoryContent = ({
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-200">
                                             {item.quantity}
                                         </td>
-                                        {/* THEME MATCH: Price color */}
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm text-center text-teal-400 font-semibold">
                                             ₹{item.price ? item.price.toFixed(2) : '0.00'}
                                         </td>
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-2">
                                                 <button 
-                                                    // THEME MATCH: Edit button color
                                                     className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition"
                                                     title="Edit Item"
                                                     onClick={() => handleEditClick(item)}
@@ -424,19 +536,13 @@ const InventoryContent = ({
                 </div>
             </div>
             
-            {/* Mobile List Card View (hidden on lg screens) */}
+            {/* Mobile/Card View (remains the same) */}
             <div className="lg:hidden">
-                {/* Header for mobile view */}
                 <div className="flex justify-between items-center mb-4">
-                    {/* THEME MATCH: Section title uses primary theme color (Indigo) */}
                     <h3 className="text-lg font-bold flex items-center text-indigo-400">
                         <Package className="w-4 h-4 mr-2" /> Inventory List ({inventory.length})
                     </h3>
-                    
-                    {/* 🌟 MOBILE ACTIONS GROUP: Add, Bulk Upload, Scan (right side) */}
                     <div className="flex space-x-2">
-                        
-                        {/* 🌟 Scan QR/Barcode Button - Cyan shade */}
                         <button 
                             className="bg-cyan-600 text-white px-2 py-1.5 rounded-lg shadow-md hover:bg-cyan-700 transition flex items-center text-sm disabled:opacity-50"
                             onClick={openScannerModal}
@@ -445,8 +551,6 @@ const InventoryContent = ({
                         >
                             <ScanLine className="w-4 h-4" />
                         </button>
-                        
-                        {/* 🌟 Bulk Upload Button - Teal shade */}
                         <button 
                             className="bg-teal-700 text-white px-2 py-1.5 rounded-lg shadow-md hover:bg-teal-800 transition flex items-center text-sm disabled:opacity-50"
                             onClick={openBulkUploadModal}
@@ -455,8 +559,6 @@ const InventoryContent = ({
                         >
                             <Upload className="w-4 h-4" />
                         </button>
-                        
-                        {/* Add Item Button (Primary action button is Indigo) */}
                         <button 
                             className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-md hover:bg-indigo-700 transition flex items-center text-sm disabled:opacity-50"
                             onClick={openAddModal}
@@ -466,8 +568,6 @@ const InventoryContent = ({
                         </button>
                     </div>
                 </div>
-                
-                {/* Non-sticky Search and Custom Sort Bar for initial view on mobile (Unchanged) */}
                 {!showStickySearch && (
                     <div className="flex gap-3 mb-4">
                         <div className="relative flex-grow">
@@ -477,7 +577,6 @@ const InventoryContent = ({
                                 placeholder="Search items..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                // THEME MATCH: Input focus/border color
                                 className="w-full pl-10 pr-4 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm"
                             />
                             {searchTerm && (
@@ -491,14 +590,13 @@ const InventoryContent = ({
                                 </button>
                             )}
                         </div>
-                        {/* Mobile Custom Sort Dropdown (THEME MATCH: Focus/Border) */}
                         <div className="relative" ref={sortDropdownRef}>
                             <button
                                 type="button"
                                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
                                 className="w-full pl-3 pr-8 py-2 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-900 text-gray-200 shadow-sm text-sm font-medium flex items-center h-full whitespace-nowrap"
                             >
-                                {currentSortLabel.replace('Sort: ', '')} {/* Use shorter label for mobile */}
+                                {currentSortLabel.replace('Sort: ', '')} 
                                 <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
                             </button>
                             
@@ -522,8 +620,6 @@ const InventoryContent = ({
                         </div>
                     </div>
                 )}
-                
-                {/* Scrollable list of cards (Unchanged) */}
                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pb-4"> 
                     {inventory.map(item => (
                         <InventoryListCard 
@@ -537,13 +633,11 @@ const InventoryContent = ({
                 </div>
             </div>
             
-            {/* Item Form Modal (No changes) */}
+            {/* Single Add/Edit Modal (remains the same) */}
             {isFormModalOpen && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
                     <form onSubmit={handleFormSubmit} 
                         className="bg-gray-800 w-full max-w-sm sm:max-w-md md:max-w-xl rounded-xl shadow-2xl transform transition-transform duration-300 translate-y-0 max-h-[90vh] overflow-y-auto border border-indigo-700">
-                        
-                        {/* Modal Header (THEME MATCH: Header BG and Title color) */}
                         <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl sticky top-0 z-10">
                             <h2 className="text-xl font-bold text-indigo-300 flex items-center">
                                 {isEditing ? <Edit className="w-5 h-5 mr-2" /> : <Plus className="w-5 h-5 mr-2" />} 
@@ -553,8 +647,6 @@ const InventoryContent = ({
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        
-                        {/* Form Body (Unchanged) */}
                         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InputField label="Product Name" name="name" type="text" value={formData.name} onChange={handleInputChange} required />
                             <InputField label="Selling Price (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} min="0" required />
@@ -562,12 +654,9 @@ const InventoryContent = ({
                             <InputField label="Reorder Level" name="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleInputChange} min="0" required />
                             <InputField label="HSN/SAC Code (Optional)" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} placeholder="e.g., 0401" />
                         </div>
-                        
-                        {/* Modal Footer (Action Button - THEME MATCH) */}
                         <div className="p-5 border-t border-gray-700">
                             <button 
                                 type="submit"
-                                // CONDITIONAL BUTTON STYLING: Edit is Indigo (primary), Add is Teal (secondary/success)
                                 className={`w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl hover:bg-teal-700 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99] ${
                                     isEditing 
                                         ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/50' 
@@ -585,7 +674,7 @@ const InventoryContent = ({
                 </div>
             )}
             
-            {/* Delete Confirmation Modal (No changes) */}
+            {/* Confirmation Modal (remains the same) */}
             {isConfirmModalOpen && itemToDelete && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity">
                     <div className="bg-gray-900 w-full max-w-sm rounded-xl shadow-2xl transform transition-transform duration-300 border border-red-700">
@@ -621,7 +710,7 @@ const InventoryContent = ({
                 </div>
             )}
             
-            {/* Loading Overlay (No changes) */}
+            {/* Global Loading Overlay (remains the same) */}
             {loading && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-gray-900 p-6 rounded-xl shadow-2xl text-indigo-400 flex items-center border border-gray-700">
@@ -629,15 +718,22 @@ const InventoryContent = ({
                     </div>
                 </div>
             )}
-
-            {/* 🌟 NEW: Scanner Modal Component */}
+            
+            {/* Scanner Modal (remains the same) */}
             <ScannerModal 
                 isOpen={isScannerModalOpen}
                 onClose={closeScannerModal}
                 onScanSuccess={handleScannedItemSuccess}
                 onScanError={handleScannedItemError}
-                // 🌟 NEW PROP: Handler for the instant "Add New" transition
                 onScanNotFound={handleScannedItemNotFound} 
+            />
+            
+            {/* NEW: Bulk Upload Modal */}
+            <BulkUploadModal
+                isOpen={isBulkUploadModalOpen}
+                onClose={closeBulkUploadModal}
+                onSubmit={handleBulkUpload}
+                loading={loading}
             />
         </div>
     );
