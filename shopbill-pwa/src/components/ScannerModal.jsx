@@ -1,211 +1,230 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, CheckCircle, AlertTriangle, ScanLine, Loader, QrCode } from 'lucide-react';
 
-// --- MOCK API CALL (Unchanged) ---
-const mockItemLookup = (code) => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            if (code && code.length > 5 && code.startsWith('8')) {
-                resolve({ success: true, item: { name: "Scanned Product X", hsn: code, price: 125.50, quantity: 42, reorderLevel: 5 } });
-            } else if (code && code.length > 5) { 
-                resolve({ success: false, error: "Item not found in inventory. Please add it." });
-            } else {
-                resolve({ success: false, error: "No code scanned." });
-            }
-        }, 800);
-    });
-};
+// --- MOCK API CALL REMOVED ---
+// const mockItemLookup = ... is now gone.
 
-// --- SCANNER MODAL COMPONENT ---
+// --- SCANNER MODAL COMPONENT (UPDATED FOR REAL INVENTORY LOOKUP) ---
 const ScannerModal = ({ 
     isOpen, 
     onClose, 
     onScanSuccess, 
     onScanError,
+    inventory, // <<< The real inventory data is now used here
     onScanNotFound 
 }) => {
     
-    // NOTE: It is critical that ZXing is available globally on the window object
+    // CRITICAL: Ensure the ZXing object is safely accessed
     const ZXing = window.ZXing; 
     
-    const qrcodeRegionId = "qr-code-full-region"; 
     const videoRef = useRef(null); 
     const codeReaderRef = useRef(null); 
     const containerRef = useRef(null); 
 
     const [result, setResult] = useState(null);
-    // idle | initializing | scanning | lookingUp | found | notFound | loadingLib
     const [lookupStatus, setLookupStatus] = useState('idle'); 
     const [lookupError, setLookupError] = useState(null);
     const lastScannedCodeRef = useRef(null); 
     const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
 
-    // --- Core Cleanup Logic (Refactored for clarity and completeness) ---
+    // --- Core Cleanup Logic (IMPROVED FOR ROBUSTNESS) ---
     const resetScannerState = useCallback(() => {
+        // ... (Cleanup logic remains the same) ...
         if (codeReaderRef.current) {
             try {
-                // IMPORTANT: Stop the video stream cleanly
                 codeReaderRef.current.reset(); 
-                console.log("Scanner: Stream stopped.");
+                console.log("Scanner: Stream stopped via ZXing reset.");
             } catch (e) {
-                console.warn("Scanner: Failed to reset stream. May already be stopped.", e);
+                console.warn("Scanner: Failed to reset stream via ZXing. It may already be stopped.", e);
             }
         }
-        codeReaderRef.current = null; 
+        
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject;
+            if (stream && typeof stream.getTracks === 'function') {
+                 stream.getTracks().forEach(track => {
+                    if (track.kind === 'video' && track.stop) { 
+                        track.stop();
+                    }
+                 });
+            }
+            videoRef.current.srcObject = null; 
+        }
+        
+        codeReaderRef.current = null;
         isProcessingRef.current = false;
         lastScannedCodeRef.current = null;
         setIsScannerInitialized(false);
         setResult(null);
-        setLookupStatus('idle');
+        setLookupStatus('idle'); 
         setLookupError(null);
-    }, []); // No dependencies needed for state reset logic
+    }, []); 
 
-    // Handles the core scanning result and subsequent item lookup
+    // Handles the core scanning result and subsequent item lookup (UPDATED)
     const handleScanResult = useCallback((decodedText) => {
         
-        if (isProcessingRef.current) {
+        if (isProcessingRef.current || decodedText === lastScannedCodeRef.current) {
             return;
         }
 
-        if (decodedText === lastScannedCodeRef.current) {
-            return;
-        }
-        
         isProcessingRef.current = true; // Block further scans
         lastScannedCodeRef.current = decodedText; 
         
         setResult(decodedText);
         setLookupStatus('lookingUp');
         
-        // CRITICAL FIX: Stop the camera feed immediately after successful scan
+        // Stop the camera stream after successful scan (prevents rapid re-scan)
         if (codeReaderRef.current) {
              try {
                 codeReaderRef.current.reset();
-                codeReaderRef.current = null; // Mark as dead until next open/re-init
              } catch (e) {
                  console.warn("Scanner: Failed to reset stream after scan.", e);
              }
         }
         
-        // Start lookup
-        mockItemLookup(decodedText).then(response => {
+        // --- REAL INVENTORY LOOKUP IMPLEMENTATION ---
+        
+        // 1. Normalize the scanned code for robust, case-insensitive match
+        const normalizedCode = decodedText.toLowerCase().trim();
+
+        // 2. Search the actual inventory array for a matching HSN
+        const existingItem = inventory.find(item => 
+            item.hsn && item.hsn.toLowerCase().trim() === normalizedCode
+        );
+
+        // Simulate a slight delay for better UX before resolving the lookup
+        setTimeout(() => {
             isProcessingRef.current = false; 
-            
-            if (response.success) {
+
+            if (existingItem) {
+                // PRODUCT FOUND: Call success handler with the found item
                 setLookupStatus('found');
-                // The onScanSuccess handler is responsible for closing the modal
-                onScanSuccess(response.item);
+                console.log("✅ Scanned Item Found in Inventory:", existingItem); 
+                onScanSuccess(existingItem);
             } else {
+                // PRODUCT NOT FOUND: Call not found handler
                 setLookupStatus('notFound'); 
-                setLookupError(response.error);
-                // onScanError is kept for potential client-side logging/toasts
-                onScanError(response.error); 
+                setLookupError(`Item with HSN/Code "${decodedText}" not found in inventory.`);
+                console.log(`⚠️ Scanned Item Not Found: ${decodedText}`);
+                
+                // Pass the raw code to the parent (InventoryContent)
+                onScanNotFound(decodedText); 
             }
-        }).catch(err => {
-            isProcessingRef.current = false; 
-            setLookupStatus('notFound');
-            setLookupError("An unknown error occurred during lookup.");
-            onScanError("An unknown error occurred during lookup.");
-        });
-    }, [onScanSuccess, onScanError]);
+        }, 500); // Small delay to show 'lookingUp' status
+        
+    }, [inventory, onScanSuccess, onScanNotFound]); // Include inventory as a dependency
 
 
     // Effect to handle auto-closing after lookup completes
     useEffect(() => {
-        let timer;
-        if (lookupStatus === 'notFound' && lastScannedCodeRef.current) {
-             timer = setTimeout(() => {
-                // If not found, call onScanNotFound which triggers modal closing logic
-                onScanNotFound(lastScannedCodeRef.current);
-                onClose(); 
-             }, 1500);
+        // Auto-close when the parent components (onScanSuccess or onScanNotFound) are expected to take over
+        if (lookupStatus === 'found' || (lookupStatus === 'notFound' && lastScannedCodeRef.current)) {
+            // No need for a separate effect if the parent handles the close, 
+            // but we keep the state here to control the UI transition.
+            
+            // Note: Since we are simulating a 500ms delay inside handleScanResult, 
+            // the transition logic in the UI already gives enough time.
         }
-        if (lookupStatus === 'found') {
-            timer = setTimeout(() => {
-                onClose(); 
-            }, 1000); 
-        }
-        return () => clearTimeout(timer);
-    }, [lookupStatus, onScanNotFound, onClose]);
-
-    // CORE SCANNER INITIALIZATION & CLEANUP EFFECT (Simplified logic)
-    useEffect(() => {
         
-        // 1. Initial State Check / Modal Closed
+        // A robust way to prevent auto-close on hard error (if no code was scanned):
+        const isHardError = lookupStatus === 'notFound' && !lastScannedCodeRef.current;
+        if (isHardError) {
+            console.log("Hard camera error detected. Waiting for manual close.");
+        }
+    }, [lookupStatus]);
+
+
+    // CORE SCANNER INITIALIZATION & CLEANUP EFFECT (Unchanged)
+    useEffect(() => {
+        // ... (Initialization logic remains the same) ...
         if (!isOpen) {
-             // CRITICAL FIX: Ensure full reset when the modal closes
              resetScannerState(); 
              return; 
         }
         
-        // 2. Prevent re-initialization if already initialized or busy
-        if (isScannerInitialized || isProcessingRef.current || lookupStatus !== 'idle') {
+        if (lookupStatus !== 'idle' || isProcessingRef.current) {
             return;
         }
         
-        // 3. Check for library presence
         if (!ZXing) {
             setLookupStatus('loadingLib');
             setLookupError("ZXing library not found. Please ensure the CDN script is loaded in index.html.");
             console.error("ZXing not found on window object.");
             return; 
         }
+
+        if (!videoRef.current) {
+            return; 
+        }
         
-        // 4. --- Start Initialization ---
         setLookupStatus('initializing');
         setLookupError(null);
 
+        if (codeReaderRef.current) {
+            codeReaderRef.current.reset();
+        }
+
         codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
 
+        // --- HINTS CONFIGURATION (OPTIMIZED FOR ALL COMMON 1D/2D) ---
         const hints = new Map();
         const decodeFormats = [
-            ZXing.BarcodeFormat.QR_CODE,
-            ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.CODE_128,
-            ZXing.BarcodeFormat.DATA_MATRIX
+            // 2D Codes
+            ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX, ZXing.BarcodeFormat.AZTEC, ZXing.BarcodeFormat.PDF_417, 
+            // 1D Codes
+            ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, 
+            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.CODABAR, 
         ];
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
         
-        // Start decoding from the camera stream
-        codeReaderRef.current.decodeFromConstraints({ 
-            video: { facingMode: "environment" } 
-        }, videoRef.current, (result, err) => {
-            if (result) {
-                // Pass the result to the main handler which also stops the stream
-                handleScanResult(result.getText());
-            }
-            if (err && !(err instanceof ZXing.NotFoundException)) {
-                console.error("ZXing Decode Error:", err);
-            }
-        })
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true); 
+        hints.set(ZXing.DecodeHintType.CHARACTER_SET, 'utf-8'); 
+
+        
+        // Use decodeFromVideoDevice with null for compatibility
+        codeReaderRef.current.decodeFromVideoDevice(
+            null, 
+            videoRef.current, 
+            (result, err) => {
+                if (result) {
+                    handleScanResult(result.getText()); 
+                }
+                if (err && !(err instanceof ZXing.NotFoundException) && err.name !== 'NotAllowedError') {
+                    console.error("ZXing Decode Error:", err);
+                }
+            }, 
+            hints
+        ) 
         .then(() => {
-            // Stream started successfully
             setIsScannerInitialized(true);
             setLookupStatus('scanning');
             console.log("Scanner: ZXing stream started successfully.");
         })
         .catch(err => {
-            // Initialization failed (e.g., camera permission denied)
             console.error("ZXing Initialization Failed:", err);
+            let userError = "Camera access denied or device unsupported. Please check permissions.";
+            if (err.name === 'NotAllowedError') {
+                 userError = "Camera access denied. Please grant permission in your browser settings.";
+            } else if (err.name === 'NotFoundError') {
+                 userError = "No camera found on this device.";
+            } else if (err.name === 'ConstraintNotSatisfiedError' || err.name === 'OverconstrainedError') {
+                 userError = "Camera failed to start. Try reloading the page or check device camera access.";
+            }
+            
             setLookupStatus('notFound'); 
-            setLookupError("Camera access denied or device unsupported. Please check permissions.");
-            // Don't call resetScannerState here as it's cleaner to keep the error state visible
+            setLookupError(userError);
+            onScanError(userError); 
         });
         
-        // 5. RETURN CLEANUP FUNCTION
-        // This runs when the component unmounts OR when 'isOpen' becomes false.
         return () => {
-             // CRITICAL: Call the reset function on cleanup to guarantee stream stop
              resetScannerState(); 
         };
-        // Dependencies: Added resetScannerState to ensure the cleanup function is up-to-date
-        // Removed `isScannerInitialized` and `lookupStatus` to ensure initialization only runs on `isOpen` change
-    }, [isOpen, ZXing, handleScanResult, resetScannerState]); 
+    }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError]); 
 
     if (!isOpen) return null;
 
-    // --- UI LOGIC (Unchanged) ---
+    // --- UI LOGIC (Remains the same based on lookupStatus) ---
     let statusIcon, statusText, statusColor, statusBg;
 
     if (lookupStatus === 'loadingLib') {
@@ -231,12 +250,17 @@ const ScannerModal = ({
         statusBg = "bg-indigo-900/40";
     } else if (lookupStatus === 'found') {
         statusIcon = <CheckCircle className="w-8 h-8 text-teal-400" />;
-        statusText = `Success! Item found.`;
+        statusText = `Success! Item found. Opening edit form...`;
         statusColor = "text-teal-300";
         statusBg = "bg-teal-900/40";
-    } else if (lookupStatus === 'notFound') {
+    } else if (lookupStatus === 'notFound' && lastScannedCodeRef.current) { 
+        statusIcon = <CheckCircle className="w-8 h-8 text-teal-400" />;
+        statusText = "New item detected! Opening 'Add Item' form..."; 
+        statusColor = "text-teal-300";
+        statusBg = "bg-teal-900/40";
+    } else if (lookupStatus === 'notFound') { 
         statusIcon = <AlertTriangle className="w-8 h-8 text-red-400" />;
-        statusText = lookupError || `Item not found. Check console for details.`; 
+        statusText = lookupError || `Scanner Failed. Check console for details.`; 
         statusColor = "text-red-300";
         statusBg = "bg-red-900/40";
     } else { // idle 
@@ -247,7 +271,7 @@ const ScannerModal = ({
     }
 
     const isBusy = lookupStatus === 'lookingUp' || lookupStatus === 'initializing' || lookupStatus === 'loadingLib';
-    const isAutoClosing = lookupStatus === 'notFound' || lookupStatus === 'found';
+    const isAutoClosing = lookupStatus === 'found' || (lookupStatus === 'notFound' && lastScannedCodeRef.current); 
 
     return (
         <div 
@@ -278,7 +302,6 @@ const ScannerModal = ({
                 {/* Camera Feed Area - Core Focus */}
                 <div className="p-6 pb-4">
                     <div 
-                        id={qrcodeRegionId}
                         className="aspect-video w-full bg-gray-900 rounded-xl overflow-hidden shadow-inner shadow-gray-950 relative border-4 border-cyan-900"
                         style={{ minHeight: '320px' }}
                     >
@@ -309,7 +332,7 @@ const ScannerModal = ({
                         
 
                         {/* Initialization/Error Overlay */}
-                        {lookupStatus === 'initializing' || lookupStatus === 'notFound' || lookupStatus === 'loadingLib' ? (
+                        {lookupStatus === 'initializing' || lookupStatus === 'loadingLib' || (lookupStatus === 'notFound' && !lastScannedCodeRef.current) ? (
                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-4 text-center">
                                 {lookupStatus === 'initializing' || lookupStatus === 'loadingLib' ? (
                                     <Loader className="w-10 h-10 text-cyan-400 animate-spin mb-4" />
@@ -343,11 +366,17 @@ const ScannerModal = ({
                     </div>
 
                     {/* Decoded Result */}
-                    {lastScannedCodeRef.current && (lookupStatus === 'lookingUp' || lookupStatus === 'found' || lookupStatus === 'notFound') && (
+                    {lastScannedCodeRef.current && (lookupStatus !== 'scanning' && lookupStatus !== 'initializing' && lookupStatus !== 'loadingLib') && (
                          <div className="mt-4 pt-4 border-t border-gray-700/50">
                              <p className="text-sm text-gray-400 mb-1">Scanned:</p>
                              <p className="font-mono text-xl text-white bg-gray-700 px-3 py-1.5 inline-block rounded-lg shadow-md">
-                                {lastScannedCodeRef.current}
+                                 {/* Truncate the code if it's too long, but show full code on hover */}
+                                 <span title={lastScannedCodeRef.current}>
+                                     {lastScannedCodeRef.current.length > 30 
+                                         ? `${lastScannedCodeRef.current.substring(0, 20)}...` 
+                                         : lastScannedCodeRef.current
+                                     }
+                                 </span>
                              </p>
                          </div>
                     )}
@@ -358,7 +387,7 @@ const ScannerModal = ({
                         className="mt-6 w-full py-3 bg-cyan-600 text-white font-semibold rounded-xl hover:bg-cyan-700 transition shadow-lg shadow-cyan-900/50 disabled:opacity-50 disabled:bg-gray-600"
                         disabled={isBusy || isAutoClosing}
                     >
-                        {isAutoClosing ? `Closing in ${lookupStatus === 'found' ? '1s' : '1.5s'}...` : isBusy ? 'Scanning in Progress...' : 'Close Scanner'}
+                        {isAutoClosing ? 'Opening Form...' : isBusy ? 'Scanning in Progress...' : 'Close Scanner'}
                     </button>
                 </div>
             </div>

@@ -303,7 +303,7 @@ useEffect(() => {
                         <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-600 dark:text-teal-400" /> Pocket POS
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
-                        User: {userRole?.charAt(0).toUpperCase() + userRole?.slice(1)} | MERN-Ready
+                        User: {userRole?.charAt(0).toUpperCase() + userRole?.slice(1)}
                     </p>
                 </div>
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

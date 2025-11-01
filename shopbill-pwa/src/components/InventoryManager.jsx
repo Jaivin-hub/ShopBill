@@ -117,7 +117,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         setIsConfirmModalOpen(true);
     }
     
-    // --- NEW: Bulk Upload Handlers ---
+    // --- NEW: Bulk Upload Handlers (remain the same) ---
     const openBulkUploadModal = () => setIsBulkUploadModalOpen(true);
     const closeBulkUploadModal = () => setIsBulkUploadModalOpen(false);
     

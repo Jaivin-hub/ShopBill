@@ -3,7 +3,7 @@ import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loa
 import ScannerModal from './ScannerModal'; 
 
 // =========================================================================
-// UPDATED: BulkUploadModal Component
+// BulkUploadModal Component (UNMODIFIED)
 // =========================================================================
 const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
     const [csvData, setCsvData] = useState('');
@@ -180,7 +180,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
 }
 
 // =========================================================================
-// InventoryListCard and InputField (Remain the same)
+// InventoryListCard and InputField (UNMODIFIED)
 // =========================================================================
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
     <div>
@@ -255,7 +255,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
     );
 };
 // =========================================================================
-// InventoryContent Component (Updated with Bulk Upload Props)
+// InventoryContent Component (UPDATED SCANNING LOOKUP LOGIC)
 // =========================================================================
 const InventoryContent = ({
     inventory,
@@ -285,29 +285,51 @@ const InventoryContent = ({
     setFormData, 
 }) => {
     const mockSetFormData = setFormData;
+    console.log('inventory===',inventory)
     
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const openScannerModal = () => setIsScannerModalOpen(true);
     const closeScannerModal = () => setIsScannerModalOpen(false);
     
-    // --- Scanning Handlers (Remain the same from last update) ---
+    // --- Scanning Handlers (MODIFIED: Lookup fix) ---
     const handleScannedItemSuccess = (scannedItem) => {
+        console.log('scanned item====',scannedItem)
+        // Use the code that came back from the lookup, which is the scanned item's identifier
         const uniqueCode = scannedItem.hsn || scannedItem.barcode; 
         
-        const existingItem = inventory.find(item => (item.hsn && item.hsn === uniqueCode) || (item.barcode && item.barcode === uniqueCode));
+        // Ensure the code exists before proceeding
+        if (!uniqueCode) {
+            closeScannerModal();
+            return handleScannedItemError("Scanned item data missing unique identifier.");
+        }
         
+        // CRITICAL FIX: Find the item in the local inventory using the HSN/Unique Code.
+        // We trim/normalize the codes for a safer comparison, even with URLs.
+        const normalizedUniqueCode = uniqueCode.toLowerCase().trim();
+        const existingItem = inventory.find(item => 
+            item.hsn && item.hsn.toLowerCase().trim() === normalizedUniqueCode
+        );
+        
+        // 2. Close Scanner (Crucial for the modal cleanup)
         closeScannerModal(); 
 
         if (existingItem) {
+            // 3. EXISTING ITEM: Open Edit Modal directly and pre-fill data 
             handleEditClick(existingItem); 
         } else {
-            handleScannedItemNotFound(uniqueCode, scannedItem);
+             // 4. NEW ITEM: Open Add Modal, pre-filled with the scanned HSN and other data
+             handleScannedItemNotFound(uniqueCode, scannedItem); 
         }
     };
 
     const handleScannedItemNotFound = (uniqueCode, prefillData = {}) => {
+        // 1. Close Scanner (Crucial for the modal cleanup)
+        closeScannerModal();
+        
+        // 2. Open Add Item Modal
         openAddModal(); 
         
+        // 3. Pre-fill the form data using the unique code and any other data returned by the lookup
         mockSetFormData(prev => ({
             ...prev,
             ...prefillData, 
@@ -316,13 +338,12 @@ const InventoryContent = ({
             quantity: prefillData.quantity || prev.quantity || 0,
             reorderLevel: prefillData.reorderLevel || prev.reorderLevel || 5, 
         }));
-        
-        closeScannerModal(); 
     };
 
     const handleScannedItemError = (errorMessage) => {
         console.error("Scanning Error:", errorMessage);
-        closeScannerModal();
+        // The ScannerModal will show the error, no need to do anything here except close if necessary.
+        // For hard errors, we rely on the user to manually close the ScannerModal after seeing the error message.
     };
     // --- End Scanning Handlers ---
 
@@ -346,6 +367,7 @@ const InventoryContent = ({
         { value: 'low-stock', label: 'Sort: Low Stock / Out of Stock' },
     ];
     const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
+
     return (
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
             <h1 className="text-3xl font-extrabold text-white mb-2">Inventory Management</h1>
@@ -722,6 +744,7 @@ const InventoryContent = ({
             {/* Scanner Modal (remains the same) */}
             <ScannerModal 
                 isOpen={isScannerModalOpen}
+                inventory={inventory}
                 onClose={closeScannerModal}
                 onScanSuccess={handleScannedItemSuccess}
                 onScanError={handleScannedItemError}
