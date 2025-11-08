@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv'); 
@@ -13,9 +15,10 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const salesRoutes = require('./routes/salesRoutes');
 const reportRoutes = require('./routes/reportRoutes');
-// 💥 NEW: Import the notification routes
 const notificationRoutes = require('./routes/notificationRoutes'); 
 const staffRoutes = require('./routes/staffRoutes');
+// 💥 NEW: Import Superadmin Routes
+const superadminRoutes = require('./routes/superadminRoutes'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,18 +31,20 @@ app.use(express.json());
 // --- API ROUTE MOUNTING ---
 // ----------------------------------------------------
 
-// AUTH ROUTES: Mount the router at /api/auth
+// AUTH ROUTES
 app.use('/api/auth', authRoutes);
 
-// DATA ROUTES: Mount the other routers
+// DATA ROUTES
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/staff', staffRoutes);
-
-// 💥 NEW: NOTIFICATION ROUTES: Mount the router at /api/notifications
 app.use('/api/notifications', notificationRoutes);
+
+// 💥 NEW: SUPERADMIN ROUTES: Mount the router at /api/superadmin
+// This will contain logic for shop creation, user listing, system configuration, etc.
+app.use('/api/superadmin', superadminRoutes);
 
 // --- Server Initialization ---
 const startServer = async () => {

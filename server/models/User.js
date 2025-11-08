@@ -11,7 +11,7 @@ const UserSchema = new mongoose.Schema({
     phone: { type: String, trim: true },
     
     // FIX: Update role enum to include all possible roles, and use PascalCase for consistency
-    role: { type: String, enum: ['owner', 'Manager', 'Cashier'], required: true }, 
+    role: { type: String, enum: ['superadmin', 'owner', 'Manager', 'Cashier'], required: true }, 
     
     shopId: { 
         type: mongoose.Schema.Types.ObjectId, 

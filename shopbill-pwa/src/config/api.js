@@ -10,6 +10,8 @@ const API = {
     passwordchange: API_BASE_URL + '/auth/password/change',
     forgetpassword: API_BASE_URL + '/auth/forgot-password',
     resetpassword: API_BASE_URL + '/auth/reset-password',
+    sync: API_BASE_URL + '/auth/data/sync',
+    uploadcloud: API_BASE_URL + '/auth/data/upload-to-cloud',
 
 
     // Staff Management Endpoints
@@ -26,6 +28,12 @@ const API = {
     reportsSummary: API_BASE_URL + '/reports/summary',
     reportsChartData: API_BASE_URL + '/reports/chart-data',
     notificationalert: API_BASE_URL + '/notifications/alerts',
+
+    // 💥 NEW: SUPERADMIN MANAGEMENT ENDPOINTS 💥
+    superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)
+    superadminShopDetails: (id) => `${API_BASE_URL}/superadmin/shops/${id}`, // GET (Single Shop), PUT (Update Shop), DELETE (Delete Shop)
+    superadminConfig: API_BASE_URL + '/superadmin/config',         // GET (System Config), PUT (Update Config)
+    // ------------------------------------------
 }
 
 export default API

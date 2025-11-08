@@ -278,7 +278,7 @@ router.put('/reset-password/:resetToken', async (req, res) => {
 });
 
 
-// --- NEW Route: Staff Account Activation (Final Step) ---
+// --- Existing Route: Staff Account Activation (Final Step) ---
 
 /**
  * @route PUT /api/auth/activate/:activationToken
@@ -382,6 +382,43 @@ router.put('/password/change', protect,
     } catch (error) {
         console.error('Change Password Error:', error);
         res.status(500).json({ error: 'Server error during password change.' });
+    }
+});
+
+
+router.post('/data/sync', protect, async (req, res) => {
+    try {
+        // 1. User is already authenticated by the 'protect' middleware.
+        const { id: userId, shopId, role } = req.user;
+
+        console.log(`Force Sync requested by User: ${userId} for Shop: ${shopId}`);
+
+        // --- Mock Data Sync Logic (Replace with actual data fetching/packaging) ---
+        
+        // In a real MERN app, this would involve:
+        // 1. Calling a Data Service to fetch all required collections (Inventory, Customers, Sales, etc.) 
+        //    based on the req.user.shopId.
+        // 2. Packaging this data into a JSON structure.
+        // 3. Sending the packaged data back to the client.
+        
+        // For now, we simulate the success response which the frontend expects:
+        
+        // const allShopData = await dataService.getSyncData(shopId); 
+        
+        res.json({ 
+            success: true, 
+            message: 'Server data retrieved and ready for client update.',
+            recordsUpdated: 150, // Example of useful metadata to send back
+            // data: allShopData, // Send the actual data payload here if needed for sync
+        });
+        
+    } catch (error) {
+        console.error('Force Sync Server Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to complete server synchronization.', 
+            message: error.message 
+        });
     }
 });
 

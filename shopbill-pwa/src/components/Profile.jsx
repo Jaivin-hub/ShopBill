@@ -1,31 +1,37 @@
 import React, { useState } from 'react';
 import { 
-    User, Mail, Phone, MapPin, DollarSign, Clock, Check, Building, 
+    User, Mail, Phone, MapPin, IndianRupee, Clock, Check, Building, 
     UploadCloud, Edit, Shield, AlertTriangle
 } from 'lucide-react';
 
 // --- Main App Component ---
 function Profile() {
-    // Combined State Initialization (Replaced useEffect and mockUser)
+    // 1. Initialize data from localStorage
+    const currentUserJSON = localStorage.getItem('currentUser');
+    const currentUser = currentUserJSON ? JSON.parse(currentUserJSON) : {}; // Safe parsing
+
+    // Mock constants (User ID is still mocked as it typically comes from the server)
+    const mockUserId = 'mock-user-1234567890';
+    
+    // 2. State Initialization: Removed 'name' and use actual 'email' and 'phone' from currentUser
     const [profile, setProfile] = useState({
-        name: 'Alex Johnson (Mock User)',
-        email: 'alex.j@example.com',
-        phone: '+91 99887 76655', 
+        email: currentUser.email || '',
+        phone: currentUser.phone || '', 
         shopName: 'AJ Retail Solutions',
         taxId: 'MOCKGST123456',
         address: '101 Mock Street, Bengaluru, 560001',
         currency: 'INR - Indian Rupee',
         timezone: 'Asia/Kolkata (GMT+5:30)',
-        profileImageUrl: 'https://placehold.co/120x120/1e293b/ffffff?text=A' 
+        profileImageUrl: 'https://placehold.co/120x120/1e293b/ffffff?text=L' 
     });
 
-    const mockUserId = 'mock-user-1234567890';
     const [isEditing, setIsEditing] = useState(false);
 
 
     const handleSave = () => {
         setIsEditing(false); 
         console.log("Local Save Simulated. Updated Profile:", profile);
+        // NOTE: In a real app, you would call apiClient.put('/api/profile', profile) here
     };
 
     const handleChange = (e) => {
@@ -60,28 +66,31 @@ function Profile() {
     return (
         <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-gray-950 transition-colors duration-300 font-sans">
             
-            {/* Page Header and Edit Button - FIX: Changed to flex-col on mobile */}
-            <header className="mb-8 pt-4 md:pt-0 flex flex-col md:flex-row justify-between items-start md:items-center max-w-xl mx-auto">
-                {/* Header Text Block */}
-                <div>
-                    <h1 className="text-3xl font-extrabold text-white">My Profile & Settings</h1>
-                    <p className="text-gray-400 mt-1">Manage user identity and core business settings.</p>
+            {/* ⭐️ NEW HEADER LAYOUT: The main header now contains the title/caption and the button, using flex for horizontal alignment. */}
+            <header className="mb-8 pt-4 md:pt-0 max-w-xl mx-auto">
+                <div className="flex justify-between items-center">
+                    {/* Header Text Block */}
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-white">My Profile</h1>
+                        <p className="text-gray-400 mt-1 text-sm">Refresh my core settings and identity.</p> {/* Refined caption */}
+                    </div>
+                    {/* Edit/Save Button: Now sits next to the title text on all screens */}
+                    <button 
+                        onClick={() => {
+                            if (isEditing) handleSave();
+                            setIsEditing(prev => !prev);
+                        }}
+                        // Removed w-full and mt-4 to make it compact and inline
+                        className={`md:w-auto flex items-center justify-center px-4 py-2 rounded-full font-semibold transition duration-200 text-sm sm:text-base 
+                            ${isEditing 
+                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40' // Save state
+                                : 'bg-transparent border border-indigo-600 text-indigo-300 hover:bg-indigo-700 hover:text-white hover:border-indigo-700' // Edit state
+                            }`}
+                    >
+                        {isEditing ? <Check className="w-5 h-5 mr-1" /> : <Edit className="w-5 h-5 mr-1" />}
+                        {isEditing ? 'Save' : 'Edit'}
+                    </button>
                 </div>
-                {/* Edit/Save Button - Now takes full width on mobile, stacked below text */}
-                <button 
-                    onClick={() => {
-                        if (isEditing) handleSave();
-                        setIsEditing(prev => !prev);
-                    }}
-                    className={`mt-4 md:mt-0 w-full md:w-auto flex items-center justify-center md:justify-start px-4 py-2 rounded-full font-semibold transition duration-150 shadow-lg text-sm sm:text-base 
-                        ${isEditing 
-                            ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-900/40' 
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-900/40'
-                        }`}
-                >
-                    {isEditing ? <Check className="w-5 h-5 mr-1" /> : <Edit className="w-5 h-5 mr-1" />}
-                    {isEditing ? 'Save Changes' : 'Edit'}
-                </button>
             </header>
             
             <main className="space-y-6 max-w-xl mx-auto">
@@ -102,13 +111,13 @@ function Profile() {
                             )}
                         </div>
                         <div className="text-center sm:text-left">
-                            <p className="text-xl font-bold text-white">{profile.name}</p>
-                            <p className="text-sm text-indigo-400 break-all font-mono mt-1">User ID: {mockUserId}</p>
+                            {/* Displaying Email as primary identity now */}
+                            <p className="text-xl font-bold text-white break-all">{profile.email || 'No Email Found'}</p>
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <ProfileInputField label="Full Name" name="name" value={profile.name} icon={User} placeholder="e.g., Jane Doe"/>
+                        {/* Removed Full Name Field */}
                         <ProfileInputField label="Email Address (Login ID)" name="email" value={profile.email} icon={Mail} readOnly={true} />
                         <ProfileInputField label="Phone Number" name="phone" value={profile.phone} icon={Phone} placeholder="e.g., +91 98765 43210"/>
                     </div>
@@ -123,19 +132,10 @@ function Profile() {
                         <ProfileInputField label="Shop / Business Name (Required for Invoices)" name="shopName" value={profile.shopName} icon={Shield} placeholder="e.g., ShopBill Retail"/>
                         <ProfileInputField label="Tax/GST ID / EIN (Required for Invoices)" name="taxId" value={profile.taxId} icon={Check} placeholder="e.g., ABCDE1234F5G"/>
                         <ProfileInputField label="Business Address (Required for Invoices)" name="address" value={profile.address} icon={MapPin} placeholder="e.g., 123 Main St, City, State, Zip"/>
-                        <ProfileInputField label="Default Currency (Core Setting - Read-Only)" name="currency" value={profile.currency} icon={DollarSign} readOnly={true}/>
+                        <ProfileInputField label="Default Currency (Core Setting - Read-Only)" name="currency" value={profile.currency} icon={IndianRupee} readOnly={true}/>
                         <ProfileInputField label="Timezone (Core Setting - Read-Only)" name="timezone" value={profile.timezone} icon={Clock} readOnly={true}/>
                     </div>
                 </section>
-                
-                {/* Save Button (Visible only when editing) */}
-                {isEditing && (
-                    <div className="p-4 sm:p-0">
-                        <button onClick={handleSave} className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition duration-150 shadow-lg shadow-indigo-900/40 flex items-center justify-center">
-                            <Check className="w-5 h-5 mr-2" /> Finalize & Save All Changes
-                        </button>
-                    </div>
-                )}
                 
             </main>
         </div>

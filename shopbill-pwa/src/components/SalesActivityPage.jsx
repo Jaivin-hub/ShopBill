@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, AlertTriangle, Calendar, TrendingUp, Eye, X, User, ArrowDownWideNarrow, Clock, CheckCircle } from 'lucide-react';
+import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, X, User, ArrowDownWideNarrow, Clock, CheckCircle } from 'lucide-react';
 import API from '../config/api';
 
 const getLocalDateString = (date) => {
@@ -37,18 +37,18 @@ const formatTimeAgo = (timestamp) => {
     const past = new Date(timestamp);
     const seconds = Math.floor((now - past) / 1000);
 
-    if (seconds < 60) return `${seconds} seconds ago`;
+    if (seconds < 60) return `${seconds}s ago`;
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes} minutes ago`;
+    if (minutes < 60) return `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} hours ago`;
+    if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
-    if (days < 30) return `${days} days ago`;
+    if (days < 30) return `${days}d ago`;
 
     return past.toLocaleDateString();
 };
 
-// --- Bill Modal Component ---
+// --- Bill Modal Component (Unchanged) ---
 const BillModal = ({ sale, onClose, isLoading }) => {
     // --- Loading and Initial Check ---
     if (!sale && isLoading) {
@@ -368,9 +368,6 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                 <div className="flex flex-col gap-4">
                     {/* Date Range Filter */}
                     <div className="p-4 bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800">
-                        {/* <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center mb-3">
-                            <Calendar className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Date Range
-                        </h2> */}
                         <DateRangeFilter
                             dateRange={dateRange}
                             onDateRangeChange={setDateRange}
@@ -378,38 +375,6 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Summary Metrics Cards */}
-            <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-8">
-                {/* Total Sales Count */}
-                <div className="bg-white dark:bg-gray-900 p-3 sm:p-5 rounded-xl shadow border border-gray-200 dark:border-gray-800">
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Total Transactions</p>
-                    <div className="flex items-center mt-1">
-                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-indigo-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{summaryMetrics.totalSalesCount}</span>
-                    </div>
-                </div>
-
-                {/* Gross Sales Value */}
-                <div className="bg-white dark:bg-gray-900 p-3 sm:p-5 rounded-xl shadow border border-gray-200 dark:border-gray-800">
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Gross Sales Value</p>
-                    <div className="flex items-center mt-1">
-                        <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-teal-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{summaryMetrics.totalSalesValue.toFixed(2)}</span>
-                    </div>
-                </div>
-
-                {/* Total Credit Given */}
-                <div className="bg-white dark:bg-gray-900 p-3 sm:p-5 rounded-xl shadow border border-gray-200 dark:border-gray-800">
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Credit Given</p>
-                    <div className="flex items-center mt-1">
-                        <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-red-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">{summaryMetrics.totalCreditGiven.toFixed(2)}</span>
-                    </div>
-                </div>
-            </div>
-
-
             {/* Sales List */}
             <div className="flex-grow overflow-y-auto bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800">
 
@@ -514,7 +479,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
     </div>
 ) : (
     /* List Container */
-    <div className="space-y-3">
+    <div className="space-y-2">
         {filteredSales.map((sale) => {
             const key = sale._id;
             const amountCreditedSafe = sale.amountCredited || 0;
@@ -528,54 +493,33 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
             return (
                 <div
                     key={key}
-                    // UPDATED: No explicit background color, relying on border and hover for emphasis
-                    className="p-4 rounded-xl shadow-lg shadow-gray-900/10 transition-all duration-200 border border-gray-700 hover:border-indigo-600 hover:bg-gray-800/50 cursor-pointer" // Adjusted shadow and hover bg
+                    // Reduced padding from p-4 to p-3, changed layout to flex row
+                    className="p-3 flex justify-between items-center rounded-xl shadow-md transition-all duration-200 border border-gray-700 hover:border-indigo-600 hover:bg-gray-800/50 cursor-pointer text-sm"
                     onClick={() => fetchSaleDetail(key)}
                 >
-                    {/* TOP ROW: Customer Name and Time Ago */}
-                    <div className="flex justify-between items-center mb-2">
-                        {/* <div className="flex items-center">
-                            <User className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                            <span className="text-sm sm:text-base font-bold text-white truncate max-w-[calc(100vw-200px)] sm:max-w-none">
-                                {customerName}
-                            </span>
-                        </div> */}
-                        <div className="flex items-center space-x-1 text-xs text-gray-500 flex-shrink-0">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatTimeAgo(sale.timestamp)}</span>
+                    {/* LEFT SIDE: Customer Name & ID */}
+                    <div className="flex flex-col flex-grow truncate mr-4 min-w-0">
+                        <span className="font-semibold text-white truncate text-sm">{customerName}</span>
+                        <span className="text-xs text-gray-500 font-mono">ID: {key.substring(0, 8).toUpperCase()}</span>
+                    </div>
+
+                    {/* CENTER: Amount & Credit Status */}
+                    <div className="flex flex-col items-end flex-shrink-0 min-w-[90px] mr-4">
+                        <div className={`font-extrabold flex items-center text-teal-400 text-base`}>
+                            <IndianRupee className="w-4 h-4 mr-1 translate-y-[1px]" />
+                            {sale.totalAmount.toFixed(0)}
+                        </div>
+                        <div className={`text-xs mt-0.5 whitespace-nowrap ${isCredit ? 'text-red-400' : 'text-green-500'}`}>
+                            {isCredit ? `Due: ₹${amountCreditedSafe.toFixed(0)}` : 'Completed'}
                         </div>
                     </div>
 
-                    {/* BOTTOM ROW: Amount, Badges, and View Action */}
-                    <div className="flex justify-between items-center">
-
-                        {/* Amount */}
-                        <div className={`text-2xl font-extrabold flex items-center text-teal-400`}>
-                            <IndianRupee className="w-5 h-5 mr-1 translate-y-[1px]" />
-                            {sale.totalAmount.toFixed(2)}
+                    {/* RIGHT SIDE: Time and View Button */}
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                        <div className="flex items-center space-x-1 text-xs text-gray-500 hidden sm:flex">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatTimeAgo(sale.timestamp)}</span>
                         </div>
-
-                        {/* Financial Status Badges */}
-                        <div className="flex items-center space-x-2 text-xs">
-                            {isCredit ? (
-                                <>
-                                    <span className="font-semibold px-2 py-1 rounded-full whitespace-nowrap bg-red-900/40 text-red-300 border border-red-700">
-                                        Due: ₹{amountCreditedSafe.toFixed(0)}
-                                    </span>
-                                    {amountPaidForDisplay > 0 && (
-                                        <span className="font-semibold px-2 py-1 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
-                                            Paid: ₹{amountPaidForDisplay.toFixed(0)}
-                                        </span>
-                                    )}
-                                </>
-                            ) : (
-                                <span className="font-semibold px-3 py-1 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
-                                    Payment Complete
-                                </span>
-                            )}
-                        </div>
-
-                        {/* View Button */}
                         <button
                             className="p-1 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-600 transition-colors flex-shrink-0"
                             title="View Bill Details"
@@ -584,7 +528,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                                 fetchSaleDetail(key);
                             }}
                         >
-                            <Eye className="w-5 h-5" />
+                            <ArrowRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>

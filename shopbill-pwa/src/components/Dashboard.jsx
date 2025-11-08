@@ -140,15 +140,18 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
     );
   }
 
+  // **CHANGE HERE**: Removed unnecessary padding/margin classes from the main container
   return (
-    <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
-
-      <div className="pb-4 border-b border-gray-800">
+    <div className="flex flex-col h-full bg-gray-950 transition-colors duration-300"> 
+      
+      {/* Removed top padding here, keeping it for the inner content */}
+      <div className="p-4 md:p-8 flex-shrink-0"> 
         <h1 className="text-3xl font-extrabold text-white mb-2">Owner's Dashboard</h1>
         <p className="text-gray-400">Quick overview of your shop's health.</p>
       </div>
 
-      <div className="flex-grow overflow-y-auto pt-6">
+      {/* Main Content Wrapper: Now handles scrolling and layout below the header */}
+      <div className="flex-grow overflow-y-auto px-4 md:px-8 pb-8"> 
 
         {/* Today's Report - Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

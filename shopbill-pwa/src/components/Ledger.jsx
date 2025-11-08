@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   List, MessageSquare, CheckCircle, XCircle, ArrowRight, UserPlus,
   CreditCard, X, TrendingUp, DollarSign, Phone, AlertTriangle, Loader, History,
-  RefreshCcw, ArrowUp, ArrowDown, Repeat, IndianRupee, Search // <--- ADDED Search ICON
+  RefreshCcw, ArrowUp, ArrowDown, Repeat, IndianRupee, Search, Info // <--- ADDED Info ICON
 } from 'lucide-react';
 import CustomerList from './CustomerList'; // Import the new child component
 
@@ -187,6 +187,46 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
 };
 // --- END History Modal Component ---
 
+// --- NEW Remind Info Modal Component ---
+const RemindInfoModal = ({ onClose }) => (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-teal-700/50 transform transition-all duration-300 my-8">
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-teal-900/40 rounded-t-xl">
+                <h2 className="text-lg font-semibold text-teal-300 flex items-center">
+                    <Info className="w-5 h-5 mr-2" /> Remind Feature Info
+                </h2>
+                <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700 transition">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+            <div className="p-4 space-y-3">
+                <p className='text-white font-medium'>
+                    The <strong>Remind</strong> feature will eventually be used for:
+                </p>
+                <ul className="list-disc list-inside text-gray-300 space-y-1 ml-2">
+                    <li>Sending automated <strong>WhatsApp/SMS reminders</strong> to customers with outstanding Khata balances.</li>
+                    <li>Generating a summary of the due amount and a link for easy payment.</li>
+                </ul>
+                <div className='p-3 bg-teal-900/30 rounded-lg border border-teal-700/50 text-teal-300 flex items-center'>
+                    <AlertTriangle className='w-5 h-5 mr-2 flex-shrink-0' />
+                    <p className='text-sm font-semibold'>
+                        <strong>Status:</strong> This functionality is currently <strong>Coming Soon</strong> and is displayed as a mock action.
+                    </p>
+                </div>
+            </div>
+            <div className="p-4 border-t border-gray-700">
+                <button 
+                    onClick={onClose} 
+                    className="w-full py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition"
+                >
+                    Got It
+                </button>
+            </div>
+        </div>
+    </div>
+);
+// --- END Remind Info Modal Component ---
+
 
 const Ledger = ({ apiClient, API, showToast }) => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -196,8 +236,11 @@ const Ledger = ({ apiClient, API, showToast }) => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState(null);
 
+  // NEW Remind Info Modal State
+  const [isRemindInfoModalOpen, setIsRemindInfoModalOpen] = useState(false); 
+
   // NEW Search Toggle State
-  const [isSearchVisible, setIsSearchVisible] = useState(false); // <--- NEW STATE
+  const [isSearchVisible, setIsSearchVisible] = useState(false); 
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -292,6 +335,15 @@ const Ledger = ({ apiClient, API, showToast }) => {
     setSelectedCustomerForHistory(null);
   };
   
+  // NEW Remind Info Modal Handlers
+  const openRemindInfoModal = () => {
+    setIsRemindInfoModalOpen(true);
+  };
+
+  const closeRemindInfoModal = () => {
+    setIsRemindInfoModalOpen(false);
+  };
+
   const openAddCustomerModal = () => {
     setNewCustomerData(initialNewCustomerState);
     setValidationErrors({});
@@ -448,8 +500,14 @@ const Ledger = ({ apiClient, API, showToast }) => {
       showToast('No customers with outstanding Khata due to remind.', 'info');
       return;
     }
+    // Updated mock to indicate 'Coming Soon'
+    showToast('Reminder feature is coming soon!', 'info'); 
+
+    // Old mock implementation (kept as a comment for context)
+    /*
     const selectedNames = outstandingCustomersForReminders.map(cust => cust.name);
     showToast(`Mock: Sending WhatsApp reminder to ${outstandingCustomersForReminders.length} customer(s): ${selectedNames.slice(0, 3).join(', ')}${outstandingCustomersForReminders.length > 3 ? ' and others' : ''}.`, 'info');
+    */
   }
 
   // --- Primary Render ---
@@ -501,7 +559,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
                 </div>
 
                 {/* Action Buttons (Stacked on mobile, side-by-side on desktop) */}
-                <div className="flex flex-row space-x-3 w-full md:w-auto">
+                <div className="flex flex-row space-x-3 w-full md:w-auto relative"> 
                     <button 
                         className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-indigo-900/50 hover:bg-indigo-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50"
                         onClick={openAddCustomerModal}
@@ -511,12 +569,26 @@ const Ledger = ({ apiClient, API, showToast }) => {
                     </button>
 
                     <button 
-                        className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50"
-                        onClick={handleSendReminders}
+                        className="relative flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50 group px-3" // Adjusted padding for better fit
+                        onClick={(e) => { e.stopPropagation(); openRemindInfoModal(); }}
                         disabled={outstandingCustomersForReminders.length === 0 || isProcessing}
                     >
-                        <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2" /> 
-                        {outstandingCustomersForReminders.length > 0 ? `Remind (${outstandingCustomersForReminders.length})` : 'No Due'}
+                        {/* Button Content */}
+                        <div className='flex items-center justify-center'>
+                           <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2" /> 
+                           <span>{outstandingCustomersForReminders.length > 0 ? `Remind (${outstandingCustomersForReminders.length})` : 'No Due'}</span>
+                        </div>
+                        
+                        {/* Info Icon Button - Positioned absolutely within the button, right edge */}
+                        {/* <button
+                            onClick={(e) => { e.stopPropagation(); openRemindInfoModal(); }}
+                            className="absolute right-0 top-1/2 transform -translate-y-1/2 mr-1 p-1 rounded-full text-teal-200 hover:text-white transition"
+                            title="Remind Feature Information"
+                            type='button'
+                            disabled={isProcessing}
+                        >
+                            <Info className="w-3 h-3 md:w-4 md:h-4" />
+                        </button> */}
                     </button>
                 </div>
             </div>
@@ -672,13 +744,18 @@ const Ledger = ({ apiClient, API, showToast }) => {
         </div>
       )}
 
-      {/* --- NEW MODAL (History Modal) --- */}
+      {/* --- History MODAL --- */}
       {isHistoryModalOpen && selectedCustomerForHistory && (
         <HistoryModal 
             customer={selectedCustomerForHistory} 
             onClose={closeHistoryModal} 
             fetchCustomerHistory={fetchCustomerHistory} 
         />
+      )}
+
+      {/* --- NEW Remind Info MODAL --- */}
+      {isRemindInfoModalOpen && (
+        <RemindInfoModal onClose={closeRemindInfoModal} />
       )}
     </div>
   );

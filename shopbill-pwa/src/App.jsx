@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus, LogOut } from 'lucide-react';
+import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus, LogOut, Bell, Smartphone, Shield, Users } from 'lucide-react';
 import axios from 'axios';
 import NotificationToast from './components/NotificationToast';
 import InventoryManager from './components/InventoryManager';
@@ -15,17 +15,18 @@ import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage'
 import ResetPassword from './components/ResetPassword';
-import StaffSetPassword from './components/StaffSetPassword'; // <-- NEW IMPORT
-
-// NOTE: Assuming you have a component named SalesActivityPage.jsx for the full sales list.
+import StaffSetPassword from './components/StaffSetPassword'; 
 import SalesActivityPage from './components/SalesActivityPage'; 
+import UserManagement from './components/UserManagement'; // <-- IMPORTED NEW COMPONENT
 
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
-  OWNER: 'owner', // Changed to match backend PascalCase
-  MANAGER: 'Manager', // Added Manager role
-  CASHIER: 'Cashier', // Changed to match backend PascalCase
+  OWNER: 'owner', 
+  MANAGER: 'manager', // Lowercase to match typical usage in constants
+  CASHIER: 'cashier', // Lowercase to match typical usage in constants
+  // --- ADDED SUPERADMIN ROLE ---
+  SUPERADMIN: 'superadmin',
 };
 
 // --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
@@ -33,7 +34,6 @@ const apiClient = axios.create();
 
 apiClient.interceptors.request.use(
   (config) => {
-    // CRITICAL: Interceptor reads token from localStorage on EVERY request creation
     const token = localStorage.getItem('userToken');
 
     if (token) {
@@ -52,21 +52,35 @@ apiClient.interceptors.request.use(
 const checkDeepLinkPath = () => {
     const path = window.location.pathname;
     
-    // Check for Staff Activation Link
     if (path.startsWith('/staff-setup/')) {
-        return 'staffSetPassword'; // <-- Must match the state name in App.js
+        return 'staffSetPassword'; 
     }
     
-    // Check for Password Reset Link
     if (path.startsWith('/reset-password/')) {
-        return 'resetPassword'; // <-- Must match the state name in App.js
+        return 'resetPassword'; 
     }
     
     return null; 
 };
 
+// --- UTILITY NAVIGATION ITEMS (New for Header/Utility area) ---
+const UTILITY_NAV_ITEMS_CONFIG = [
+    { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+    { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+];
+
+// --- SUPERADMIN NAVIGATION CONFIG ---
+const SUPERADMIN_NAV_ITEMS = [
+    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_users', name: 'Manage Users', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+];
+// --- END SUPERADMIN CONFIG ---
+
+
 const App = () => {
-  // FIX: Use the updated checkDeepLinkPath function
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -74,8 +88,8 @@ const App = () => {
   
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
-  // FIX: Use the updated USER_ROLES constant
-  const userRole = currentUser?.role || USER_ROLES.CASHIER;
+  // Normalized user role access
+  const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -98,10 +112,13 @@ const App = () => {
 
   // --- LOGIN HANDLER ---
   const handleLoginSuccess = useCallback((user, token) => {
+    // Ensure the role is stored in lowercase for consistency
+    const userWithNormalizedRole = { ...user, role: user.role.toLowerCase() }; 
+    
     localStorage.setItem('userToken', token);
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    localStorage.setItem('currentUser', JSON.stringify(userWithNormalizedRole));
 
-    setCurrentUser(user);
+    setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
     setCurrentPage('dashboard');
     showToast('Welcome back!', 'success');
@@ -114,30 +131,24 @@ useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
     
-    // 1. Check for a deep link path first
-    const deepLink = checkDeepLinkPath(); // 'staffSetPassword' or 'resetPassword' or null
+    const deepLink = checkDeepLinkPath(); 
 
     if (token && userJson && token !== 'undefined' && token !== null) {
       try {
-        const user = JSON.parse(userJson);
+        let user = JSON.parse(userJson);
+        // Normalize role on load
+        user = { ...user, role: user.role.toLowerCase() };
         setCurrentUser(user);
         
-        // 2. If the user is logged in, DO NOT display the deep link page.
-        //    Instead, force a redirect to the dashboard.
         if (deepLink) {
             setCurrentPage('dashboard');
-        } else {
-            // Otherwise, keep the current page or default to dashboard
-            // if the initial page state was set by checkDeepLinkPath() (which shouldn't happen here)
-            // No action needed here, as the initial state is already 'dashboard' if no deep link was found.
-        }
+        } 
 
       } catch (error) {
         console.error("Error parsing user data from localStorage:", error);
         logout();
       }
     } else if (deepLink) {
-        // 3. CRITICAL: If NOT logged in but on a deep link, KEEP the deep link page active.
         setCurrentPage(deepLink);
     }
     
@@ -183,16 +194,38 @@ useEffect(() => {
   }, []);
   // --- END NAVIGATION HANDLERS ---
 
+  // Main Navigation Menu Items with Access Control
+  const navItems = useMemo(() => {
+    // 1. Define standard (non-superadmin) menu items
+    const standardNav = [
+        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+    ];
 
-  // Navigation Menu Items with Access Control
-  const navItems = useMemo(() => ([
-    // FIX: Updated roles to use PascalCase constants
-    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-    { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-    { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-    { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-    { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-  ].filter(item => item.roles.includes(userRole))), [userRole]);
+    // 2. Return Superadmin menu if applicable
+    if (userRole === USER_ROLES.SUPERADMIN) {
+        return SUPERADMIN_NAV_ITEMS;
+    }
+
+    // 3. Otherwise, filter standard menu by user role
+    return standardNav.filter(item => item.roles.includes(userRole));
+  }, [userRole]);
+
+  // Utility Navigation Items with Access Control (for Header/Sidebar)
+  const utilityNavItems = useMemo(() => {
+    // Superadmin has a different setup, only show Profile/Notifications
+    if (userRole === USER_ROLES.SUPERADMIN) {
+        return UTILITY_NAV_ITEMS_CONFIG.filter(item => 
+            item.id === 'profile' || item.id === 'notifications'
+        );
+    }
+    
+    // Filter standard utility items
+    return UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
+  }, [userRole]);
 
   const renderContent = () => {
     
@@ -205,12 +238,10 @@ useEffect(() => {
         );
     }
     
-    // NEW LOGIC: Handle the Staff Set Password deep link
     if (currentPage === 'staffSetPassword') {
         return <StaffSetPassword />;
     }
     
-    // Existing Logic: Handle the Password Reset deep link
     if (currentPage === 'resetPassword') {
         return <ResetPassword />;
     }
@@ -252,7 +283,10 @@ useEffect(() => {
       case 'khata':
         return <Ledger {...commonProps} />;
       case 'inventory':
-        return <InventoryManager {...commonProps} />;
+        // Only render InventoryManager if user is NOT Superadmin
+        return userRole !== USER_ROLES.SUPERADMIN 
+            ? <InventoryManager {...commonProps} />
+            : <div className="p-8 text-center text-gray-400">Superadmin: Access to Inventory via system tools.</div>;
       case 'reports':
         return <Reports {...commonProps} />;
       case 'salesActivity':
@@ -262,8 +296,17 @@ useEffect(() => {
       case 'profile':
         return <Profile {...commonProps} />;
       case 'notifications':
-        return <NotificationsPage {...commonProps} />;  
+        return <NotificationsPage {...commonProps} />;
+        
+      // --- NEW SUPERADMIN ROUTES ---
+      case 'superadmin_users':
+        return <UserManagement {...commonProps} />; // <-- Renders the new component
+      case 'superadmin_systems':
+        return <div className="p-8 text-center text-gray-200">System Configuration Interface (SUPERADMIN)</div>;
+      // --- END NEW SUPERADMIN ROUTES ---
+        
       default:
+        // Default to Dashboard for all roles
         return <Dashboard 
             {...commonProps}
             onViewAllSales={handleViewAllSales}
@@ -273,10 +316,12 @@ useEffect(() => {
     }
   };
 
-  // Determine if we should show the full app UI (Header/Sidebar/FooterNav)
   const showAppUI = currentUser && 
                     currentPage !== 'resetPassword' && 
-                    currentPage !== 'staffSetPassword'; // <-- EXCLUDE new page
+                    currentPage !== 'staffSetPassword'; 
+  
+  // Helper to correctly capitalize role for display
+  const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
@@ -284,12 +329,14 @@ useEffect(() => {
         {showAppUI && (
             <Header
                 companyName="Pocket POS"
-                // FIX: Use optional chaining before calling charAt in case role is null
-                userRole={userRole?.charAt(0).toUpperCase() + userRole?.slice(1)} 
+                userRole={displayRole} 
                 setCurrentPage={setCurrentPage}
                 onLogout={logout}
                 apiClient={apiClient}
                 API={API}
+                // CRITICAL: Passing these props for mobile header highlighting
+                currentPage={currentPage}
+                utilityNavItems={utilityNavItems}
             />
         )}
         
@@ -299,14 +346,15 @@ useEffect(() => {
                  transition-colors duration-300 border-r border-gray-200 dark:border-gray-800"
             >
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">
-                        <DollarSign className="inline-block w-6 h-6 mr-2 text-teal-600 dark:text-teal-400" /> Pocket POS
+                    <h2 className="text-2xl font-extrabold text-indigo-400">
+                        <Smartphone className="inline-block w-6 h-6 mr-2 text-indigo-400" /> Pocket POS
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
-                        User: {userRole?.charAt(0).toUpperCase() + userRole?.slice(1)}
+                        User: {displayRole}
                     </p>
                 </div>
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                    {/* Main Navigation Items */}
                     {navItems.map(item => (
                         <button
                             key={item.id}
@@ -320,6 +368,25 @@ useEffect(() => {
                             {item.name}
                         </button>
                     ))}
+                    
+                    {/* Utility Navigation Items for Desktop Sidebar */}
+                    {utilityNavItems.length > 0 && (
+                        <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                            {utilityNavItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setCurrentPage(item.id)}
+                                    className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
+                                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    <item.icon className="w-5 h-5 mr-3" />
+                                    {item.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </nav>
                 
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800">
@@ -336,10 +403,11 @@ useEffect(() => {
         )}
 
         {/* Main Content Area */}
-        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 pb-16 md:pb-0' : 'w-full'}`}>
+        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-0 pb-16 md:pb-0' : 'w-full pt-16 md:pt-0'}`}>
             {renderContent()}
         </main>
 
+        {/* Mobile Footer Navigation */}
         {showAppUI && (
             <nav className="fixed bottom-0 left-0 right-0 h-16 
                  bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 

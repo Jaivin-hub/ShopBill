@@ -9,8 +9,9 @@ import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
 import StaffPermissionsManager from './StaffPermissionsManager';
 import ChangePasswordForm from './ChangePasswordForm';
+import API from '../config/api';
 
-// --- UPDATED MODAL: Cloud Upload Confirmation (Disconnect button is now functional) ---
+// --- UPDATED MODAL: Cloud Upload Confirmation (No changes here) ---
 const CloudUploadConfirmationModal = ({ 
     isConnected, 
     accountEmail, 
@@ -168,9 +169,15 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     const [cloudUploadStatus, setCloudUploadStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
     const [cloudSelectionModal, setCloudSelectionModal] = useState(null); 
     
+    // --- NEW STATE for Force Sync ---
+    const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
+
     // State for connection and connected account details
     const [isCloudConnected, setIsCloudConnected] = useState(true); 
-    const [connectedAccountEmail, setConnectedAccountEmail] = useState("user@example.com"); 
+    const currentUserJSON = localStorage.getItem('currentUser')
+    const currentUser = JSON.parse(currentUserJSON);
+    console.log('currentUser',currentUser.email)
+    const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
     // Placeholder handlers (Log out, Password, etc. - Unchanged)
     const handleToggleDarkMode = () => { if (toggleDarkMode) { toggleDarkMode(); } };
@@ -178,13 +185,27 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     const handleBackup = () => console.log("Data backup initiated (Mock API call).");
     const handleStaffPermissionsClick = () => setCurrentView('staff');
     const handleChangePasswordClick = () => setCurrentView('password');
+    
+    // 🌟 UPDATED: Fully functional handleWipeLocalData
     const handleWipeLocalData = () => { 
         setConfirmModal({
-            message: "Are you sure you want to clear the local cache? This will wipe browser storage and require a full data re-sync from the server.",
-            onConfirm: () => { console.log('Local cache wiped.'); setConfirmModal(null); },
+            message: "Are you sure you want to clear the local cache? This will wipe browser storage (including login status) and require a full data re-sync from the server.",
+            onConfirm: () => { 
+                // 1. Clear all local storage
+                localStorage.clear(); 
+                console.log('Local cache wiped successfully.'); 
+                setConfirmModal(null);
+                // 2. Force logout/reload to enforce the new state (login screen)
+                if (onLogout) {
+                    onLogout(); 
+                } else {
+                    window.location.reload();
+                }
+            },
             onCancel: () => setConfirmModal(null)
         });
     };
+
     const handleLogout = () => {
         setConfirmModal({
             message: "Are you sure you want to log out of your owner/admin account?",
@@ -211,9 +232,8 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         if (showToast) { showToast('Cloud account connected successfully!', 'success'); }
     };
     
-    // 🌟 REAL-WORLD CODE IMPROVEMENT: Cloud Upload Handler now returns and uses the file link
-    // Function within the Settings component
-const handleUploadToCloud = async (driveType) => {
+    // 🌟 REAL-WORLD CODE IMPROVEMENT: Cloud Upload Handler (Reverting to original API.post for safety)
+    const handleUploadToCloud = async (driveType) => {
     console.log('driveType',driveType)
     setCloudSelectionModal(null); 
     if (cloudUploadStatus === 'loading') return; 
@@ -221,26 +241,21 @@ const handleUploadToCloud = async (driveType) => {
     setCloudUploadStatus('loading');
     
     try {
-        // 🚀 REAL API CALL: Your front-end sends a request to your MERN backend.
-        // The MERN backend handles the connection to Google Drive API.
-        const response = await apiClient.post('/api/data/upload-to-cloud', { 
+        // NOTE: Using API.uploadcloud as in the original file snippet, 
+        // as API.uploadcloud was not defined in the provided backend route list.
+        const response = await apiClient.post(API.uploadcloud || '/api/data/upload-to-cloud', { // Added fallback to original path
             driveType 
         });
 
-        // 💡 The backend response must include the success status and file details.
         const { success, fileId, fileName } = response.data;
 
         if (success) {
-            // Construct the real file link using the file ID returned by the server
-            // (Note: The server typically returns the full URL, but we'll construct a mock one here 
-            // based on the ID to show the structure).
             const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
             
             setCloudUploadStatus('success');
             console.log(`Data backup successfully uploaded to ${driveType}. File: ${fileName}`);
             
             if (showToast) { 
-                // Display the real link to the user
                 showToast(`Backup complete! Data uploaded to **${connectedAccountEmail}**. [View File on Drive](${fileLink})`, 'success'); 
             } else { 
                 alert(`Data successfully uploaded to Cloud/Drive! File: ${fileLink}`); 
@@ -248,12 +263,10 @@ const handleUploadToCloud = async (driveType) => {
             
             setTimeout(() => setCloudUploadStatus('idle'), 3000); 
         } else {
-            // Handle server-side failure response (e.g., Google Drive API returned an error)
             throw new Error(`Upload to ${driveType} failed on server: ${response.data.message || 'Unknown error'}`);
         }
 
     } catch (error) {
-        // Handle network error or unexpected server response
         setCloudUploadStatus('error');
         console.error("Upload to Cloud Error:", error);
         if (showToast) { 
@@ -264,8 +277,47 @@ const handleUploadToCloud = async (driveType) => {
         setTimeout(() => setCloudUploadStatus('idle'), 5000);
     }
 };
-// The rest of the Settings component code remains the same.
-    
+
+    // 🆕 NEW FUNCTIONALITY: Handle Force Sync
+    const handleForceSync = async () => {
+        if (syncStatus === 'loading') return;
+
+        setSyncStatus('loading');
+        if (showToast) { showToast('Initiating synchronization with server...', 'info'); }
+
+        try {
+            // Use the API.sync endpoint you added to the backend router
+            const response = await apiClient.post(API.sync, { 
+                userId: currentUser.id // Sending user ID for targeted sync might be necessary
+            });
+            
+            // Assuming the backend returns a success message and maybe new data count/status
+            if (response.data.success) {
+                setSyncStatus('success');
+                console.log("Data successfully synced from server.");
+                
+                if (showToast) { 
+                    showToast(`Synchronization complete! Data is up to date. (${response.data.recordsUpdated || 0} updated)`, 'success'); 
+                }
+                
+                setTimeout(() => setSyncStatus('idle'), 4000); 
+            } else {
+                // Handle success response but with a server-side failure flag
+                throw new Error(response.data.message || 'Sync process reported an issue on the server.');
+            }
+
+        } catch (error) {
+            setSyncStatus('error');
+            console.error("Force Sync Error:", error);
+            if (showToast) { 
+                showToast(`Force Sync Failed: ${error.message || 'Network or server error.'}`, 'error'); 
+            } else { 
+                alert(`Force Sync Failed: ${error.message || 'Network or server error.'}`); 
+            }
+            setTimeout(() => setSyncStatus('idle'), 5000);
+        }
+    };
+
     // NEW HANDLER: Triggers the initial confirmation modal (Unchanged)
     const handleUploadToCloudClick = () => {
         if (cloudUploadStatus !== 'idle') return;
@@ -281,8 +333,9 @@ const handleUploadToCloud = async (driveType) => {
     };
     // -------------------------
     
-    // --- Helper function to determine the action component for Cloud Upload (Unchanged) ---
+    // --- Helper function to determine the action component for Cloud Upload ---
     const getCloudUploadActionComponent = () => {
+        // ... (Existing cloud status logic - kept for completeness) ...
         switch (cloudUploadStatus) {
             case 'loading':
                 return (
@@ -309,6 +362,35 @@ const handleUploadToCloud = async (driveType) => {
                 return null;
         }
     };
+
+    // 🆕 NEW HELPER: Determine the action component for Force Sync
+    // const getSyncActionComponent = () => {
+    //     switch (syncStatus) {
+    //         case 'loading':
+    //             return (
+    //                 <div className="flex items-center text-indigo-600 dark:text-indigo-400">
+    //                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+    //                     Syncing...
+    //                 </div>
+    //             );
+    //         case 'success':
+    //             return (
+    //                 <div className="flex items-center text-green-600 dark:text-green-400">
+    //                     <CheckCircle className="w-5 h-5 mr-2" />
+    //                     Done
+    //                 </div>
+    //             );
+    //         case 'error':
+    //             return (
+    //                 <div className="text-red-600 dark:text-red-400 font-semibold">
+    //                     Error
+    //                 </div>
+    //             );
+    //         case 'idle':
+    //         default:
+    //             return null;
+    //     }
+    // };
     
     // --- Render Logic ---
     const renderSettingsList = () => (
@@ -327,17 +409,17 @@ const handleUploadToCloud = async (driveType) => {
             </section>
             
             {/* 2. App Preferences Section (Unchanged) */}
-            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
                     <Globe className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> App Preferences
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
                     <SettingItem icon={Bell} title="Notifications" description="Enable or disable in-app toast notifications." actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} />} accentColor="text-blue-600 dark:text-blue-400" />
                 </div>
-            </section>
+            </section> */}
 
             {/* 3. Data Management Section */}
-            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
                     <Server className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" /> Data Management
                 </h2>
@@ -345,7 +427,6 @@ const handleUploadToCloud = async (driveType) => {
                     
                     <SettingItem icon={Cloud} title="Backup Data (Download)" description="Download a full backup of your shop data." onClick={handleBackup} accentColor="text-green-600 dark:text-green-400"/>
                     
-                    {/* 🚀 UPDATED FEATURE: Upload to Cloud/Drive */}
                     <SettingItem 
                         icon={UploadCloud}
                         title="Upload to Cloud/Drive"
@@ -366,10 +447,22 @@ const handleUploadToCloud = async (driveType) => {
                         }
                     />
                     
-                    <SettingItem icon={RefreshCw} title="Force Sync" description="Manually force a synchronization with the MERN server." onClick={() => console.log('Force sync initiated.')} accentColor="text-indigo-600 dark:text-indigo-400"/>
+                    <SettingItem 
+                        icon={RefreshCw} 
+                        title="Force Sync" 
+                        description="Manually force a synchronization with the MERN server to refresh your data." 
+                        onClick={handleForceSync} 
+                        actionComponent={getSyncActionComponent()}
+                        accentColor={
+                            syncStatus === 'loading' ? 'text-indigo-600 dark:text-indigo-400' :
+                            syncStatus === 'success' ? 'text-green-600 dark:text-green-400' :
+                            'text-indigo-600 dark:text-indigo-400'
+                        }
+                    />
+                    
                     <SettingItem icon={Trash2} title="Clear Cache" description="Wipe local browser storage (requires re-sync)." onClick={handleWipeLocalData} accentColor="text-red-600 dark:text-red-400"/>
                 </div>
-            </section>
+            </section> */}
             
         </main>
     );

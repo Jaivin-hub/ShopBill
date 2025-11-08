@@ -43,4 +43,21 @@ const protect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect };
+// --- 2. AUTHORIZE MIDDLEWARE (Ensure user has required role) ---
+/**
+ * Factory function that returns a middleware to restrict access to specified roles.
+ * @param {...string} roles The allowed user roles (e.g., 'superadmin', 'owner', 'Manager')
+ */
+const authorize = (...roles) => {
+    return (req, res, next) => {
+        // req.user is populated by the 'protect' middleware
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({ 
+                error: `User role '${req.user.role}' is not authorized to access this route. Requires one of: ${roles.join(', ')}.` 
+            });
+        }
+        next();
+    };
+};
+
+module.exports = { protect, authorize };

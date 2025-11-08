@@ -203,55 +203,58 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
     const isLowStock = item.quantity <= item.reorderLevel;
     return (
         <div 
-            key={itemId} 
-            className={`bg-gray-900 p-4 rounded-xl shadow-lg border transition duration-150 ${
-                isLowStock 
-                    ? 'border-red-700/50 bg-red-900/10' 
-                    : 'border-gray-800 hover:shadow-2xl'
-            }`}>
-            <div className="flex justify-between items-start mb-2 border-b border-gray-700 pb-2">
-                <div>
-                    <p className="text-base font-semibold text-gray-200 truncate max-w-[180px]">{item.name}</p>
-                    <span className="text-xs text-gray-400 flex items-center mt-0.5">HSN: {item.hsn}</span>
-                </div>
-                <div className="text-right">
-                    <span className="text-lg font-bold text-teal-400 whitespace-nowrap">
-                        ₹{item.price ? item.price.toFixed(2) : '0.00'}
-                    </span>
-                    {isLowStock && (
-                        <span className="block text-xs text-red-400 flex items-center justify-end mt-1">
-                            <AlertTriangle className="w-3 h-3 mr-1" /> Low Stock
-                        </span>
-                    )}
-                </div>
-            </div>
-            <div className="flex justify-between items-center pt-2">
-                <p className={`text-sm font-medium ${isLowStock ? 'text-red-300' : 'text-indigo-400'}`}>
-                    Stock: <span className="font-bold">{item.quantity}</span>
-                    {isLowStock && (
-                        <span className="text-xs ml-2 text-gray-400">(Reorder: {item.reorderLevel})</span>
-                    )}
-                </p>
-                
-                <div className="flex space-x-2">
-                    <button 
-                        className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
-                        title="Edit Item"
-                        onClick={() => handleEditClick(item)}
-                    >
-                        <Edit className="w-4 h-4" />
-                    </button>
-                    <button 
-                        className="text-red-400 hover:text-white hover:bg-red-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
-                        title="Delete Item"
-                        onClick={() => handleDeleteClick(item._id || item.id, item.name)}
-                        disabled={loading}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
+    key={itemId} 
+    className={`bg-gray-900 p-4 rounded-xl shadow-lg border transition duration-150 ${
+        isLowStock 
+            ? 'border-red-700/50 bg-red-900/10' 
+            : 'border-gray-800 hover:shadow-2xl'
+    }`}>
+    <div className="flex justify-between items-start mb-2 border-b border-gray-700 pb-2">
+        
+        {/* FIX APPLIED HERE: Added 'min-w-0' to this div */}
+        <div className="min-w-0"> 
+            <p className="text-base font-semibold text-gray-200 truncate max-w-[180px]">{item.name}</p>
+            <span className="text-xs text-gray-400 flex items-center mt-0.5">HSN: {item.hsn.length > 15 ? `${item.hsn.slice(0, 10)}...` : item.hsn}</span>
         </div>
+        
+        <div className="text-right">
+            <span className="text-lg font-bold text-teal-400 whitespace-nowrap">
+                ₹{item.price ? item.price.toFixed(2) : '0.00'}
+            </span>
+            {isLowStock && (
+                <span className="block text-xs text-red-400 flex items-center justify-end mt-1">
+                    <AlertTriangle className="w-3 h-3 mr-1" /> Low Stock
+                </span>
+            )}
+        </div>
+    </div>
+    <div className="flex justify-between items-center pt-2">
+        <p className={`text-sm font-medium ${isLowStock ? 'text-red-300' : 'text-indigo-400'}`}>
+            Stock: <span className="font-bold">{item.quantity}</span>
+            {isLowStock && (
+                <span className="text-xs ml-2 text-gray-400">(Reorder: {item.reorderLevel})</span>
+            )}
+        </p>
+        
+        <div className="flex space-x-2">
+            <button 
+                className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
+                title="Edit Item"
+                onClick={() => handleEditClick(item)}
+            >
+                <Edit className="w-4 h-4" />
+            </button>
+            <button 
+                className="text-red-400 hover:text-white hover:bg-red-600 p-2 rounded-full transition-colors duration-200 shadow-sm"
+                title="Delete Item"
+                onClick={() => handleDeleteClick(item._id || item.id, item.name)}
+                disabled={loading}
+            >
+                <Trash2 className="w-4 h-4" />
+            </button>
+        </div>
+    </div>
+</div>
     );
 };
 // =========================================================================
@@ -518,7 +521,7 @@ const InventoryContent = ({
                                         className={`transition duration-150 ${isLowStock ? 'bg-red-900/10 hover:bg-red-900/20' : 'hover:bg-gray-800'}`}>
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-200">
                                             {item.name}
-                                            <span className="block text-xs text-gray-500">HSN: {item.hsn}</span>
+                                            <span className="block text-xs text-gray-500">HSN: {item.hsn.length > 15 ? `${item.hsn.slice(0, 15)}...` : item.hsn}</span>
                                             {isLowStock && (
                                                 <span className="block text-xs text-red-400 flex items-center mt-1">
                                                     <AlertTriangle className="w-3 h-3 mr-1" /> Low Stock! (Reorder Lvl: {item.reorderLevel})

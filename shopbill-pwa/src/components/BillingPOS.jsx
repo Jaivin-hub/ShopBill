@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { DollarSign, IndianRupee, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader, Camera } from 'lucide-react';
+import { DollarSign, IndianRupee, List, Trash2, User, ShoppingCart, Minus, Plus, Search, X, Loader, ScanLine } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER, ADD_NEW_CUSTOMER_ID } from './PaymentModal';
 import ScannerModal from './ScannerModal'; // Assuming ScannerModal is in this path
 
@@ -237,10 +237,10 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           )}
           <button
             onClick={() => setIsCameraScannerOpen(true)}
-            className="absolute right-10 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
             title="Scan Barcode with Camera"
           >
-            <Camera className="w-5 h-5" />
+            <ScanLine className="w-5 h-5" />
           </button>
         </div>
         <div className="max-h-96 overflow-y-auto p-3 border border-gray-700 rounded-xl bg-gray-900 shadow-inner">
