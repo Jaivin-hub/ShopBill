@@ -115,7 +115,7 @@ router.post('/signup', async (req, res) => {
             password,
             phone: phone || null,
             // FIX: Changed role from lowercase 'owner' to PascalCase 'owner' for consistency
-            role: 'owner', 
+            role: 'superadmin', 
             // Create a new ObjectID to use temporarily until we save the user's ID as their shopId
             shopId: new mongoose.Types.ObjectId(), 
         });
