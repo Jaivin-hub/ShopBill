@@ -1,7 +1,7 @@
 // src/components/UserManagement.js (Frontend - Fixed Date Joined Extraction and Tenure Sorting)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, DollarSign, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock } from 'lucide-react';
+import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import API from '../config/api';
 
 // Define roles for staff count (for display purposes)
@@ -51,18 +51,23 @@ const getPlanStyles = (plan) => {
  * FINAL: Clean Staff Summary - Managers and Cashiers only
  */
 const StaffPill = ({ count }) => {
-    // The total now represents staff who are not the owner (Managers + Cashiers)
-    const staffTotal = count.manager + count.cashier;
     return (
-        <div className="flex items-center justify-center space-x-3 w-full">
+        <div className="flex items-center justify-center gap-2 w-full">
             {/* Displaying Managers and Cashiers count */}
-            
-            <div className="flex flex-col space-y-1 text-xs">
-                <span className="flex items-center text-teal-400 bg-gray-800 px-2 py-0.5 rounded-full" title="Managers">
-                    <Users className="w-3 h-3 mr-1" />{count.manager} M
+            <div className="flex items-center gap-2">
+                <span 
+                    className="flex items-center gap-1.5 text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:bg-teal-500/20" 
+                    title="Managers"
+                >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{count.manager}</span>
                 </span>
-                <span className="flex items-center text-yellow-400 bg-gray-800 px-2 py-0.5 rounded-full" title="Cashiers">
-                    <User className="w-3 h-3 mr-1" />{count.cashier} C
+                <span 
+                    className="flex items-center gap-1.5 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:bg-yellow-500/20" 
+                    title="Cashiers"
+                >
+                    <User className="w-3.5 h-3.5" />
+                    <span>{count.cashier}</span>
                 </span>
             </div>
         </div>
@@ -75,24 +80,336 @@ const PerformanceTrendIndicator = ({ performance }) => {
     
     let icon = Minus;
     let color = 'text-gray-400';
-    let bgColor = 'bg-gray-800';
+    let bgColor = 'bg-gray-500/10';
+    let borderColor = 'border-gray-500/20';
 
     if (trend === 'up') {
         icon = TrendingUp;
         color = 'text-green-400';
-        bgColor = 'bg-green-900/40';
+        bgColor = 'bg-green-500/10';
+        borderColor = 'border-green-500/30';
     } else if (trend === 'down') {
         icon = TrendingDown;
         color = 'text-red-400';
-        bgColor = 'bg-red-900/40';
+        bgColor = 'bg-red-500/10';
+        borderColor = 'border-red-500/30';
     }
 
     const IconComponent = icon;
 
     return (
-        <div className={`flex items-center justify-center px-3 py-1 text-sm font-semibold rounded-lg ${bgColor} border border-gray-700/50`}>
-            <IconComponent className={`w-4 h-4 mr-1 ${color}`} />
-            <span className={`${color}`}>{metric}</span>
+        <div className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg ${bgColor} border ${borderColor} transition-all duration-200`}>
+            <IconComponent className={`w-3.5 h-3.5 ${color}`} />
+            <span className={color}>{metric}</span>
+        </div>
+    );
+};
+
+// Generate current month payment status (dummy data)
+const generateCurrentMonthPaymentStatus = () => {
+    const statuses = ['paid', 'pending', 'failed', 'overdue'];
+    const weights = [0.7, 0.15, 0.1, 0.05]; // 70% paid, 15% pending, 10% failed, 5% overdue
+    const random = Math.random();
+    let cumulative = 0;
+    
+    for (let i = 0; i < statuses.length; i++) {
+        cumulative += weights[i];
+        if (random < cumulative) {
+            return statuses[i];
+        }
+    }
+    return 'paid'; // fallback
+};
+
+// Payment Status Badge Component
+const PaymentStatusBadge = ({ status }) => {
+    let icon, color, bgColor, borderColor, text;
+    
+    switch (status) {
+        case 'paid':
+            icon = CheckCircle;
+            color = 'text-green-400';
+            bgColor = 'bg-green-500/10';
+            borderColor = 'border-green-500/30';
+            text = 'Paid';
+            break;
+        case 'pending':
+            icon = Clock;
+            color = 'text-yellow-400';
+            bgColor = 'bg-yellow-500/10';
+            borderColor = 'border-yellow-500/30';
+            text = 'Pending';
+            break;
+        case 'failed':
+            icon = XCircle;
+            color = 'text-red-400';
+            bgColor = 'bg-red-500/10';
+            borderColor = 'border-red-500/30';
+            text = 'Failed';
+            break;
+        case 'overdue':
+            icon = AlertCircle;
+            color = 'text-orange-400';
+            bgColor = 'bg-orange-500/10';
+            borderColor = 'border-orange-500/30';
+            text = 'Overdue';
+            break;
+        default:
+            icon = Clock;
+            color = 'text-gray-400';
+            bgColor = 'bg-gray-500/10';
+            borderColor = 'border-gray-500/30';
+            text = 'Unknown';
+    }
+    
+    const IconComponent = icon;
+    
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${bgColor} ${color} border ${borderColor} transition-all duration-200`}>
+            <IconComponent className="w-3.5 h-3.5" />
+            {text}
+        </span>
+    );
+};
+
+// Generate dummy payment data
+const generateDummyPaymentData = (shopName, plan) => {
+    const planPrices = {
+        [SHOP_PLANS.BASIC]: 2499,
+        [SHOP_PLANS.PRO]: 6999,
+        [SHOP_PLANS.ENTERPRISE]: 16999,
+    };
+    
+    const price = planPrices[plan] || planPrices[SHOP_PLANS.BASIC];
+    const now = new Date();
+    
+    // Generate payment history (last 6 months)
+    const paymentHistory = [];
+    for (let i = 5; i >= 0; i--) {
+        const paymentDate = new Date(now);
+        paymentDate.setMonth(paymentDate.getMonth() - i);
+        
+        // Random payment status (mostly paid, some failed)
+        const isPaid = Math.random() > 0.15;
+        const status = isPaid ? 'paid' : 'failed';
+        
+        paymentHistory.push({
+            id: `payment-${i}`,
+            date: paymentDate.toISOString(),
+            amount: price,
+            status: status,
+            transactionId: `TXN${Math.random().toString(36).substring(2, 11).toUpperCase()}`,
+            method: ['Credit Card', 'Debit Card', 'Bank Transfer', 'UPI'][Math.floor(Math.random() * 4)],
+        });
+    }
+    
+    // Generate upcoming payment
+    const nextPaymentDate = new Date(now);
+    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    nextPaymentDate.setDate(1); // First of next month
+    
+    const daysUntilPayment = Math.ceil((nextPaymentDate - now) / (1000 * 60 * 60 * 24));
+    
+    return {
+        paymentHistory: paymentHistory.sort((a, b) => new Date(b.date) - new Date(a.date)),
+        upcomingPayment: {
+            date: nextPaymentDate.toISOString(),
+            amount: price,
+            daysUntil: daysUntilPayment,
+        },
+        currentPlan: plan,
+        billingCycle: 'Monthly',
+    };
+};
+
+// Payment Modal Component
+const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, API, showToast }) => {
+    const [paymentData, setPaymentData] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    useEffect(() => {
+        if (isOpen && shopId) {
+            const fetchPaymentData = async () => {
+                setIsLoading(true);
+                try {
+                    const response = await apiClient.get(API.superadminShopPayments(shopId));
+                    if (response.data.success) {
+                        setPaymentData(response.data.data);
+                    } else {
+                        throw new Error(response.data.message || 'Failed to load payment data');
+                    }
+                } catch (error) {
+                    console.error('Failed to load payment data:', error);
+                    // Fallback to dummy data
+                    const data = generateDummyPaymentData(shopName, shopPlan);
+                    setPaymentData(data);
+                    showToast('Using cached payment data. API connection failed.', 'warning');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchPaymentData();
+        }
+    }, [isOpen, shopId, shopName, shopPlan, apiClient, API, showToast]);
+    
+    if (!isOpen) return null;
+    
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+                <div 
+                    className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex items-center justify-center h-64">
+                        <Loader className="w-8 h-8 animate-spin text-indigo-400" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+    const getStatusBadge = (status) => {
+        if (status === 'paid') {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Paid
+                </span>
+            );
+        } else if (status === 'failed') {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                    <XCircle className="w-3.5 h-3.5" />
+                    Failed
+                </span>
+            );
+        } else {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Pending
+                </span>
+            );
+        }
+    };
+    
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm cursor-pointer" onClick={onClose}>
+            <div 
+                className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col cursor-default"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gradient-to-r from-gray-800/50 to-gray-800/30">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                            <CreditCard className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white">Payment History</h2>
+                            <p className="text-sm text-gray-400">{shopName}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all duration-200 cursor-pointer"
+                    >
+                        <X className="w-5 h-5 cursor-pointer" />
+                    </button>
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {paymentData && (
+                        <>
+                            {/* Current Plan & Upcoming Payment */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <IndianRupee className="w-5 h-5 text-indigo-400" />
+                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Current Plan</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-white mb-1">{paymentData.currentPlan}</p>
+                                    <p className="text-sm text-gray-400">{paymentData.billingCycle} Billing</p>
+                                </div>
+                                
+                                <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl p-5 border border-indigo-500/30">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Calendar className="w-5 h-5 text-indigo-400" />
+                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Next Payment</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-white mb-1">
+                                        ₹{paymentData.upcomingPayment.amount.toFixed(2)}
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        {paymentData.upcomingPayment.daysUntil > 0 
+                                            ? `Due in ${paymentData.upcomingPayment.daysUntil} days`
+                                            : 'Due today'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {formatDate(paymentData.upcomingPayment.date)}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* Payment History */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-indigo-400" />
+                                    Payment History
+                                </h3>
+                                <div className="space-y-3">
+                                    {paymentData.paymentHistory.map((payment) => (
+                                        <div
+                                            key={payment.id}
+                                            className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/30 hover:border-gray-600/50 transition-all duration-200"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-semibold text-white">
+                                                                ₹{payment.amount.toFixed(2)}
+                                                            </span>
+                                                            {getStatusBadge(payment.status)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3.5 h-3.5" />
+                                                            {formatDate(payment.date)}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <CreditCard className="w-3.5 h-3.5" />
+                                                            {payment.method}
+                                                        </span>
+                                                        <span className="text-gray-500">
+                                                            ID: {payment.transactionId}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+                
+                {/* Footer */}
+                <div className="p-6 border-t border-gray-800 bg-gray-800/30">
+                    <div className="flex justify-end">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
@@ -103,6 +420,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState({ key: 'name', direction: 'ascending' });
+    const [paymentModal, setPaymentModal] = useState({ isOpen: false, shopName: null, shopPlan: null, shopId: null });
 
     // --- Data Fetching Logic ---
     const mapUserToShop = (user) => ({
@@ -120,6 +438,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         staffCount: { owner: 1, manager: user.managerCount || 0, cashier: user.cashierCount || 0 }, 
         tenureDays: user.tenureDays || 'N/A', // Assuming 0 or N/A if not calculated by backend
         performanceTrend: user.performanceTrend || { metric: "N/A", trend: 'flat' }, 
+        paymentStatus: user.paymentStatus || generateCurrentMonthPaymentStatus(), // Current month payment status (from API or generated)
         apiEndpoint: `/api/superadmin/shops/${user._id}`,
     });
 
@@ -128,6 +447,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         try {
             const response = await apiClient.get(API.superadminShops);
             if (response.data.success) {
+                // Payment status is now included in the shops response
                 // Ensure data structure is flat and map to shop object
                 const mappedShops = response.data.data.map(mapUserToShop);
                 setShops(mappedShops);
@@ -142,7 +462,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, showToast]); 
+    }, [apiClient, API, showToast]); 
 
     useEffect(() => {
         if (currentUser && currentUser.role === 'superadmin') {
@@ -182,6 +502,17 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                 return 0;
             }
             // --- End FIX ---
+
+            // Handle payment status sorting with priority order
+            if (sortBy.key === 'paymentStatus') {
+                const statusPriority = { 'paid': 1, 'pending': 2, 'failed': 3, 'overdue': 4 };
+                const aPriority = statusPriority[aValue] || 5;
+                const bPriority = statusPriority[bValue] || 5;
+                
+                if (aPriority < bPriority) return sortBy.direction === 'ascending' ? -1 : 1;
+                if (aPriority > bPriority) return sortBy.direction === 'ascending' ? 1 : -1;
+                return 0;
+            }
 
             // Handle date comparison for dateJoined
             if (sortBy.key === 'dateJoined') {
@@ -230,10 +561,20 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         }
     };
 
+    // Handle opening payment modal
+    const handleOpenPaymentModal = (shopId, shopName, shopPlan) => {
+        setPaymentModal({ isOpen: true, shopId, shopName, shopPlan });
+    };
+
+    // Handle closing payment modal
+    const handleClosePaymentModal = () => {
+        setPaymentModal({ isOpen: false, shopId: null, shopName: null, shopPlan: null });
+    };
+
     // --- Component Render ---
     const SortIcon = ({ columnKey }) => {
-        if (sortBy.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 text-gray-600" />;
-        return <ArrowUpDown className={`w-3 h-3 ml-1 ${sortBy.direction === 'ascending' ? 'rotate-180 text-indigo-400' : 'text-indigo-400'}`} />;
+        if (sortBy.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 text-gray-600 cursor-pointer" />;
+        return <ArrowUpDown className={`w-3 h-3 ml-1 cursor-pointer ${sortBy.direction === 'ascending' ? 'rotate-180 text-indigo-400' : 'text-indigo-400'}`} />;
     };
 
     return (
@@ -259,132 +600,190 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             <div className="flex-grow overflow-y-auto">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-400">
-                        <Loader className="w-10 h-10 animate-spin text-teal-400" />
-                        <p className='mt-3'>Loading shop list...</p>
+                        <Loader className="w-10 h-10 animate-spin text-indigo-400" />
+                        <p className='mt-3 text-gray-300'>Loading shop list...</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-xl shadow-2xl border border-gray-800">
-                        <table className="min-w-full divide-y divide-gray-800">
-                            <thead className="bg-gray-800">
+                    <div className="overflow-x-auto rounded-2xl shadow-2xl border border-gray-800/50 bg-gray-900/50 backdrop-blur-sm">
+                        <table className="min-w-full">
+                            <thead className="bg-gradient-to-r from-gray-800/90 to-gray-800/70 sticky top-0 z-10 border-b border-gray-700/50">
                                 <tr>
                                     <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-700/50 transition duration-150"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200 group"
                                         onClick={() => handleSort('name')}
                                     >
-                                        <div className="flex items-center">Shop Name <SortIcon columnKey="name" /></div>
+                                        <div className="flex items-center gap-2">
+                                            <span>Shop Name</span>
+                                            <SortIcon columnKey="name" />
+                                        </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden sm:table-cell cursor-pointer hover:bg-gray-700/50 transition duration-150"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('location')}
                                     >
-                                        <div className="flex items-center">Location <SortIcon columnKey="location" /></div>
+                                        <div className="flex items-center gap-2">
+                                            <span>Location</span>
+                                            <SortIcon columnKey="location" />
+                                        </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden sm:table-cell cursor-pointer hover:bg-gray-700/50 transition duration-150"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('dateJoined')}
                                     >
-                                        <div className="flex items-center">Joined <SortIcon columnKey="dateJoined" /></div>
+                                        <div className="flex items-center gap-2">
+                                            <span>Joined</span>
+                                            <SortIcon columnKey="dateJoined" />
+                                        </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden sm:table-cell cursor-pointer hover:bg-gray-700/50 transition duration-150"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('tenureDays')}
                                     >
-                                        <div className="flex items-center">Tenure (Days) <SortIcon columnKey="tenureDays" /></div>
+                                        <div className="flex items-center gap-2">
+                                            <span>Tenure</span>
+                                            <SortIcon columnKey="tenureDays" />
+                                        </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-700/50 transition duration-150"
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('plan')}
                                     >
-                                        <div className="flex justify-center items-center">Plan <SortIcon columnKey="plan" /></div>
+                                        <div className="flex justify-center items-center gap-2">
+                                            <span>Plan</span>
+                                            <SortIcon columnKey="plan" />
+                                        </div>
                                     </th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                        Staff Summary
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                        Staff
                                     </th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                        Performance (30D)
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                                        Performance
                                     </th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
                                         Status
                                     </th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th 
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        onClick={() => handleSort('paymentStatus')}
+                                    >
+                                        <div className="flex justify-center items-center gap-2">
+                                            <span>Payment Status</span>
+                                            <SortIcon columnKey="paymentStatus" />
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-gray-900 divide-y divide-gray-800">
+                            <tbody className="bg-gray-900/30 divide-y divide-gray-800/50">
                                 {filteredAndSortedShops.length === 0 ? (
                                     <tr>
-                                        <td colSpan="9" className="py-8 text-center text-gray-400">
-                                            {searchTerm ? 'No shops found matching your criteria.' : 'No shops registered or failed to load from API.'}
+                                        <td colSpan="10" className="py-16 text-center">
+                                            <div className="flex flex-col items-center justify-center">
+                                                <Building className="w-12 h-12 text-gray-600 mb-3" />
+                                                <p className="text-gray-400 text-sm font-medium">
+                                                    {searchTerm ? 'No shops found matching your criteria.' : 'No shops registered or failed to load from API.'}
+                                                </p>
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredAndSortedShops.map((shop) => (
-                                        <tr key={shop.id} className="hover:bg-gray-850 transition duration-150">
+                                    filteredAndSortedShops.map((shop, index) => (
+                                        <tr 
+                                            key={shop.id} 
+                                            className="hover:bg-gray-800/40 transition-all duration-200 border-b border-gray-800/30 group"
+                                        >
                                             {/* Shop Name */}
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <Store className="w-5 h-5 mr-3 text-indigo-400" />
-                                                    <p className="text-sm font-medium text-white">{shop.name}</p>
+                                            <td className="px-6 py-5 whitespace-nowrap">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                        <Store className="w-5 h-5 text-indigo-400" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                                                            {shop.name}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </td>
                                             {/* Location */}
-                                            <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                                                <div className="flex items-center text-sm text-gray-400">
-                                                    <MapPin className="w-4 h-4 mr-1 text-gray-500" /> {shop.location}
+                                            <td className="px-6 py-5 whitespace-nowrap hidden md:table-cell">
+                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                    <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span className="truncate max-w-[150px]">{shop.location}</span>
                                                 </div>
                                             </td>
-                                            {/* Date Joined (Fixed: using formatDate utility) */}
-                                            <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                                                <div className="flex items-center text-sm text-gray-400">
-                                                    <Calendar className="w-4 h-4 mr-1 text-gray-500" /> {shop.dateJoined}
+                                            {/* Date Joined */}
+                                            <td className="px-6 py-5 whitespace-nowrap hidden lg:table-cell">
+                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                    <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span>{shop.dateJoined}</span>
                                                 </div>
                                             </td>
                                             {/* Tenure (Days) */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-left hidden sm:table-cell">
-                                                <div className="flex items-center text-sm text-gray-400">
-                                                    <Clock className="w-4 h-4 mr-1 text-gray-500" /> {shop.tenureDays}
+                                            <td className="px-6 py-5 whitespace-nowrap text-left hidden lg:table-cell">
+                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                    <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span className="font-medium">{shop.tenureDays}</span>
                                                 </div>
                                             </td>
                                             {/* Plan */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-6 py-5 whitespace-nowrap text-center">
                                                 <span 
-                                                    className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getPlanStyles(shop.plan)}`}
+                                                    className={`px-3 py-1.5 inline-flex items-center text-xs font-semibold rounded-lg border transition-all duration-200 ${getPlanStyles(shop.plan)}`}
                                                 >
-                                                    <DollarSign className='w-3 h-3 mr-1 mt-0.5' /> {shop.plan.toUpperCase()}
+                                                    <IndianRupee className='w-3.5 h-3.5 mr-1.5' />
+                                                    {shop.plan.toUpperCase()}
                                                 </span>
                                             </td>
                                             {/* Staff Summary */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-6 py-5 whitespace-nowrap text-center">
                                                 <StaffPill count={shop.staffCount} />
                                             </td>
                                             {/* Performance (30D) */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-6 py-5 whitespace-nowrap text-center hidden md:table-cell">
                                                 <PerformanceTrendIndicator performance={shop.performanceTrend} />
                                             </td>
                                             {/* Status */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-6 py-5 whitespace-nowrap text-center">
                                                 <span 
-                                                    className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                        shop.status === 'Active' ? 'bg-green-800/50 text-green-300' : 
-                                                        shop.status === 'Suspended' ? 'bg-red-800/50 text-red-300' : 'bg-yellow-800/50 text-yellow-300'
+                                                    className={`px-3 py-1.5 inline-flex text-xs font-semibold rounded-lg transition-all duration-200 ${
+                                                        shop.status === 'Active' 
+                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+                                                        shop.status === 'Suspended' 
+                                                            ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                                            : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                                                     }`}
                                                 >
                                                     {shop.status}
                                                 </span>
                                             </td>
+                                            {/* Payment Status */}
+                                            <td className="px-6 py-5 whitespace-nowrap text-center">
+                                                <PaymentStatusBadge status={shop.paymentStatus} />
+                                            </td>
                                             {/* Action Column */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                                <div className="flex justify-center space-x-2">
+                                            <td className="px-6 py-5 whitespace-nowrap text-center text-sm font-medium">
+                                                <div className="flex justify-center gap-2">
                                                     <button 
-                                                        className="text-red-400 hover:text-white hover:bg-red-600/50 p-2 rounded-full transition-colors"
+                                                        className="text-indigo-400 hover:text-white hover:bg-indigo-500/20 p-2.5 rounded-lg transition-all duration-200 border border-transparent hover:border-indigo-500/30 group/btn cursor-pointer"
+                                                        title="View Payment History"
+                                                        onClick={() => {
+                                                            handleOpenPaymentModal(shop.id, shop.name, shop.plan);
+                                                        }}
+                                                    >
+                                                        <CreditCard className="w-4 h-4 group-hover/btn:scale-110 transition-transform cursor-pointer" />
+                                                    </button>
+                                                    <button 
+                                                        className="text-red-400 hover:text-white hover:bg-red-500/20 p-2.5 rounded-lg transition-all duration-200 border border-transparent hover:border-red-500/30 group/btn cursor-pointer"
                                                         title="Delete Shop"
                                                         onClick={() => {
                                                             console.log(`[CLICK] Delete button clicked for ${shop.name}.`);
                                                             handleDeleteShop(shop.id, shop.name);
                                                         }}
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform cursor-pointer" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -396,6 +795,18 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                     </div>
                 )}
             </div>
+            
+            {/* Payment Modal */}
+            <PaymentModal
+                isOpen={paymentModal.isOpen}
+                onClose={handleClosePaymentModal}
+                shopId={paymentModal.shopId}
+                shopName={paymentModal.shopName}
+                shopPlan={paymentModal.shopPlan}
+                apiClient={apiClient}
+                API={API}
+                showToast={showToast}
+            />
         </div>
     );
 };

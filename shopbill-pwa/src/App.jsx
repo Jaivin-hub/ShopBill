@@ -18,6 +18,9 @@ import ResetPassword from './components/ResetPassword';
 import StaffSetPassword from './components/StaffSetPassword'; 
 import SalesActivityPage from './components/SalesActivityPage'; 
 import UserManagement from './components/UserManagement'; // <-- IMPORTED NEW COMPONENT
+import SuperAdminDashboard from './components/superAdminDashboard'; // <-- IMPORTED SUPERADMIN DASHBOARD
+import SystemConfig from './components/SystemConfig'; // <-- IMPORTED SYSTEM CONFIG
+import GlobalReport from './components/GlobalReport'; // <-- IMPORTED GLOBAL REPORT
 
 
 // --- Configuration and Constants ---
@@ -73,7 +76,7 @@ const UTILITY_NAV_ITEMS_CONFIG = [
 // --- SUPERADMIN NAVIGATION CONFIG ---
 const SUPERADMIN_NAV_ITEMS = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_users', name: 'Manage Users', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
@@ -270,7 +273,10 @@ useEffect(() => {
     
     switch (currentPage) {
       case 'dashboard':
-        return (
+        // Show SuperAdminDashboard for superadmin, regular Dashboard for others
+        return userRole === USER_ROLES.SUPERADMIN ? (
+            <SuperAdminDashboard {...commonProps} />
+        ) : (
             <Dashboard 
                 {...commonProps} 
                 onViewAllSales={handleViewAllSales}
@@ -288,7 +294,12 @@ useEffect(() => {
             ? <InventoryManager {...commonProps} />
             : <div className="p-8 text-center text-gray-400">Superadmin: Access to Inventory via system tools.</div>;
       case 'reports':
-        return <Reports {...commonProps} />;
+        // Show GlobalReport for superadmin, regular Reports for others
+        return userRole === USER_ROLES.SUPERADMIN ? (
+            <GlobalReport {...commonProps} />
+        ) : (
+            <Reports {...commonProps} />
+        );
       case 'salesActivity':
         return <SalesActivityPage {...commonProps} />;
       case 'settings':
@@ -302,17 +313,21 @@ useEffect(() => {
       case 'superadmin_users':
         return <UserManagement {...commonProps} />; // <-- Renders the new component
       case 'superadmin_systems':
-        return <div className="p-8 text-center text-gray-200">System Configuration Interface (SUPERADMIN)</div>;
+        return <SystemConfig {...commonProps} />; // <-- Renders System Config component
       // --- END NEW SUPERADMIN ROUTES ---
         
       default:
-        // Default to Dashboard for all roles
-        return <Dashboard 
-            {...commonProps}
-            onViewAllSales={handleViewAllSales}
-            onViewAllCredit={handleViewAllCredit}
-            onViewAllInventory={handleViewAllInventory}
-        />;
+        // Default to Dashboard for all roles (SuperAdminDashboard for superadmin)
+        return userRole === USER_ROLES.SUPERADMIN ? (
+            <SuperAdminDashboard {...commonProps} />
+        ) : (
+            <Dashboard 
+                {...commonProps}
+                onViewAllSales={handleViewAllSales}
+                onViewAllCredit={handleViewAllCredit}
+                onViewAllInventory={handleViewAllInventory}
+            />
+        );
     }
   };
 

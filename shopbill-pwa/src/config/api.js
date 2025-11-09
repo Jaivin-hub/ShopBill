@@ -33,6 +33,10 @@ const API = {
     superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)
     superadminShopDetails: (id) => `${API_BASE_URL}/superadmin/shops/${id}`, // GET (Single Shop), PUT (Update Shop), DELETE (Delete Shop)
     superadminConfig: API_BASE_URL + '/superadmin/config',         // GET (System Config), PUT (Update Config)
+    superadminDashboard: API_BASE_URL + '/superadmin/dashboard',   // GET (Dashboard Stats)
+    superadminReports: API_BASE_URL + '/superadmin/reports',        // GET (Global Reports)
+    superadminShopPayments: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payments`, // GET (Payment History)
+    superadminShopPaymentStatus: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payment-status`, // GET (Payment Status)
     // ------------------------------------------
 }
 
