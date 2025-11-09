@@ -28,13 +28,45 @@ router.get('/shops', superadminProtect, async (req, res) => {
         const shops = await User.find({ role: 'owner' }).select('-password -resetPasswordToken -resetPasswordExpire');
 
         if (!shops.length) {
-            return res.status(200).json({ message: 'No shops registered yet.', data: [] });
+            return res.status(200).json({ success: true, message: 'No shops registered yet.', data: [] });
         }
+        
+        // Enhance shop data with calculated tenure and mock performance (30D)
+        const shopsWithDetails = shops.map(shop => {
+            // Calculate tenure in days using the Mongoose 'createdAt' timestamp
+            // --- CORE LOGIC FOR TENURE ---
+            const daysActive = Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+            // ----------------------------
+            
+            // Mocking Performance Trend (0: flat, 1: up, 2: down)
+            const trendValue = Math.floor(Math.random() * 3); 
+            let trendType = 'flat';
+            if (trendValue === 1) trendType = 'up';
+            else if (trendValue === 2) trendType = 'down';
+
+            // Mock performance metric (e.g., Revenue change)
+            const performanceMetric = (Math.random() * 10).toFixed(2) + '%';
+            
+            return {
+                ...shop.toObject(), // Convert Mongoose document to plain object
+                // Injecting the requested fields for the frontend table:
+                dateJoined: shop.createdAt.toISOString().split('T')[0], // YYYY-MM-DD for reliable date sorting
+                tenureDays: daysActive, // 🚀 This is the field the frontend needs
+                performanceTrend: { metric: performanceMetric, trend: trendType },
+                // Add sensible defaults for other missing fields needed by the frontend, 
+                // e.g., plan, managerCount, cashierCount, location, if they aren't on the User model
+                plan: 'Basic', // Default to Basic
+                managerCount: 1, // Mock manager count
+                cashierCount: 3, // Mock cashier count
+                location: 'City, State', // Mock location
+            };
+        });
+
 
         res.json({ 
             success: true, 
-            count: shops.length,
-            data: shops
+            count: shopsWithDetails.length,
+            data: shopsWithDetails
         });
         
     } catch (error) {
@@ -42,6 +74,7 @@ router.get('/shops', superadminProtect, async (req, res) => {
         res.status(500).json({ error: 'Server error retrieving shop list.' });
     }
 });
+
 
 /**
  * @route GET /api/superadmin/shops/:id
@@ -70,6 +103,7 @@ router.get('/shops/:id', superadminProtect, async (req, res) => {
         res.status(500).json({ success: false, error: 'Server error retrieving shop details.' });
     }
 });
+
 
 
 /**
@@ -108,6 +142,7 @@ router.delete('/shops/:id', superadminProtect, async (req, res) => {
         res.status(500).json({ success: false, error: 'Server error during shop deletion.' });
     }
 });
+
 
 
 /**
