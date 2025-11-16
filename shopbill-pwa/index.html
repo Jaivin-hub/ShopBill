@@ -13,9 +13,10 @@
     <title>Pocket POS</title>
     
     <script>
-      // Checks for 'darkMode' in localStorage. If it's 'false', it means light mode.
-      // Otherwise (true/undefined/null), we default to dark mode.
-      const isDarkMode = localStorage.getItem('darkMode') !== 'false';
+      // Checks for 'darkMode' in localStorage. Reads JSON boolean value.
+      // Defaults to light mode (false) if not set.
+      const saved = localStorage.getItem('darkMode');
+      const isDarkMode = saved ? JSON.parse(saved) : false;
       const html = document.documentElement;
 
       if (isDarkMode) {

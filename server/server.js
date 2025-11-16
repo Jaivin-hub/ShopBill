@@ -18,7 +18,9 @@ const reportRoutes = require('./routes/reportRoutes');
 const notificationRoutes = require('./routes/notificationRoutes'); 
 const staffRoutes = require('./routes/staffRoutes');
 // 💥 NEW: Import Superadmin Routes
-const superadminRoutes = require('./routes/superadminRoutes'); 
+const superadminRoutes = require('./routes/superadminRoutes');
+// 💥 NEW: Import User Routes (for plan management)
+const userRoutes = require('./routes/userRoutes'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +43,10 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// 💥 NEW: USER ROUTES: Mount the router at /api/user
+// This contains plan management and user-specific operations
+app.use('/api/user', userRoutes);
 
 // 💥 NEW: SUPERADMIN ROUTES: Mount the router at /api/superadmin
 // This will contain logic for shop creation, user listing, system configuration, etc.

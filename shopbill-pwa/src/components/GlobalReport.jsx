@@ -227,7 +227,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-indigo-400" />
                 <p className='mt-3 text-gray-300'>Loading global reports...</p>
             </div>
@@ -247,7 +247,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     const maxRevenue = Math.max(...chartData.map(d => d.revenue));
     
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto">
+        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300 overflow-y-auto">
             {/* Header */}
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">

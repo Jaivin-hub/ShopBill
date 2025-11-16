@@ -39,11 +39,11 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 
     return (
         <>
-            <h2 className="text-3xl font-extrabold text-white text-center mb-6">
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white text-center mb-6">
                 Welcome Back
             </h2>
             {authError && (
-                <div className="p-3 mb-4 text-sm text-red-100 bg-red-800 rounded-lg text-center" role="alert">
+                <div className="p-3 mb-4 text-sm text-red-100 dark:text-red-100 bg-red-600 dark:bg-red-800 rounded-lg text-center" role="alert">
                     {authError}
                 </div>
             )}
@@ -52,7 +52,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                 <input
                     type="text"
                     placeholder="Email Address or Phone Number"
-                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 border-gray-600`}
+                    className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 border-gray-300 dark:border-gray-600`}
                     // Use identifier state and setIdentifier handler
                     onChange={(e) => setIdentifier(e.target.value)}
                     value={identifier}
@@ -66,7 +66,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                     <input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Password"
-                        className="w-full pr-12 px-4 py-3 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                        className="w-full pr-12 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                         onChange={(e) => setPassword(e.target.value)}
                         value={password}
                         required
@@ -75,7 +75,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-indigo-400 transition duration-150"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition duration-150"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -104,11 +104,11 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
             </form>
 
             {/* Switch View */}
-            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
+            <p className="text-center text-gray-600 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700/50">
                 New to Pocket POS?
                 <button
                     onClick={() => setView('signup')}
-                    className="ml-2 cursor-pointer text-teal-400 hover:text-teal-300 font-bold transition duration-150"
+                    className="ml-2 cursor-pointer text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-bold transition duration-150"
                     disabled={loading}
                 >
                     Create Account
@@ -240,11 +240,11 @@ const SignupForm = ({
 
     return (
         <>
-            <h2 className="text-3xl font-extrabold text-white text-center mb-6">
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white text-center mb-6">
                 Get Started Free
             </h2>
             {authError && (
-                <div className="p-3 mb-4 text-sm text-red-100 bg-red-800 rounded-lg text-center" role="alert">
+                <div className="p-3 mb-4 text-sm text-red-100 dark:text-red-100 bg-red-600 dark:bg-red-800 rounded-lg text-center" role="alert">
                     {authError}
                 </div>
             )}
@@ -252,8 +252,8 @@ const SignupForm = ({
 
                 {/* 1. Phone Input (Custom Implementation with Searchable Dropdown) */}
                 <div className={`
-                    w-full flex rounded-lg transition duration-150 bg-gray-700
-                    ${phoneError ? 'border border-red-500' : 'border border-gray-600'}
+                    w-full flex rounded-lg transition duration-150 bg-gray-50 dark:bg-gray-700
+                    ${phoneError ? 'border border-red-500' : 'border border-gray-300 dark:border-gray-600'}
                     focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500
                 `} ref={dropdownRef}>
                     
@@ -263,16 +263,16 @@ const SignupForm = ({
                             type="button"
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             className={`
-                                bg-gray-700 text-gray-200 py-3 pl-3 pr-2 border-r border-gray-600 
+                                bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-3 pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
                                 focus:outline-none rounded-l-lg cursor-pointer flex items-center justify-between
                                 w-auto min-w-[70px] max-w-[110px] sm:min-w-[80px] sm:max-w-[120px] 
-                                text-sm truncate hover:bg-gray-600 transition duration-150
-                                ${isDropdownOpen ? 'bg-gray-600' : ''}
+                                text-sm truncate hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150
+                                ${isDropdownOpen ? 'bg-gray-200 dark:bg-gray-600' : ''}
                             `}
                             disabled={countryCodes.length === 0}
                         >
                             {countryCodes.length === 0 ? (
-                                <span className="text-gray-400">...</span>
+                                <span className="text-gray-500 dark:text-gray-400">...</span>
                             ) : (
                                 <>
                                     <span>{selectedCountry?.flag}</span>
@@ -284,14 +284,14 @@ const SignupForm = ({
                         
                         {/* Dropdown Panel with Search */}
                         {isDropdownOpen && countryCodes.length > 0 && (
-                            <div className="absolute z-10 top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-gray-700 rounded-lg shadow-xl border border-indigo-500/50">
+                            <div className="absolute z-10 top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
                                 
                                 {/* Search Input */}
-                                <div className="p-2 sticky top-0 bg-gray-700 border-b border-gray-600 z-20">
+                                <div className="p-2 sticky top-0 bg-white dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 z-20">
                                     <input
                                         type="text"
                                         placeholder="Search country or code..."
-                                        className="w-full px-3 py-2 bg-gray-800 text-gray-200 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 text-sm"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 text-sm"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         // Auto-focus the search bar when the dropdown opens
@@ -308,16 +308,16 @@ const SignupForm = ({
                                                 key={code}
                                                 className={`
                                                     p-2 text-sm rounded-md cursor-pointer flex justify-between items-center
-                                                    ${code === dialCode ? 'bg-indigo-600 text-white' : 'text-gray-200 hover:bg-gray-600'}
+                                                    ${code === dialCode ? 'bg-indigo-600 text-white' : 'text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600'}
                                                 `}
                                                 onClick={() => handleSelectCountry(code)}
                                             >
                                                 <span className="font-medium truncate">{flag} {name}</span>
-                                                <span className={`${code === dialCode ? 'font-bold' : 'text-gray-400'}`}>{code}</span>
+                                                <span className={`${code === dialCode ? 'font-bold' : 'text-gray-600 dark:text-gray-400'}`}>{code}</span>
                                             </li>
                                         ))
                                     ) : (
-                                        <li className="p-2 text-sm text-gray-400 text-center">No countries found.</li>
+                                        <li className="p-2 text-sm text-gray-600 dark:text-gray-400 text-center">No countries found.</li>
                                     )}
                                 </ul>
                             </div>
@@ -352,7 +352,7 @@ const SignupForm = ({
                 <input
                     type="text"
                     placeholder="Email Address (Lowercase, no spaces)"
-                    className={`w-full px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-600'}`}
+                    className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     onChange={(e) => handleEmailChange(e.target.value)}
                     onBlur={handleEmailBlur}
                     value={email}
@@ -369,7 +369,7 @@ const SignupForm = ({
                     <input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Password (Min 8 characters)"
-                        className={`w-full pr-12 px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${passwordError ? 'border-red-500' : 'border-gray-600'}`}
+                        className={`w-full pr-12 px-4 py-3 bg-gray-50 dark:bg-gray-700 border text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                         onChange={handlePasswordChange}
                         onBlur={handlePasswordBlur}
                         value={password}
@@ -379,7 +379,7 @@ const SignupForm = ({
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-indigo-400 transition duration-150"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition duration-150"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -405,7 +405,7 @@ const SignupForm = ({
             </form>
 
             {/* Switch View */}
-            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
+            <p className="text-center text-gray-600 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700/50">
                 Already have an account?
                 <button
                     onClick={() => setView('login')}
@@ -478,7 +478,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
             </form>
 
             {/* Switch View */}
-            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-700/50">
+            <p className="text-center text-gray-600 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700/50">
                 <button
                     onClick={() => setView('login')}
                     className="ml-2 cursor-pointer text-indigo-400 hover:text-indigo-300 font-bold transition duration-150"
@@ -826,13 +826,13 @@ const Login = ({ onLogin, onBackToLanding }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
-            <div className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4 font-inter">
+            <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl dark:shadow-indigo-900/50 border border-gray-200 dark:border-gray-700">
 
                 {/* Logo */}
                 <div className="text-center mb-4">
                     <DollarSign className="w-12 h-12 text-indigo-500 mx-auto" />
-                    <h1 className="text-3xl font-extrabold text-white">Pocket POS</h1>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Pocket POS</h1>
                 </div>
 
                 {/* Render the appropriate form */}
@@ -842,7 +842,7 @@ const Login = ({ onLogin, onBackToLanding }) => {
                 <div className="text-center text-sm mt-8">
                     <button
                         onClick={onBackToLanding}
-                        className="cursor-pointer text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
+                        className="cursor-pointer text-gray-600 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
                         disabled={loading}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M19 12H5" /><polyline points="12 19 5 12 12 5" /></svg>

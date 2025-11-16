@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { 
     User, Lock, Moon, Sun, Cloud, Globe, Check, Server, Bell, 
     RefreshCw, Trash2, Users, LogOut, ArrowLeft, UploadCloud, 
-    CheckCircle, XCircle, Link, Slash, Mail
+    CheckCircle, XCircle, Link, Slash, Mail, Crown
 } from 'lucide-react'; 
 // Assuming these are imported from sibling components/files
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
 import StaffPermissionsManager from './StaffPermissionsManager';
 import ChangePasswordForm from './ChangePasswordForm';
+import PlanUpgrade from './PlanUpgrade';
 import API from '../config/api';
 
 // --- UPDATED MODAL: Cloud Upload Confirmation (No changes here) ---
@@ -34,7 +35,7 @@ const CloudUploadConfirmationModal = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+        <div className="fixed inset-0 bg-black/60 dark:bg-gray-900/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
             <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 transform transition-transform duration-300">
                 <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-indigo-100 dark:bg-indigo-900/40 rounded-t-xl">
                     <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300 flex items-center"><UploadCloud className="w-5 h-5 mr-2" /> Cloud Backup Confirmation</h2> 
@@ -180,11 +181,17 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
     // Placeholder handlers (Log out, Password, etc. - Unchanged)
-    const handleToggleDarkMode = () => { if (toggleDarkMode) { toggleDarkMode(); } };
+    const handleToggleDarkMode = () => { 
+        if (toggleDarkMode) { 
+            toggleDarkMode(); 
+            showToast(isDarkMode ? 'Switched to light mode' : 'Switched to dark mode', 'success');
+        } 
+    };
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
     const handleBackup = () => console.log("Data backup initiated (Mock API call).");
     const handleStaffPermissionsClick = () => setCurrentView('staff');
     const handleChangePasswordClick = () => setCurrentView('password');
+    const handlePlanUpgradeClick = () => setCurrentView('plan');
     
     // 🌟 UPDATED: Fully functional handleWipeLocalData
     const handleWipeLocalData = () => { 
@@ -402,21 +409,43 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                     <User className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Account & User Management
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                    {currentUser?.role?.toLowerCase() === 'owner' && (
+                        <SettingItem 
+                            icon={Crown} 
+                            title="Upgrade Plan" 
+                            description="Upgrade or change your subscription plan to unlock more features." 
+                            onClick={handlePlanUpgradeClick} 
+                            accentColor="text-yellow-600 dark:text-yellow-400"
+                        />
+                    )}
                     <SettingItem icon={Users} title="Staff & Permissions" description="Add, edit, or remove staff members and define their access roles." onClick={handleStaffPermissionsClick} accentColor="text-indigo-600 dark:text-indigo-400" />
                     <SettingItem icon={Lock} title="Change Password" description="Update your owner/admin login credentials securely." onClick={handleChangePasswordClick} accentColor="text-red-600 dark:text-red-400"/>
                     <SettingItem icon={LogOut} title="Log Out" description="Securely log out of your current session." onClick={handleLogout} accentColor="text-red-600 dark:text-red-500" />
                 </div>
             </section>
             
-            {/* 2. App Preferences Section (Unchanged) */}
-            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* 2. App Preferences Section */}
+            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
                     <Globe className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> App Preferences
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                    <SettingItem icon={Bell} title="Notifications" description="Enable or disable in-app toast notifications." actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} />} accentColor="text-blue-600 dark:text-blue-400" />
+                    <SettingItem 
+                        icon={isDarkMode ? Moon : Sun} 
+                        title="Dark Mode" 
+                        description={isDarkMode ? "Switch to light mode for a brighter interface." : "Switch to dark mode for a comfortable viewing experience."} 
+                        actionComponent={<ToggleSwitch checked={isDarkMode} onChange={handleToggleDarkMode} />} 
+                        accentColor={isDarkMode ? "text-indigo-600 dark:text-indigo-400" : "text-yellow-600 dark:text-yellow-400"} 
+                    />
+                    <SettingItem 
+                        icon={Bell} 
+                        title="Notifications" 
+                        description="Enable or disable in-app toast notifications." 
+                        actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} />} 
+                        accentColor="text-blue-600 dark:text-blue-400" 
+                    />
                 </div>
-            </section> */}
+            </section>
 
             {/* 3. Data Management Section */}
             {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
@@ -486,6 +515,8 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} />;
             case 'staff':
                 return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} setConfirmModal={setConfirmModal} />;
+            case 'plan':
+                return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={() => setCurrentView('main')} />;
             case 'main':
             default:
                 return renderSettingsList();

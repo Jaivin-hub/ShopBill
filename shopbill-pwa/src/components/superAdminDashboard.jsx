@@ -96,7 +96,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
     const colorClass = colorClasses[color] || colorClasses.indigo;
     
     return (
-        <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200">
+        <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600/50 transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
                 <div className={`w-12 h-12 rounded-lg ${colorClass} flex items-center justify-center border`}>
                     <Icon className="w-6 h-6" />
@@ -111,7 +111,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
                 )}
             </div>
             <div>
-                <p className="text-sm font-medium text-gray-400 mb-1">{title}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
                 <div className="flex items-baseline gap-1">
                     {unit && <span className="text-lg text-gray-500">{unit}</span>}
                     <h3 className="text-2xl font-bold text-white">{value}</h3>
@@ -150,37 +150,46 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
     
     // Fetch dashboard data
     const fetchDashboardData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const response = await apiClient.get(API.superadminDashboard);
-            if (response.data.success) {
-                const apiData = response.data.data;
-                // Generate recent activity (mock for now - would need activity log)
-                const now = new Date();
-                const recentActivity = [
-                    { type: 'shop_created', shop: 'New Shop', time: new Date(now - 2 * 60 * 60 * 1000), status: 'success' },
-                    { type: 'payment_received', shop: 'Shop Payment', amount: 6999, time: new Date(now - 5 * 60 * 60 * 1000), status: 'success' },
-                ];
-                
-                // Use API data, add recentActivity if not present
-                setDashboardData({
-                    ...apiData,
-                    recentActivity: apiData.recentActivity || recentActivity,
-                    // monthlyTrend should come from API now
-                });
-            } else {
-                throw new Error(response.data.message || 'Failed to load dashboard data');
-            }
-        } catch (error) {
-            console.error('Failed to load dashboard data:', error);
-            // Fallback to dummy data on error
-            const data = generateDummyDashboardData();
-            setDashboardData(data);
-            showToast('Using cached data. API connection failed.', 'warning');
-        } finally {
-            setIsLoading(false);
+    setIsLoading(true);
+    try {
+        // Fetch dashboard stats and recent activity in parallel. Recent activity failure is non-fatal.
+        const [dashResp, activityResp] = await Promise.all([
+            apiClient.get(API.superadminDashboard),
+            apiClient.get(API.superadminRecentActivity).catch(() => null)
+        ]);
+
+        if (!dashResp || !dashResp.data || !dashResp.data.success) {
+            throw new Error((dashResp && dashResp.data && dashResp.data.message) || 'Failed to load dashboard data');
         }
-    }, [apiClient, API, showToast]);
+
+        const apiData = dashResp.data.data || {};
+        const activityData = activityResp && activityResp.data && activityResp.data.success ? activityResp.data.data : null;
+
+        // Fallback activity if API doesn't provide any
+        const now = new Date();
+        const fallbackActivity = [
+            { type: 'shop_created', shop: 'New Shop', time: new Date(now.getTime() - 2 * 60 * 60 * 1000), status: 'success' },
+            { type: 'payment_received', shop: 'Shop Payment', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
+        ];
+
+        setDashboardData({
+            ...apiData,
+            recentActivity: Array.isArray(apiData.recentActivity)
+                ? apiData.recentActivity
+                : Array.isArray(activityData)
+                    ? activityData
+                    : fallbackActivity,
+        });
+    } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        // Fallback to dummy data on error
+        const data = generateDummyDashboardData();
+        setDashboardData(data);
+        if (typeof showToast === 'function') showToast('Using cached data. API connection failed.', 'warning');
+    } finally {
+        setIsLoading(false);
+    }
+}, [apiClient, API, showToast]);
     
     useEffect(() => {
         if (currentUser && currentUser.role === 'superadmin') {
@@ -190,9 +199,9 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
     
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-indigo-400" />
-                <p className='mt-3 text-gray-300'>Loading dashboard data...</p>
+                <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading dashboard data...</p>
             </div>
         );
     }
@@ -207,20 +216,20 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
     }
     
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto">
+        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300 overflow-y-auto">
             {/* Header */}
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
                         <Shield className="w-8 h-8 text-indigo-400" />
                         Super Admin Dashboard
                     </h1>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <Calendar className="w-4 h-4" />
                         <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                 </div>
-                <p className="text-gray-400">Overview of all shops, revenue, and system metrics</p>
+                <p className="text-gray-600 dark:text-gray-400">Overview of all shops, revenue, and system metrics</p>
             </div>
             
             {/* Key Metrics Grid */}
@@ -268,9 +277,9 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             {/* Secondary Metrics and Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Plan Distribution */}
-                <div className="lg:col-span-2 bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                <div className="lg:col-span-2 bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <PieChart className="w-5 h-5 text-indigo-400" />
                             Plan Distribution
                         </h2>
@@ -278,7 +287,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     <div className="space-y-4">
                         {dashboardData.planDistribution && Object.entries(dashboardData.planDistribution).map(([plan, data]) => {
                             const planColors = {
-                                basic: 'bg-gray-500/20 border-gray-500/30 text-gray-300',
+                                basic: 'bg-gray-500/20 border-gray-500/30 text-gray-700 dark:text-gray-300',
                                 pro: 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300',
                                 enterprise: 'bg-purple-500/20 border-purple-500/30 text-purple-300',
                             };
@@ -295,11 +304,11 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                             <span className={`px-3 py-1 rounded-lg text-xs font-semibold border ${planColors[plan]}`}>
                                                 {planNames[plan]}
                                             </span>
-                                            <span className="text-sm text-gray-400">{data.count || 0} shops</span>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">{data.count || 0} shops</span>
                                         </div>
-                                        <span className="text-sm font-semibold text-white">{formatCurrency(data.revenue || 0)}/mo</span>
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(data.revenue || 0)}/mo</span>
                                     </div>
-                                    <div className="w-full bg-gray-700/30 rounded-full h-2">
+                                    <div className="w-full bg-gray-200 dark:bg-gray-700/30 rounded-full h-2">
                                         <div
                                             className={`h-2 rounded-full transition-all duration-500 ${
                                                 plan === 'basic' ? 'bg-gray-500' :
@@ -316,8 +325,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                 </div>
                 
                 {/* Payment Status Overview */}
-                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                         <CreditCard className="w-5 h-5 text-indigo-400" />
                         Payment Status
                     </h2>
@@ -327,7 +336,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                 <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
                                     <div className="flex items-center gap-2">
                                         <CheckCircle className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm text-gray-300">Paid</span>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">Paid</span>
                                     </div>
                                     <span className="text-sm font-semibold text-green-400">{dashboardData.paymentStatus.paid || 0}</span>
                                 </div>
@@ -361,8 +370,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             {/* Monthly Revenue Trend and Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Monthly Revenue Trend */}
-                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                         <BarChart3 className="w-5 h-5 text-indigo-400" />
                         Monthly Revenue Trend
                     </h2>
@@ -374,8 +383,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                 
                                 return (
                                     <div key={index} className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-400 w-12">{item.month}</span>
-                                        <div className="flex-1 bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
+                                        <span className="text-xs text-gray-600 dark:text-gray-400 w-12">{item.month}</span>
+                                        <div className="flex-1 bg-gray-200 dark:bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
                                             <div
                                                 className="h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                                                 style={{ width: `${percentage}%` }}
@@ -389,14 +398,14 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                 );
                             })
                         ) : (
-                            <p className="text-sm text-gray-400 text-center py-4">No revenue data available</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">No revenue data available</p>
                         )}
                     </div>
                 </div>
                 
                 {/* Recent Activity */}
-                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                         <Activity className="w-5 h-5 text-indigo-400" />
                         Recent Activity
                     </h2>
@@ -445,7 +454,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                         {getActivityIcon()}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-gray-300 truncate">{getActivityText()}</p>
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{getActivityText()}</p>
                                         <p className="text-xs text-gray-500 mt-0.5">{formatTimeAgo(activity.time)}</p>
                                     </div>
                                 </div>
@@ -457,7 +466,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             
             {/* System Health & Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center justify-center">
                             <Server className="w-5 h-5 text-green-400" />
@@ -473,7 +482,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     </div>
                 </div>
                 
-                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
                             <Database className="w-5 h-5 text-blue-400" />
@@ -489,7 +498,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     </div>
                 </div>
                 
-                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
+                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
                             <Zap className="w-5 h-5 text-purple-400" />

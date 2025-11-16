@@ -17,7 +17,7 @@ const initialNewCustomerState = {
 // Helper component for form inputs
 const InputField = ({ label, name, type, value, onChange, dark, error, disabled, ...props }) => (
   <div>
-    <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
+    <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
       {label}
     </label>
     <input
@@ -27,7 +27,7 @@ const InputField = ({ label, name, type, value, onChange, dark, error, disabled,
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={`w-full p-3 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 ${error ? 'border-2 border-red-500' : 'border border-gray-600'
+      className={`w-full p-3 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200 ${error ? 'border-2 border-red-500' : 'border border-gray-300 dark:border-gray-600'
         } ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
       {...props}
     />
@@ -92,15 +92,15 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
 
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-gray-800 w-full max-w-lg rounded-xl shadow-2xl border border-indigo-700 transform transition-all duration-300 my-8">
+        <div className="fixed inset-0 bg-black/60 dark:bg-gray-900/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-xl shadow-2xl border border-gray-200 dark:border-indigo-700 transform transition-all duration-300 my-8">
                 
                 {/* Header */}
-                <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
-                    <h2 className="text-xl font-bold text-indigo-300 flex items-center">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-indigo-100 dark:bg-indigo-900/40 rounded-t-xl">
+                    <h2 className="text-xl font-bold text-indigo-700 dark:text-indigo-300 flex items-center">
                         <History className="w-5 h-5 mr-2" /> Khata Ledger
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700 transition">
+                    <button onClick={onClose} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -109,18 +109,18 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                 <div className="p-4 space-y-4">
                     
                     {/* Customer Name and Current Due */}
-                    <div className="flex justify-between items-center border-b border-gray-700 pb-2">
-                        <p className="text-lg font-bold text-white truncate">
+                    <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2">
+                        <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                             {customer.name}
                         </p>
                         <span className="text-red-400 text-2xl font-extrabold flex items-center">
                             ₹{customer.outstandingCredit?.toFixed(0) || '0'}
-                            <span className="text-sm text-gray-400 ml-1">Due</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">Due</span>
                         </span>
                     </div>
 
                     {/* Transaction List Area */}
-                    <div className="h-96 overflow-y-auto p-2 bg-gray-900 rounded-lg border border-gray-700">
+                    <div className="h-96 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
                         {isLoading && (
                             <div className="flex justify-center items-center h-full min-h-[inherit]">
                                 <Loader className="w-6 h-6 animate-spin text-indigo-400" />
@@ -134,7 +134,7 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                         )}
 
                         {!isLoading && history.length === 0 && !error && (
-                            <div className="text-gray-400 p-4 text-center italic">
+                            <div className="text-gray-600 dark:text-gray-400 p-4 text-center italic">
                                 <History className='w-8 h-8 mx-auto mb-3'/>
                                 <p>No transactions recorded yet.</p>
                             </div>
@@ -153,8 +153,8 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                                                 {styles.icon}
                                             </div>
                                             <div className="flex-grow min-w-0">
-                                                <p className="font-medium text-white text-sm truncate">{styles.label}</p>
-                                                <p className="text-xs text-gray-400">{formatDate(t.timestamp)}</p>
+                                                <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{styles.label}</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">{formatDate(t.timestamp)}</p>
                                                 {t.details && t.details !== 'N/A' && (
                                                     <p className="text-xs text-gray-300 mt-1 italic truncate">{t.details}</p>
                                                 )}
@@ -523,7 +523,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
 
   return (
     // Outer container: Full height, dark background, and a max-width for better desktop design.
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-4 md:p-6 lg:p-8 flex flex-col items-center">
+    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-200 p-4 md:p-6 lg:p-8 flex flex-col items-center">
       
       {/* Content wrapper with max-width for alignment */}
       <div className="w-full max-w-4xl">
@@ -533,23 +533,23 @@ const Ledger = ({ apiClient, API, showToast }) => {
             {/* Conditional rendering for title/caption vs. search */}
             {isSearchVisible ? (
                 <div className='flex items-center space-x-2'>
-                    <h1 className="text-3xl font-extrabold text-white-300 mb-1">Search Khata</h1>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1">Search Khata</h1>
                 </div>
             ) : (
                 <>
-                    <h1 className="text-3xl font-extrabold text-white-300 mb-1">Khata Ledger</h1>
-                    <p className="text-gray-400">Manage all outstanding customer credit accounts.</p>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1">Khata Ledger</h1>
+                    <p className="text-gray-600 dark:text-gray-400">Manage all outstanding customer credit accounts.</p>
                 </>
             )}
         </div>
 
         {/* 2. Dashboard Header Panel (Matching POS Total/Pay block) */}
-        <div className="p-4 md:p-6 bg-gray-900 rounded-xl mb-6 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
+        <div className="p-4 md:p-6 bg-gray-100 dark:bg-gray-900 rounded-xl mb-6 border border-indigo-300 dark:border-indigo-700 shadow-2xl dark:shadow-indigo-900/10">
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center space-y-4 md:space-y-0 md:space-x-4">
                 
                 {/* Total Outstanding Display */}
                 <div className="flex-1 p-3 py-4 bg-red-900/40 rounded-xl border border-red-700 flex items-center justify-between shadow-inner">
-                    <span className="text-xl font-bold text-white flex items-center">
+                    <span className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
                         <TrendingUp className='w-5 h-5 mr-2 text-red-300' /> Total Outstanding:
                     </span>
                     <span className="text-red-400 text-3xl font-extrabold">

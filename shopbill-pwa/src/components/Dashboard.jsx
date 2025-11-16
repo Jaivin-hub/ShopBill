@@ -121,19 +121,19 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   if (!isOwner) {
     return (
-      // Access Denied (Dark Mode Only)
-      <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300">
+      // Access Denied
+      <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-white dark:bg-gray-950 transition-colors duration-300">
         <AlertTriangle className="w-12 h-12 text-indigo-400 mb-4" />
-        <h2 className="text-xl font-semibold text-white">Access Denied</h2>
-        <p className="text-gray-400">You do not have permission to view the main dashboard. Please proceed to the Billing screen.</p>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Access Denied</h2>
+        <p className="text-gray-600 dark:text-gray-400">You do not have permission to view the main dashboard. Please proceed to the Billing screen.</p>
       </div>
     );
   }
 
   if (isLoading) {
-    // Initial Loading (Dark Mode Only)
+    // Initial Loading
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
         <Loader className="w-10 h-10 animate-spin text-teal-400" />
         <p className='mt-3'>Loading dashboard summary data...</p>
       </div>
@@ -142,12 +142,12 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   // **CHANGE HERE**: Removed unnecessary padding/margin classes from the main container
   return (
-    <div className="flex flex-col h-full bg-gray-950 transition-colors duration-300"> 
+    <div className="flex flex-col h-full bg-white dark:bg-gray-950 transition-colors duration-300"> 
       
       {/* Removed top padding here, keeping it for the inner content */}
       <div className="p-4 md:p-8 flex-shrink-0"> 
-        <h1 className="text-3xl font-extrabold text-white mb-2">Owner's Dashboard</h1>
-        <p className="text-gray-400">Quick overview of your shop's health.</p>
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Owner's Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400">Quick overview of your shop's health.</p>
       </div>
 
       {/* Main Content Wrapper: Now handles scrolling and layout below the header */}
@@ -161,7 +161,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             unit="₹"
             icon={IndianRupee}
             colorClass="text-teal-400"
-            bgColor="bg-gray-900"
+            bgColor="bg-gray-100 dark:bg-gray-900"
           />
           <StatCard
             title="Today's New Credit Given"
@@ -169,7 +169,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             unit="₹"
             icon={CreditCard}
             colorClass="text-indigo-400"
-            bgColor="bg-gray-900"
+            bgColor="bg-gray-100 dark:bg-gray-900"
           />
           <StatCard
             title="Total Credit Outstanding"
@@ -177,7 +177,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             unit="₹"
             icon={Users}
             colorClass="text-red-400"
-            bgColor="bg-gray-900"
+            bgColor="bg-gray-100 dark:bg-gray-900"
           />
         </div>
 
@@ -185,10 +185,10 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
           {/* Inventory Health Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col transition-colors duration-300">
+          <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
             {/* Conditional View All Button for Inventory */}
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                 <Package className="w-5 h-5 mr-2 text-teal-400" /> Inventory Alerts
               </h2>
               {/* Logic: Only show if there are more than 5 alerts */}
@@ -215,16 +215,16 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                   ))}
                 </ul>
               ) : (
-                <p className="text-gray-400 text-sm p-4 bg-green-900/20 rounded-lg border border-green-700 text-center font-medium">All inventory levels look great!</p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-300 dark:border-green-700 text-center font-medium">All inventory levels look great!</p>
               )}
             </div>
           </div>
 
           {/* Khata (Credit) Status Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col transition-colors duration-300">
+          <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
             {/* Conditional View All Button for Credit Holders */}
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                 <Users className="w-5 h-5 mr-2 text-indigo-400" /> Top Credit Holders
               </h2>
               {/* Logic: Only show if there are more than 5 credit holders */}
@@ -241,27 +241,27 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             </div>
 
             <div className="flex-grow">
-              <ul className="divide-y divide-gray-800 pt-2">
+              <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
                 {topCreditHolders.length > 0 ? (
                   topCreditHolders.map((cust) => (
                     <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
-                      <span className="truncate w-1/2 font-medium text-gray-300">{cust.name}</span>
+                      <span className="truncate w-1/2 font-medium text-gray-700 dark:text-gray-300">{cust.name}</span>
                       <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-400' : 'text-yellow-400'}`}>
                         ₹{cust.outstandingCredit.toFixed(2)}
                       </span>
                     </li>
                   ))
                 ) : (
-                  <p className="text-gray-400 text-sm p-4 bg-indigo-900/20 rounded-lg border border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg border border-indigo-300 dark:border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
                 )}
               </ul>
             </div>
           </div>
 
           {/* Recent Sales Activity Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col transition-colors duration-300">
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
+          <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded-xl shadow-lg dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 flex flex-col transition-colors duration-300">
+            <div className="flex justify-between items-center mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                 <List className="w-5 h-5 mr-2 text-teal-400" /> Recent Sales Activity
               </h2>
               {/* Conditional View All Button for Sales */}
@@ -278,12 +278,12 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             </div>
 
             <div className="flex-grow">
-              <ul className="divide-y divide-gray-800 pt-2">
+              <ul className="divide-y divide-gray-200 dark:divide-gray-800 pt-2">
                 {recentSales.length > 0 ? (
                   recentSales.map((sale) => {
 
                     let paymentDisplay = sale.paymentMethod;
-                    let colorClass = 'bg-gray-700 text-gray-400';
+                    let colorClass = 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
 
                     // --- Standard Logic for UPI/Cash/Full Credit (Dark Mode Only) ---
                     if (sale.paymentMethod === 'Credit') {
@@ -348,7 +348,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                     );
                   })
                 ) : (
-                  <p className="text-gray-400 text-sm p-4 bg-gray-800 rounded-lg border border-gray-700 text-center font-medium">No sales recorded yet.</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 text-center font-medium">No sales recorded yet.</p>
                 )}
               </ul>
             </div>

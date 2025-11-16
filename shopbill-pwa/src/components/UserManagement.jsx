@@ -43,7 +43,7 @@ const getPlanStyles = (plan) => {
             return 'bg-indigo-800/50 text-indigo-300 border-indigo-700';
         case SHOP_PLANS.BASIC:
         default:
-            return 'bg-gray-700/50 text-gray-300 border-gray-600';
+            return 'bg-gray-200 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600';
     }
 };
 
@@ -79,7 +79,7 @@ const PerformanceTrendIndicator = ({ performance }) => {
     const { metric, trend } = performance;
     
     let icon = Minus;
-    let color = 'text-gray-400';
+    let color = 'text-gray-600 dark:text-gray-400';
     let bgColor = 'bg-gray-500/10';
     let borderColor = 'border-gray-500/20';
 
@@ -258,7 +258,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
                 <div 
-                    className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+                    className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-center h-64">
@@ -297,23 +297,23 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm cursor-pointer" onClick={onClose}>
             <div 
-                className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col cursor-default"
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col cursor-default"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gradient-to-r from-gray-800/50 to-gray-800/30">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-100 dark:from-gray-800/50 to-gray-100 dark:to-gray-800/30">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                             <CreditCard className="w-6 h-6 text-indigo-400" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">Payment History</h2>
-                            <p className="text-sm text-gray-400">{shopName}</p>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Payment History</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{shopName}</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all duration-200 cursor-pointer"
+                        className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer"
                     >
                         <X className="w-5 h-5 cursor-pointer" />
                     </button>
@@ -325,29 +325,29 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                         <>
                             {/* Current Plan & Upcoming Payment */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
+                                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                                     <div className="flex items-center gap-2 mb-3">
                                         <IndianRupee className="w-5 h-5 text-indigo-400" />
-                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Current Plan</h3>
+                                        <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Current Plan</h3>
                                     </div>
-                                    <p className="text-2xl font-bold text-white mb-1">{paymentData.currentPlan}</p>
-                                    <p className="text-sm text-gray-400">{paymentData.billingCycle} Billing</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{paymentData.currentPlan}</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">{paymentData.billingCycle} Billing</p>
                                 </div>
                                 
                                 <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl p-5 border border-indigo-500/30">
                                     <div className="flex items-center gap-2 mb-3">
                                         <Calendar className="w-5 h-5 text-indigo-400" />
-                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Next Payment</h3>
+                                        <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Next Payment</h3>
                                     </div>
-                                    <p className="text-2xl font-bold text-white mb-1">
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
                                         ₹{paymentData.upcomingPayment.amount.toFixed(2)}
                                     </p>
-                                    <p className="text-sm text-gray-400">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
                                         {paymentData.upcomingPayment.daysUntil > 0 
                                             ? `Due in ${paymentData.upcomingPayment.daysUntil} days`
                                             : 'Due today'}
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                                         {formatDate(paymentData.upcomingPayment.date)}
                                     </p>
                                 </div>
@@ -355,7 +355,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                             
                             {/* Payment History */}
                             <div>
-                                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                                     <Clock className="w-5 h-5 text-indigo-400" />
                                     Payment History
                                 </h3>
@@ -363,19 +363,19 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                     {paymentData.paymentHistory.map((payment) => (
                                         <div
                                             key={payment.id}
-                                            className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/30 hover:border-gray-600/50 transition-all duration-200"
+                                            className="bg-gray-100 dark:bg-gray-800/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700/30 hover:border-gray-300 dark:hover:border-gray-600/50 transition-all duration-200"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-3 mb-2">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-semibold text-white">
+                                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                                                 ₹{payment.amount.toFixed(2)}
                                                             </span>
                                                             {getStatusBadge(payment.status)}
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                                                    <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
                                                         <span className="flex items-center gap-1">
                                                             <Calendar className="w-3.5 h-3.5" />
                                                             {formatDate(payment.date)}
@@ -399,7 +399,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                 </div>
                 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-800 bg-gray-800/30">
+                <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/30">
                     <div className="flex justify-end">
                         <button
                             onClick={onClose}
@@ -578,10 +578,10 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     };
 
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
+        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300">
             {/* Header / Search Bar */}
-            <div className="pb-4 border-b border-gray-800 flex justify-between items-center">
-                <h1 className="text-3xl font-extrabold text-white flex items-center">
+            <div className="pb-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                     <Building className="w-7 h-7 mr-3 text-indigo-400" /> Shop Management
                 </h1>
             </div>
@@ -592,24 +592,24 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                     placeholder="Search by Shop Name or Location..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                 />
             </div>
 
             {/* Table */}
             <div className="flex-grow overflow-y-auto">
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-400">
+                    <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-600 dark:text-gray-400">
                         <Loader className="w-10 h-10 animate-spin text-indigo-400" />
-                        <p className='mt-3 text-gray-300'>Loading shop list...</p>
+                        <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading shop list...</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-2xl shadow-2xl border border-gray-800/50 bg-gray-900/50 backdrop-blur-sm">
+                    <div className="overflow-x-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800/50 bg-white dark:bg-gray-900/50 backdrop-blur-sm">
                         <table className="min-w-full">
-                            <thead className="bg-gradient-to-r from-gray-800/90 to-gray-800/70 sticky top-0 z-10 border-b border-gray-700/50">
+                            <thead className="bg-gradient-to-r from-gray-100 dark:from-gray-800/90 to-gray-100 dark:to-gray-800/70 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700/50">
                                 <tr>
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200 group"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200 group"
                                         onClick={() => handleSort('name')}
                                     >
                                         <div className="flex items-center gap-2">
@@ -618,7 +618,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('location')}
                                     >
                                         <div className="flex items-center gap-2">
@@ -627,7 +627,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('dateJoined')}
                                     >
                                         <div className="flex items-center gap-2">
@@ -636,7 +636,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('tenureDays')}
                                     >
                                         <div className="flex items-center gap-2">
@@ -645,7 +645,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         </div>
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('plan')}
                                     >
                                         <div className="flex justify-center items-center gap-2">
@@ -653,17 +653,17 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="plan" />
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                                         Staff
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                                         Performance
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                                         Status
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('paymentStatus')}
                                     >
                                         <div className="flex justify-center items-center gap-2">
@@ -671,18 +671,18 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="paymentStatus" />
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-gray-900/30 divide-y divide-gray-800/50">
+                            <tbody className="bg-white dark:bg-gray-900/30 divide-y divide-gray-200 dark:divide-gray-800/50">
                                 {filteredAndSortedShops.length === 0 ? (
                                     <tr>
                                         <td colSpan="10" className="py-16 text-center">
                                             <div className="flex flex-col items-center justify-center">
                                                 <Building className="w-12 h-12 text-gray-600 mb-3" />
-                                                <p className="text-gray-400 text-sm font-medium">
+                                                <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">
                                                     {searchTerm ? 'No shops found matching your criteria.' : 'No shops registered or failed to load from API.'}
                                                 </p>
                                             </div>
@@ -692,7 +692,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     filteredAndSortedShops.map((shop, index) => (
                                         <tr 
                                             key={shop.id} 
-                                            className="hover:bg-gray-800/40 transition-all duration-200 border-b border-gray-800/30 group"
+                                            className="hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all duration-200 border-b border-gray-200 dark:border-gray-800/30 group"
                                         >
                                             {/* Shop Name */}
                                             <td className="px-6 py-5 whitespace-nowrap">
@@ -701,7 +701,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                         <Store className="w-5 h-5 text-indigo-400" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
                                                             {shop.name}
                                                         </p>
                                                     </div>
@@ -709,21 +709,21 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             </td>
                                             {/* Location */}
                                             <td className="px-6 py-5 whitespace-nowrap hidden md:table-cell">
-                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                                     <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                                     <span className="truncate max-w-[150px]">{shop.location}</span>
                                                 </div>
                                             </td>
                                             {/* Date Joined */}
                                             <td className="px-6 py-5 whitespace-nowrap hidden lg:table-cell">
-                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                                     <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                                     <span>{shop.dateJoined}</span>
                                                 </div>
                                             </td>
                                             {/* Tenure (Days) */}
                                             <td className="px-6 py-5 whitespace-nowrap text-left hidden lg:table-cell">
-                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                                     <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                                     <span className="font-medium">{shop.tenureDays}</span>
                                                 </div>

@@ -12,17 +12,7 @@ export default defineConfig({
     tailwindcss({
       // This is the content that would normally go into tailwind.config.js
       // We set darkMode to 'class' to enable manual toggling.
-      config: {
-        darkMode: 'class', 
-        content: [
-          './index.html',
-          './src/**/*.{js,ts,jsx,tsx}',
-        ],
-        // You can include theme extensions or other config here if needed
-        theme: {
-          extend: {},
-        },
-      }
+      darkMode: 'class', // Enable class-based dark mode (Tailwind v4 format)
     }),
     // ----------------------------------------------------------------------
     

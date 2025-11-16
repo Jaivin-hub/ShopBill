@@ -1,7 +1,7 @@
-// api.js
+// api.js - API Endpoints Configuration
 
-const API_BASE_URL = 'https://shopbill-3le1.onrender.com/api'
-// const API_BASE_URL = 'http://localhost:5000/api';
+// Use environment variable if available, otherwise fallback to production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://shopbill-3le1.onrender.com/api';
 
 const API = {
     // New Authentication Endpoints
@@ -37,6 +37,11 @@ const API = {
     superadminReports: API_BASE_URL + '/superadmin/reports',        // GET (Global Reports)
     superadminShopPayments: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payments`, // GET (Payment History)
     superadminShopPaymentStatus: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payment-status`, // GET (Payment Status)
+    superadminRecentActivity: API_BASE_URL + '/superadmin/recent-activity', // GET (Recent Activities)
+    // ------------------------------------------
+    
+    // Plan Management (Owner only)
+    updatePlan: API_BASE_URL + '/user/plan', // GET (Get current plan), PUT (Update subscription plan)
     // ------------------------------------------
 }
 

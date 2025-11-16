@@ -146,14 +146,14 @@ const Reports = ({ apiClient, API, showToast }) => {
     
     // MetricCard Component - UPDATED FOR DARK THEME
     const MetricCard = ({ title, value, icon: Icon, colorClass, description }) => (
-        <div className={`p-4 rounded-xl shadow-xl shadow-indigo-900/10 border-b-4 ${colorClass} bg-gray-900 transition-shadow border border-gray-800`}>
+        <div className={`p-4 rounded-xl shadow-xl dark:shadow-indigo-900/10 border-b-4 ${colorClass} bg-gray-100 dark:bg-gray-900 transition-shadow border border-gray-200 dark:border-gray-800`}>
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="text-sm font-medium text-gray-400">{title}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
                     {isLoading ? (
-                         <div className="h-6 w-20 bg-gray-700 rounded animate-pulse mt-1"></div>
+                         <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-1"></div>
                     ) : (
-                        <h2 className="text-2xl font-extrabold text-white mt-1">
+                        <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">
                             {value}
                         </h2>
                     )}
@@ -161,7 +161,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                 {/* Ensure the icon uses the specified colorClass for text */}
                 <Icon className={`w-8 h-8 ${colorClass.replace('border-b-4', 'text')}`} />
             </div>
-            {description && <p className="text-xs text-gray-500 mt-2">{description}</p>}
+            {description && <p className="text-xs text-gray-600 dark:text-gray-500 mt-2">{description}</p>}
         </div>
     );
 
@@ -188,7 +188,7 @@ const Reports = ({ apiClient, API, showToast }) => {
     
     // --- Render Component ---
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 font-sans">
+        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300 font-sans">
             <style jsx global>{`
                 .font-sans {
                     font-family: 'Inter', sans-serif;
@@ -196,17 +196,17 @@ const Reports = ({ apiClient, API, showToast }) => {
             `}</style>
             
             {/* 2. FIXED HEADER BLOCK (Title, Description, and Filters) - UPDATED FOR DARK THEME */}
-            <div className="pb-4 mb-4 border-b border-gray-800 bg-gray-950 z-10 sticky top-0">
-                <h1 className="text-3xl font-extrabold text-white mb-2">
+            <div className="pb-4 mb-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 z-10 sticky top-0">
+                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                     Business Reports
                 </h1>
-                <p className="text-gray-400 mb-6">Analyzing data for: <span className="font-semibold text-teal-400">{getCurrentFilterLabel()}</span></p>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">Analyzing data for: <span className="font-semibold text-teal-400">{getCurrentFilterLabel()}</span></p>
 
                 {/* --- Filter Controls & View Type Selector --- */}
                 <div className="space-y-4">
                     {/* Preset Filters */}
                     <div className="overflow-x-auto whitespace-nowrap py-2">
-                        <div className="inline-flex space-x-2 p-1 bg-gray-900 rounded-xl shadow-xl shadow-indigo-900/10 border border-gray-800">
+                        <div className="inline-flex space-x-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl shadow-xl dark:shadow-indigo-900/10 border border-gray-200 dark:border-gray-800">
                             {DATE_FILTERS.map(filter => (
                                 <button
                                     key={filter.id}
@@ -214,7 +214,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                     className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-150 ${
                                         selectedFilter === filter.id
                                             ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700'
-                                            : 'text-gray-300 hover:bg-gray-700'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                                     }`}
                                     disabled={isLoading}
                                 >
@@ -226,26 +226,26 @@ const Reports = ({ apiClient, API, showToast }) => {
 
                     {/* Custom Date Picker (Visible when 'custom' is selected) */}
                     {selectedFilter === 'custom' && (
-                        <div className="flex flex-col md:flex-row gap-4 p-4 bg-gray-900 rounded-xl shadow-md border border-gray-800">
+                        <div className="flex flex-col md:flex-row gap-4 p-4 bg-gray-100 dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800">
                             <div className="flex-1">
-                                <label htmlFor="start-date" className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
+                                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
                                 <input
                                     id="start-date"
                                     type="date"
                                     value={customStartDate}
                                     onChange={(e) => setCustomStartDate(e.target.value)}
-                                    className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-teal-500 focus:border-teal-500"
+                                    className="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-teal-500 focus:border-teal-500"
                                     disabled={isLoading}
                                 />
                             </div>
                             <div className="flex-1">
-                                <label htmlFor="end-date" className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
+                                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
                                 <input
                                     id="end-date"
                                     type="date"
                                     value={customEndDate}
                                     onChange={(e) => setCustomEndDate(e.target.value)}
-                                    className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-teal-500 focus:border-teal-500"
+                                    className="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-teal-500 focus:border-teal-500"
                                     disabled={isLoading}
                                 />
                             </div>
@@ -291,7 +291,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                 </div>
                 
                 {/* --- 3. Sales Chart Visualization - UPDATED FOR DARK THEME --- */}
-                <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/10 border border-gray-800 mb-8">
+                <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-xl shadow-2xl dark:shadow-indigo-900/10 border border-gray-200 dark:border-gray-800 mb-8">
                     <h3 className="text-xl font-bold flex items-center text-gray-200 mb-4 border-b border-gray-800 pb-3">
                         <BarChart className="w-5 h-5 mr-2 text-indigo-400" /> Trend Analysis
                     </h3>
@@ -304,14 +304,14 @@ const Reports = ({ apiClient, API, showToast }) => {
                             <div className="inline-flex rounded-full shadow-sm w-full">
                                 <button
                                     onClick={() => setChartYAxis('revenue')}
-                                    className={`flex-1 px-3 py-2 text-xs font-semibold rounded-l-full transition ${chartYAxis === 'revenue' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    className={`flex-1 px-3 py-2 text-xs font-semibold rounded-l-full transition ${chartYAxis === 'revenue' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
                                     disabled={isLoading}
                                 >
                                     Revenue
                                 </button>
                                 <button
                                     onClick={() => setChartYAxis('bills')}
-                                    className={`flex-1 px-3 py-2 text-xs font-semibold rounded-r-full transition ${chartYAxis === 'bills' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    className={`flex-1 px-3 py-2 text-xs font-semibold rounded-r-full transition ${chartYAxis === 'bills' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
                                     disabled={isLoading}
                                 >
                                     Bills
@@ -329,7 +329,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                         className={`flex-1 px-3 py-2 text-xs font-semibold transition ${
                                             viewType === type 
                                                 ? 'bg-teal-600 text-white' 
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                                         } ${type === 'Day' ? 'rounded-l-full' : type === 'Month' ? 'rounded-r-full' : ''}`}
                                         disabled={isLoading}
                                     >
@@ -359,21 +359,21 @@ const Reports = ({ apiClient, API, showToast }) => {
                 {/* --- 4. Top Selling Items & Khata Due - UPDATED FOR DARK THEME --- */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-4">
                     {/* Top Selling Items */}
-                    <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/10 border border-gray-800">
-                        <h3 className="text-xl font-bold flex items-center text-gray-200 mb-4 border-b border-gray-800 pb-3">
+                    <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-xl shadow-2xl dark:shadow-indigo-900/10 border border-gray-200 dark:border-gray-800">
+                        <h3 className="text-xl font-bold flex items-center text-gray-900 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-800 pb-3">
                             <Package className="w-5 h-5 mr-2 text-blue-400" /> Top Selling Items
                         </h3>
                         
                         {isLoading ? (
                              <div className="space-y-3">
-                                <div className="h-10 bg-gray-800 rounded animate-pulse"></div>
-                                <div className="h-10 w-3/4 bg-gray-800 rounded animate-pulse"></div>
+                                <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                                <div className="h-10 w-3/4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
                              </div>
                         ) : data.topItems.length > 0 ? (
                             <div className="space-y-3">
                                 {data.topItems.map((item, index) => (
-                                    <div key={item.name} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700">
-                                        <span className="font-semibold text-gray-300 flex items-center">
+                                    <div key={item.name} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <span className="font-semibold text-gray-700 dark:text-gray-300 flex items-center">
                                             <span className="w-6 h-6 text-center rounded-full bg-blue-600 text-white text-sm font-bold mr-3 flex items-center justify-center">{index + 1}</span>
                                             {item.name}
                                         </span>
@@ -384,13 +384,13 @@ const Reports = ({ apiClient, API, showToast }) => {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-center text-gray-400 py-4">No sales recorded in this period.</p>
+                            <p className="text-center text-gray-600 dark:text-gray-400 py-4">No sales recorded in this period.</p>
                         )}
                     </div>
 
                     {/* Khata Due / Total Summary */}
-                    <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/10 border border-gray-800">
-                        <h3 className="text-xl font-bold flex items-center text-gray-200 mb-4 border-b border-gray-800 pb-3">
+                    <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-xl shadow-2xl dark:shadow-indigo-900/10 border border-gray-200 dark:border-gray-800">
+                        <h3 className="text-xl font-bold flex items-center text-gray-900 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-800 pb-3">
                             <CreditCard className="w-5 h-5 mr-2 text-red-400" /> Financial Summary
                         </h3>
                         

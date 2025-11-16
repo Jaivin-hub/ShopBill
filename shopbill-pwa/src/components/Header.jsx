@@ -10,7 +10,8 @@ import { Smartphone, User, Bell, Settings } from 'lucide-react';
 const Header = ({ 
     companyName, 
     userRole, 
-    setCurrentPage, 
+    setCurrentPage,
+    currentPage, // Add currentPage to know which page is active
     // REMOVED: isDarkMode, 
     // REMOVED: onToggleDarkMode, 
     onLogout, 
@@ -54,26 +55,32 @@ const Header = ({
 
 
     // Common classes for action buttons (reused for readability)
-    const buttonClasses = `p-2 rounded-full 
-        bg-gray-800 
-        text-gray-300 
-        hover:bg-gray-700 
+    const baseButtonClasses = `p-2 rounded-full 
         transition-all duration-300 active:scale-95 transform`;
+    
+    // Function to get button classes based on active state
+    const getButtonClasses = (pageName) => {
+        const isActive = currentPage === pageName;
+        return `${baseButtonClasses} ${
+            isActive 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/50' 
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+        }`;
+    };
     // NOTE: Simplified classes to only use dark mode variants (e.g., removed dark:bg-gray-800 from initial state as it's the only state now).
 
 
     return (
         <header
-            // Use only dark mode classes for the header background and border
             className={`fixed top-0 left-0 right-0 
-                   bg-gray-900 
-                   border-b border-gray-700 
+                   bg-white dark:bg-gray-900 
+                   border-b border-gray-200 dark:border-gray-700 
                    shadow-lg dark:shadow-indigo-900/20
                    md:hidden 
                    z-30 p-4 flex justify-between items-center transition-colors duration-300`}
         >
-            {/* Company Name/Logo - Fixed for dark mode */}
-            <h1 className="text-xl font-extrabold text-indigo-400 truncate flex items-center">
+            {/* Company Name/Logo */}
+            <h1 className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate flex items-center">
                 <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
                 {companyName}
             </h1>
@@ -83,7 +90,7 @@ const Header = ({
                 {/* Notification Icon */}
                 <button
                     onClick={() => setCurrentPage('notifications')} 
-                    className={`${buttonClasses} relative`}
+                    className={`${getButtonClasses('notifications')} relative`}
                     title="Notifications"
                 >
                     <Bell className="w-5 h-5" />
@@ -98,7 +105,7 @@ const Header = ({
                 {/* Settings Icon (New Addition) */}
                 <button
                     onClick={() => setCurrentPage('settings')} 
-                    className={buttonClasses}
+                    className={getButtonClasses('settings')}
                     title="Settings"
                 >
                     <Settings className="w-5 h-5" />
@@ -108,12 +115,7 @@ const Header = ({
                 {/* User Profile Button */}
                 <button
                     onClick={() => setCurrentPage('profile')} 
-                    className="p-2 rounded-full 
-                       bg-indigo-600 
-                       text-indigo-200 
-                       hover:bg-indigo-700 
-                       transition-colors duration-300 active:scale-95 transform 
-                       flex items-center"
+                    className={`${getButtonClasses('profile')} flex items-center`}
                     title={`Logged in as ${userRole}`}
                 >
                     <User className="w-5 h-5" />

@@ -1,70 +1,28 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus, LogOut, Bell, Smartphone, Shield, Users } from 'lucide-react';
-import axios from 'axios';
 import NotificationToast from './components/NotificationToast';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
-import API from '../src/config/api'
+import API from './config/api';
+import apiClient from './lib/apiClient';
+import { ApiProvider } from './contexts/ApiContext';
+import { USER_ROLES } from './utils/constants';
 import BillingPOS from './components/BillingPOS';
 import Header from './components/Header';
 import Ledger from './components/Ledger';
 import Reports from './components/Reports';
-import SettingsPage from './components/Settings'
+import SettingsPage from './components/Settings';
 import Profile from './components/Profile';
 import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
-import LandingPage from './components/LandingPage'
+import LandingPage from './components/LandingPage';
 import ResetPassword from './components/ResetPassword';
 import StaffSetPassword from './components/StaffSetPassword'; 
 import SalesActivityPage from './components/SalesActivityPage'; 
-import UserManagement from './components/UserManagement'; // <-- IMPORTED NEW COMPONENT
-import SuperAdminDashboard from './components/superAdminDashboard'; // <-- IMPORTED SUPERADMIN DASHBOARD
-import SystemConfig from './components/SystemConfig'; // <-- IMPORTED SYSTEM CONFIG
-import GlobalReport from './components/GlobalReport'; // <-- IMPORTED GLOBAL REPORT
-
-
-// --- Configuration and Constants ---
-const USER_ROLES = {
-  OWNER: 'owner', 
-  MANAGER: 'manager', // Lowercase to match typical usage in constants
-  CASHIER: 'cashier', // Lowercase to match typical usage in constants
-  // --- ADDED SUPERADMIN ROLE ---
-  SUPERADMIN: 'superadmin',
-};
-
-// --- AXIOS INSTANCE WITH AUTH INTERCEPTOR (Remains Global) ---
-const apiClient = axios.create();
-
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('userToken');
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-// --- END AXIOS CONFIG ---
-
-// Helper to check the URL for deep link routes on initial load
-const checkDeepLinkPath = () => {
-    const path = window.location.pathname;
-    
-    if (path.startsWith('/staff-setup/')) {
-        return 'staffSetPassword'; 
-    }
-    
-    if (path.startsWith('/reset-password/')) {
-        return 'resetPassword'; 
-    }
-    
-    return null; 
-};
+import UserManagement from './components/UserManagement';
+import SuperAdminDashboard from './components/superAdminDashboard';
+import SystemConfig from './components/SystemConfig';
+import GlobalReport from './components/GlobalReport';
 
 // --- UTILITY NAVIGATION ITEMS (New for Header/Utility area) ---
 const UTILITY_NAV_ITEMS_CONFIG = [
@@ -82,6 +40,20 @@ const SUPERADMIN_NAV_ITEMS = [
 ];
 // --- END SUPERADMIN CONFIG ---
 
+// Helper to check the URL for deep link routes on initial load
+const checkDeepLinkPath = () => {
+    const path = window.location.pathname;
+    
+    if (path.startsWith('/staff-setup/')) {
+        return 'staffSetPassword'; 
+    }
+    
+    if (path.startsWith('/reset-password/')) {
+        return 'resetPassword'; 
+    }
+    
+    return null; 
+};
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
@@ -90,6 +62,48 @@ const App = () => {
   const [toast, setToast] = useState(null);
   
   const [isViewingLogin, setIsViewingLogin] = useState(false);
+  
+  // Dark Mode State - Load from localStorage or default to false (light mode)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+  
+  // Toggle dark mode and save to localStorage
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode(prev => {
+      const newValue = !prev;
+      localStorage.setItem('darkMode', JSON.stringify(newValue));
+      return newValue;
+    });
+  }, []);
+  
+  // Apply dark mode class to document root on mount and when it changes
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isDarkMode) {
+      html.classList.add('dark');
+      html.style.colorScheme = 'dark';
+    } else {
+      html.classList.remove('dark');
+      html.style.colorScheme = 'light';
+    }
+  }, [isDarkMode]);
+  
+  // Ensure dark mode is applied immediately on mount (sync with localStorage)
+  useEffect(() => {
+    const saved = localStorage.getItem('darkMode');
+    const savedDarkMode = saved ? JSON.parse(saved) : false;
+    const html = document.documentElement;
+    
+    if (savedDarkMode) {
+      html.classList.add('dark');
+      html.style.colorScheme = 'dark';
+    } else {
+      html.classList.remove('dark');
+      html.style.colorScheme = 'light';
+    }
+  }, []); // Run only on mount
   
   // Normalized user role access
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
@@ -234,7 +248,7 @@ useEffect(() => {
     
     if (isLoadingAuth) {
          return (
-             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
+             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-teal-400" />
                 <p className='mt-3'>Checking authentication...</p>
              </div>
@@ -269,6 +283,8 @@ useEffect(() => {
       apiClient, 
       API, 
       onLogout:logout,
+      isDarkMode,
+      toggleDarkMode,
     };
     
     switch (currentPage) {
@@ -339,7 +355,8 @@ useEffect(() => {
   const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+    <ApiProvider>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
         {showAppUI && (
             <Header
@@ -357,7 +374,7 @@ useEffect(() => {
         
         {showAppUI && (
             <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full 
-                 bg-white dark:bg-gray-900 shadow-2xl shadow-indigo-900/10 z-10 
+                 bg-white dark:bg-gray-900 shadow-2xl dark:shadow-indigo-900/10 z-10 
                  transition-colors duration-300 border-r border-gray-200 dark:border-gray-800"
             >
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
@@ -446,12 +463,13 @@ useEffect(() => {
             </nav>
         )}
 
-      <NotificationToast
-        message={toast?.message}
-        type={toast?.type}
-        onClose={() => setToast(null)}
-      />
-    </div>
+        <NotificationToast
+          message={toast?.message}
+          type={toast?.type}
+          onClose={() => setToast(null)}
+        />
+      </div>
+    </ApiProvider>
   );
 };
 
