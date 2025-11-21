@@ -493,8 +493,9 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
 
 
 // Main Login Component
-const Login = ({ onLogin, onBackToLanding }) => {
-    const [view, setView] = useState('login'); // 'login', 'signup', 'forgotPassword'
+const Login = ({ onLogin, onBackToLanding, initialPlan }) => {
+    const [checkoutPlan, setCheckoutPlan] = useState(initialPlan || null);
+    const [view, setView] = useState(initialPlan ? 'signup' : 'login'); // 'login', 'signup', 'forgotPassword'
     // RENAMED STATE: 'email' is now 'identifier' for generality
     const [identifier, setIdentifier] = useState(''); 
     const [password, setPassword] = useState('');
@@ -677,6 +678,11 @@ const Login = ({ onLogin, onBackToLanding }) => {
         setEmailError(null); 
 
         let hasError = false;
+        if (hasError) {
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
 
         // **LOGIN VIEW:** Skip client-side email/phone validation. Let the backend handle the identifier check.
         if (view === 'login') {
@@ -740,7 +746,14 @@ const Login = ({ onLogin, onBackToLanding }) => {
             if (data && data.token && data.user) {
                 localStorage.removeItem('userToken');
                 localStorage.setItem('userToken', data.token);
-                onLogin(data.user, data.token);
+                
+                // CRITICAL CHANGE: If a plan was selected, redirect to checkout, NOT the dashboard
+                if (isSignup && checkoutPlan) {
+                    onLogin(data.user, data.token, checkoutPlan); // Pass checkoutPlan to App.js
+                } else {
+                    onLogin(data.user, data.token);
+                }
+
             } else {
                 setAuthError(`${formType} failed. Unexpected response structure.`);
             }

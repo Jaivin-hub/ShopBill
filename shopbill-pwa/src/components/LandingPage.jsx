@@ -148,7 +148,7 @@ const renderTitle = (fullTitle, gradientWord) => {
 };
 
 
-const LandingPage = ({ onStartApp }) => {
+const LandingPage = ({ onStartApp, onSelectPlan }) => {
     const [language, setLanguage] = useState('en');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -474,7 +474,7 @@ const LandingPage = ({ onStartApp }) => {
                                 </ul>
 
                                 <button
-                                    onClick={onStartApp}
+                                    onClick={() => onSelectPlan('BASIC')}
                                     className="block cursor-pointer w-full py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition duration-300">
                                     {t.selectBasic}
                                 </button>
@@ -512,7 +512,7 @@ const LandingPage = ({ onStartApp }) => {
                                 </ul>
 
                                 <button
-                                    onClick={onStartApp}
+                                    onClick={() => onSelectPlan('PRO')}
                                     className="block cursor-pointer w-full py-3 bg-white text-indigo-700 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
                                     {t.choosePro}
                                 </button>

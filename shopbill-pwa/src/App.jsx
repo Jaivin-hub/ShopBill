@@ -23,6 +23,7 @@ import UserManagement from './components/UserManagement';
 import SuperAdminDashboard from './components/superAdminDashboard';
 import SystemConfig from './components/SystemConfig';
 import GlobalReport from './components/GlobalReport';
+import Checkout from './components/Checkout';
 
 // --- UTILITY NAVIGATION ITEMS (New for Header/Utility area) ---
 const UTILITY_NAV_ITEMS_CONFIG = [
@@ -60,8 +61,16 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
   
   const [isViewingLogin, setIsViewingLogin] = useState(false);
+
+  // Handler passed to LandingPage for paid subscriptions
+  const handleSelectPlan = useCallback((plan) => {
+    setSelectedPlan(plan);
+    setIsViewingLogin(true); // Redirects to the Login component
+}, []);
+
   
   // Dark Mode State - Load from localStorage or default to false (light mode)
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -127,9 +136,8 @@ const App = () => {
     showToast('Logged out successfully.', 'info');
   }, [showToast]);
 
-  // --- LOGIN HANDLER ---
-  const handleLoginSuccess = useCallback((user, token) => {
-    // Ensure the role is stored in lowercase for consistency
+  // --- LOGIN HANDLER (called from Login.js) ---
+  const handleLoginSuccess = useCallback((user, token, planToCheckout = null) => {
     const userWithNormalizedRole = { ...user, role: user.role.toLowerCase() }; 
     
     localStorage.setItem('userToken', token);
@@ -137,10 +145,17 @@ const App = () => {
 
     setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
-    setCurrentPage('dashboard');
-    showToast('Welcome back!', 'success');
     
-  }, [showToast]);
+    // CRITICAL: If a plan was selected during sign-up, go to checkout, otherwise go to dashboard
+    if (planToCheckout) {
+        setCurrentPage('checkout');
+        setSelectedPlan(planToCheckout); // Ensure state is retained
+    } else {
+        setCurrentPage('dashboard');
+    }
+    
+    showToast('Welcome back!', 'success');
+}, [showToast]);
 
 
   // --- INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
@@ -180,7 +195,7 @@ useEffect(() => {
     html.style.colorScheme = 'dark'; 
   }, []); 
 
-  // Action Functions (Simplified)
+  // Action Functions (Simplified) - These are placeholders
   const addSale = useCallback(async (saleData) => {
     try {
       showToast('Sale successfully recorded!', 'success');
@@ -263,16 +278,56 @@ useEffect(() => {
         return <ResetPassword />;
     }
 
+    // --- LANDING/LOGIN FLOW ---
     if (!currentUser) {
-            if (isViewingLogin) {
-                return <Login 
-                    onLogin={handleLoginSuccess} 
-                    showToast={showToast} 
-                    onBackToLanding={() => setIsViewingLogin(false)} 
-                />;
-            }
-            return <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
+        if (isViewingLogin) {
+            return <Login 
+                onLogin={handleLoginSuccess} 
+                showToast={showToast} 
+                onBackToLanding={() => {
+                    setIsViewingLogin(false);
+                    setSelectedPlan(null); // Clear selected plan on back
+                }} 
+                // PASS THE PLAN TO LOGIN COMPONENT
+                initialPlan={selectedPlan} 
+            />;
+        }
+        return (
+            <LandingPage 
+                onStartApp={() => setIsViewingLogin(true)} 
+                // PASS THE NEW HANDLER HERE
+                onSelectPlan={handleSelectPlan} 
+            />
+        );
     }
+    // --- END LANDING/LOGIN FLOW ---
+
+    // --- CHECKOUT FLOW ---
+    if (currentPage === 'checkout') {
+        if (!selectedPlan) {
+            // Should not happen, but ensure a fallback
+            showToast('No plan selected. Redirecting to dashboard.', 'error');
+            setCurrentPage('dashboard');
+            return null;
+        }
+        return (
+            <Checkout 
+                plan={selectedPlan}
+                onPaymentSuccess={(plan) => {
+                    // This function is called after the payment simulation succeeds
+                    showToast(`${plan} plan activated!`, 'success');
+                    setCurrentPage('dashboard');
+                    setSelectedPlan(null); // Clear the plan state
+                    // In a real app, you'd also reload user data to reflect the new subscription status
+                }}
+                onBackToDashboard={() => {
+                    setCurrentPage('dashboard');
+                    setSelectedPlan(null); // Clear the plan state
+                }}
+            />
+        );
+    }
+    // --- END CHECKOUT FLOW ---
     
     const commonProps = {
       currentUser, 
@@ -327,11 +382,10 @@ useEffect(() => {
         
       // --- NEW SUPERADMIN ROUTES ---
       case 'superadmin_users':
-        return <UserManagement {...commonProps} />; // <-- Renders the new component
+        return <UserManagement {...commonProps} />; 
       case 'superadmin_systems':
-        return <SystemConfig {...commonProps} />; // <-- Renders System Config component
+        return <SystemConfig {...commonProps} />; 
       // --- END NEW SUPERADMIN ROUTES ---
-        
       default:
         // Default to Dashboard for all roles (SuperAdminDashboard for superadmin)
         return userRole === USER_ROLES.SUPERADMIN ? (
@@ -347,9 +401,11 @@ useEffect(() => {
     }
   };
 
+  // CRITICAL FIX: Exclude 'checkout' from showAppUI so it renders full-screen, without the sidebar/header.
   const showAppUI = currentUser && 
                     currentPage !== 'resetPassword' && 
-                    currentPage !== 'staffSetPassword'; 
+                    currentPage !== 'staffSetPassword' &&
+                    currentPage !== 'checkout'; 
   
   // Helper to correctly capitalize role for display
   const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
@@ -358,6 +414,7 @@ useEffect(() => {
     <ApiProvider>
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         
+        {/* Desktop Header */}
         {showAppUI && (
             <Header
                 companyName="Pocket POS"
@@ -372,6 +429,7 @@ useEffect(() => {
             />
         )}
         
+        {/* Desktop Sidebar */}
         {showAppUI && (
             <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full 
                  bg-white dark:bg-gray-900 shadow-2xl dark:shadow-indigo-900/10 z-10 
@@ -435,7 +493,8 @@ useEffect(() => {
         )}
 
         {/* Main Content Area */}
-        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-0 pb-16 md:pb-0' : 'w-full pt-16 md:pt-0'}`}>
+        {/* Adjust margin based on showAppUI state */}
+        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-0 pb-16 md:pb-0' : 'w-full pt-0'}`}>
             {renderContent()}
         </main>
 
