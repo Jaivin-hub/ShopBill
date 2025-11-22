@@ -278,7 +278,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                     
                     try {
                         // STEP 4: Verify Payment Signature on Server
-                        const verifyUrl = `${API.payment}/verify`;
+                        const verifyUrl = `${API.verifypayment}`;
                         const verificationResponse = await axios.post(verifyUrl, {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,

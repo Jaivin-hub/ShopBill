@@ -46,6 +46,7 @@ const API = {
     
     // Payment Routes
     createpayment: API_BASE_URL + '/payment/create-order', // POST (Process payment)
+    verifypayment: API_BASE_URL + '/payment/verify'
     // ------------------------------------------
 }
 
