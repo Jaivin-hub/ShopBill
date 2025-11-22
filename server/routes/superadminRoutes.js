@@ -26,9 +26,11 @@ const superadminProtect = [protect, authorize('superadmin')];
  */
 router.get('/shops', superadminProtect, async (req, res) => {
     try {
-        // Find all users who are owners, as in this design, the owner represents the shop entry.
-        // We exclude the superadmin user from this list.
-        const shops = await User.find({ role: 'owner' }).select('-password -resetPasswordToken -resetPasswordExpire');
+        // Find all users who are owners, as the owner represents the shop entry.
+        // 1. SORTING: Add .sort({ createdAt: -1 }) for Last-In, First-Out order.
+        const shops = await User.find({ role: 'owner' })
+            .sort({ createdAt: -1 }) // Sort by creation date descending (newest first)
+            .select('-password -resetPasswordToken -resetPasswordExpire');
 
         if (!shops.length) {
             return res.status(200).json({ success: true, message: 'No shops registered yet.', data: [] });
@@ -37,23 +39,23 @@ router.get('/shops', superadminProtect, async (req, res) => {
         // Get staff counts for each shop
         const shopIds = shops.map(shop => shop._id);
         const staffCounts = await User.aggregate([
-            { $match: { shopId: { $in: shopIds }, role: { $in: ['Manager', 'Cashier', 'manager', 'cashier'] } } },
+            { $match: { shopId: { $in: shopIds }, role: { $in: ['Manager', 'Cashier'] } } }, // Match only relevant staff roles
             {
                 $group: {
                     _id: '$shopId',
-                    managers: {
+                    managerCount: {
                         $sum: {
                             $cond: [
-                                { $in: ['$role', ['Manager', 'manager']] },
+                                { $eq: ['$role', 'Manager'] },
                                 1,
                                 0
                             ]
                         }
                     },
-                    cashiers: {
+                    cashierCount: {
                         $sum: {
                             $cond: [
-                                { $in: ['$role', ['Cashier', 'cashier']] },
+                                { $eq: ['$role', 'Cashier'] },
                                 1,
                                 0
                             ]
@@ -65,55 +67,59 @@ router.get('/shops', superadminProtect, async (req, res) => {
 
         const staffCountMap = new Map();
         staffCounts.forEach(item => {
-            staffCountMap.set(item._id.toString(), { manager: item.managers, cashier: item.cashiers });
+            staffCountMap.set(item._id.toString(), { managerCount: item.managerCount, cashierCount: item.cashierCount });
         });
 
-        // Enhance shop data with calculated tenure and mock performance (30D)
+        // Enhance shop data with calculated tenure, payment status, and mock performance
         const shopsWithDetails = shops.map(shop => {
-            // Calculate tenure in days using the Mongoose 'createdAt' timestamp
+            const shopObject = shop.toObject();
+            
             // --- CORE LOGIC FOR TENURE ---
             const daysActive = Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24));
-            // ----------------------------
+            
+            // --- PAYMENT STATUS LOGIC (Mocked, but using transactionId for stability) ---
+            let paymentStatus = 'paid';
+            
+            // Generate a 'deterministic' random value based on the transactionId or shopId
+            // This makes the mock status stick to the shop entry across multiple API calls.
+            const hash = shopObject.transactionId ? shopObject.transactionId.charCodeAt(0) : shopObject._id.toString().charCodeAt(0);
+            
+            if (hash % 10 === 0) {
+                paymentStatus = 'overdue'; // ~10% chance
+            } else if (hash % 7 === 0) {
+                paymentStatus = 'failed'; // ~14% chance
+            } else if (hash % 5 === 0) {
+                paymentStatus = 'pending'; // ~20% chance
+            } else {
+                paymentStatus = 'paid';
+            }
+            // --------------------------------------------------------------------------
 
-            // Mocking Performance Trend (0: flat, 1: up, 2: down)
+            // Mock Performance Trend (0: flat, 1: up, 2: down) - Still uses pure random as it's time-based data
             const trendValue = Math.floor(Math.random() * 3);
             let trendType = 'flat';
             if (trendValue === 1) trendType = 'up';
             else if (trendValue === 2) trendType = 'down';
 
-            // Mock performance metric (e.g., Revenue change)
+            // Mock performance metric
             const performanceMetric = (Math.random() * 10).toFixed(2) + '%';
 
             // Get staff counts
-            const staffCount = staffCountMap.get(shop._id.toString()) || { manager: 0, cashier: 0 };
+            const staffCount = staffCountMap.get(shop._id.toString()) || { managerCount: 0, cashierCount: 0 };
 
-            // Generate payment status (mock - would need actual payment model)
-            const statuses = ['paid', 'pending', 'failed', 'overdue'];
-            const weights = [0.7, 0.15, 0.1, 0.05];
-            const random = Math.random();
-            let cumulative = 0;
-            let paymentStatus = 'paid';
-            for (let i = 0; i < statuses.length; i++) {
-                cumulative += weights[i];
-                if (random < cumulative) {
-                    paymentStatus = statuses[i];
-                    break;
-                }
-            }
 
             return {
-                ...shop.toObject(), // Convert Mongoose document to plain object
-                // Injecting the requested fields for the frontend table:
-                dateJoined: shop.createdAt.toISOString().split('T')[0], // YYYY-MM-DD for reliable date sorting
-                tenureDays: daysActive, // 🚀 This is the field the frontend needs
+                ...shopObject, 
+                // shopName is now available because it's on the User schema and returned by find()
+                shopName: shopObject.shopName, 
+                dateJoined: shop.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
+                tenureDays: daysActive, 
                 performanceTrend: { metric: performanceMetric, trend: trendType },
-                // Add sensible defaults for other missing fields needed by the frontend, 
-                // e.g., plan, managerCount, cashierCount, location, if they aren't on the User model
-                plan: shop.plan || 'Basic', // Use plan from user or default
-                managerCount: staffCount.manager,
-                cashierCount: staffCount.cashier,
-                location: shop.location || 'City, State', // Use location from user or default
-                paymentStatus: paymentStatus, // Current month payment status
+                plan: shop.plan || 'BASIC', 
+                managerCount: staffCount.managerCount,
+                cashierCount: staffCount.cashierCount,
+                location: shop.location || 'N/A', 
+                paymentStatus: paymentStatus, 
             };
         });
 
@@ -138,16 +144,66 @@ router.get('/shops', superadminProtect, async (req, res) => {
  */
 router.get('/shops/:id', superadminProtect, async (req, res) => {
     try {
-        // Find the user by ID and ensure they have the 'owner' role
-        const shop = await User.findOne({ _id: req.params.id, role: 'owner' }).select('-password -resetPasswordToken -resetPasswordExpire');
+        const shopId = req.params.id;
+
+        // 1. Find the owner account by ID and ensure they have the 'owner' role
+        const shop = await User.findOne({ _id: shopId, role: 'owner' })
+            .select('-password -resetPasswordToken -resetPasswordExpire');
 
         if (!shop) {
-            return res.status(404).json({ success: false, message: `Shop with ID ${req.params.id} not found or is not an owner account.` });
+            return res.status(404).json({ success: false, message: `Shop with ID ${shopId} not found or is not an owner account.` });
         }
 
+        // 2. Aggregate staff counts for this specific shop
+        const staffCounts = await User.aggregate([
+            // Match staff records belonging to this shopId (which is the owner's _id)
+            { $match: { shopId: shop._id, role: { $in: ['Manager', 'Cashier'] } } },
+            {
+                $group: {
+                    _id: null, // Group all results together
+                    managerCount: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$role', 'Manager'] },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    cashierCount: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$role', 'Cashier'] },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    totalStaff: { $sum: 1 } // Total staff count (excluding owner)
+                }
+            }
+        ]);
+        
+        // 3. Prepare the final response object
+        const staffData = staffCounts[0] || { managerCount: 0, cashierCount: 0, totalStaff: 0 };
+        
+        const shopObject = shop.toObject();
+        
+        // Calculate tenure in days (copied from your /shops route for consistency)
+        const daysActive = Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Combine shop details with staff counts
         res.json({
             success: true,
-            data: shop
+            data: {
+                ...shopObject,
+                dateJoined: shop.createdAt.toISOString().split('T')[0],
+                tenureDays: daysActive,
+                managerCount: staffData.managerCount,
+                cashierCount: staffData.cashierCount,
+                totalStaff: staffData.totalStaff,
+                // You might also add paymentStatus, performanceTrend mocks here if needed for consistency
+            }
         });
 
     } catch (error) {
@@ -174,19 +230,26 @@ router.delete('/shops/:id', superadminProtect, async (req, res) => {
         const shopId = req.params.id;
 
         // 1. Find and ensure the user exists and has the 'owner' role
+        // We use findOneAndDelete for atomic operation, but finding first is better 
+        // if you need the 'shop' object for the message and have pre/post hooks.
         const shop = await User.findOne({ _id: shopId, role: 'owner' });
 
         if (!shop) {
             return res.status(404).json({ success: false, message: `Shop with ID ${shopId} not found or is not an owner account.` });
         }
 
+        // --- CRUCIAL IMPROVEMENT: Delete All Associated Staff ---
+        // The shop's ID is the shopId for all its staff members.
+        const deleteStaffResult = await User.deleteMany({ shopId: shop._id, role: { $in: ['Manager', 'Cashier'] } });
+        // --------------------------------------------------------
+
         // 2. Perform the deletion of the owner document (representing the shop)
         await shop.deleteOne();
-
+        
         // 3. Respond success
         res.json({
             success: true,
-            message: `Shop '${shop.email}' (ID: ${shopId}) and associated owner account successfully deleted.`
+            message: `Shop '${shop.shopName}' (Owner: ${shop.email}) and ${deleteStaffResult.deletedCount} associated staff accounts successfully deleted.`
         });
 
     } catch (error) {
@@ -339,127 +402,171 @@ router.put('/config', superadminProtect, async (req, res) => {
  */
 router.get('/dashboard', superadminProtect, async (req, res) => {
     try {
+        // --- Date Helpers ---
         const now = new Date();
-        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        
+        // Plan Mapping (Must match UserSchema)
+        const PLANS = ['BASIC', 'PRO', 'PREMIUM'];
+        const planPrices = { BASIC: 2499, PRO: 6999, PREMIUM: 16999 };
 
-        // Get all shops
-        const allShops = await User.find({ role: 'owner' });
-        const totalShops = allShops.length;
-        const activeShops = allShops.filter(shop => shop.isActive !== false).length;
+        // --- Parallel Data Fetching & Aggregation ---
+        const [
+            shopStats,
+            allUserStats,
+            monthlySales,
+            lastMonthSales,
+            allTimeSales,
+            newShopsThisMonth,
+            newUsersThisMonth
+        ] = await Promise.all([
+            // 1. Shop Counts and Plan Distribution (Owners only)
+            User.aggregate([
+                { $match: { role: 'owner' } },
+                {
+                    $group: {
+                        _id: '$plan',
+                        count: { $sum: 1 },
+                        activeCount: { $sum: { $cond: ['$isActive', 1, 0] } }
+                    }
+                }
+            ]),
+            
+            // 2. Total User and Active User Counts (All Non-Superadmin)
+            User.aggregate([
+                { $match: { role: { $in: ['owner', 'Manager', 'Cashier'] } } },
+                {
+                    $group: {
+                        _id: null,
+                        totalUsers: { $sum: 1 },
+                        activeUsers: { $sum: { $cond: ['$isActive', 1, 0] } }
+                    }
+                }
+            ]),
+            
+            // 3. Current Month Sales
+            Sale.aggregate([
+                { $match: { timestamp: { $gte: thisMonthStart } } },
+                { $group: { _id: null, totalAmount: { $sum: '$totalAmount' } } }
+            ]),
 
-        // Get all sales (this month and last month)
-        const [thisMonthSales, lastMonthSales, allTimeSales] = await Promise.all([
-            Sale.find({ timestamp: { $gte: thisMonth } }),
-            Sale.find({ timestamp: { $gte: lastMonth, $lt: thisMonth } }),
-            Sale.find({})
+            // 4. Last Month Sales
+            Sale.aggregate([
+                { $match: { timestamp: { $gte: lastMonthStart, $lt: thisMonthStart } } },
+                { $group: { _id: null, totalAmount: { $sum: '$totalAmount' } } }
+            ]),
+
+            // 5. All Sales (Used for trend, will optimize later if volume is huge)
+            Sale.find({}).select('totalAmount timestamp'),
+            
+            // 6. New Shops This Month
+            User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
+
+            // 7. New Users This Month
+            User.countDocuments({ role: { $in: ['owner', 'Manager', 'Cashier'] }, createdAt: { $gte: thisMonthStart } }),
         ]);
 
-        // Calculate revenue
-        const monthlyRevenue = thisMonthSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-        const lastMonthRevenue = lastMonthSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-        const totalRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        // --- Process Aggregation Results ---
+        
+        // --- Shops and Plans ---
+        const planCountsMap = new Map();
+        let totalShops = 0;
+        let activeShops = 0;
+        
+        shopStats.forEach(stat => {
+            const plan = stat._id || 'BASIC'; // Handle null plan as BASIC
+            planCountsMap.set(plan, {
+                count: stat.count,
+                activeCount: stat.activeCount,
+                revenue: (stat.activeCount || 0) * (planPrices[plan] || 0) // Mock subscription revenue
+            });
+            totalShops += stat.count;
+            activeShops += stat.activeCount;
+        });
+
+        // Structure Plan Distribution
+        const planDistribution = PLANS.reduce((acc, plan) => {
+            const data = planCountsMap.get(plan) || { count: 0, revenue: 0 };
+            acc[plan.toLowerCase()] = {
+                count: data.count,
+                revenue: data.revenue,
+                percentage: totalShops > 0 ? Math.round((data.count / totalShops) * 100) : 0
+            };
+            return acc;
+        }, {});
+        
+        const totalPlanRevenue = Object.values(planDistribution).reduce((sum, item) => sum + item.revenue, 0);
+
+        // --- Revenue and Growth ---
+        const monthlyRevenue = monthlySales[0]?.totalAmount || 0;
+        const lastMonthRevenue = lastMonthSales[0]?.totalAmount || 0;
+        const totalRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0); // Still relying on JS reduction of a large array for this single field
+        
         const revenueGrowth = lastMonthRevenue > 0
             ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
             : 0;
 
-        // Get all users (handle both cases for roles)
-        const allUsers = await User.find({ role: { $in: ['owner', 'Owner', 'Manager', 'manager', 'Cashier', 'cashier'] } });
-        const totalUsers = allUsers.length;
-        const activeUsers = allUsers.filter(user => user.isActive !== false).length;
+        // --- Users ---
+        const totalUsers = allUserStats[0]?.totalUsers || 0;
+        const activeUsers = allUserStats[0]?.activeUsers || 0;
 
-        // Calculate plan distribution (count shops by plan)
-        const planCounts = {
-            basic: allShops.filter(s => (s.plan || 'Basic').toLowerCase() === 'basic').length,
-            pro: allShops.filter(s => (s.plan || 'Basic').toLowerCase() === 'pro').length,
-            enterprise: allShops.filter(s => (s.plan || 'Basic').toLowerCase() === 'enterprise').length
-        };
-
-        // Calculate revenue per plan (from sales)
-        const planRevenue = { basic: 0, pro: 0, enterprise: 0 };
-        const planPrices = { basic: 2499, pro: 6999, enterprise: 16999 };
-
-        allShops.forEach(shop => {
-            const plan = (shop.plan || 'Basic').toLowerCase();
-            if (plan === 'basic' || plan === 'pro' || plan === 'enterprise') {
-                planRevenue[plan] += planPrices[plan] || 0;
-            }
-        });
-
-        const totalPlanRevenue = Object.values(planRevenue).reduce((sum, rev) => sum + rev, 0);
-        const planDistribution = {
-            basic: {
-                count: planCounts.basic,
-                revenue: planRevenue.basic,
-                percentage: totalShops > 0 ? Math.round((planCounts.basic / totalShops) * 100) : 0
-            },
-            pro: {
-                count: planCounts.pro,
-                revenue: planRevenue.pro,
-                percentage: totalShops > 0 ? Math.round((planCounts.pro / totalShops) * 100) : 0
-            },
-            enterprise: {
-                count: planCounts.enterprise,
-                revenue: planRevenue.enterprise,
-                percentage: totalShops > 0 ? Math.round((planCounts.enterprise / totalShops) * 100) : 0
-            }
-        };
-
-        // Calculate new shops this month
-        const newShopsThisMonth = allShops.filter(shop =>
-            shop.createdAt >= thisMonth
-        ).length;
+        // --- Growth Metrics ---
         const shopsGrowth = (totalShops - newShopsThisMonth) > 0
             ? (newShopsThisMonth / (totalShops - newShopsThisMonth)) * 100
             : 0;
 
-        // Calculate new users this month
-        const newUsersThisMonth = allUsers.filter(user =>
-            user.createdAt >= thisMonth
-        ).length;
-
-        // Payment status (mock - would need payment model)
+        // --- Payment Status (Mocked) ---
+        // Using fixed percentages for dashboard view (75% Paid, 20% Pending, 3% Failed, 2% Overdue)
         const paymentStatus = {
-            paid: Math.floor(totalShops * 0.7),
-            pending: Math.floor(totalShops * 0.2),
-            failed: Math.floor(totalShops * 0.08),
-            overdue: Math.floor(totalShops * 0.02)
+            paid: Math.floor(totalShops * 0.75),
+            pending: Math.floor(totalShops * 0.20),
+            failed: Math.floor(totalShops * 0.03),
+            overdue: totalShops - Math.floor(totalShops * 0.75) - Math.floor(totalShops * 0.20) - Math.floor(totalShops * 0.03)
         };
-
-        // Generate monthly revenue trend (last 6 months) from actual sales
+        
+        // --- Monthly Revenue Trend (Last 6 months) ---
         const monthlyTrend = [];
         for (let i = 5; i >= 0; i--) {
             const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
             monthEnd.setHours(23, 59, 59, 999);
 
+            // Filter sales for this specific month (O(N) operation on the allTimeSales array)
             const monthSales = allTimeSales.filter(sale =>
                 sale.timestamp >= monthStart && sale.timestamp <= monthEnd
             );
 
             monthlyTrend.push({
-                month: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+                month: monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
                 revenue: monthSales.reduce((sum, sale) => sum + sale.totalAmount, 0)
             });
         }
-
+        
         res.json({
             success: true,
             data: {
-                totalRevenue,
-                monthlyRevenue,
-                revenueGrowth,
+                // Revenue
+                totalSalesRevenue: totalRevenue, // Renamed for clarity
+                monthlySalesRevenue: monthlyRevenue,
+                revenueGrowth: revenueGrowth.toFixed(2), // Sales Revenue Growth %
+                totalPlanRevenue: totalPlanRevenue, // Mocked Subscription Revenue
+                
+                // Shops
                 totalShops,
                 activeShops,
                 newShopsThisMonth,
-                shopsGrowth,
+                shopsGrowth: shopsGrowth.toFixed(2), // Shop Growth %
+                
+                // Users
                 totalUsers,
                 activeUsers,
                 newUsersThisMonth,
+                
+                // Distribution & Status
                 planDistribution,
                 paymentStatus,
-                monthlyTrend
+                monthlyTrend // Last 6 months sales trend
             }
         });
     } catch (error) {
