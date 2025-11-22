@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, Loader, IndianRupee, Wifi, AlertTriangle, Eye, EyeOff, Globe } from 'lucide-react';
+import { ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, Loader, IndianRupee, Wifi, AlertTriangle, Eye, EyeOff, Globe, Building } from 'lucide-react';
 import API from '../config/api';
 import apiClient from '../lib/apiClient';
 import axios from 'axios';
@@ -57,6 +57,12 @@ const validatePhoneNumber = (phone) => {
     return null;
 };
 
+const validateShopName = (name) => {
+    if (!name || name.trim() === '') return 'Shop name is required.';
+    if (name.length < 3) return 'Shop name must be at least 3 characters.';
+    return null;
+};
+
 /**
  * Utility to load the Razorpay script dynamically.
  * @param {string} src - The script URL
@@ -79,9 +85,13 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [shopName, setShopName] = useState('');
+    
+    // Error states
     const [emailError, setEmailError] = useState(null);
     const [phoneError, setPhoneError] = useState(null);
     const [passwordError, setPasswordError] = useState(null);
+    const [shopNameError, setShopNameError] = useState(null);
     
     // Phone number state
     const [dialCode, setDialCode] = useState('+91');
@@ -144,6 +154,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             setCountryCodes(codes);
         } catch (error) {
             console.error('Failed to fetch country codes:', error);
+            // Fallback codes
             setCountryCodes([
                 { code: '+1', flag: '🇺🇸', name: 'United States' },
                 { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
@@ -215,6 +226,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         setEmailError(null);
         setPhoneError(null);
         setPasswordError(null);
+        setShopNameError(null);
         
         // --- Validation ---
         if (!plan) {
@@ -231,6 +243,12 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         const phoneValidation = validatePhoneNumber(phone);
         if (phoneValidation) {
             setPhoneError(phoneValidation);
+            return;
+        }
+        
+        const shopNameValidation = validateShopName(shopName);
+        if (shopNameValidation) {
+            setShopNameError(shopNameValidation);
             return;
         }
         
@@ -296,7 +314,8 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 password: password,
                                 phone: phone,
                                 plan: planKey,
-                                transactionId: transactionId 
+                                transactionId: transactionId,
+                                shopName: shopName, // Pass shopName here
                             });
 
                             if (signupResponse.data && signupResponse.data.user) {
@@ -326,7 +345,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                 prefill: {
                     email: email,
                     contact: phone,
-                    name: 'POS Shop Owner', 
+                    name: shopName || 'POS Shop Owner', 
                 },
                 theme: {
                     color: '#4f46e5' 
@@ -357,7 +376,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             setIsProcessing(false);
         }
 
-    }, [plan, planKey, email, phone, password, onPaymentSuccess]);
+    }, [plan, planKey, email, phone, password, shopName, onPaymentSuccess]);
 
 
     // --- Render Content Based on State ---
@@ -397,7 +416,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans">
             <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
                 
-                {/* Header (Unchanged) */}
+                {/* Header */}
                 <div className="text-center mb-8">
                     <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         Complete Payment & Create Account
@@ -413,36 +432,43 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
 
                 <form onSubmit={handlePaymentSubmit}>
                     
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                         
-                        {/* Left Side: Plan Details + Account Information (User Info Section REMAINS) */}
+                        {/* Left Side: Account Information (User Input Only) */}
                         <div className="h-full">
-                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full">
+                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col">
                                 
-                                {/* Plan Details (Unchanged) */}
-                                <div className={`p-6 rounded-xl ${plan.color} text-white shadow-lg h-48 flex flex-col justify-between`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-xl font-bold flex items-center">
-                                            <ShoppingCart className="w-5 h-5 mr-2" />
-                                            {plan.name}
-                                        </h4>
-                                        <span className="text-xs font-medium uppercase border border-white/50 px-2 py-1 rounded-full">{plan.interval}</span>
-                                    </div>
-                                    <div className="mt-auto pt-4 border-t border-white/30">
-                                        <p className="text-sm text-white/90 mb-1">Total Due:</p>
-                                        <p className="text-4xl font-extrabold">{formatCurrency(plan.price)}</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    {/* Account Information Header (Unchanged) */}
-                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-600">
-                                        Account Information
+                                <div className='flex-grow'>
+                                    {/* Account Information Header */}
+                                    <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                                        Owner & Shop Details
                                     </h4>
                                     
-                                    {/* Email Input (Unchanged) */}
-                                    <div className="mb-4">
-                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                                    {/* Shop Name Input */}
+                                    <div className="mb-6">
+                                        <label htmlFor="shopName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Shop/Business Name</label>
+                                        <div className='relative'>
+                                            <Building className='w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' />
+                                            <input
+                                                type="text"
+                                                id="shopName"
+                                                value={shopName}
+                                                onChange={(e) => {
+                                                    setShopName(e.target.value);
+                                                    setShopNameError(null);
+                                                }}
+                                                placeholder="Ex: Sharma General Store"
+                                                className={`w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                                required
+                                                disabled={isProcessing}
+                                            />
+                                        </div>
+                                        {shopNameError && <p className="text-red-500 text-xs mt-1">{shopNameError}</p>}
+                                    </div>
+                                    
+                                    {/* Email Input */}
+                                    <div className="mb-6">
+                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address (for Login)</label>
                                         <input
                                             type="email"
                                             id="email"
@@ -459,21 +485,21 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
                                     </div>
                                     
-                                    {/* Phone Input (Unchanged) */}
-                                    <div className="mb-4">
+                                    {/* Phone Input */}
+                                    <div className="mb-6">
                                         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
                                         <div className={`
                                             w-full flex rounded-lg transition duration-150 bg-white dark:bg-gray-800
                                             ${phoneError ? 'border border-red-500' : 'border border-gray-300 dark:border-gray-600'}
                                             focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500
                                         `} ref={dropdownRef}>
-                                            {/* Country Code Selector and Phone Number Input (Same logic) */}
+                                            {/* Country Code Selector */}
                                             <div className="relative">
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                                     className={`
-                                                        bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-3 pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
+                                                        bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-[0.865rem] pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
                                                         focus:outline-none rounded-l-lg cursor-pointer flex items-center justify-between
                                                         w-auto min-w-[80px] max-w-[120px]
                                                         text-sm truncate hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150
@@ -492,7 +518,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     )}
                                                 </button>
                                                 
-                                                {/* Dropdown Panel with Search (Same logic) */}
+                                                {/* Dropdown Panel with Search */}
                                                 {isDropdownOpen && countryCodes.length > 0 && (
                                                     <div className="absolute z-10 top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
                                                         <div className="p-2 sticky top-0 bg-white dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 z-20">
@@ -528,8 +554,8 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     </div>
                                                 )}
                                             </div>
-                                            
-                                            {/* Phone Number Input (Same logic) */}
+
+                                            {/* Phone Number Input */}
                                             <input
                                                 type="tel"
                                                 placeholder="Enter phone number"
@@ -551,9 +577,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         )}
                                     </div>
                                     
-                                    {/* Password Input (Unchanged) */}
+                                    {/* Password Input */}
                                     <div>
-                                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password (for Login)</label>
                                         <div className="relative">
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
@@ -583,12 +609,36 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             </div>
                         </div>
 
-                        {/* Right Side: Razorpay Payment Info (REPLACED CONTENT) */}
+                        {/* Right Side: Plan Details + Razorpay Payment Info (Consolidated) */}
                         <div className="h-full">
-                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-center items-center text-center">
+                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-start">
                                 
-                                {/* Card Preview (Visual Element) - RETAINED FOR BRANDING/UX */}
+                                {/* 1. Plan Details (Moved Here) */}
+                                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                    Your Subscription
+                                </h4>
+                                <div className={`p-6 rounded-xl ${plan.color} text-white shadow-lg flex flex-col justify-between`}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-2xl font-bold flex items-center">
+                                            <ShoppingCart className="w-6 h-6 mr-3" />
+                                            {plan.name}
+                                        </h4>
+                                        <span className="text-xs font-medium uppercase border border-white/50 px-2 py-1 rounded-full">{plan.interval}</span>
+                                    </div>
+                                    <div className="border-t border-white/30 pt-4">
+                                        <p className="text-sm text-white/90 mb-1">Total Due Today:</p>
+                                        <p className="text-4xl font-extrabold">{formatCurrency(plan.price)}</p>
+                                    </div>
+                                </div>
+
+                                {/* 2. Payment Information Header */}
+                                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
+                                    Secure Payment
+                                </h4>
+
+                                {/* Card Preview (Visual Element) */}
                                 <div className="w-full h-48 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-xl p-5 shadow-2xl relative overflow-hidden text-white font-mono transition-all duration-300 border border-indigo-600">
+                                    {/* Decorative elements */}
                                     <div className="absolute top-0 right-0 w-2/3 h-full rounded-l-full opacity-10 bg-teal-400 transform translate-x-1/2 -translate-y-1/2"></div>
                                     <div className="absolute bottom-0 left-0 w-1/2 h-1/2 rounded-r-full opacity-10 bg-white transform -translate-x-1/4 translate-y-1/4"></div>
 
@@ -598,47 +648,43 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     </div>
 
                                     <p className="text-2xl tracking-widest relative z-10 mb-4">
-                                        #### #### #### ####
+                                        •••• •••• •••• ••••
                                     </p>
 
                                     <div className="flex justify-between items-center text-sm mt-5 relative z-10">
                                         <div>
-                                            <p className="text-xs text-indigo-300 mb-1">Payment via</p>
+                                            <p className="text-xs text-indigo-300 mb-1">Payment Processor</p>
                                             <p className="font-semibold uppercase truncate w-32">Razorpay</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-indigo-300 mb-1">Secured by</p>
-                                            <p className="font-semibold">HTTPS/SSL</p>
+                                            <p className="font-semibold flex items-center">
+                                                <Lock className='w-3 h-3 mr-1' /> HTTPS/SSL
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                                 {/* End Card Preview */}
 
-                                {/* Payment Details Header and Info */}
-                                <div>
-                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-600">
-                                        Secure Payment
-                                    </h4>
+                                {/* Payment Method Description */}
+                                {/* <div className="space-y-3 mt-2 text-left">
+                                    <h5 className='text-md font-bold text-gray-900 dark:text-white'>Accepted Methods</h5>
+                                    <ul className="text-gray-700 dark:text-gray-300 text-sm list-disc list-inside space-y-1">
+                                        <li>**UPI** (Google Pay, PhonePe, Paytm)</li>
+                                        <li>**Credit/Debit Cards** (Visa, MasterCard, Rupay)</li>
+                                        <li>**Netbanking**</li>
+                                    </ul>
                                     
-                                    <div className="text-gray-700 dark:text-gray-300 space-y-3">
-                                        <p className="text-center">
-                                            Click the button below to open the secure **Razorpay** popup.
-                                        </p>
-                                        <p className="font-medium text-sm text-center">
-                                            You can complete your payment using **UPI, Netbanking, or Card** within the popup window.
-                                        </p>
-                                        <div className="flex items-center justify-center text-sm text-indigo-600 dark:text-indigo-400">
-                                            <IndianRupee className="w-4 h-4 mr-1" />
-                                            We only accept payments in Indian Rupees (INR).
-                                        </div>
+                                    <div className="flex items-center text-sm text-center text-gray-600 dark:text-gray-400 pt-2">
+                                        <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+                                        <span>Payment is processed through a secure, third-party Razorpay gateway.</span>
                                     </div>
-                                    
-                                </div>
+                                </div> */}
                             </div>
                         </div>
                     </div>
-
-                    {/* Submit Button - Triggers Order Creation and Razorpay Popup */}
+                    
+                    {/* Footer / Submit Button Section */}
                     <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <button
                             type="submit"
@@ -652,18 +698,15 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 </>
                             ) : (
                                 <>
-                                    Pay {formatCurrency(plan.price)}
-                                    <Lock className="w-5 h-5 ml-2" />
+                                    <IndianRupee className="w-5 h-5 mr-2" />
+                                    Pay {formatCurrency(plan.price)} Securely
                                 </>
                             )}
                         </button>
-                        
-                        {/* Footer (Unchanged) */}
                         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4 flex items-center justify-center">
                             <Lock className="w-4 h-4 mr-1" />
-                            Secure payment processing via Razorpay.
+                            By clicking 'Pay Securely', you agree to our Terms and Conditions.
                         </p>
-
                         <div className="text-center pt-4">
                             <button 
                                 type="button" 
@@ -671,16 +714,13 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 className="cursor-pointer text-sm text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
                                 disabled={isProcessing}
                             >
-                                <ArrowLeft className="w-4 h-4 mr-1 cursor-pointer" /> Cancel and go back
+                                <ArrowLeft className="w-4 h-4 mr-1 cursor-pointer" /> Cancel and go back to plans
                             </button>
                         </div>
                     </div>
-
                 </form>
-
             </div>
         </div>
     );
 };
-
 export default Checkout;

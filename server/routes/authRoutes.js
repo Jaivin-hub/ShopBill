@@ -101,21 +101,28 @@ router.post('/login', async (req, res) => {
  * @access Public
  */
 router.post('/signup', async (req, res) => {
-    const { email, password, phone, plan, transactionId } = req.body;
+    // UPDATED: Destructure shopName
+    const { email, password, phone, plan, transactionId, shopName } = req.body;
     
-    // REQUIREMENT: Must have a verified transaction ID and plan to sign up as an owner
-    if (!email || !password || !plan || !transactionId) {
-        return res.status(400).json({ error: 'Email, password, plan, and transaction ID are required for owner signup.' });
+    // REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
+    if (!email || !password || !plan || !transactionId || !shopName) {
+        return res.status(400).json({ error: 'Email, password, shop name, plan, and transaction ID are required for owner signup.' });
     }
 
     try {
         // Check if user exists by email OR phone number
         const userExists = await User.findOne({ $or: [{ email }, { phone }] });
         if (userExists) {
-            // NOTE: A user might try to sign up with an existing email/phone after paying. 
-            // In a production app, you'd handle this better (e.g., refund or link payment).
             return res.status(400).json({ error: 'User already exists with this email or phone number.' });
         }
+        
+        // Also check if a shop with this name already exists (as implemented by the schema's unique constraint, 
+        // but an explicit check provides a better error message)
+        const shopNameExists = await User.findOne({ shopName });
+        if (shopNameExists) {
+            return res.status(400).json({ error: 'A shop with this name is already registered. Please choose a different name.' });
+        }
+
 
         const newUser = await User.create({
             email,
@@ -126,6 +133,7 @@ router.post('/signup', async (req, res) => {
             shopId: new mongoose.Types.ObjectId(), 
             plan: plan,
             transactionId: transactionId,
+            shopName: shopName, // NEW: Store shop name
         });
         
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
@@ -143,11 +151,16 @@ router.post('/signup', async (req, res) => {
                 shopId: newUser.shopId,
                 phone: newUser.phone,
                 plan: newUser.plan,
+                shopName: newUser.shopName, // NEW: Return shop name in response
             }
         });
 
     } catch (error) {
         console.error('Signup Error:', error);
+        // Mongoose validation errors will be caught here if they involve unique constraints
+        if (error.code === 11000) { // Duplicate key error code
+             return res.status(400).json({ error: 'A user or shop with this email/shop name already exists.' });
+        }
         res.status(500).json({ error: 'Server error during signup.' });
     }
 });

@@ -7,7 +7,7 @@ const translations = {
         tagline: "#1 Retail Management Tool",
         title: "Your Shop, Fully Managed. Right in your Pocket.",
         subtitle: "Pocket POS transforms your smartphone or tablet into a powerful Point of Sale and Business Manager. Cut down on clutter, save time, and track every rupee instantly.",
-        getStarted: "Get Started",
+        getStarted: "Log In",
         startTrial: "Start Your Free Trial",
         exploreFeatures: "Explore Features",
         featuresTitle: "Manage Every Aspect of Your Business",
@@ -242,11 +242,11 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     </div>
                                 )}
                             </div>
-                            <a
-                                href='#pricing'
+                            <button
+                                onClick={onStartApp}
                                 className="bg-indigo-600 text-white cursor-pointer text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
                                 {t.getStarted}
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>

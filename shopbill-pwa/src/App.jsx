@@ -133,8 +133,8 @@ const App = () => {
     setCurrentUser(null);
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
-    setIsLoadingAuth(false);
     showToast('Logged out successfully.', 'info');
+    setIsLoadingAuth(false);
   }, [showToast]);
 
   // --- LOGIN HANDLER (called from Login.js) ---
@@ -334,9 +334,20 @@ useEffect(() => {
                 onLogin={handleLoginSuccess} 
                 showToast={showToast} 
                 onBackToLanding={() => {
+                    // *** CRITICAL UPDATE: Update state FIRST, then defer the hash navigation. ***
+                    
+                    // 1. Update state to switch from Login to LandingPage view
                     setIsViewingLogin(false);
-                    setSelectedPlan(null); // Clear selected plan on back
-                    setCurrentPage('dashboard'); // Reset to show landing page
+                    setSelectedPlan(null); 
+                    setCurrentPage('dashboard'); 
+
+                    // 2. Defer the hash navigation using setTimeout to ensure the LandingPage
+                    //    component has finished rendering before the browser attempts to scroll.
+                    setTimeout(() => {
+                        // If the URL is already on the root path, just setting the hash works.
+                        // We use a full assignment to ensure scroll happens.
+                        window.location.href = '#pricing';
+                    }, 100); // 100ms should be enough for component transition
                 }} 
                 // initialPlan is no longer used - checkout handles signup now
                 initialPlan={null} 
