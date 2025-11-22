@@ -494,8 +494,9 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
 
 // Main Login Component
 const Login = ({ onLogin, onBackToLanding, initialPlan }) => {
-    const [checkoutPlan, setCheckoutPlan] = useState(initialPlan || null);
-    const [view, setView] = useState(initialPlan ? 'signup' : 'login'); // 'login', 'signup', 'forgotPassword'
+    // NOTE: initialPlan is no longer used for signup flow - checkout handles that now
+    // This is kept for backward compatibility but login page always shows login form
+    const [view, setView] = useState('login'); // 'login', 'signup', 'forgotPassword'
     // RENAMED STATE: 'email' is now 'identifier' for generality
     const [identifier, setIdentifier] = useState(''); 
     const [password, setPassword] = useState('');
@@ -747,12 +748,9 @@ const Login = ({ onLogin, onBackToLanding, initialPlan }) => {
                 localStorage.removeItem('userToken');
                 localStorage.setItem('userToken', data.token);
                 
-                // CRITICAL CHANGE: If a plan was selected, redirect to checkout, NOT the dashboard
-                if (isSignup && checkoutPlan) {
-                    onLogin(data.user, data.token, checkoutPlan); // Pass checkoutPlan to App.js
-                } else {
-                    onLogin(data.user, data.token);
-                }
+                // NEW FLOW: Signup now happens in checkout, so login page just handles login
+                // If user signs up here (shouldn't happen in new flow), just log them in
+                onLogin(data.user, data.token);
 
             } else {
                 setAuthError(`${formType} failed. Unexpected response structure.`);

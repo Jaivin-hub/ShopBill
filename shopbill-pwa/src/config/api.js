@@ -43,6 +43,10 @@ const API = {
     // Plan Management (Owner only)
     updatePlan: API_BASE_URL + '/user/plan', // GET (Get current plan), PUT (Update subscription plan)
     // ------------------------------------------
+    
+    // Payment Routes
+    createpayment: API_BASE_URL + '/payment/create-order', // POST (Process payment)
+    // ------------------------------------------
 }
 
 export default API

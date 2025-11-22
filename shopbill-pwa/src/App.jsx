@@ -66,9 +66,10 @@ const App = () => {
   const [isViewingLogin, setIsViewingLogin] = useState(false);
 
   // Handler passed to LandingPage for paid subscriptions
+  // NEW FLOW: Go directly to checkout, signup happens after payment
   const handleSelectPlan = useCallback((plan) => {
     setSelectedPlan(plan);
-    setIsViewingLogin(true); // Redirects to the Login component
+    setCurrentPage('checkout'); // Go directly to checkout
 }, []);
 
   
@@ -146,15 +147,17 @@ const App = () => {
     setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
     
-    // CRITICAL: If a plan was selected during sign-up, go to checkout, otherwise go to dashboard
+    // NEW FLOW: If signup happened after checkout (planToCheckout exists), go to dashboard
+    // Otherwise, if it's a regular login, go to dashboard
     if (planToCheckout) {
-        setCurrentPage('checkout');
-        setSelectedPlan(planToCheckout); // Ensure state is retained
+        // User just signed up after payment, go to dashboard
+        showToast('Account created successfully! Your plan is now active.', 'success');
+        setSelectedPlan(null); // Clear the plan state
     } else {
-        setCurrentPage('dashboard');
+        showToast('Welcome back!', 'success');
     }
     
-    showToast('Welcome back!', 'success');
+    setCurrentPage('dashboard');
 }, [showToast]);
 
 
@@ -278,56 +281,80 @@ useEffect(() => {
         return <ResetPassword />;
     }
 
+    // --- CHECKOUT FLOW (Check first, before login/landing) ---
+    // NEW: Checkout can now be accessed by non-authenticated users
+    if (currentPage === 'checkout') {
+        if (!selectedPlan) {
+            // Should not happen, but ensure a fallback
+            showToast('No plan selected. Redirecting to landing page.', 'error');
+            setCurrentPage('dashboard');
+            setIsViewingLogin(false);
+            return null;
+        }
+        return (
+            <Checkout 
+                plan={selectedPlan}
+                onPaymentSuccess={(data) => {
+                    // NEW FLOW: Payment and signup completed - redirect to login
+                    if (data && data.success) {
+                        // Show success message and redirect to login
+                        showToast(data.message || 'Account created successfully! Please login to continue.', 'success');
+                        setCurrentPage('dashboard');
+                        setSelectedPlan(null);
+                        setIsViewingLogin(true); // Show login page
+                    } else {
+                        // Fallback: should not happen, but handle gracefully
+                        showToast('Account created successfully! Please login to continue.', 'success');
+                        setCurrentPage('dashboard');
+                        setSelectedPlan(null);
+                        setIsViewingLogin(true);
+                    }
+                }}
+                onBackToDashboard={() => {
+                    // If user is not authenticated, go back to landing page
+                    if (!currentUser) {
+                        setCurrentPage('dashboard'); // Reset to default, which will show landing page
+                        setIsViewingLogin(false);
+                        setSelectedPlan(null);
+                    } else {
+                        setCurrentPage('dashboard');
+                        setSelectedPlan(null);
+                    }
+                }}
+            />
+        );
+    }
+    // --- END CHECKOUT FLOW ---
+
     // --- LANDING/LOGIN FLOW ---
     if (!currentUser) {
         if (isViewingLogin) {
+            // Show login page
             return <Login 
                 onLogin={handleLoginSuccess} 
                 showToast={showToast} 
                 onBackToLanding={() => {
                     setIsViewingLogin(false);
                     setSelectedPlan(null); // Clear selected plan on back
+                    setCurrentPage('dashboard'); // Reset to show landing page
                 }} 
-                // PASS THE PLAN TO LOGIN COMPONENT
-                initialPlan={selectedPlan} 
+                // initialPlan is no longer used - checkout handles signup now
+                initialPlan={null} 
             />;
         }
+        // Show landing page
         return (
             <LandingPage 
-                onStartApp={() => setIsViewingLogin(true)} 
+                onStartApp={() => {
+                    setIsViewingLogin(true);
+                    setCurrentPage('dashboard'); // Ensure we're not on checkout
+                }} 
                 // PASS THE NEW HANDLER HERE
                 onSelectPlan={handleSelectPlan} 
             />
         );
     }
     // --- END LANDING/LOGIN FLOW ---
-
-    // --- CHECKOUT FLOW ---
-    if (currentPage === 'checkout') {
-        if (!selectedPlan) {
-            // Should not happen, but ensure a fallback
-            showToast('No plan selected. Redirecting to dashboard.', 'error');
-            setCurrentPage('dashboard');
-            return null;
-        }
-        return (
-            <Checkout 
-                plan={selectedPlan}
-                onPaymentSuccess={(plan) => {
-                    // This function is called after the payment simulation succeeds
-                    showToast(`${plan} plan activated!`, 'success');
-                    setCurrentPage('dashboard');
-                    setSelectedPlan(null); // Clear the plan state
-                    // In a real app, you'd also reload user data to reflect the new subscription status
-                }}
-                onBackToDashboard={() => {
-                    setCurrentPage('dashboard');
-                    setSelectedPlan(null); // Clear the plan state
-                }}
-            />
-        );
-    }
-    // --- END CHECKOUT FLOW ---
     
     const commonProps = {
       currentUser, 

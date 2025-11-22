@@ -20,7 +20,9 @@ const staffRoutes = require('./routes/staffRoutes');
 // 💥 NEW: Import Superadmin Routes
 const superadminRoutes = require('./routes/superadminRoutes');
 // 💥 NEW: Import User Routes (for plan management)
-const userRoutes = require('./routes/userRoutes'); 
+const userRoutes = require('./routes/userRoutes');
+// 💥 NEW: Import Payment Routes
+const paymentRoutes = require('./routes/paymentRoutes'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +53,25 @@ app.use('/api/user', userRoutes);
 // 💥 NEW: SUPERADMIN ROUTES: Mount the router at /api/superadmin
 // This will contain logic for shop creation, user listing, system configuration, etc.
 app.use('/api/superadmin', superadminRoutes);
+
+// 💥 NEW: PAYMENT ROUTES: Mount the router at /api/payment
+app.use('/api/payment', paymentRoutes);
+
+// Debug route to list all available routes
+app.get('/api/routes', (req, res) => {
+    res.json({
+        message: 'Available API routes',
+        routes: [
+            '/api/auth/login',
+            '/api/auth/signup',
+            '/api/payment/test',
+            '/api/payment/process',
+            '/api/inventory',
+            '/api/customers',
+            '/api/sales',
+        ]
+    });
+});
 
 // --- Server Initialization ---
 const startServer = async () => {

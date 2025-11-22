@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CreditCard, Receipt, Package, Users, LineChart, UserCog, Cloud, Globe } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
-
 // --- TRANSLATION DATA ---
 const translations = {
     en: {
@@ -30,16 +29,16 @@ const translations = {
         testimonialShop: "Sharma General Store, Kochi",
         pricingTitle: "Simple Pricing, Powerful Features",
         pricingSubtitle: "Choose the plan that fits your business. No hidden fees, just everything you need to grow.",
-        freePlan: "Free Plan",
         basicPlan: "Basic Plan",
         proPlan: "Pro Plan",
-        freeDesc: "Perfect for new sellers and home businesses.",
+        premiumPlan: "Premium Plan",
         basicDesc: "Best for single outlets and small teams.",
         proDesc: "Ideal for multiple outlets and high-growth businesses.",
+        premiumDesc: "Perfect for large businesses with advanced needs.",
         recommended: "Recommended",
-        getStartedFree: "Get Started Free",
         selectBasic: "Select Basic",
         choosePro: "Choose Pro",
+        choosePremium: "Choose Premium",
         unlimitedTxn: "Unlimited Transactions",
         limitedTxn: "Up to 50 Transactions/month",
         user1: "1 User (Owner Only)",
@@ -83,16 +82,16 @@ const translations = {
         testimonialShop: "ശർമ്മ ജനറൽ സ്റ്റോർ, കൊച്ചി",
         pricingTitle: "ലളിതമായ വില, ശക്തമായ ഫീച്ചറുകൾ",
         pricingSubtitle: "നിങ്ങളുടെ ബിസിനസ്സിന് അനുയോജ്യമായ പ്ലാൻ തിരഞ്ഞെടുക്കുക. മറഞ്ഞ ഫീസില്ല, വളരാൻ ആവശ്യമായതെല്ലാം ഇതിലുണ്ട്.",
-        freePlan: "സൗജന്യ പ്ലാൻ",
         basicPlan: "ബേസിക് പ്ലാൻ",
         proPlan: "പ്രോ പ്ലാൻ",
-        freeDesc: "പുതിയ വിൽപ്പനക്കാർക്കും ഹോം ബിസിനസുകൾക്കും അനുയോജ്യം.",
+        premiumPlan: "പ്രീമിയം പ്ലാൻ",
         basicDesc: "ഒരു ഔട്ട്ലെറ്റിനും ചെറിയ ടീമിനും മികച്ചത്.",
         proDesc: "ഒന്നിലധികം ഔട്ട്ലെറ്റുകൾക്കും വളരുന്ന ബിസിനസുകൾക്കും അനുയോജ്യമാണ്.",
+        premiumDesc: "വലിയ ബിസിനസുകൾക്കും അഡ്വാൻസ്ഡ് ആവശ്യങ്ങൾക്കും അനുയോജ്യം.",
         recommended: "ശുപാർശ ചെയ്യുന്നത്",
-        getStartedFree: "സൗജന്യമായി തുടങ്ങുക",
         selectBasic: "ബേസിക് തിരഞ്ഞെടുക്കുക",
         choosePro: "പ്രോ തിരഞ്ഞെടുക്കുക",
+        choosePremium: "പ്രീമിയം തിരഞ്ഞെടുക്കുക",
         unlimitedTxn: "അൺലിമിറ്റഡ് ഇടപാടുകൾ",
         limitedTxn: "പ്രതിമാസം 50 ഇടപാടുകൾ വരെ",
         user1: "1 ഉപയോക്താവ് (ഉടമ മാത്രം)",
@@ -147,15 +146,12 @@ const renderTitle = (fullTitle, gradientWord) => {
     });
 };
 
-
 const LandingPage = ({ onStartApp, onSelectPlan }) => {
     const [language, setLanguage] = useState('en');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
     const t = translations[language]; // Current translation object
-
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -175,10 +171,7 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
         { code: 'en', label: 'English' },
         { code: 'ml', label: 'മലയാളം (Malayalam)' },
     ];
-
-    // Determine the gradient word based on the current language
     const gradientWord = language === 'ml' ? 'പോക്കറ്റിൽ' : 'Pocket';
-
     return (
         <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300 font-sans">
             {/* Custom Styles using a style block within the component */}
@@ -208,16 +201,9 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                     }
                 }
             `}</style>
-
             {/* Navigation Header */}
             <nav className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-sm shadow-xl shadow-indigo-900/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/*
-          CHANGE: Changed 'justify-between' to 'flex' (default) and added
-          'sm:justify-between' to control the alignment on different screen sizes.
-          On mobile, we rely on the implicit spacing and `justify-start` behavior.
-          The fix is actually in the inner flex container (see below)
-        */}
                     <div className="flex justify-between items-center h-16">
 
                         {/* Logo/Title Group - Stays on the left */}
@@ -225,14 +211,7 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                             <CreditCard className="w-6 h-6 text-indigo-400" />
                             <span className="text-xl font-bold text-white">Pocket POS</span>
                         </a>
-
-                        {/* CTA Group - We'll control the gap here */}
-                        {/* CHANGE: Added 'space-x-2' for mobile and 'sm:space-x-4' for tablet/desktop 
-              to control the gap between the language icon and the button.
-            */}
                         <div className="flex items-center space-x-2 sm:space-x-4">
-
-                            {/* --- LANGUAGE DROPDOWN --- */}
                             <div className="relative" ref={dropdownRef}>
                                 <button
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -263,18 +242,15 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     </div>
                                 )}
                             </div>
-                            {/* --- END LANGUAGE DROPDOWN --- */}
-
-                            <button
-                                onClick={onStartApp}
+                            <a
+                                href='#pricing'
                                 className="bg-indigo-600 text-white cursor-pointer text-sm font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300">
                                 {t.getStarted}
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
             </nav>
-
             {/* Main Content */}
             <main>
                 {/* 1. Hero Section */}
@@ -303,7 +279,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 {t.exploreFeatures}
                             </a>
                         </div>
-
                         {/* Mock App Screenshot/Mockup */}
                         <div className="mt-12">
                             <img
@@ -314,7 +289,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </div>
                     </div>
                 </section>
-
                 {/* 2. Core Features Section */}
                 <section id="features" className="py-16 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -326,7 +300,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 {t.featuresSubtitle}
                             </p>
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900/50 hover:shadow-2xl">
@@ -344,7 +317,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">{t.stockControl}</h3>
                                 <p className="text-gray-400">{t.stockControlDesc}</p>
                             </div>
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-amber-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-900/50 text-amber-400 mb-4">
                                     <Users className="w-6 h-6" />
@@ -352,7 +324,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">{t.khata}</h3>
                                 <p className="text-gray-400">{t.khataDesc}</p>
                             </div>
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-purple-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-900/50 text-purple-400 mb-4">
                                     <LineChart className="w-6 h-6" />
@@ -360,7 +331,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">{t.reports}</h3>
                                 <p className="text-gray-400">{t.reportsDesc}</p>
                             </div>
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-pink-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-900/50 text-pink-400 mb-4">
                                     <UserCog className="w-6 h-6" />
@@ -368,7 +338,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">{t.staff}</h3>
                                 <p className="text-gray-400">{t.staffDesc}</p>
                             </div>
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-900/50 text-blue-400 mb-4">
                                     <Cloud className="w-6 h-6" />
@@ -379,7 +348,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </div>
                     </div>
                 </section>
-
                 {/* 3. Testimonial/Social Proof */}
                 <section className="py-16 md:py-20 bg-indigo-700">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -398,7 +366,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </blockquote>
                     </div>
                 </section>
-
                 {/* 4. Pricing / Final CTA */}
                 <section id="pricing" className="py-16 md:py-20 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -408,44 +375,8 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
                             {t.pricingSubtitle}
                         </p>
-
                         {/* Pricing Card Grid (3 Columns) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-
-                            {/* -------------------- FREE PLAN -------------------- */}
-                            <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-teal-600 transition duration-300">
-                                <h3 className="text-2xl font-bold mb-2 text-white">{t.freePlan}</h3>
-                                <p className="text-gray-400 text-sm">{t.freeDesc}</p>
-                                <div className="my-6">
-                                    <span className="text-5xl font-extrabold text-white">₹0</span>
-                                    <span className="text-xl font-medium text-gray-400">/{language === 'ml' ? 'മാസം' : 'month'}</span>
-                                </div>
-                                <ul className="text-left space-y-3 mb-8 text-gray-300">
-                                    <li className="flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
-                                        {t.limitedTxn}
-                                    </li>
-                                    <li className="flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
-                                        {t.user1}
-                                    </li>
-                                    <li className="flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
-                                        {t.basicInv}
-                                    </li>
-                                    <li className="flex items-center text-gray-500">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-red-500"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                        {t.khataView}
-                                    </li>
-                                </ul>
-
-                                <button
-                                    onClick={onStartApp}
-                                    className="block cursor-pointer w-full py-3 bg-teal-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-teal-700 transition duration-300">
-                                    {t.getStartedFree}
-                                </button>
-                            </div>
-
                             {/* -------------------- BASIC PLAN -------------------- */}
                             <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-indigo-600 transition duration-300">
                                 <h3 className="text-2xl font-bold mb-2 text-white">{t.basicPlan}</h3>
@@ -479,15 +410,45 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     {t.selectBasic}
                                 </button>
                             </div>
-
-
-                            {/* -------------------- PRO PLAN (FEATURED - ₹999/month) -------------------- */}
+                            {/* -------------------- PRO PLAN -------------------- */}
+                            <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-indigo-600 transition duration-300">
+                                <h3 className="text-2xl font-bold mb-2 text-white">{t.proPlan}</h3>
+                                <p className="text-gray-400 text-sm">{t.proDesc}</p>
+                                <div className="my-6">
+                                    <span className="text-5xl font-extrabold text-white">₹799</span>
+                                    <span className="text-xl font-medium text-gray-400">/{language === 'ml' ? 'മാസം' : 'month'}</span>
+                                </div>
+                                <ul className="text-left space-y-3 mb-8 text-gray-300">
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
+                                        {t.unlimitedTxn}
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
+                                        {t.userUnlimited}
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
+                                        {t.fullInvBulk}
+                                    </li>
+                                    <li className="flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 mr-2 text-teal-400"><polyline points="20 6 9 17 4 12" /></svg>
+                                        {t.khataSMS}
+                                    </li>
+                                </ul>
+                                <button
+                                    onClick={() => onSelectPlan('PRO')}
+                                    className="block cursor-pointer w-full py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition duration-300">
+                                    {t.choosePro}
+                                </button>
+                            </div>
+                            {/* -------------------- PREMIUM PLAN (FEATURED) -------------------- */}
                             <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-indigo-400 transform scale-100 lg:scale-[1.05] lg:relative lg:-top-3 transition duration-300">
                                 <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-teal-400 text-gray-900 text-xs font-bold py-1 px-3 rounded-full shadow-md">
                                     {t.recommended}
                                 </div>
-                                <h3 className="text-2xl font-bold mb-2">{t.proPlan}</h3>
-                                <p className="text-indigo-200 text-sm">{t.proDesc}</p>
+                                <h3 className="text-2xl font-bold mb-2">{t.premiumPlan}</h3>
+                                <p className="text-indigo-200 text-sm">{t.premiumDesc}</p>
                                 <div className="my-6">
                                     <span className="text-5xl font-extrabold text-white">₹999</span>
                                     <span className="text-xl font-medium text-indigo-200">/{language === 'ml' ? 'മാസം' : 'month'}</span>
@@ -510,19 +471,16 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                         {t.khataSMS}
                                     </li>
                                 </ul>
-
                                 <button
-                                    onClick={() => onSelectPlan('PRO')}
+                                    onClick={() => onSelectPlan('PREMIUM')}
                                     className="block cursor-pointer w-full py-3 bg-white text-indigo-700 text-lg font-bold rounded-xl shadow-lg hover:bg-gray-100 transition duration-300">
-                                    {t.choosePro}
+                                    {t.choosePremium}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </section>
-
             </main>
-
             {/* Footer */}
             <footer className="bg-gray-900 border-t border-gray-800 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
@@ -537,5 +495,4 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
         </div>
     );
 };
-
 export default LandingPage;

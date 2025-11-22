@@ -95,18 +95,25 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Register a New owner/Shop
+/**
+ * @route POST /api/auth/signup
+ * @desc Register a New owner/Shop after successful payment verification.
+ * @access Public
+ */
 router.post('/signup', async (req, res) => {
-    const { email, password, phone } = req.body;
+    const { email, password, phone, plan, transactionId } = req.body;
     
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required.' });
+    // REQUIREMENT: Must have a verified transaction ID and plan to sign up as an owner
+    if (!email || !password || !plan || !transactionId) {
+        return res.status(400).json({ error: 'Email, password, plan, and transaction ID are required for owner signup.' });
     }
 
     try {
         // Check if user exists by email OR phone number
         const userExists = await User.findOne({ $or: [{ email }, { phone }] });
         if (userExists) {
+            // NOTE: A user might try to sign up with an existing email/phone after paying. 
+            // In a production app, you'd handle this better (e.g., refund or link payment).
             return res.status(400).json({ error: 'User already exists with this email or phone number.' });
         }
 
@@ -114,10 +121,11 @@ router.post('/signup', async (req, res) => {
             email,
             password,
             phone: phone || null,
-            // FIX: Changed role from lowercase 'owner' to PascalCase 'owner' for consistency
             role: 'owner', 
-            // Create a new ObjectID to use temporarily until we save the user's ID as their shopId
+            // Temporary shopId, will be replaced by _id immediately after creation
             shopId: new mongoose.Types.ObjectId(), 
+            plan: plan,
+            transactionId: transactionId,
         });
         
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
@@ -134,7 +142,7 @@ router.post('/signup', async (req, res) => {
                 role: newUser.role,
                 shopId: newUser.shopId,
                 phone: newUser.phone,
-
+                plan: newUser.plan,
             }
         });
 
