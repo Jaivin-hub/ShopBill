@@ -34,7 +34,7 @@ const generateDummyDashboardData = () => {
     const planDistribution = {
         basic: { count: 89, revenue: 222611, percentage: 57 },
         pro: { count: 52, revenue: 363948, percentage: 33 },
-        enterprise: { count: 15, revenue: 254985, percentage: 10 }
+        premium: { count: 15, revenue: 254985, percentage: 10 }
     };
     
     // Generate payment status
@@ -289,12 +289,12 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                             const planColors = {
                                 basic: 'bg-gray-500/20 border-gray-500/30 text-gray-700 dark:text-gray-300',
                                 pro: 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300',
-                                enterprise: 'bg-purple-500/20 border-purple-500/30 text-purple-300',
+                                premium: 'bg-purple-500/20 border-purple-500/30 text-purple-300',
                             };
                             const planNames = {
                                 basic: 'Basic',
                                 pro: 'Pro',
-                                enterprise: 'Enterprise',
+                                premium: 'Premium',
                             };
                             
                             return (

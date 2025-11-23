@@ -125,6 +125,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
     // Fetch country codes 
     const fetchCountryCodes = useCallback(async () => {
         try {
+            // Note: Using a public API to fetch country data, this is not a mock.
             const response = await axios.get('https://restcountries.com/v3.1/all?fields=name,idd,flag');
             const data = response.data;
 
@@ -219,7 +220,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         }
     }, [plan]);
 
-    // --- RAZORPAY PAYMENT HANDLER ---
+    // --- RAZORPAY PAYMENT HANDLER (UPDATED FOR SUBSCRIPTIONS) ---
     const handlePaymentSubmit = useCallback(async (e) => {
         e.preventDefault();
         setPaymentError(null);
@@ -269,53 +270,64 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                 return;
             }
             
-            // STEP 2: Create Order on Server (GET ORDER ID)
-            const createOrderUrl = `${API.createpayment}`;
-            const orderResponse = await axios.post(createOrderUrl, {
+            // ----------------------------------------------------------------------
+            // STEP 2: Create Subscription Mandate on Server (GET SUBSCRIPTION ID)
+            // ----------------------------------------------------------------------
+            const createSubscriptionUrl = `${API.createSubscription}`; // Using the new subscription endpoint
+            const subscriptionResponse = await apiClient.post(createSubscriptionUrl, {
                 plan: planKey,
             });
             
-            const { orderId, currency, amount, keyId } = orderResponse.data;
-            if (!orderId) {
-                setPaymentError("Failed to initiate payment. Order ID missing from server.");
+            // The response contains the Subscription ID, the ₹1 verification charge amount (100 paise), currency, and keyId
+            const { subscriptionId, currency, amount, keyId } = subscriptionResponse.data; 
+            if (!subscriptionId) {
+                setPaymentError("Failed to initiate subscription mandate. Subscription ID missing from server.");
                 setIsProcessing(false);
                 return;
             }
 
+            // ----------------------------------------------------------------------
             // STEP 3: Configure and Open Razorpay Checkout Popup
+            // IMPORTANT: Pass subscription_id instead of order_id
+            // ----------------------------------------------------------------------
             const options = {
                 key: keyId, 
-                amount: amount, 
+                amount: amount, // This is the ₹1 verification charge (100 paise)
                 currency: currency,
                 name: 'Pocket POS Subscription',
-                description: `Payment for ${plan.name}`,
-                order_id: orderId,
+                description: `Setup Mandate for ${plan.name} (1 Rupee verification)`,
+                subscription_id: subscriptionId, // <<--- CRITICAL CHANGE: Use subscription_id
                 handler: async (response) => {
-                    // This function is executed when payment succeeds on the popup
+                    // This function is executed when the mandate setup succeeds on the popup
                     setIsProcessing(true);
                     
                     try {
-                        // STEP 4: Verify Payment Signature on Server
-                        const verifyUrl = `${API.verifypayment}`;
-                        const verificationResponse = await axios.post(verifyUrl, {
+                        // ----------------------------------------------------------------------
+                        // STEP 4: Verify Subscription Mandate Signature on Server
+                        // Pass the new razorpay_subscription_id field
+                        // ----------------------------------------------------------------------
+                        const verifyUrl = `${API.verifySubscription}`; // Using the new verification endpoint
+                        const verificationResponse = await apiClient.post(verifyUrl, {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
+                            razorpay_subscription_id: response.razorpay_subscription_id, // <<--- CRITICAL NEW FIELD
                         });
 
                         const { success: verificationSuccess, transactionId } = verificationResponse.data;
-
+                        
+                        // transactionId here should be the razorpay_subscription_id
                         if (verificationSuccess && transactionId) {
-                            // STEP 5: Signup User using the Verified Transaction ID
-                            console.log('Payment verified. Creating user account with email:', email);
+                            // STEP 5: Signup User using the Verified Subscription ID
+                            console.log('Subscription mandate verified. Creating user account with subscription ID:', transactionId);
                             
                             const signupResponse = await apiClient.post(API.signup, {
                                 email: email.toLowerCase().trim(),
                                 password: password,
                                 phone: phone,
                                 plan: planKey,
-                                transactionId: transactionId,
-                                shopName: shopName, // Pass shopName here
+                                transactionId: transactionId, // This is the Subscription ID
+                                shopName: shopName,
                             });
 
                             if (signupResponse.data && signupResponse.data.user) {
@@ -328,11 +340,11 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     });
                                 }, 1500);
                             } else {
-                                setPaymentError("Account creation failed after verified payment. Contact support.");
+                                setPaymentError("Account creation failed after verified mandate. Contact support.");
                                 setIsProcessing(false);
                             }
                         } else {
-                            setPaymentError('Payment verification failed. Please try again or contact support.');
+                            setPaymentError('Subscription mandate verification failed. Please try again or contact support.');
                             setIsProcessing(false);
                         }
                         
@@ -363,14 +375,14 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             
 
         } catch (error) {
-            console.error('Initial Order Creation Error:', error);
+            console.error('Initial Subscription Creation Error:', error);
             
             if (error.response?.data?.error) {
                 setPaymentError(error.response.data.error);
             } else if (error.response?.data?.message) {
                 setPaymentError(error.response.data.message);
             } else {
-                setPaymentError("Failed to connect to the server or create order.");
+                setPaymentError("Failed to connect to the server or create subscription mandate.");
             }
             
             setIsProcessing(false);
@@ -401,9 +413,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             <div className="flex items-center justify-center min-h-screen bg-gray-950 p-4">
                 <div className="w-full max-w-md bg-gray-800 p-10 rounded-2xl shadow-2xl text-center border border-green-600/50">
                     <CheckCircle className="w-16 h-16 text-green-400 mx-auto animate-bounce" />
-                    <h2 className="text-3xl font-extrabold text-white mt-4">Payment Successful!</h2>
+                    <h2 className="text-3xl font-extrabold text-white mt-4">Subscription Mandate Successful!</h2>
                     <p className="text-gray-400 mt-2">
-                        Your account has been created. Redirecting you to login...
+                        Your account has been created and your 30-day free trial has begun. Redirecting you to login...
                     </p>
                 </div>
             </div>
@@ -419,9 +431,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
-                        Complete Payment & Create Account
+                        Complete Registration & Start Free Trial
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">Enter your details to complete your subscription</p>
+                    <p className="text-gray-600 dark:text-gray-400">Secure your subscription mandate to begin your 30-day free trial.</p>
                 </div>
 
                 {paymentError && (
@@ -429,6 +441,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                         {paymentError}
                     </div>
                 )}
+
 
                 <form onSubmit={handlePaymentSubmit}>
                     
@@ -626,14 +639,16 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         <span className="text-xs font-medium uppercase border border-white/50 px-2 py-1 rounded-full">{plan.interval}</span>
                                     </div>
                                     <div className="border-t border-white/30 pt-4">
-                                        <p className="text-sm text-white/90 mb-1">Total Due Today:</p>
-                                        <p className="text-4xl font-extrabold">{formatCurrency(plan.price)}</p>
+                                        <p className="text-sm text-white/90 mb-1">Total Due Today (Verification Charge):</p>
+                                        {/* Displaying ₹1, the verification charge, instead of the full plan price for mandate setup */}
+                                        <p className="text-4xl font-extrabold">{formatCurrency(1)}</p>
+                                        <p className="text-sm text-white/80 mt-1">Full plan charge {formatCurrency(plan.price)} will start after the 30-day free trial.</p>
                                     </div>
                                 </div>
 
                                 {/* 2. Payment Information Header */}
                                 <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
-                                    Secure Payment
+                                    Secure Mandate Setup
                                 </h4>
 
                                 {/* Card Preview (Visual Element) */}
@@ -665,21 +680,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     </div>
                                 </div>
                                 {/* End Card Preview */}
-
-                                {/* Payment Method Description */}
-                                {/* <div className="space-y-3 mt-2 text-left">
-                                    <h5 className='text-md font-bold text-gray-900 dark:text-white'>Accepted Methods</h5>
-                                    <ul className="text-gray-700 dark:text-gray-300 text-sm list-disc list-inside space-y-1">
-                                        <li>**UPI** (Google Pay, PhonePe, Paytm)</li>
-                                        <li>**Credit/Debit Cards** (Visa, MasterCard, Rupay)</li>
-                                        <li>**Netbanking**</li>
-                                    </ul>
-                                    
-                                    <div className="flex items-center text-sm text-center text-gray-600 dark:text-gray-400 pt-2">
-                                        <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-                                        <span>Payment is processed through a secure, third-party Razorpay gateway.</span>
-                                    </div>
-                                </div> */}
                             </div>
                         </div>
                     </div>
@@ -694,18 +694,18 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             {isProcessing ? (
                                 <>
                                     <Loader className="w-5 h-5 mr-2 animate-spin" />
-                                    {window.Razorpay ? 'Waiting for Payment...' : 'Creating Order...'} 
+                                    {window.Razorpay ? 'Processing Mandate...' : 'Creating Mandate...'} 
                                 </>
                             ) : (
                                 <>
-                                    <IndianRupee className="w-5 h-5 mr-2" />
-                                    Pay {formatCurrency(plan.price)} Securely
+                                    <Lock className="w-5 h-5 mr-2" />
+                                    Setup Mandate & Start Free Trial
                                 </>
                             )}
                         </button>
                         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4 flex items-center justify-center">
                             <Lock className="w-4 h-4 mr-1" />
-                            By clicking 'Pay Securely', you agree to our Terms and Conditions.
+                            By clicking 'Setup Mandate', you agree to our Terms and Conditions.
                         </p>
                         <div className="text-center pt-4">
                             <button 

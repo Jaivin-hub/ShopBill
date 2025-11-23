@@ -1,53 +1,43 @@
 const express = require('express');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
-const { protect } = require('../middleware/authMiddleware'); // Assuming this is needed for future paid-user features
+const { protect } = require('../middleware/authMiddleware'); // For future paid-user features
 
 const router = express.Router();
 
 // --- 1. Initialize Razorpay Instance ---
-// This uses your keys from the environment variables (dotenv is loaded in server.js)
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// --- Constants for Payments (Example Values) ---
+// --- Constants for Payments (Updated to include Razorpay Plan IDs) ---
+// NOTE: These IDs MUST be created on your Razorpay Dashboard in Live Mode
 const PLAN_DETAILS = {
-    BASIC: { amount: 499, currency: 'INR', description: 'Pocket POS Basic Plan' }, // Amount in Rupees
-    PRO: { amount: 999, currency: 'INR', description: 'Pocket POS Pro Plan' },    // Amount in Rupees
-    PREMIUM: { amount: 1999, currency: 'INR', description: 'Pocket POS Premium Plan' }, // Amount in Rupees
+    BASIC: { 
+        plan_id: process.env.BASIC_PLAN, // <<== REPLACE WITH YOUR LIVE BASIC PLAN ID
+        description: 'Pocket POS Basic Plan'
+    },
+    PRO: { 
+        plan_id: process.env.PRO_PLAN, // <<== REPLACE WITH YOUR LIVE PRO PLAN ID
+        description: 'Pocket POS Pro Plan'
+    },    
+    PREMIUM: { 
+        plan_id: process.env.PREMIUM_PLAN, // <<== REPLACE WITH YOUR LIVE PREMIUM PLAN ID
+        description: 'Pocket POS Premium Plan'
+    }, 
 };
 
-// --- Health Check Routes (Kept for completeness) ---
+// ------------------------------------------------------------------
+// --- CORE RAZORPAY SUBSCRIPTION FLOW ---
+// ------------------------------------------------------------------
 
 /**
- * @route GET /api/payment/test
- * @desc Test endpoint to verify payment routes are working
+ * @route POST /api/payment/create-subscription
+ * @desc Creates a new Razorpay Subscription Mandate. Includes 30-day free trial logic.
  * @access Public
  */
-router.get('/test', (req, res) => {
-    res.json({
-        success: true,
-        message: 'Razorpay Payment routes are active and initialized!',
-        endpoints: {
-            createOrder: 'POST /api/payment/create-order',
-            verifyPayment: 'POST /api/payment/verify',
-        },
-        timestamp: new Date().toISOString()
-    });
-});
-
-// ------------------------------------------------------------------
-// --- CORE RAZORPAY FLOW ---
-// ------------------------------------------------------------------
-
-/**
- * @route POST /api/payment/create-order
- * @desc Creates a new Razorpay Order on the server.
- * @access Public (This happens before the user is a registered owner)
- */
-router.post('/create-order', async (req, res) => {
+router.post('/create-subscription', async (req, res) => {
     const { plan } = req.body;
 
     // 1. Basic validation
@@ -55,16 +45,27 @@ router.post('/create-order', async (req, res) => {
         return res.status(400).json({ error: 'Invalid or missing plan selected.' });
     }
 
-    const { amount, currency, description } = PLAN_DETAILS[plan];
+    const { plan_id, description } = PLAN_DETAILS[plan];
     
-    // Razorpay amount is in the smallest currency unit (Paisa for INR)
-    const amountInPaise = amount * 100;
+    // --- 30-DAY FREE TRIAL LOGIC ---
+    // The payment mandate is set up immediately, but the first full charge is delayed.
+    const trialDays = 30;
+    const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
-    const options = {
-        amount: amountInPaise, 
-        currency: currency,
-        receipt: `receipt_pos_${Date.now()}`, // Unique receipt ID for idempotency
-        payment_capture: 1, // Auto capture the payment upon success
+    const subscriptionOptions = {
+        plan_id: plan_id, // The recurring plan created on the Razorpay Dashboard
+        customer_notify: 1, // Notify customer of successful mandate setup
+        total_count: 0, // 0 for infinite billing cycles (until cancelled)
+        start_at: startAtTimestamp, // First full payment occurs 30 days from now
+        
+        // Add a small ₹1 charge for mandate setup verification (Mandatory for some methods)
+        addons: [{
+            item: {
+                name: 'Verification Charge',
+                amount: 100, // 100 paise = ₹1.00
+                currency: 'INR'
+            }
+        }],
         notes: {
             plan_name: plan,
             description: description
@@ -72,40 +73,42 @@ router.post('/create-order', async (req, res) => {
     };
 
     try {
-        // 2. Call Razorpay API to create the Order
-        const order = await razorpay.orders.create(options);
+        // 2. Call Razorpay API to create the Subscription
+        const subscription = await razorpay.subscriptions.create(subscriptionOptions);
 
-        // 3. Return the Order details to the frontend
+        // 3. Return the Subscription ID and other details to the frontend
         res.json({
             success: true,
-            orderId: order.id,
-            currency: order.currency,
-            amount: order.amount, // Amount in paise
-            keyId: process.env.RAZORPAY_KEY_ID, // Send key ID back to frontend for checkout
+            subscriptionId: subscription.id,
+            currency: subscription.currency,
+            amount: subscription.amount, // This will be the ₹1 verification charge
+            keyId: process.env.RAZORPAY_KEY_ID, // Send key ID back for checkout integration
         });
 
     } catch (error) {
-        console.error('Razorpay Order Creation Error:', error);
-        res.status(500).json({ error: 'Failed to create payment order.', details: error.message });
+        console.error('Razorpay Subscription Creation Error:', error);
+        res.status(500).json({ error: 'Failed to create subscription mandate.', details: error.message });
     }
 });
 
 
 /**
- * @route POST /api/payment/verify
- * @desc Verifies the payment signature returned by the client-side checkout.
+ * @route POST /api/payment/verify-subscription
+ * @desc Verifies the signature returned by the client-side checkout after mandate setup.
  * @access Public
  */
-router.post('/verify', async (req, res) => {
+router.post('/verify-subscription', async (req, res) => {
     // These three fields are returned by the Razorpay Checkout handler on the frontend
+    // NOTE: The 'order' ID is now the ID of the internal order created for the mandate setup
     const { 
         razorpay_order_id, 
         razorpay_payment_id, 
-        razorpay_signature 
+        razorpay_signature,
+        razorpay_subscription_id // New critical field for subscription verification
     } = req.body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-        return res.status(400).json({ success: false, error: 'Missing payment verification data.' });
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
+        return res.status(400).json({ success: false, error: 'Missing payment verification data for subscription mandate.' });
     }
 
     try {
@@ -122,28 +125,25 @@ router.post('/verify', async (req, res) => {
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
-            // SUCCESS: Signature verified, payment is legitimate.
-            // In a real application, you would:
-            // a) Find the pending payment/user record by razorpay_order_id
-            // b) Update the record as 'paid'
-            // c) Proceed to the signup logic using the payment ID as the transaction ID
-
+            // SUCCESS: Signature verified, mandate setup is legitimate.
+            // 4. Use the subscription ID as the transaction ID for the signup process.
+            
             res.json({
                 success: true,
-                message: 'Payment verified successfully. Proceed to user signup.',
-                transactionId: razorpay_payment_id, // Use this for the signup process!
+                message: 'Subscription mandate verified successfully. Proceed to user signup.',
+                transactionId: razorpay_subscription_id, // Use the SUBSCRIPTION ID as the transaction ID
             });
         } else {
             // FAILURE: Signature mismatch (potential fraud attempt)
             res.status(400).json({
                 success: false,
-                error: 'Payment verification failed. Signature mismatch.',
+                error: 'Subscription mandate verification failed. Signature mismatch.',
             });
         }
 
     } catch (error) {
-        console.error('Razorpay Verification Error:', error);
-        res.status(500).json({ success: false, error: 'Server error during payment verification.' });
+        console.error('Razorpay Subscription Verification Error:', error);
+        res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
     }
 });
 

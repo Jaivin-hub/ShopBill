@@ -1,8 +1,5 @@
-// src/components/UserManagement.js (Frontend - Fixed Date Joined Extraction and Tenure Sorting)
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import API from '../config/api';
 
 // Define roles for staff count (for display purposes)
 const STAFF_ROLES = {
@@ -14,7 +11,7 @@ const STAFF_ROLES = {
 const SHOP_PLANS = {
     BASIC: 'Basic',
     PRO: 'Pro',
-    ENTERPRISE: 'Enterprise',
+    Premium: 'Premium',
 };
 
 // --- Utility Functions ---
@@ -37,7 +34,7 @@ const formatDate = (isoString) => {
 
 const getPlanStyles = (plan) => {
     switch (plan) {
-        case SHOP_PLANS.ENTERPRISE:
+        case SHOP_PLANS.Premium:
             return 'bg-purple-800/50 text-purple-300 border-purple-700';
         case SHOP_PLANS.PRO:
             return 'bg-indigo-800/50 text-indigo-300 border-indigo-700';
@@ -177,7 +174,7 @@ const generateDummyPaymentData = (shopName, plan) => {
     const planPrices = {
         [SHOP_PLANS.BASIC]: 2499,
         [SHOP_PLANS.PRO]: 6999,
-        [SHOP_PLANS.ENTERPRISE]: 16999,
+        [SHOP_PLANS.Premium]: 16999,
     };
     
     const price = planPrices[plan] || planPrices[SHOP_PLANS.BASIC];

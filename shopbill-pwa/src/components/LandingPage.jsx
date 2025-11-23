@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CreditCard, Receipt, Package, Users, LineChart, UserCog, Cloud, Globe } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
-// --- TRANSLATION DATA ---
 const translations = {
     en: {
         tagline: "#1 Retail Management Tool",
@@ -110,19 +109,14 @@ const translations = {
         currentLang: "മലയാളം",
     }
 };
-
-// Helper function to handle the title rendering logic
 const renderTitle = (fullTitle, gradientWord) => {
     return fullTitle.split('. ').map((part, index) => {
         const isLastPart = index === fullTitle.split('. ').length - 1;
         let content;
-
         if (part.includes(gradientWord)) {
-            // Split the part into textBefore and textAfter (which might be empty)
             const parts = part.split(gradientWord);
             const textBefore = parts[0].trim();
             const textAfter = parts.slice(1).join(gradientWord); // Handles cases where the word appears multiple times (unlikely here)
-
             content = (
                 <React.Fragment>
                     {textBefore && `${textBefore} `}
@@ -132,25 +126,20 @@ const renderTitle = (fullTitle, gradientWord) => {
                 </React.Fragment>
             );
         } else {
-            // Render all other parts normally
             content = part;
         }
-
         return (
             <React.Fragment key={index}>
                 {content}
-                {/* Re-add the separator (period) and line break/space for all but the last part */}
                 {!isLastPart && <>. <br className="hidden sm:inline" />{'\u00A0'}</>}
             </React.Fragment>
         );
     });
 };
-
 const LandingPage = ({ onStartApp, onSelectPlan }) => {
     const [language, setLanguage] = useState('en');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
-
     const t = translations[language]; // Current translation object
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -161,12 +150,10 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
     const handleLanguageChange = (lang) => {
         setLanguage(lang);
         setIsDropdownOpen(false);
     };
-
     const languages = [
         { code: 'en', label: 'English' },
         { code: 'ml', label: 'മലയാളം (Malayalam)' },
@@ -174,7 +161,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
     const gradientWord = language === 'ml' ? 'പോക്കറ്റിൽ' : 'Pocket';
     return (
         <div className="min-h-screen bg-gray-950 scroll-smooth text-gray-300 font-sans">
-            {/* Custom Styles using a style block within the component */}
             <style jsx="true" global="true">{`
                 :root {
                     --color-primary: #818cf8; /* indigo-400 for dark theme contrast */
@@ -201,12 +187,9 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                     }
                 }
             `}</style>
-            {/* Navigation Header */}
             <nav className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-sm shadow-xl shadow-indigo-900/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-
-                        {/* Logo/Title Group - Stays on the left */}
                         <a href="#" className="flex items-center space-x-2">
                             <CreditCard className="w-6 h-6 text-indigo-400" />
                             <span className="text-xl font-bold text-white">Pocket POS</span>
@@ -221,7 +204,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     <Globe className="w-5 h-5 mr-1" />
                                     <span className="text-sm font-medium hidden sm:inline">{t.currentLang}</span>
                                 </button>
-
                                 {isDropdownOpen && (
                                     <div className="absolute right-0 mt-2 w-48 rounded-md shadow-2xl bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 border border-indigo-700/50">
                                         <div className="py-1">
@@ -251,24 +233,18 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                     </div>
                 </div>
             </nav>
-            {/* Main Content */}
             <main>
-                {/* 1. Hero Section */}
                 <section className="py-12 md:py-24 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <span className="inline-block text-sm font-semibold text-teal-400 uppercase tracking-widest bg-teal-900/50 px-3 py-1 rounded-full mb-3 border border-teal-700/50">
                             {t.tagline}
                         </span>
-
                         <h1 className="hero-title text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tighter mb-4 text-white">
                             {renderTitle(t.title, gradientWord)}
                         </h1>
-
                         <p className="mt-4 text-lg text-gray-400 max-w-3xl mx-auto mb-8">
                             {t.subtitle}
                         </p>
-
-                        {/* Primary CTAs */}
                         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                             <a
                                 href="#pricing"
@@ -279,7 +255,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 {t.exploreFeatures}
                             </a>
                         </div>
-                        {/* Mock App Screenshot/Mockup */}
                         <div className="mt-12">
                             <img
                                 src={coverImage}
@@ -289,7 +264,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </div>
                     </div>
                 </section>
-                {/* 2. Core Features Section */}
                 <section id="features" className="py-16 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="text-center mb-12">
@@ -301,7 +275,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                             </p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-900/50 text-indigo-400 mb-4">
                                     <Receipt className="w-6 h-6" />
@@ -309,7 +282,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                 <h3 className="text-xl font-bold text-white mb-2">{t.fastPOS}</h3>
                                 <p className="text-gray-400">{t.fastPOSDesc}</p>
                             </div>
-
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-teal-900/50 hover:shadow-2xl">
                                 <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-900/50 text-teal-400 mb-4">
                                     <Package className="w-6 h-6" />
@@ -348,7 +320,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </div>
                     </div>
                 </section>
-                {/* 3. Testimonial/Social Proof */}
                 <section className="py-16 md:py-20 bg-indigo-700">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <blockquote className="text-white">
@@ -366,7 +337,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </blockquote>
                     </div>
                 </section>
-                {/* 4. Pricing / Final CTA */}
                 <section id="pricing" className="py-16 md:py-20 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                         <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
@@ -375,9 +345,7 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
                             {t.pricingSubtitle}
                         </p>
-                        {/* Pricing Card Grid (3 Columns) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                            {/* -------------------- BASIC PLAN -------------------- */}
                             <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-indigo-600 transition duration-300">
                                 <h3 className="text-2xl font-bold mb-2 text-white">{t.basicPlan}</h3>
                                 <p className="text-gray-400 text-sm">{t.basicDesc}</p>
@@ -410,7 +378,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     {t.selectBasic}
                                 </button>
                             </div>
-                            {/* -------------------- PRO PLAN -------------------- */}
                             <div className="bg-gray-800 text-gray-300 p-8 rounded-2xl shadow-xl border-2 border-gray-700/50 hover:border-indigo-600 transition duration-300">
                                 <h3 className="text-2xl font-bold mb-2 text-white">{t.proPlan}</h3>
                                 <p className="text-gray-400 text-sm">{t.proDesc}</p>
@@ -442,7 +409,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                                     {t.choosePro}
                                 </button>
                             </div>
-                            {/* -------------------- PREMIUM PLAN (FEATURED) -------------------- */}
                             <div className="bg-indigo-600 text-white p-8 rounded-2xl shadow-[0_25px_50px_-12px_rgba(79,70,229,0.5)] border-4 border-indigo-400 transform scale-100 lg:scale-[1.05] lg:relative lg:-top-3 transition duration-300">
                                 <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-teal-400 text-gray-900 text-xs font-bold py-1 px-3 rounded-full shadow-md">
                                     {t.recommended}
@@ -481,7 +447,6 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                     </div>
                 </section>
             </main>
-            {/* Footer */}
             <footer className="bg-gray-900 border-t border-gray-800 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
                     <div className="mb-4">

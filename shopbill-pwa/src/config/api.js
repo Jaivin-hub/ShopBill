@@ -45,8 +45,8 @@ const API = {
     // ------------------------------------------
     
     // Payment Routes
-    createpayment: API_BASE_URL + '/payment/create-order', // POST (Process payment)
-    verifypayment: API_BASE_URL + '/payment/verify'
+    createSubscription: API_BASE_URL + '/payment/create-subscription', // POST (Creates a recurring subscription mandate)
+    verifySubscription: API_BASE_URL + '/payment/verify-subscription' // POST (Verifies the mandate setup signature)
     // ------------------------------------------
 }
 
