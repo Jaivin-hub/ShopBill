@@ -52,7 +52,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 {
                     id: 'basic',
                     name: 'Basic',
-                    price: 2499,
+                    price: 499,
                     features: ['Basic Inventory Management', 'Up to 5 Users', 'Email Support'],
                     maxUsers: 5,
                     maxInventory: 1000,
@@ -60,7 +60,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 {
                     id: 'pro',
                     name: 'Pro',
-                    price: 6999,
+                    price: 799,
                     features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
                     maxUsers: 20,
                     maxInventory: 10000,
@@ -68,7 +68,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 {
                     id: 'enterprise',
                     name: 'Enterprise',
-                    price: 16999,
+                    price: 999,
                     features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
                     maxUsers: -1,
                     maxInventory: -1,

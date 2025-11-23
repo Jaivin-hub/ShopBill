@@ -292,7 +292,7 @@ router.get('/config', superadminProtect, async (req, res) => {
             plans: {
                 basic: {
                     name: 'Basic',
-                    price: 2499,
+                    price: 499,
                     features: ['Basic Inventory Management', 'Up to 5 Users', 'Email Support'],
                     maxUsers: 5,
                     maxInventory: 1000,
@@ -300,7 +300,7 @@ router.get('/config', superadminProtect, async (req, res) => {
                 },
                 pro: {
                     name: 'Pro',
-                    price: 6999,
+                    price: 799,
                     features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
                     maxUsers: 20,
                     maxInventory: 10000,
@@ -308,7 +308,7 @@ router.get('/config', superadminProtect, async (req, res) => {
                 },
                 enterprise: {
                     name: 'Enterprise',
-                    price: 16999,
+                    price: 999,
                     features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
                     maxUsers: -1,
                     maxInventory: -1,
@@ -409,7 +409,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         
         // Plan Mapping (Must match UserSchema)
         const PLANS = ['BASIC', 'PRO', 'PREMIUM'];
-        const planPrices = { BASIC: 2499, PRO: 6999, PREMIUM: 16999 };
+        const planPrices = { BASIC: 499, PRO: 799, PREMIUM: 999 };
 
         // --- Parallel Data Fetching & Aggregation ---
         const [
@@ -749,9 +749,9 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         .limit(12); // Fetch the last 12 months/payments
 
         const planPrices = {
-            'BASIC': 2499,
-            'PRO': 6999,
-            'PREMIUM': 16999 // Using PREMIUM for consistency with payment router
+            'BASIC': 499,
+            'PRO': 799,
+            'PREMIUM': 999 // Using PREMIUM for consistency with payment router
         };
         const price = planPrices[plan] || planPrices['BASIC'];
 

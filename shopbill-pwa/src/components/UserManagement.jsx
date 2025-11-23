@@ -172,9 +172,9 @@ const PaymentStatusBadge = ({ status }) => {
 // Generate dummy payment data
 const generateDummyPaymentData = (shopName, plan) => {
     const planPrices = {
-        [SHOP_PLANS.BASIC]: 2499,
-        [SHOP_PLANS.PRO]: 6999,
-        [SHOP_PLANS.Premium]: 16999,
+        [SHOP_PLANS.BASIC]: 499,
+        [SHOP_PLANS.PRO]: 799,
+        [SHOP_PLANS.Premium]: 999,
     };
     
     const price = planPrices[plan] || planPrices[SHOP_PLANS.BASIC];

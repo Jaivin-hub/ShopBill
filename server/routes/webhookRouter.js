@@ -118,7 +118,7 @@ router.post('/razorpay', async (req, res) => {
             let amountInCurrency = amountInPaise / 100; 
 
             // Fallback prices if amount is missing (e.g., sometimes minimal data on failure)
-            const fallbackPrices = { 'BASIC': 2499, 'PRO': 6999, 'PREMIUM': 16999 };
+            const fallbackPrices = { 'BASIC': 499, 'PRO': 799, 'PREMIUM': 999 };
             const fallbackAmount = fallbackPrices[owner.plan] || 0;
 
             if (event === 'subscription.charged' && paymentEntity?.status === 'captured') {
