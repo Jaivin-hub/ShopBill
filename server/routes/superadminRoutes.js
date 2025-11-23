@@ -4,7 +4,7 @@ const User = require('../models/User'); // Reusing the User model for shop data 
 const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
-
+const Payment = require('../models/Payment');
 const router = express.Router();
 
 /**
@@ -728,66 +728,76 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
     try {
         const shopId = req.params.id;
 
-        // Verify shop exists
-        const shop = await User.findOne({ _id: shopId, role: 'owner' });
-        if (!shop) {
+        // 1. Verify shop owner exists
+        const owner = await User.findOne({ _id: shopId, role: 'owner' });
+        if (!owner) {
             return res.status(404).json({
                 success: false,
-                message: 'Shop not found.'
+                message: 'Shop/Owner not found.'
             });
         }
 
-        // In a real system, this would query a Payment model
-        // For now, we'll generate mock payment history based on shop creation date
-        const now = new Date();
-        const paymentHistory = [];
+        const plan = owner.plan || 'BASIC';
+        const subscriptionId = owner.transactionId; // This is the Razorpay Subscription ID
+
+        // 2. Fetch REAL Payment History from the database
+        const paymentHistory = await Payment.find({ 
+            shopId: shopId,
+            subscriptionId: subscriptionId // Ensure we only get records for the active subscription
+        })
+        .sort({ paymentDate: -1 })
+        .limit(12); // Fetch the last 12 months/payments
+
         const planPrices = {
-            'Basic': 2499,
-            'Pro': 6999,
-            'Enterprise': 16999
+            'BASIC': 2499,
+            'PRO': 6999,
+            'PREMIUM': 16999 // Using PREMIUM for consistency with payment router
         };
-        const plan = shop.plan || 'Basic';
-        const price = planPrices[plan] || planPrices['Basic'];
+        const price = planPrices[plan] || planPrices['BASIC'];
 
-        // Generate last 6 months of payment history
-        for (let i = 5; i >= 0; i--) {
-            const paymentDate = new Date(now);
-            paymentDate.setMonth(paymentDate.getMonth() - i);
 
-            const isPaid = Math.random() > 0.15;
-            const status = isPaid ? 'paid' : 'failed';
+        // 3. Determine the last successful payment date to calculate the next cycle
+        const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
+        
+        // Reference date for next payment calculation:
+        // Use the last successful payment date, OR the user's signup date (for the free trial period)
+        const referenceDate = lastSuccessfulPayment 
+            ? new Date(lastSuccessfulPayment.paymentDate) 
+            : new Date(owner.createdAt); 
 
-            paymentHistory.push({
-                id: `payment-${i}`,
-                date: paymentDate.toISOString(),
-                amount: price,
-                status: status,
-                transactionId: `TXN${Math.random().toString(36).substring(2, 11).toUpperCase()}`,
-                method: ['Credit Card', 'Debit Card', 'Bank Transfer', 'UPI'][Math.floor(Math.random() * 4)],
-            });
-        }
-
-        // Generate upcoming payment
-        const nextPaymentDate = new Date(now);
+        // 4. Calculate the Next Payment Date (approx. 1 month from reference date)
+        const nextPaymentDate = new Date(referenceDate);
         nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-        nextPaymentDate.setDate(1);
-        const daysUntilPayment = Math.ceil((nextPaymentDate - now) / (1000 * 60 * 60 * 24));
+        
+        const now = new Date();
+        const daysUntilPayment = Math.max(0, Math.ceil((nextPaymentDate - now) / (1000 * 60 * 60 * 24)));
 
+        // 5. Structure the response
         res.json({
             success: true,
             data: {
-                paymentHistory: paymentHistory.sort((a, b) => new Date(b.date) - new Date(a.date)),
+                // Map the DB records to the expected frontend format
+                paymentHistory: paymentHistory.map(p => ({
+                    id: p._id,
+                    date: p.paymentDate.toISOString(),
+                    // The webhook stores the amount in your primary currency unit (e.g., INR, not paise)
+                    amount: p.amount, 
+                    status: p.status,
+                    transactionId: p.paymentId || p.subscriptionId, // Use the specific payment ID if available
+                    method: 'Razorpay Auto-Debit', 
+                })),
                 upcomingPayment: {
                     date: nextPaymentDate.toISOString(),
                     amount: price,
                     daysUntil: daysUntilPayment
                 },
                 currentPlan: plan,
-                billingCycle: 'Monthly'
+                billingCycle: 'Monthly',
+                subscriptionId: subscriptionId
             }
         });
     } catch (error) {
-        console.error('Payment History Error:', error);
+        console.error('Payment History Fetch Error:', error);
         res.status(500).json({ success: false, error: 'Server error retrieving payment history.' });
     }
 });

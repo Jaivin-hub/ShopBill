@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv'); 
@@ -17,12 +15,11 @@ const salesRoutes = require('./routes/salesRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const notificationRoutes = require('./routes/notificationRoutes'); 
 const staffRoutes = require('./routes/staffRoutes');
-// 💥 NEW: Import Superadmin Routes
 const superadminRoutes = require('./routes/superadminRoutes');
-// 💥 NEW: Import User Routes (for plan management)
 const userRoutes = require('./routes/userRoutes');
-// 💥 NEW: Import Payment Routes
 const paymentRoutes = require('./routes/paymentRoutes'); 
+const webhookRouter = require('./routes/webhookRouter');
+const superadminRouter = require('./routes/superadminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,27 +32,18 @@ app.use(express.json());
 // --- API ROUTE MOUNTING ---
 // ----------------------------------------------------
 
-// AUTH ROUTES
 app.use('/api/auth', authRoutes);
-
-// DATA ROUTES
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/notifications', notificationRoutes);
-
-// 💥 NEW: USER ROUTES: Mount the router at /api/user
-// This contains plan management and user-specific operations
 app.use('/api/user', userRoutes);
-
-// 💥 NEW: SUPERADMIN ROUTES: Mount the router at /api/superadmin
-// This will contain logic for shop creation, user listing, system configuration, etc.
 app.use('/api/superadmin', superadminRoutes);
-
-// 💥 NEW: PAYMENT ROUTES: Mount the router at /api/payment
 app.use('/api/payment', paymentRoutes);
+app.use('/api/webhooks', webhookRouter); // CRITICAL: This route MUST be accessible publicly
+app.use('/api/superadmin', superadminRouter);
 
 // Debug route to list all available routes
 app.get('/api/routes', (req, res) => {

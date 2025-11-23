@@ -416,13 +416,15 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     const [shops, setShops] = useState([]); 
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortBy, setSortBy] = useState({ key: 'name', direction: 'ascending' });
+    // 💥 FIX 1: Set default sort to 'dateJoined' and 'descending' for LIFO/newest first
+    const [sortBy, setSortBy] = useState({ key: 'dateJoined', direction: 'descending' });
     const [paymentModal, setPaymentModal] = useState({ isOpen: false, shopName: null, shopPlan: null, shopId: null });
 
     // --- Data Fetching Logic ---
     const mapUserToShop = (user) => ({
         id: user._id, 
-        // 💥 Extraction Fix: Using createdAt to derive dateJoined
+        // 💥 FIX 2: Store the ISO date for reliable sorting
+        dateSortValue: user.createdAt,
         dateJoined: formatDate(user.createdAt), 
         // 💥 Extraction Fix: Deriving shop name from email
         name: user.email.split('@')[0].trim() || user._id, 
@@ -500,6 +502,16 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             }
             // --- End FIX ---
 
+            // 💥 FIX 3: Reliable date comparison using the stored ISO string (dateSortValue)
+            if (sortBy.key === 'dateJoined') {
+                const aDate = new Date(a.dateSortValue).getTime();
+                const bDate = new Date(b.dateSortValue).getTime();
+
+                if (aDate < bDate) return sortBy.direction === 'ascending' ? -1 : 1;
+                if (aDate > bDate) return sortBy.direction === 'ascending' ? 1 : -1;
+                return 0;
+            }
+
             // Handle payment status sorting with priority order
             if (sortBy.key === 'paymentStatus') {
                 const statusPriority = { 'paid': 1, 'pending': 2, 'failed': 3, 'overdue': 4 };
@@ -509,15 +521,6 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                 if (aPriority < bPriority) return sortBy.direction === 'ascending' ? -1 : 1;
                 if (aPriority > bPriority) return sortBy.direction === 'ascending' ? 1 : -1;
                 return 0;
-            }
-
-            // Handle date comparison for dateJoined
-            if (sortBy.key === 'dateJoined') {
-                // Since the backend provided 'createdAt' is available in the original 'user' object, 
-                // but here we only have the formatted string ('Oct 07, 2025'), simple string comparison 
-                // is unreliable. For simplicity and since we only have the formatted string here, 
-                // we'll rely on the default string comparison below, but it's noted as an area for improvement 
-                // (ideally, the mapUserToShop would save the ISO date for sorting).
             }
 
             // Default string comparison (for name, location, plan, status, etc.)
