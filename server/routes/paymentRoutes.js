@@ -46,10 +46,19 @@ router.post('/create-subscription', async (req, res) => {
     }
 
     const { plan_id, description } = PLAN_DETAILS[plan];
+
+    // CRITICAL PRE-CHECK: Ensure the Plan ID is actually loaded from environment variables
+    if (!plan_id) {
+        console.error(`Missing environment variable for ${plan} plan_id.`);
+        return res.status(400).json({ 
+            error: `Configuration Error: Razorpay Plan ID for '${plan}' is missing on the server. Please check environment variables (e.g., PREMIUM_PLAN).` 
+        });
+    }
     
     // --- 30-DAY FREE TRIAL LOGIC ---
     // The payment mandate is set up immediately, but the first full charge is delayed.
     const trialDays = 30;
+    // Calculate start_at timestamp (30 days from now)
     const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
     const subscriptionOptions = {
@@ -87,7 +96,12 @@ router.post('/create-subscription', async (req, res) => {
 
     } catch (error) {
         console.error('Razorpay Subscription Creation Error:', error);
-        res.status(500).json({ error: 'Failed to create subscription mandate.', details: error.message });
+        // IMPROVED DEBUGGING: Return the exact error message from the Razorpay API
+        // This will often say things like "Plan does not exist" or "Invalid parameter"
+        res.status(500).json({ 
+            error: error.message || 'Failed to create subscription mandate.',
+            details: error.message // Keep the original message for log traceability
+        });
     }
 });
 
