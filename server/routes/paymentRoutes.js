@@ -56,18 +56,16 @@ router.post('/create-subscription', async (req, res) => {
     }
     
     // --- 30-DAY FREE TRIAL LOGIC ---
-    // The payment mandate is set up immediately, but the first full charge is delayed.
     const trialDays = 30;
-    // Calculate start_at timestamp (30 days from now)
     const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
     const subscriptionOptions = {
         plan_id: plan_id, // The recurring plan created on the Razorpay Dashboard
         customer_notify: 1, // Notify customer of successful mandate setup
-        total_count: 0, // 0 for infinite billing cycles (until cancelled)
+        total_count: 0, 
         start_at: startAtTimestamp, // First full payment occurs 30 days from now
         
-        // Add a small ₹1 charge for mandate setup verification (Mandatory for some methods)
+        // Add a small ₹1 charge for mandate setup verification
         addons: [{
             item: {
                 name: 'Verification Charge',
@@ -90,17 +88,24 @@ router.post('/create-subscription', async (req, res) => {
             success: true,
             subscriptionId: subscription.id,
             currency: subscription.currency,
-            amount: subscription.amount, // This will be the ₹1 verification charge
-            keyId: process.env.RAZORPAY_KEY_ID, // Send key ID back for checkout integration
+            amount: subscription.amount, 
+            keyId: process.env.RAZORPAY_KEY_ID, 
         });
 
     } catch (error) {
         console.error('Razorpay Subscription Creation Error:', error);
-        // IMPROVED DEBUGGING: Return the exact error message from the Razorpay API
-        // This will often say things like "Plan does not exist" or "Invalid parameter"
-        res.status(500).json({ 
-            error: error.message || 'Failed to create subscription mandate.',
-            details: error.message // Keep the original message for log traceability
+
+        // VERBOSE ERROR REPORTING: Extract and return the most specific error detail
+        // Razorpay errors are often nested in the 'error' property of the error object
+        const specificApiError = error.error || error.message || 'Unknown Razorpay error.';
+        const statusCode = error.statusCode || 500;
+
+        res.status(statusCode).json({ 
+            error: 'Failed to create subscription mandate.',
+            // THIS FIELD CONTAINS THE EXACT ERROR FROM RAZORPAY:
+            razorpayApiError: specificApiError, 
+            // Including the status code in case of auth issues (401)
+            statusCode: statusCode, 
         });
     }
 });
@@ -113,7 +118,6 @@ router.post('/create-subscription', async (req, res) => {
  */
 router.post('/verify-subscription', async (req, res) => {
     // These three fields are returned by the Razorpay Checkout handler on the frontend
-    // NOTE: The 'order' ID is now the ID of the internal order created for the mandate setup
     const { 
         razorpay_order_id, 
         razorpay_payment_id, 
@@ -140,8 +144,6 @@ router.post('/verify-subscription', async (req, res) => {
 
         if (isAuthentic) {
             // SUCCESS: Signature verified, mandate setup is legitimate.
-            // 4. Use the subscription ID as the transaction ID for the signup process.
-            
             res.json({
                 success: true,
                 message: 'Subscription mandate verified successfully. Proceed to user signup.',
