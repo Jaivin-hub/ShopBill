@@ -3,8 +3,6 @@ import { ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, Loader, IndianR
 import API from '../config/api';
 import apiClient from '../lib/apiClient';
 import axios from 'axios';
-
-// Mock data to represent plan details (since we don't have a backend Plan API)
 const PLAN_DETAILS = {
     BASIC: {
         name: 'Basic Plan',
@@ -28,8 +26,6 @@ const PLAN_DETAILS = {
         color: 'bg-indigo-600',
     }
 };
-
-// Simple helper to format currency
 const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -37,8 +33,6 @@ const formatCurrency = (amount) => {
         minimumFractionDigits: 0,
     }).format(amount);
 };
-
-// Validation functions
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return 'Email is required.';
@@ -56,13 +50,11 @@ const validatePhoneNumber = (phone) => {
     }
     return null;
 };
-
 const validateShopName = (name) => {
     if (!name || name.trim() === '') return 'Shop name is required.';
     if (name.length < 3) return 'Shop name must be at least 3 characters.';
     return null;
 };
-
 /**
  * Utility to load the Razorpay script dynamically.
  * @param {string} src - The script URL
@@ -77,42 +69,27 @@ const loadRazorpayScript = (src) => {
         document.body.appendChild(script);
     });
 };
-
 const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
     const plan = PLAN_DETAILS[planKey] || null;
-    
-    // State for user info
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [shopName, setShopName] = useState('');
-    
-    // Error states
     const [emailError, setEmailError] = useState(null);
     const [phoneError, setPhoneError] = useState(null);
     const [passwordError, setPasswordError] = useState(null);
     const [shopNameError, setShopNameError] = useState(null);
-    
-    // Phone number state
     const [dialCode, setDialCode] = useState('+91');
     const [localNumber, setLocalNumber] = useState('');
     const [phone, setPhone] = useState('+91');
-    
-    // Country code dropdown state
     const [countryCodes, setCountryCodes] = useState([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const dropdownRef = useRef(null);
-    
-    // UI state
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [paymentError, setPaymentError] = useState(null);
-    
-    // Selected country for display
     const selectedCountry = countryCodes.find(c => c.code === dialCode);
-    
-    // Filtered country codes based on search
     const filteredCodes = useMemo(() => {
         if (!searchQuery) return countryCodes;
         const query = searchQuery.toLowerCase();
@@ -121,14 +98,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             c.code.includes(query)
         );
     }, [countryCodes, searchQuery]);
-    
-    // Fetch country codes 
     const fetchCountryCodes = useCallback(async () => {
         try {
-            // Note: Using a public API to fetch country data, this is not a mock.
             const response = await axios.get('https://restcountries.com/v3.1/all?fields=name,idd,flag');
             const data = response.data;
-
             const codes = data
                 .map(country => {
                     const root = country.idd.root || '';
@@ -151,11 +124,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                     return acc;
                 }, [])
                 .sort((a, b) => a.sortName.localeCompare(b.sortName));
-
             setCountryCodes(codes);
         } catch (error) {
             console.error('Failed to fetch country codes:', error);
-            // Fallback codes
             setCountryCodes([
                 { code: '+1', flag: '🇺🇸', name: 'United States' },
                 { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
@@ -163,13 +134,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             ]);
         }
     }, []);
-    
-    // Load country codes on mount 
     useEffect(() => {
         fetchCountryCodes();
     }, [fetchCountryCodes]);
-    
-    // Update phone when dialCode or localNumber changes 
     useEffect(() => {
         if (dialCode) {
             const sanitizedLocalNumber = localNumber.replace(/\D/g, '');
@@ -179,15 +146,11 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             }
         }
     }, [dialCode, localNumber, phone]);
-    
-    // Set default dial code when codes are loaded 
     useEffect(() => {
         if (countryCodes.length > 0 && !dialCode) {
             setDialCode('+91');
         }
     }, [countryCodes, dialCode]);
-    
-    // Handle clicks outside dropdown 
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -197,30 +160,22 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-    
-    // Handle country selection 
     const handleSelectCountry = (code) => {
         setDialCode(code);
         setIsDropdownOpen(false);
         setSearchQuery('');
         if (phoneError) setPhoneError(null);
     };
-    
-    // Handle phone number change 
     const handleNumberChange = (e) => {
         const sanitizedNumber = e.target.value.replace(/\D/g, '');
         setLocalNumber(sanitizedNumber);
         if (phoneError) setPhoneError(null);
     };
-
-    // Effect to handle navigation if plan is invalid 
     useEffect(() => {
         if (!plan) {
             setPaymentError("Invalid subscription plan selected. Please go back.");
         }
     }, [plan]);
-
-    // --- RAZORPAY PAYMENT HANDLER (UPDATED FOR SUBSCRIPTIONS) ---
     const handlePaymentSubmit = useCallback(async (e) => {
         e.preventDefault();
         setPaymentError(null);
@@ -228,99 +183,66 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         setPhoneError(null);
         setPasswordError(null);
         setShopNameError(null);
-        
-        // --- Validation ---
         if (!plan) {
             setPaymentError("Plan error. Cannot proceed.");
             return;
         }
-        
         const emailValidation = validateEmail(email);
         if (emailValidation) {
             setEmailError(emailValidation);
             return;
         }
-        
         const phoneValidation = validatePhoneNumber(phone);
         if (phoneValidation) {
             setPhoneError(phoneValidation);
             return;
         }
-        
         const shopNameValidation = validateShopName(shopName);
         if (shopNameValidation) {
             setShopNameError(shopNameValidation);
             return;
         }
-        
         if (!password || password.length < 8) {
             setPasswordError('Password must be 8 or more characters long.');
             return;
         }
-        // --- End Validation ---
-
         setIsProcessing(true);
-
         try {
-            // STEP 1: Load Razorpay Script
             const razorpayLoad = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!razorpayLoad) {
                 setPaymentError('Failed to load the Razorpay payment script. Check your network.');
                 setIsProcessing(false);
                 return;
             }
-            
-            // ----------------------------------------------------------------------
-            // STEP 2: Create Subscription Mandate on Server (GET SUBSCRIPTION ID)
-            // ----------------------------------------------------------------------
             const createSubscriptionUrl = `${API.createSubscription}`; // Using the new subscription endpoint
             const subscriptionResponse = await apiClient.post(createSubscriptionUrl, {
                 plan: planKey,
             });
-            
-            // The response contains the Subscription ID, the ₹1 verification charge amount (100 paise), currency, and keyId
-            const { subscriptionId, currency, amount, keyId } = subscriptionResponse.data; 
+            const { subscriptionId, currency, amount, keyId } = subscriptionResponse.data;
             if (!subscriptionId) {
                 setPaymentError("Failed to initiate subscription mandate. Subscription ID missing from server.");
                 setIsProcessing(false);
                 return;
             }
-
-            // ----------------------------------------------------------------------
-            // STEP 3: Configure and Open Razorpay Checkout Popup
-            // IMPORTANT: Pass subscription_id instead of order_id
-            // ----------------------------------------------------------------------
             const options = {
-                key: keyId, 
+                key: keyId,
                 amount: amount, // This is the ₹1 verification charge (100 paise)
                 currency: currency,
                 name: 'Pocket POS Subscription',
                 description: `Setup Mandate for ${plan.name} (1 Rupee verification)`,
                 subscription_id: subscriptionId, // <<--- CRITICAL CHANGE: Use subscription_id
                 handler: async (response) => {
-                    // This function is executed when the mandate setup succeeds on the popup
                     setIsProcessing(true);
-                    
                     try {
-                        // ----------------------------------------------------------------------
-                        // STEP 4: Verify Subscription Mandate Signature on Server
-                        // Pass the new razorpay_subscription_id field
-                        // ----------------------------------------------------------------------
                         const verifyUrl = `${API.verifySubscription}`; // Using the new verification endpoint
                         const verificationResponse = await apiClient.post(verifyUrl, {
-                            razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
-                            razorpay_subscription_id: response.razorpay_subscription_id, // <<--- CRITICAL NEW FIELD
+                            razorpay_subscription_id: response.razorpay_subscription_id || subscriptionId,
                         });
-
                         const { success: verificationSuccess, transactionId } = verificationResponse.data;
-                        
-                        // transactionId here should be the razorpay_subscription_id
                         if (verificationSuccess && transactionId) {
-                            // STEP 5: Signup User using the Verified Subscription ID
                             console.log('Subscription mandate verified. Creating user account with subscription ID:', transactionId);
-                            
                             const signupResponse = await apiClient.post(API.signup, {
                                 email: email.toLowerCase().trim(),
                                 password: password,
@@ -329,7 +251,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 transactionId: transactionId, // This is the Subscription ID
                                 shopName: shopName,
                             });
-
                             if (signupResponse.data && signupResponse.data.user) {
                                 setPaymentSuccess(true);
                                 setTimeout(() => {
@@ -347,7 +268,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             setPaymentError('Subscription mandate verification failed. Please try again or contact support.');
                             setIsProcessing(false);
                         }
-                        
+
                     } catch (error) {
                         console.error('Verification/Signup Error:', error);
                         setPaymentError(error.response?.data?.error || 'Verification failed. Server error.');
@@ -357,26 +278,22 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                 prefill: {
                     email: email,
                     contact: phone,
-                    name: shopName || 'POS Shop Owner', 
+                    name: shopName || 'POS Shop Owner',
                 },
                 theme: {
-                    color: '#4f46e5' 
+                    color: '#4f46e5'
                 },
                 modal: {
                     ondismiss: () => {
                         console.log('Razorpay popup dismissed');
-                        setIsProcessing(false); 
+                        setIsProcessing(false);
                     }
                 }
             };
-
             const rzp1 = new window.Razorpay(options);
             rzp1.open();
-            
-
         } catch (error) {
             console.error('Initial Subscription Creation Error:', error);
-            
             if (error.response?.data?.error) {
                 setPaymentError(error.response.data.error);
             } else if (error.response?.data?.message) {
@@ -384,15 +301,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             } else {
                 setPaymentError("Failed to connect to the server or create subscription mandate.");
             }
-            
             setIsProcessing(false);
         }
 
     }, [plan, planKey, email, phone, password, shopName, onPaymentSuccess]);
-
-
-    // --- Render Content Based on State ---
-
     if (!plan) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-950 p-8">
@@ -407,7 +319,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             </div>
         );
     }
-
     if (paymentSuccess) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-950 p-4">
@@ -421,43 +332,28 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             </div>
         );
     }
-
-
-    // --- Main Checkout Form (RENDER) ---
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans">
             <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
-                
-                {/* Header */}
                 <div className="text-center mb-8">
                     <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         Complete Registration & Start Free Trial
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">Secure your subscription mandate to begin your 30-day free trial.</p>
                 </div>
-
                 {paymentError && (
                     <div className="p-4 mb-6 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
                         {paymentError}
                     </div>
                 )}
-
-
                 <form onSubmit={handlePaymentSubmit}>
-                    
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                        
-                        {/* Left Side: Account Information (User Input Only) */}
                         <div className="h-full">
                             <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col">
-                                
                                 <div className='flex-grow'>
-                                    {/* Account Information Header */}
                                     <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
                                         Owner & Shop Details
                                     </h4>
-                                    
-                                    {/* Shop Name Input */}
                                     <div className="mb-6">
                                         <label htmlFor="shopName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Shop/Business Name</label>
                                         <div className='relative'>
@@ -478,8 +374,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         </div>
                                         {shopNameError && <p className="text-red-500 text-xs mt-1">{shopNameError}</p>}
                                     </div>
-                                    
-                                    {/* Email Input */}
                                     <div className="mb-6">
                                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address (for Login)</label>
                                         <input
@@ -497,8 +391,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         />
                                         {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
                                     </div>
-                                    
-                                    {/* Phone Input */}
                                     <div className="mb-6">
                                         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
                                         <div className={`
@@ -526,12 +418,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                         <>
                                                             <span>{selectedCountry?.flag}</span>
                                                             <span className="mx-1 font-semibold">{selectedCountry?.code}</span>
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"/></svg>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
                                                         </>
                                                     )}
                                                 </button>
-                                                
-                                                {/* Dropdown Panel with Search */}
                                                 {isDropdownOpen && countryCodes.length > 0 && (
                                                     <div className="absolute z-10 top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
                                                         <div className="p-2 sticky top-0 bg-white dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 z-20">
@@ -567,8 +457,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* Phone Number Input */}
                                             <input
                                                 type="tel"
                                                 placeholder="Enter phone number"
@@ -589,8 +477,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                             <p className="text-red-500 text-xs mt-1">{phoneError}</p>
                                         )}
                                     </div>
-                                    
-                                    {/* Password Input */}
                                     <div>
                                         <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password (for Login)</label>
                                         <div className="relative">
@@ -621,12 +507,8 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Right Side: Plan Details + Razorpay Payment Info (Consolidated) */}
                         <div className="h-full">
                             <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-start">
-                                
-                                {/* 1. Plan Details (Moved Here) */}
                                 <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                                     Your Subscription
                                 </h4>
@@ -640,32 +522,23 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     </div>
                                     <div className="border-t border-white/30 pt-4">
                                         <p className="text-sm text-white/90 mb-1">Total Due Today (Verification Charge):</p>
-                                        {/* Displaying ₹1, the verification charge, instead of the full plan price for mandate setup */}
                                         <p className="text-4xl font-extrabold">{formatCurrency(1)}</p>
                                         <p className="text-sm text-white/80 mt-1">Full plan charge {formatCurrency(plan.price)} will start after the 30-day free trial.</p>
                                     </div>
                                 </div>
-
-                                {/* 2. Payment Information Header */}
                                 <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
                                     Secure Mandate Setup
                                 </h4>
-
-                                {/* Card Preview (Visual Element) */}
                                 <div className="w-full h-48 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-xl p-5 shadow-2xl relative overflow-hidden text-white font-mono transition-all duration-300 border border-indigo-600">
-                                    {/* Decorative elements */}
                                     <div className="absolute top-0 right-0 w-2/3 h-full rounded-l-full opacity-10 bg-teal-400 transform translate-x-1/2 -translate-y-1/2"></div>
                                     <div className="absolute bottom-0 left-0 w-1/2 h-1/2 rounded-r-full opacity-10 bg-white transform -translate-x-1/4 translate-y-1/4"></div>
-
                                     <div className="flex justify-between items-start mb-4 relative z-10">
                                         <CreditCard className="w-7 h-7 text-white" />
                                         <Wifi className="w-6 h-6 text-teal-400 transform rotate-90" />
                                     </div>
-
                                     <p className="text-2xl tracking-widest relative z-10 mb-4">
                                         •••• •••• •••• ••••
                                     </p>
-
                                     <div className="flex justify-between items-center text-sm mt-5 relative z-10">
                                         <div>
                                             <p className="text-xs text-indigo-300 mb-1">Payment Processor</p>
@@ -679,12 +552,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                         </div>
                                     </div>
                                 </div>
-                                {/* End Card Preview */}
                             </div>
                         </div>
                     </div>
-                    
-                    {/* Footer / Submit Button Section */}
                     <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <button
                             type="submit"
@@ -694,7 +564,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             {isProcessing ? (
                                 <>
                                     <Loader className="w-5 h-5 mr-2 animate-spin" />
-                                    {window.Razorpay ? 'Processing Mandate...' : 'Creating Mandate...'} 
+                                    {window.Razorpay ? 'Processing Mandate...' : 'Creating Mandate...'}
                                 </>
                             ) : (
                                 <>
@@ -708,9 +578,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             By clicking 'Setup Mandate', you agree to our Terms and Conditions.
                         </p>
                         <div className="text-center pt-4">
-                            <button 
-                                type="button" 
-                                onClick={onBackToDashboard} 
+                            <button
+                                type="button"
+                                onClick={onBackToDashboard}
                                 className="cursor-pointer text-sm text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
                                 disabled={isProcessing}
                             >

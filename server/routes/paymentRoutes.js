@@ -122,27 +122,28 @@ router.post('/create-subscription', async (req, res) => {
 router.post('/verify-subscription', async (req, res) => {
     // These fields are returned by the Razorpay Checkout handler on the frontend
     const { 
-        razorpay_order_id, 
         razorpay_payment_id, 
         razorpay_signature,
         razorpay_subscription_id 
-    } = req.body;
+    } = req.body; // NOTE: razorpay_order_id is not returned for subscription mandates
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
-        return res.status(400).json({ success: false, error: 'Missing payment verification data for subscription mandate.' });
+    // 1. UPDATED VALIDATION: Check only for the three returned fields.
+    if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
+        return res.status(400).json({ success: false, error: 'Missing required payment verification data for subscription mandate.' });
     }
 
     try {
-        // 1. Combine the order ID and payment ID with a '|' separator
-        const body = razorpay_order_id + '|' + razorpay_payment_id;
+        // 2. UPDATED SIGNATURE BODY: For subscription verification, the body is 
+        //    the payment_id combined with the subscription_id.
+        const body = razorpay_payment_id + '|' + razorpay_subscription_id;
 
-        // 2. Create the expected signature using HMAC-SHA256
+        // 3. Create the expected signature using HMAC-SHA256
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
             .digest('hex');
             
-        // 3. Compare the generated signature with the signature from Razorpay
+        // 4. Compare the generated signature with the signature from Razorpay
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
@@ -165,6 +166,5 @@ router.post('/verify-subscription', async (req, res) => {
         res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
     }
 });
-
 
 module.exports = router;
