@@ -57,13 +57,19 @@ router.post('/create-subscription', async (req, res) => {
     
     // --- 30-DAY FREE TRIAL LOGIC ---
     const trialDays = 30;
+    // Calculate the timestamp 30 days from now (in seconds)
     const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
     const subscriptionOptions = {
         plan_id: plan_id, // The recurring plan created on the Razorpay Dashboard
         customer_notify: 1, // Notify customer of successful mandate setup
-        total_count: 0, 
-        start_at: startAtTimestamp, // First full payment occurs 30 days from now
+        
+        // FIX: The API required total_count >= 1. 
+        // We set it high (9999) to signify an indefinite subscription.
+        total_count: 9999, 
+        
+        // This ensures the first full payment occurs 30 days from now
+        start_at: startAtTimestamp, 
         
         // Add a small ₹1 charge for mandate setup verification
         addons: [{
@@ -96,15 +102,12 @@ router.post('/create-subscription', async (req, res) => {
         console.error('Razorpay Subscription Creation Error:', error);
 
         // VERBOSE ERROR REPORTING: Extract and return the most specific error detail
-        // Razorpay errors are often nested in the 'error' property of the error object
         const specificApiError = error.error || error.message || 'Unknown Razorpay error.';
         const statusCode = error.statusCode || 500;
 
         res.status(statusCode).json({ 
             error: 'Failed to create subscription mandate.',
-            // THIS FIELD CONTAINS THE EXACT ERROR FROM RAZORPAY:
             razorpayApiError: specificApiError, 
-            // Including the status code in case of auth issues (401)
             statusCode: statusCode, 
         });
     }
@@ -117,12 +120,12 @@ router.post('/create-subscription', async (req, res) => {
  * @access Public
  */
 router.post('/verify-subscription', async (req, res) => {
-    // These three fields are returned by the Razorpay Checkout handler on the frontend
+    // These fields are returned by the Razorpay Checkout handler on the frontend
     const { 
         razorpay_order_id, 
         razorpay_payment_id, 
         razorpay_signature,
-        razorpay_subscription_id // New critical field for subscription verification
+        razorpay_subscription_id 
     } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
