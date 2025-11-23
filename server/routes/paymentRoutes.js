@@ -64,9 +64,9 @@ router.post('/create-subscription', async (req, res) => {
         plan_id: plan_id, // The recurring plan created on the Razorpay Dashboard
         customer_notify: 1, // Notify customer of successful mandate setup
         
-        // FIX: The API required total_count >= 1. 
-        // We set it high (9999) to signify an indefinite subscription.
-        total_count: 9999, 
+        // FIX: Setting total_count to the maximum allowed (1200 cycles, or 100 years 
+        // for a monthly plan) to signify an indefinite subscription, as 9999 was too high.
+        total_count: 1200, 
         
         // This ensures the first full payment occurs 30 days from now
         start_at: startAtTimestamp, 
