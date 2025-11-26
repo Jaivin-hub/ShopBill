@@ -198,4 +198,56 @@ router.post('/verify-subscription', async (req, res) => {
     }
 });
 
+
+router.post('/cancel-subscription', protect, async (req, res) => {
+    // Assumption: The protect middleware attaches the authenticated user to req.user
+    const userId = req.user._id;
+
+    try {
+        // 1. Fetch the user to get the Subscription ID
+        const user = await User.findById(userId);
+        if (!user || !user.transactionId) {
+            return res.status(404).json({ error: 'Subscription not found for this user.' });
+        }
+        
+        const subscriptionId = user.transactionId;
+        
+        // 2. Define cancellation options
+        const cancelOptions = {
+            // true: Cancels at the end of the current billing cycle (recommended for user experience).
+            // false (default): Cancels immediately.
+            cancel_at_cycle_end: true 
+        };
+
+        // 3. Call Razorpay API to cancel the subscription
+        const result = await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
+
+        // 4. Update the User model status (Optional but good practice)
+        // Note: The webhook for 'subscription.cancelled' will handle the final status update,
+        // but updating it here provides immediate feedback to the user.
+        await User.updateOne({ _id: userId }, { 
+            $set: { 
+                subscriptionStatus: 'cancellation_pending', // Custom status for 'cancel_at_cycle_end: true'
+                lastStatusUpdate: new Date(),
+            } 
+        });
+
+        console.log(`[SUBSCRIPTION CANCELLED] Subscription ${subscriptionId} cancelled for user ${userId}.`);
+
+        res.json({
+            success: true,
+            message: 'Subscription will be cancelled at the end of the current billing cycle.',
+            razorpayStatus: result.status, // Should be 'cancelled' or similar
+        });
+
+    } catch (error) {
+        console.error('Razorpay Subscription Cancellation Error:', error);
+
+        res.status(500).json({ 
+            error: 'Failed to cancel subscription.',
+            razorpayApiError: error.message, 
+        });
+    }
+});
+
 module.exports = router;

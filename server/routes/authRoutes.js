@@ -443,5 +443,32 @@ router.post('/data/sync', protect, async (req, res) => {
     }
 });
 
+router.get('/current-plan', protect, async (req, res) => {
+    try {
+        // 'protect' middleware ensures req.user is populated with the authenticated user's details
+        const userId = req.user.id; 
+
+        // 1. Find the user by ID
+        // We use .select('plan') to fetch only the plan field from the database, 
+        // which improves performance and security.
+        const user = await User.findById(userId).select('plan');
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // 2. Return the plan
+        res.json({ 
+            success: true,
+            plan: user.plan || 'BASIC' // Default to BASIC if plan is null/undefined
+        });
+
+    } catch (error) {
+        console.error('Fetch Current Plan Error:', error);
+        res.status(500).json({ error: 'Server error while fetching user plan.' });
+    }
+});
+
+
 
 module.exports = router;

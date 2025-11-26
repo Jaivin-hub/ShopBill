@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ArrowLeft, CheckCircle, Crown, Zap, Building2, 
     Loader, CreditCard, AlertCircle, IndianRupee, 
-    Users, Package, Slash 
+    Users, Package, XCircle, Slash // Added Slash icon for cancellation modal
 } from 'lucide-react';
-// import API from '../config/api'; // API is not used in demo mode
+import API from '../config/api';
+// API is now used
 
 // Hardcoded Plan Data (Simulating the configuration fetch)
 const DEMO_PLANS = [
@@ -35,8 +36,8 @@ const DEMO_PLANS = [
 ];
 
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
-    // 🌟 Initializing with a hardcoded plan for the demo
-    const [currentPlan, setCurrentPlan] = useState('Pro'); 
+    // 🌟 currentPlan is initialized to null now, waiting for API response
+    const [currentPlan, setCurrentPlan] = useState(null); 
     const [availablePlans, setAvailablePlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpgrading, setIsUpgrading] = useState(false);
@@ -45,25 +46,41 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
 
-    // 1. SIMULATED DATA FETCHING
-    const fetchPlanData = useCallback(() => {
+    // 1. INTEGRATED DATA FETCHING
+    const fetchPlanData = useCallback(async () => {
         setIsLoading(true);
-        // Simulate a network delay for fetching data
-        setTimeout(() => {
-            // Set current plan based on a mock user or hardcoded value
-            const initialPlan = currentUser?.plan || 'Pro'; 
-            setCurrentPlan(initialPlan);
+        
+        // 1A. Fetch Current Plan from API
+        try {
+            const planResponse = await apiClient.get(API.currentPlan);
+            
+            // Assuming planResponse.planName gives 'Basic', 'Pro', or 'Enterprise'
+            // Fallback to 'Basic' if the API response is unexpected
+            const fetchedPlanName = planResponse.planName || 'Basic'; 
+            setCurrentPlan(fetchedPlanName);
+            
+            // 1B. Set Available Plans (Simulated from hardcoded data)
             setAvailablePlans(DEMO_PLANS);
+            
+        } catch (error) {
+            console.error("Error fetching plan data:", error);
+            // Fallback to a default plan or show an error
+            setCurrentPlan('Basic'); 
+            setAvailablePlans(DEMO_PLANS);
+            showToast('Failed to fetch current plan. Defaulting to Basic.', 'error');
+        } finally {
             setIsLoading(false);
-        }, 800);
-    }, [currentUser]);
+        }
+
+    }, [apiClient, showToast]); // Added apiClient and showToast to dependencies
 
     useEffect(() => {
         fetchPlanData();
     }, [fetchPlanData]);
 
     const handleUpgradeClick = (plan) => {
-        if (plan.id === currentPlan?.toLowerCase()) {
+        // Now using currentPlan directly which is a string (e.g., 'Pro')
+        if (plan.id === currentPlan?.toLowerCase()) { 
             showToast('This is your current plan.', 'info');
             return;
         }
@@ -89,25 +106,39 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         }, 1200);
     };
     
-    // 3. SIMULATED CANCELLATION LOGIC
-    const handleCancelSubscription = () => {
+    // 3. CANCELLATION LOGIC (Implemented with API call)
+    const handleCancelSubscription = async () => {
         if (currentPlan === 'Basic' || currentPlan?.toLowerCase() === 'basic') {
-            showToast('The Basic plan cannot be cancelled. (DEMO)', 'warning');
+            showToast('The Basic plan cannot be cancelled.', 'warning');
             setShowCancelModal(false);
             return;
         }
         
         setIsCancelling(true);
 
-        // Simulate a successful cancellation API call delay
-        setTimeout(() => {
-            // Revert the account to the Basic plan tier for simulation
-            setCurrentPlan('Basic'); 
-            showToast(`Subscription cancelled successfully. You have reverted to the Basic plan. (DEMO)`, 'success');
+        try {
+            // Call the backend API to cancel the Razorpay subscription
+            const response = await apiClient.post(API.cancelSubscription);
             
+            if (response.success) {
+                // Assuming the backend cancels at the end of the cycle (recommended UX).
+                // We update the local state to reflect the imminent downgrade.
+                setCurrentPlan('Basic'); 
+                showToast(response.message || `Subscription cancellation initiated. Your plan will revert to Basic at the end of the current cycle.`, 'success');
+            } else {
+                // If API returns an error status (e.g., 400), show the error message
+                showToast(response.error || 'Failed to cancel subscription due to an unknown error.', 'error');
+            }
+        } catch (error) {
+            // Handle network or unhandled server errors (e.g., 500)
+            console.error("Subscription Cancellation Error:", error);
+            // Safely accessing the error message
+            const errorMessage = error.response?.data?.razorpayApiError || error.message || 'Failed to connect to the server or Razorpay.';
+            showToast(`Cancellation failed: ${errorMessage}`, 'error');
+        } finally {
             setShowCancelModal(false);
             setIsCancelling(false);
-        }, 1500);
+        }
     };
 
     const formatCurrency = (amount) => {
@@ -156,12 +187,12 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         return planOrderValue > currentOrder;
     };
 
-    if (isLoading) {
+    if (isLoading || currentPlan === null) {
         return (
             <div className="min-h-screen p-4 pb-20 md:p-8 bg-gray-100 dark:bg-gray-950">
                 <div className="flex flex-col items-center justify-center h-64">
                     <Loader className="w-10 h-10 animate-spin text-indigo-400" />
-                    <p className="mt-4 text-gray-400">Loading plans...</p>
+                    <p className="mt-4 text-gray-400">Loading current plan and available options...</p>
                 </div>
             </div>
         );
@@ -204,16 +235,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 <p className="text-lg font-semibold text-white">Monthly</p>
                             </div>
                             {/* Cancel Subscription Button */}
-                            {currentPlan?.toLowerCase() !== 'basic' && (
                                 <button
                                     onClick={() => setShowCancelModal(true)}
-                                    className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                    className="cursor-pointer px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1"
                                     disabled={isCancelling}
                                 >
-                                    <Slash className="w-4 h-4" />
-                                    Cancel
+                                    <XCircle className="w-4 h-4" />
+                                    Cancel Subscription
                                 </button>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -372,19 +401,19 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                         <div className="p-6 border-b border-gray-700">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                 <Slash className="w-6 h-6 text-red-400" />
-                                Confirm Subscription Cancellation (DEMO)
+                                Confirm Subscription Cancellation
                             </h2>
                         </div>
                         <div className="p-6">
                             <p className="text-gray-300 mb-4">
                                 Are you sure you want to cancel your current **{currentPlan}** subscription? 
                                 <br/><br/>
-                                **Simulated Effect:** This will immediately revert your plan to the **Basic** tier.
+                                By confirming, your plan will be scheduled for cancellation and will revert to the **Basic** tier at the end of the current billing cycle.
                             </p>
                             <div className="bg-red-700/30 rounded-lg p-4 mb-4 flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                                 <p className="text-sm text-red-300 font-semibold">
-                                    You will lose access to features specific to the {currentPlan} plan.
+                                    You will retain access to the {currentPlan} plan until the end of your paid billing period.
                                 </p>
                             </div>
                         </div>

@@ -12,6 +12,8 @@ const API = {
     resetpassword: API_BASE_URL + '/auth/reset-password',
     sync: API_BASE_URL + '/auth/data/sync',
     uploadcloud: API_BASE_URL + '/auth/data/upload-to-cloud',
+    currentPlan: API_BASE_URL + '/auth/data/current-plan',
+
 
 
     // Staff Management Endpoints
@@ -46,7 +48,8 @@ const API = {
     
     // Payment Routes
     createSubscription: API_BASE_URL + '/payment/create-subscription', // POST (Creates a recurring subscription mandate)
-    verifySubscription: API_BASE_URL + '/payment/verify-subscription' // POST (Verifies the mandate setup signature)
+    verifySubscription: API_BASE_URL + '/payment/verify-subscription', // POST (Verifies the mandate setup signature)
+    cancelSubscription: API_BASE_URL + '/payment/cancel-subscription' // POST (Cancels the active subscription)
     // ------------------------------------------
 }
 
