@@ -237,7 +237,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           )}
           <button
             onClick={() => setIsCameraScannerOpen(true)}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
+            className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
             title="Scan Barcode with Camera"
           >
             <ScanLine className="w-5 h-5" />
@@ -248,7 +248,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             {filteredInventory.map(item => (
               <button
                 key={item._id || item.id}
-                className="bg-indigo-900/40 text-indigo-300 p-2 rounded-lg font-semibold text-xs transition hover:bg-indigo-800/60 shadow-md border border-indigo-700 active:scale-[0.98] transform whitespace-nowrap overflow-hidden text-ellipsis"
+                className="cursor-pointer bg-indigo-900/40 text-indigo-300 p-2 rounded-lg font-semibold text-xs transition hover:bg-indigo-800/60 shadow-md border border-indigo-700 active:scale-[0.98] transform whitespace-nowrap overflow-hidden text-ellipsis"
                 onClick={() => addItemToCart(item)}
                 title={item.name}
               >
@@ -277,7 +277,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                 <div className="flex items-center space-x-2 w-1/5 justify-center">
                   <button
                     onClick={() => updateCartQuantity(item._id || item.id, -1)}
-                    className="p-1 rounded-lg bg-red-900/40 text-red-300 active:bg-red-900/60 transition hover:bg-red-900/60"
+                    className="cursor-pointer p-1 rounded-lg bg-red-900/40 text-red-300 active:bg-red-900/60 transition hover:bg-red-900/60"
                     title="Decrease Quantity"
                   >
                     <Minus className="w-4 h-4" />
@@ -285,7 +285,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                   <span className="font-extrabold w-4 text-center text-base text-gray-900 dark:text-white">{item.quantity}</span>
                   <button
                     onClick={() => updateCartQuantity(item._id || item.id, 1)}
-                    className="p-1 rounded-lg bg-green-900/40 text-green-300 active:bg-green-900/60 transition hover:bg-green-900/60"
+                    className="cursor-pointer p-1 rounded-lg bg-green-900/40 text-green-300 active:bg-green-900/60 transition hover:bg-green-900/60"
                     title="Increase Quantity"
                   >
                     <Plus className="w-4 h-4" />
@@ -295,7 +295,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                   <span className="font-extrabold text-lg text-teal-400">₹{(item.quantity * item.price).toFixed(2)}</span>
                   <button
                     onClick={() => removeItemFromCart(item._id || item.id)}
-                    className="text-red-400 hover:text-red-300 ml-3 p-1 transition"
+                    className="cursor-pointer text-red-400 hover:text-red-300 ml-3 p-1 transition"
                     title="Remove Item"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -319,7 +319,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                 <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
               </div>
               <button
-                className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
+                className="cursor-pointer w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
                 onClick={() => {
                   if (totalAmount > 0) {
                     setIsPaymentModalOpen(true);

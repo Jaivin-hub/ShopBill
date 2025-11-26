@@ -740,30 +740,39 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         const plan = owner.plan || 'BASIC';
         const subscriptionId = owner.transactionId; // This is the Razorpay Subscription ID
 
-        // 2. Fetch REAL Payment History from the database
-        const paymentHistory = await Payment.find({ 
-            shopId: shopId,
-            subscriptionId: subscriptionId // Ensure we only get records for the active subscription
-        })
-        .sort({ paymentDate: -1 })
-        .limit(12); // Fetch the last 12 months/payments
+        // --- REVISED STEP 2: Fetch ALL Payment/Attempt History ---
+        // Fetch ALL payment records associated with this shopId, regardless of their status.
+        // We will filter by the active subscriptionId only if it exists.
+        const query = { shopId: shopId };
+        if (subscriptionId) {
+            // If an active subscription ID is present, fetch only records tied to it.
+            // This ensures we track failures/successes for the current billing cycle.
+            query.subscriptionId = subscriptionId;
+        }
+
+        const paymentHistory = await Payment.find(query)
+            .sort({ paymentDate: -1 }) // Sort by newest first
+            .limit(12); // Fetch the last 12 records (successful, failed, or halted)
 
         const planPrices = {
             'BASIC': 499,
             'PRO': 799,
-            'PREMIUM': 999 // Using PREMIUM for consistency with payment router
+            'PREMIUM': 999
         };
         const price = planPrices[plan] || planPrices['BASIC'];
 
 
-        // 3. Determine the last successful payment date to calculate the next cycle
+        // --- REVISED STEP 3: Determine the last successful payment date ---
+        // We must still use the 'paid' status to accurately calculate the next billing cycle.
         const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
-        
+
         // Reference date for next payment calculation:
-        // Use the last successful payment date, OR the user's signup date (for the free trial period)
+        // Use the last successful payment date, OR the user's signup date (for the start of billing)
         const referenceDate = lastSuccessfulPayment 
             ? new Date(lastSuccessfulPayment.paymentDate) 
             : new Date(owner.createdAt); 
+        // -----------------------------------------------------------------
+
 
         // 4. Calculate the Next Payment Date (approx. 1 month from reference date)
         const nextPaymentDate = new Date(referenceDate);
@@ -782,8 +791,9 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
                     date: p.paymentDate.toISOString(),
                     // The webhook stores the amount in your primary currency unit (e.g., INR, not paise)
                     amount: p.amount, 
-                    status: p.status,
-                    transactionId: p.paymentId || p.subscriptionId, // Use the specific payment ID if available
+                    // This now correctly includes statuses like 'failed', 'halted', 'pending', etc.
+                    status: p.status, 
+                    transactionId: p.paymentId || p.subscriptionId, 
                     method: 'Razorpay Auto-Debit', 
                 })),
                 upcomingPayment: {

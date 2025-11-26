@@ -2,82 +2,61 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ArrowLeft, CheckCircle, Crown, Zap, Building2, 
     Loader, CreditCard, AlertCircle, IndianRupee, 
-    TrendingUp, Users, Package, Shield, Clock
+    Users, Package, Slash 
 } from 'lucide-react';
-import API from '../config/api';
+// import API from '../config/api'; // API is not used in demo mode
+
+// Hardcoded Plan Data (Simulating the configuration fetch)
+const DEMO_PLANS = [
+    {
+        id: 'basic',
+        name: 'Basic',
+        price: 499,
+        features: ['Basic Inventory Management', 'Up to 5 Users', 'Email Support'],
+        maxUsers: 5,
+        maxInventory: 1000,
+    },
+    {
+        id: 'pro',
+        name: 'Pro',
+        price: 799,
+        features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
+        maxUsers: 20,
+        maxInventory: 10000,
+    },
+    {
+        id: 'enterprise',
+        name: 'Enterprise',
+        price: 999,
+        features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
+        maxUsers: -1,
+        maxInventory: -1,
+    }
+];
 
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
-    const [currentPlan, setCurrentPlan] = useState(null);
+    // 🌟 Initializing with a hardcoded plan for the demo
+    const [currentPlan, setCurrentPlan] = useState('Pro'); 
     const [availablePlans, setAvailablePlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpgrading, setIsUpgrading] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showCancelModal, setShowCancelModal] = useState(false);
 
-    // Fetch current plan and available plans
-    const fetchPlanData = useCallback(async () => {
+    // 1. SIMULATED DATA FETCHING
+    const fetchPlanData = useCallback(() => {
         setIsLoading(true);
-        try {
-            // Get current user's plan from localStorage or API
-            if (currentUser && currentUser.plan) {
-                setCurrentPlan(currentUser.plan);
-            } else {
-                // Try to get from API
-                try {
-                    const planResponse = await apiClient.get(API.updatePlan);
-                    if (planResponse.data.success) {
-                        setCurrentPlan(planResponse.data.data.plan);
-                    }
-                } catch (err) {
-                    // Fallback to Basic if API fails
-                    setCurrentPlan('Basic');
-                }
-            }
-
-            // Get available plans from system config
-            const configResponse = await apiClient.get(API.superadminConfig);
-            if (configResponse.data.success && configResponse.data.data.plans) {
-                const plans = configResponse.data.data.plans;
-                setAvailablePlans([
-                    { id: 'basic', ...plans.basic },
-                    { id: 'pro', ...plans.pro },
-                    { id: 'enterprise', ...plans.enterprise }
-                ]);
-            }
-        } catch (error) {
-            console.error('Failed to load plan data:', error);
-            showToast('Failed to load plan information.', 'error');
-            // Set default plans if API fails
-            setAvailablePlans([
-                {
-                    id: 'basic',
-                    name: 'Basic',
-                    price: 499,
-                    features: ['Basic Inventory Management', 'Up to 5 Users', 'Email Support'],
-                    maxUsers: 5,
-                    maxInventory: 1000,
-                },
-                {
-                    id: 'pro',
-                    name: 'Pro',
-                    price: 799,
-                    features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
-                    maxUsers: 20,
-                    maxInventory: 10000,
-                },
-                {
-                    id: 'enterprise',
-                    name: 'Enterprise',
-                    price: 999,
-                    features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
-                    maxUsers: -1,
-                    maxInventory: -1,
-                }
-            ]);
-        } finally {
+        // Simulate a network delay for fetching data
+        setTimeout(() => {
+            // Set current plan based on a mock user or hardcoded value
+            const initialPlan = currentUser?.plan || 'Pro'; 
+            setCurrentPlan(initialPlan);
+            setAvailablePlans(DEMO_PLANS);
             setIsLoading(false);
-        }
-    }, [apiClient, API, showToast]);
+        }, 800);
+    }, [currentUser]);
 
     useEffect(() => {
         fetchPlanData();
@@ -92,32 +71,43 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         setShowConfirmModal(true);
     };
 
-    const handleConfirmUpgrade = async () => {
+    // 2. SIMULATED UPGRADE/SWITCH LOGIC
+    const handleConfirmUpgrade = () => {
         if (!selectedPlan) return;
 
         setIsUpgrading(true);
-        try {
-            const response = await apiClient.put(API.updatePlan || '/api/user/plan', {
-                plan: selectedPlan.name
-            });
-
-            if (response.data.success) {
-                setCurrentPlan(selectedPlan.name);
-                showToast(`Successfully upgraded to ${selectedPlan.name} plan!`, 'success');
-                setShowConfirmModal(false);
-                setSelectedPlan(null);
-                // Refresh user data
-                fetchPlanData();
-            } else {
-                throw new Error(response.data.message || 'Failed to upgrade plan');
-            }
-        } catch (error) {
-            console.error('Plan upgrade error:', error);
-            const errorMessage = error.response?.data?.error || error.message || 'Failed to upgrade plan.';
-            showToast(errorMessage, 'error');
-        } finally {
+        
+        // Simulate a successful API transaction delay
+        setTimeout(() => {
+            // Update the UI state with the new plan
+            setCurrentPlan(selectedPlan.name);
+            showToast(`Successfully ${isUpgrade(selectedPlan) ? 'upgraded' : 'switched'} to ${selectedPlan.name} plan! (DEMO)`, 'success');
+            
+            setShowConfirmModal(false);
+            setSelectedPlan(null);
             setIsUpgrading(false);
+        }, 1200);
+    };
+    
+    // 3. SIMULATED CANCELLATION LOGIC
+    const handleCancelSubscription = () => {
+        if (currentPlan === 'Basic' || currentPlan?.toLowerCase() === 'basic') {
+            showToast('The Basic plan cannot be cancelled. (DEMO)', 'warning');
+            setShowCancelModal(false);
+            return;
         }
+        
+        setIsCancelling(true);
+
+        // Simulate a successful cancellation API call delay
+        setTimeout(() => {
+            // Revert the account to the Basic plan tier for simulation
+            setCurrentPlan('Basic'); 
+            showToast(`Subscription cancelled successfully. You have reverted to the Basic plan. (DEMO)`, 'success');
+            
+            setShowCancelModal(false);
+            setIsCancelling(false);
+        }, 1500);
     };
 
     const formatCurrency = (amount) => {
@@ -190,7 +180,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 </button>
                 <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                     <Crown className="w-8 h-8 mr-3 text-indigo-500" />
-                    Upgrade Your Plan
+                    Upgrade Your Plan (DEMO MODE)
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-2">
                     Choose the perfect plan for your business needs. Upgrade or downgrade anytime.
@@ -200,17 +190,30 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             {/* Current Plan Badge */}
             {currentPlan && (
                 <div className="max-w-6xl mx-auto mb-6">
-                    <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 flex items-center justify-between">
+                    <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <CheckCircle className="w-5 h-5 text-indigo-400" />
+                            <CheckCircle className="w-5 h-5 text-green-400" />
                             <div>
                                 <p className="text-sm text-gray-400">Current Plan</p>
-                                <p className="text-lg font-semibold text-white">{currentPlan}</p>
+                                <p className="text-xl font-bold text-white">{currentPlan}</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-sm text-gray-400">Billing Cycle</p>
-                            <p className="text-lg font-semibold text-white">Monthly</p>
+                        <div className="text-right flex items-center gap-4">
+                            <div>
+                                <p className="text-sm text-gray-400">Billing Cycle</p>
+                                <p className="text-lg font-semibold text-white">Monthly</p>
+                            </div>
+                            {/* Cancel Subscription Button */}
+                            {currentPlan?.toLowerCase() !== 'basic' && (
+                                <button
+                                    onClick={() => setShowCancelModal(true)}
+                                    className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                    disabled={isCancelling}
+                                >
+                                    <Slash className="w-4 h-4" />
+                                    Cancel
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -282,7 +285,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
                             <button
                                 onClick={() => handleUpgradeClick(plan)}
-                                disabled={isCurrent || isUpgrading}
+                                disabled={isCurrent || isUpgrading || isCancelling}
                                 className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
                                     isCurrent
                                         ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
@@ -298,14 +301,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 })}
             </div>
 
-            {/* Confirmation Modal */}
+            {/* Confirmation Modal (Upgrade/Switch) */}
             {showConfirmModal && selectedPlan && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
                         <div className="p-6 border-b border-gray-700">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                 <AlertCircle className="w-6 h-6 text-yellow-400" />
-                                Confirm Plan Change
+                                Confirm Plan Change (DEMO)
                             </h2>
                         </div>
                         <div className="p-6">
@@ -326,7 +329,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 </div>
                             </div>
                             <p className="text-sm text-gray-400">
-                                Your plan will be updated immediately. Billing will be prorated.
+                                Your plan will be updated immediately (Simulated).
                             </p>
                         </div>
                         <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
@@ -361,9 +364,61 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                     </div>
                 </div>
             )}
+            
+            {/* Cancellation Confirmation Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
+                        <div className="p-6 border-b border-gray-700">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Slash className="w-6 h-6 text-red-400" />
+                                Confirm Subscription Cancellation (DEMO)
+                            </h2>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-300 mb-4">
+                                Are you sure you want to cancel your current **{currentPlan}** subscription? 
+                                <br/><br/>
+                                **Simulated Effect:** This will immediately revert your plan to the **Basic** tier.
+                            </p>
+                            <div className="bg-red-700/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                                <p className="text-sm text-red-300 font-semibold">
+                                    You will lose access to features specific to the {currentPlan} plan.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowCancelModal(false)}
+                                disabled={isCancelling}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors cursor-pointer"
+                            >
+                                Keep Plan
+                            </button>
+                            <button
+                                onClick={handleCancelSubscription}
+                                disabled={isCancelling}
+                                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                                {isCancelling ? (
+                                    <>
+                                        <Loader className="w-4 h-4 animate-spin" />
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Slash className="w-4 h-4" />
+                                        Confirm Cancellation
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default PlanUpgrade;
-

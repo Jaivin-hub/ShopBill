@@ -101,7 +101,7 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                         <History className="w-5 h-5 mr-2" /> Khata Ledger
                     </h2>
                     <button onClick={onClose} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-                        <X className="w-6 h-6" />
+                        <X className="cursor-pointer w-6 h-6" />
                     </button>
                 </div>
                 
@@ -176,7 +176,7 @@ const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                 <div className="p-4 border-t border-gray-700">
                     <button 
                         onClick={onClose} 
-                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-extrabold text-lg shadow-xl hover:bg-indigo-700 transition"
+                        className="cursor-pointer w-full py-3 bg-indigo-600 text-white rounded-xl font-extrabold text-lg shadow-xl hover:bg-indigo-700 transition"
                     >
                         Close Ledger
                     </button>
@@ -522,11 +522,11 @@ const Ledger = ({ apiClient, API, showToast }) => {
   }
 
   return (
-    // Outer container: Full height, dark background, and a max-width for better desktop design.
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-200 p-4 md:p-6 lg:p-8 flex flex-col items-center">
+    // Outer container: Full height, dark background, now using w-full and responsive padding
+    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-200 flex flex-col w-full">
       
-      {/* Content wrapper with max-width for alignment */}
-      <div className="w-full max-w-4xl">
+      {/* Content wrapper: Now full width with horizontal padding */}
+      <div className="w-full p-4 md:p-6 lg:p-8">
         
         {/* 1. Main Heading and Description (Matching POS style) */}
         <div className='mb-6'>
@@ -544,22 +544,24 @@ const Ledger = ({ apiClient, API, showToast }) => {
         </div>
 
         {/* 2. Dashboard Header Panel (Matching POS Total/Pay block) */}
+        {/* Adjusted padding/margin for full width */}
         <div className="p-4 md:p-6 bg-gray-100 dark:bg-gray-900 rounded-xl mb-6 border border-indigo-300 dark:border-indigo-700 shadow-2xl dark:shadow-indigo-900/10">
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center space-y-4 md:space-y-0 md:space-x-4">
+            <div className="flex flex-col xl:flex-row justify-between items-stretch xl:items-center space-y-4 xl:space-y-0 xl:space-x-4">
                 
-                {/* Total Outstanding Display */}
-                <div className="flex-1 p-3 py-4 bg-red-900/40 rounded-xl border border-red-700 flex items-center justify-between shadow-inner">
-                    <span className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                {/* Total Outstanding Display - Optimized for full width/flex-1 */}
+                <div className="flex-1 min-w-0 p-3 py-4 bg-red-900/40 rounded-xl border border-red-700 flex items-center justify-between shadow-inner">
+                    <span className="text-xl font-bold text-gray-900 dark:text-white flex items-center truncate">
                         <TrendingUp className='w-5 h-5 mr-2 text-red-300' /> Total Outstanding:
                     </span>
-                    <span className="text-red-400 text-3xl font-extrabold">
+                    <span className="text-red-400 text-3xl font-extrabold ml-4 flex-shrink-0">
                         {/* Safely render totalOutstanding */}
                         ₹{totalOutstanding?.toFixed(0) || '0'}
                     </span>
                 </div>
 
                 {/* Action Buttons (Stacked on mobile, side-by-side on desktop) */}
-                <div className="flex flex-row space-x-3 w-full md:w-auto relative"> 
+                {/* Ensure the button container takes full width on smaller screens, and controls width on larger screens */}
+                <div className="flex flex-row space-x-3 w-full xl:w-auto xl:min-w-[400px] relative flex-shrink-0"> 
                     <button 
                         className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-indigo-900/50 hover:bg-indigo-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50"
                         onClick={openAddCustomerModal}
@@ -569,7 +571,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
                     </button>
 
                     <button 
-                        className="relative flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50 group px-3" // Adjusted padding for better fit
+                        className="relative flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold text-sm md:text-base shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform disabled:opacity-50 group px-3"
                         onClick={(e) => { e.stopPropagation(); openRemindInfoModal(); }}
                         disabled={outstandingCustomersForReminders.length === 0 || isProcessing}
                     >
@@ -578,29 +580,18 @@ const Ledger = ({ apiClient, API, showToast }) => {
                            <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2" /> 
                            <span>{outstandingCustomersForReminders.length > 0 ? `Remind (${outstandingCustomersForReminders.length})` : 'No Due'}</span>
                         </div>
-                        
-                        {/* Info Icon Button - Positioned absolutely within the button, right edge */}
-                        {/* <button
-                            onClick={(e) => { e.stopPropagation(); openRemindInfoModal(); }}
-                            className="absolute right-0 top-1/2 transform -translate-y-1/2 mr-1 p-1 rounded-full text-teal-200 hover:text-white transition"
-                            title="Remind Feature Information"
-                            type='button'
-                            disabled={isProcessing}
-                        >
-                            <Info className="w-3 h-3 md:w-4 md:h-4" />
-                        </button> */}
                     </button>
                 </div>
             </div>
         </div>
 
-        {/* 3. Customer List - Pass down search state */}
+        {/* 3. Customer List - Now utilizes the full width available */}
         <CustomerList
           sortedCustomers={sortedCustomers}
           openPaymentModal={openPaymentModal}
           isProcessing={isProcessing}
           openHistoryModal={openHistoryModal} 
-          isSearchVisible={isSearchVisible} // <--- NEW PROP PASSED
+          isSearchVisible={isSearchVisible}
         />
       </div>
 
@@ -648,7 +639,6 @@ const Ledger = ({ apiClient, API, showToast }) => {
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   className="w-full p-3 border-2 border-teal-600 rounded-lg text-3xl font-bold text-center focus:ring-teal-500 focus:border-teal-500 transition-colors bg-gray-900 text-teal-400 shadow-inner shadow-teal-900/50"
-                  // autoFocus REMOVED from here
                   disabled={isProcessing}
                 />
               </div>

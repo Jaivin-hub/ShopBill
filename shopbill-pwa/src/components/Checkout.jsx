@@ -512,21 +512,46 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                                     Your Subscription
                                 </h4>
-                                <div className={`p-6 rounded-xl ${plan.color} text-white shadow-lg flex flex-col justify-between`}>
+                                <div className={`p-6 mt-2 rounded-xl ${plan.color} text-white shadow-2xl flex flex-col justify-between`}>
+
+                                    {/* Header: Plan Name and Interval */}
                                     <div className="flex items-center justify-between mb-4">
                                         <h4 className="text-2xl font-bold flex items-center">
-                                            <ShoppingCart className="w-6 h-6 mr-3" />
+                                            {/* Replace with your actual imported icon component, e.g., <ShoppingCart className="w-6 h-6 mr-3" /> */}
+                                            <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                             {plan.name}
                                         </h4>
-                                        <span className="text-xs font-medium uppercase border border-white/50 px-2 py-1 rounded-full">{plan.interval}</span>
+                                        <span className="text-sm font-medium uppercase border border-white/70 px-3 py-1 rounded-full bg-white/10">
+                                            {plan.interval}
+                                        </span>
                                     </div>
+
+                                    {/* Section 1: Verification Charge (Prominently Displayed) */}
+                                    <div className="border-t border-white/30 pt-4 pb-4">
+                                        <p className="text-sm text-white/90 mb-2 font-medium">Total Due Today (Start of Trial):</p>
+
+                                        <div className="flex items-baseline">
+                                            <p className="text-5xl font-extrabold mr-3">{formatCurrency(1)}</p>
+                                            <span className="text-lg font-semibold text-green-300">
+                                                (Verification Charge)
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-white/70 mt-1">
+                                            This amount is <strong>instantly refunded</strong> after successful card verification.
+                                        </p>
+                                    </div>
+
+                                    {/* Section 2: Full Plan Charge (Trial Information) */}
                                     <div className="border-t border-white/30 pt-4">
-                                        <p className="text-sm text-white/90 mb-1">Total Due Today (Verification Charge):</p>
-                                        <p className="text-4xl font-extrabold">{formatCurrency(1)}</p>
-                                        <p className="text-sm text-white/80 mt-1">Full plan charge {formatCurrency(plan.price)} will start after the 30-day free trial.</p>
+                                        <p className="text-sm text-white/90 mb-1 font-medium">Monthly Charge After Trial:</p>
+                                        <p className="text-4xl font-extrabold">{formatCurrency(plan.price)}</p>
+                                        <p className="text-sm text-white/80 mt-2">
+                                            Full plan charge will begin <strong>after your 30-day free trial</strong> ends.
+                                        </p>
                                     </div>
+
                                 </div>
-                                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
+                                {/* <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
                                     Secure Mandate Setup
                                 </h4>
                                 <div className="w-full h-48 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-xl p-5 shadow-2xl relative overflow-hidden text-white font-mono transition-all duration-300 border border-indigo-600">
@@ -551,7 +576,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                             </p>
                                         </div>
                                     </div>
-                                </div>
+                                </div> */}
                             </div>
                         </div>
                     </div>

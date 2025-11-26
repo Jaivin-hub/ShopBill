@@ -1,5 +1,7 @@
-import React from 'react'
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import React from 'react';
+// Import LineChart and Line components instead of BarChart and Bar
+import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingUp } from 'lucide-react'; 
 
 // Define the configurations for the two potential charts
 const CHART_CONFIG = {
@@ -25,84 +27,106 @@ const CHART_CONFIG = {
     }
 };
 
-// --- NEW HELPER FUNCTION: Maps backend ID to a readable label ---
+/**
+ * --- HELPER FUNCTION: Maps backend ID to a readable label ---
+ * Converts numeric viewType IDs (1-12, 1-52, 1-365) into user-friendly labels.
+ * @param {string} viewType - 'Day', 'Week', or 'Month'
+ * @param {number|string} id - The ID value from the data (e.g., 10 for October)
+ * @returns {string} The formatted label.
+ */
 const getChartLabel = (viewType, id) => {
+    // Ensure ID is a number for date operations
+    const numericId = parseInt(id, 10);
+
     if (viewType === 'Month') {
-        const date = new Date(2000, id - 1, 1); // Use a dummy year
+        const date = new Date(2000, numericId - 1, 1); // Use a dummy year
         return date.toLocaleString('en-US', { month: 'short' }); // e.g., '10' -> 'Oct'
     } 
     if (viewType === 'Week') {
-        return `Wk ${id}`; // e.g., '39' -> 'Wk 39'
+        return `Wk ${numericId}`; // e.g., '39' -> 'Wk 39'
     }
-    // For 'Day' (which is actually dayOfYear in the backend)
-    // NOTE: If you pass actual dates to the backend, you should use that date string here.
-    // Since the backend returns dayOfYear, we'll just show the number for now.
-    // If your backend changes to return a formatted date string, this needs adjustment.
-    return id; // e.g., '278'
+    // For 'Day' (assuming it's day-of-year or simply an index)
+    return id; 
 };
 
-// Component receives the data, viewType, and the new yAxisKey from Reports.js
+/**
+ * Renders a dual-axis Line Chart for Sales (Revenue and Transactions).
+ * @param {Array<Object>} data - The sales data array.
+ * @param {('Day'|'Week'|'Month')} viewType - Key used for the X-axis in the data.
+ * @param {('revenue'|'bills')} yAxisKey - Determines which metric is primary (left Y-axis).
+ */
 const SalesChart = ({ data, viewType, yAxisKey }) => {
-    const isMobile = window.innerWidth < 768; 
+    // Check window size for responsive height adjustment
+    const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
     
     // Determine the dynamic X-Axis data key based on viewType
-    const xAxisDataKey = viewType; // Will be 'Day', 'Week', or 'Month'
+    const xAxisDataKey = viewType; 
     
     // Map the raw data to include a formatted label for the X-Axis
     const processedData = data.map(d => ({
         ...d,
-        // The label value is stored under the key name 'Day', 'Week', or 'Month'
-        labelValue: d[xAxisDataKey], 
         // Create the user-friendly label for display
         label: getChartLabel(viewType, d[xAxisDataKey]),
     }));
     
 
-    // Determine which key is primary for the main visualization
+    // Determine primary (left axis) and secondary (right axis) configurations
     const primaryConfig = CHART_CONFIG[yAxisKey] || CHART_CONFIG.revenue;
     const secondaryConfig = yAxisKey === 'revenue' ? { 
         dataKey: primaryConfig.transactionDataKey, 
         name: primaryConfig.transactionName, 
         color: primaryConfig.transactionColor,
-        yAxisId: 'right' // Use the right axis for the secondary data
+        yAxisId: 'right' 
     } : {
         dataKey: primaryConfig.secondaryDataKey,
         name: primaryConfig.secondaryName,
         color: primaryConfig.secondaryColor,
-        yAxisId: 'right' // Use the right axis for the secondary data
+        yAxisId: 'right' 
     };
 
-    // Formatter function for the Tooltip
+    /**
+     * Formatter function for the Tooltip, handles currency and standard numbers.
+     */
     const tooltipFormatter = (value, name, props) => {
-        // Use IN currency format for revenue, or just number format for transactions/bills
+        // Check for 'Revenue' in the name or the dataKey for currency formatting
         if (name.includes('Revenue') || props.dataKey === 'revenue') {
             return [`₹${value.toLocaleString('en-IN')}`, name];
         }
-        return [value.toLocaleString(), name];
+        // Format transactions/bills as standard number
+        return [value.toLocaleString('en-IN'), name];
     };
     
-    // Filter out data points where both primary and secondary values are zero
-    const filteredData = processedData.filter(d => d[primaryConfig.dataKey] > 0 || d[secondaryConfig.dataKey] > 0);
+    // Filter out data points where both primary and secondary values are zero for a cleaner graph
+    const filteredData = processedData.filter(d => 
+        (d[primaryConfig.dataKey] && d[primaryConfig.dataKey] > 0) || 
+        (d[secondaryConfig.dataKey] && d[secondaryConfig.dataKey] > 0)
+    );
     
-    if (filteredData.length === 0) return <p className="text-center text-gray-500 py-12">No data available for the selected period.</p>;
+    if (filteredData.length === 0) {
+        return (
+            <div className="h-[400px] flex items-center justify-center">
+                <p className="text-center text-gray-500 py-12">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    No sales data available for the selected period.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
-            <RechartsBarChart
-                // Use the filtered and processed data
+            <RechartsLineChart
                 data={filteredData} 
-                margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                margin={{ top: 10, right: 20, left: 10, bottom: 5 }} // Increased right margin for right Y-axis
             >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" className="dark:stroke-gray-700" />
+                {/* Updated stroke color for dark theme compatibility */}
+                <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" className="dark:stroke-gray-700" />
                 
-                {/* CRITICAL FIX: Use the 'label' key (which we created) for the X-Axis
-                  The tickFormatter is not strictly needed anymore since we created the 'label' key.
-                */}
+                {/* X-Axis */}
                 <XAxis 
                     dataKey="label" 
                     stroke="#6b7280" 
                     className="dark:text-gray-400 text-xs" 
-                    // To handle many ticks (e.g., daily view)
                     interval="preserveStartEnd" 
                 />
                 
@@ -120,11 +144,13 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                     orientation="right" 
                     stroke={secondaryConfig.color} 
                     className="dark:text-gray-400 text-xs"
+                    // Add formatter for the secondary axis if needed (e.g., bills are just numbers)
+                    tickFormatter={(value) => value.toLocaleString('en-IN', { notation: 'compact' })}
                 />
                 
                 <Tooltip
                     contentStyle={{ 
-                        backgroundColor: 'rgba(55, 65, 81, 0.9)', // Darker background
+                        backgroundColor: 'rgba(31, 41, 55, 0.9)', // Darker background (gray-800)
                         border: '1px solid #4b5563', // Dark border
                         borderRadius: '8px',
                         padding: '8px',
@@ -137,27 +163,33 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                 
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
                 
-                {/* PRIMARY BAR: The one the user selected (Revenue or Bills) */}
-                <Bar 
+                {/* Primary Line */}
+                <Line 
                     yAxisId="left" 
                     dataKey={primaryConfig.dataKey} 
                     name={primaryConfig.name} 
-                    fill={primaryConfig.color} 
-                    radius={[4, 4, 0, 0]}
+                    stroke={primaryConfig.color} 
+                    type="monotone" // Creates a smooth curve
+                    strokeWidth={2}
+                    dot={{ r: 4 }} // Highlight data points
+                    activeDot={{ r: 8, strokeWidth: 2 }} // Larger dot on hover
                 />
                 
-                {/* SECONDARY BAR: The other metric, for context (e.g., bills if revenue is primary) */}
-                <Bar 
+                {/* Secondary Line */}
+                <Line 
                     yAxisId="right" 
                     dataKey={secondaryConfig.dataKey} 
                     name={secondaryConfig.name} 
-                    fill={secondaryConfig.color} 
-                    radius={[4, 4, 0, 0]} 
-                    opacity={0.6} // Make it slightly transparent
+                    stroke={secondaryConfig.color} 
+                    type="monotone" // Creates a smooth curve
+                    strokeWidth={2}
+                    dot={{ r: 4 }} 
+                    activeDot={{ r: 8, strokeWidth: 2 }} 
+                    opacity={0.8} // Slightly reduced opacity for secondary data
                 />
-            </RechartsBarChart>
+            </RechartsLineChart>
         </ResponsiveContainer>
     );
 };
 
-export default SalesChart
+export default SalesChart;

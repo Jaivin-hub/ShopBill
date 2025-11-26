@@ -184,7 +184,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     const handleToggleDarkMode = () => { 
         if (toggleDarkMode) { 
             toggleDarkMode(); 
-            showToast(isDarkMode ? 'Switched to light mode' : 'Switched to dark mode', 'success');
+            showToast({ message: isDarkMode ? 'Switched to light mode' : 'Switched to dark mode', type: 'success' });
         } 
     };
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
@@ -228,7 +228,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         console.log("Cloud account disconnected.");
         setIsCloudConnected(false); // Only update the state
         setConnectedAccountEmail(""); // Clear the email
-        if (showToast) { showToast('Cloud account disconnected.', 'info'); }
+        if (showToast) { showToast({ message: 'Cloud account disconnected.', type: 'info' }); }
     };
     
     // UPDATED HANDLER: Simulates connecting the cloud account and updates email
@@ -236,7 +236,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         console.log(`Successfully connected new account: ${email}`);
         setIsCloudConnected(true);
         setConnectedAccountEmail(email); // Set the new email
-        if (showToast) { showToast('Cloud account connected successfully!', 'success'); }
+        if (showToast) { showToast({ message: 'Cloud account connected successfully!', type: 'success' }); }
     };
     
     // 🌟 REAL-WORLD CODE IMPROVEMENT: Cloud Upload Handler (Reverting to original API.post for safety)
@@ -263,7 +263,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
             console.log(`Data backup successfully uploaded to ${driveType}. File: ${fileName}`);
             
             if (showToast) { 
-                showToast(`Backup complete! Data uploaded to **${connectedAccountEmail}**. [View File on Drive](${fileLink})`, 'success'); 
+                showToast({ message: `Backup complete! Data uploaded to **${connectedAccountEmail}**. [View File on Drive](${fileLink})`, type: 'success' }); 
             } else { 
                 alert(`Data successfully uploaded to Cloud/Drive! File: ${fileLink}`); 
             }
@@ -277,7 +277,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         setCloudUploadStatus('error');
         console.error("Upload to Cloud Error:", error);
         if (showToast) { 
-            showToast(`Upload failed: ${error.message || 'Network error.'}`, 'error'); 
+            showToast({ message: `Upload failed: ${error.message || 'Network error.'}`, type: 'error' }); 
         } else { 
             alert(`Upload failed: ${error.message || 'Network error.'}`); 
         }
@@ -290,7 +290,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         if (syncStatus === 'loading') return;
 
         setSyncStatus('loading');
-        if (showToast) { showToast('Initiating synchronization with server...', 'info'); }
+        if (showToast) { showToast({ message: 'Initiating synchronization with server...', type: 'info' }); }
 
         try {
             // Use the API.sync endpoint you added to the backend router
@@ -304,7 +304,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 console.log("Data successfully synced from server.");
                 
                 if (showToast) { 
-                    showToast(`Synchronization complete! Data is up to date. (${response.data.recordsUpdated || 0} updated)`, 'success'); 
+                    showToast({ message: `Synchronization complete! Data is up to date. (${response.data.recordsUpdated || 0} updated)`, type: 'success' }); 
                 }
                 
                 setTimeout(() => setSyncStatus('idle'), 4000); 
@@ -317,7 +317,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
             setSyncStatus('error');
             console.error("Force Sync Error:", error);
             if (showToast) { 
-                showToast(`Force Sync Failed: ${error.message || 'Network or server error.'}`, 'error'); 
+                showToast({ message: `Force Sync Failed: ${error.message || 'Network or server error.'}`, type: 'error' }); 
             } else { 
                 alert(`Force Sync Failed: ${error.message || 'Network or server error.'}`); 
             }
@@ -370,38 +370,11 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         }
     };
 
-    // 🆕 NEW HELPER: Determine the action component for Force Sync
-    // const getSyncActionComponent = () => {
-    //     switch (syncStatus) {
-    //         case 'loading':
-    //             return (
-    //                 <div className="flex items-center text-indigo-600 dark:text-indigo-400">
-    //                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-    //                     Syncing...
-    //                 </div>
-    //             );
-    //         case 'success':
-    //             return (
-    //                 <div className="flex items-center text-green-600 dark:text-green-400">
-    //                     <CheckCircle className="w-5 h-5 mr-2" />
-    //                     Done
-    //                 </div>
-    //             );
-    //         case 'error':
-    //             return (
-    //                 <div className="text-red-600 dark:text-red-400 font-semibold">
-    //                     Error
-    //                 </div>
-    //             );
-    //         case 'idle':
-    //         default:
-    //             return null;
-    //     }
-    // };
     
     // --- Render Logic ---
     const renderSettingsList = () => (
-        <main className="space-y-6 max-w-xl mx-auto">
+        // 💥 UPDATED: Removed max-w-xl mx-auto from main settings list
+        <main className="space-y-6">
             
             {/* 1. Account & User Management Section (Unchanged) */}
             <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
@@ -447,59 +420,56 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 </div>
             </section>
 
-            {/* 3. Data Management Section */}
-            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* 3. Data Management Section - NEWLY ADDED */}
+            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
-                    <Server className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" /> Data Management
+                    <Server className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" /> Data & Sync
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                    
-                    <SettingItem icon={Cloud} title="Backup Data (Download)" description="Download a full backup of your shop data." onClick={handleBackup} accentColor="text-green-600 dark:text-green-400"/>
-                    
-                    <SettingItem 
-                        icon={UploadCloud}
-                        title="Upload to Cloud/Drive"
-                        description={
-                            cloudUploadStatus === 'success' ? 
-                            "Backup complete. Your data is secure in the cloud." :
-                            cloudUploadStatus === 'error' ?
-                            "Upload failed. Click to confirm account and try again." :
-                            isCloudConnected ? `Connected to: ${connectedAccountEmail}. Click to upload.` : "Cloud account not linked. Click to link and upload."
-                        }
-                        onClick={handleUploadToCloudClick} 
-                        actionComponent={getCloudUploadActionComponent()} 
-                        accentColor={
-                            cloudUploadStatus === 'loading' ? 'text-indigo-600 dark:text-indigo-400' :
-                            cloudUploadStatus === 'success' ? 'text-green-600 dark:text-green-400' :
-                            cloudUploadStatus === 'error' ? 'text-red-600 dark:text-red-400' :
-                            isCloudConnected ? "text-purple-600 dark:text-purple-400" : "text-gray-500 dark:text-gray-400"
-                        }
-                    />
-                    
                     <SettingItem 
                         icon={RefreshCw} 
-                        title="Force Sync" 
-                        description="Manually force a synchronization with the MERN server to refresh your data." 
+                        title="Force Sync Data" 
+                        description="Manually trigger an immediate synchronization of all local data with the server." 
                         onClick={handleForceSync} 
-                        actionComponent={getSyncActionComponent()}
-                        accentColor={
-                            syncStatus === 'loading' ? 'text-indigo-600 dark:text-indigo-400' :
-                            syncStatus === 'success' ? 'text-green-600 dark:text-green-400' :
-                            'text-indigo-600 dark:text-indigo-400'
+                        actionComponent={
+                            syncStatus === 'loading' ? (
+                                <div className="flex items-center text-indigo-600 dark:text-indigo-400">
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Syncing...
+                                </div>
+                            ) : syncStatus === 'success' ? (
+                                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            ) : (
+                                <RefreshCw className="w-5 h-5 text-indigo-500 hover:text-indigo-700" />
+                            )
                         }
+                        accentColor="text-indigo-600 dark:text-indigo-400" 
                     />
-                    
-                    <SettingItem icon={Trash2} title="Clear Cache" description="Wipe local browser storage (requires re-sync)." onClick={handleWipeLocalData} accentColor="text-red-600 dark:text-red-400"/>
+                    <SettingItem 
+                        icon={UploadCloud} 
+                        title="Cloud Backup" 
+                        description={`Backup all current data to your linked cloud account: ${connectedAccountEmail || 'None Linked'}`}
+                        onClick={handleUploadToCloudClick} 
+                        actionComponent={getCloudUploadActionComponent() || <Cloud className="w-5 h-5 text-teal-500 hover:text-teal-700" />} 
+                        accentColor="text-teal-600 dark:text-teal-400"
+                    />
+                    <SettingItem 
+                        icon={Trash2} 
+                        title="Wipe Local Cache" 
+                        description="Clear all application data stored locally on this device (requires re-sync)." 
+                        onClick={handleWipeLocalData} 
+                        accentColor="text-red-600 dark:text-red-400"
+                    />
                 </div>
-            </section> */}
-            
+            </section>
         </main>
     );
 
     const renderHeader = () => {
         if (currentView === 'main') {
             return (
-                <header className="mb-8 pt-1 md:pt-0 max-w-xl mx-auto">
+                // 💥 UPDATED: Applied max-w-4xl mx-auto to Header
+                <header className="mb-8 pt-1 md:pt-0 max-w-4xl mx-auto">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                         Settings
                     </h1>
@@ -507,11 +477,14 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 </header>
             );
         }
+        // For sub-views, the back button/header is usually handled within the sub-component itself
+        return null;
     }
 
     const renderContent = () => {
         switch (currentView) {
             case 'password':
+                // Sub-components usually handle their own width/layout
                 return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} />;
             case 'staff':
                 return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} setConfirmModal={setConfirmModal} />;
@@ -519,7 +492,12 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={() => setCurrentView('main')} />;
             case 'main':
             default:
-                return renderSettingsList();
+                // 💥 WRAPPER: Applied max-w-4xl mx-auto here to contain the settings list
+                return (
+                    <div className="max-w-4xl mx-auto"> 
+                        {renderSettingsList()}
+                    </div>
+                );
         }
     };
 

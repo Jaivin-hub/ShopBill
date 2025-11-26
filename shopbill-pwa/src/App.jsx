@@ -487,7 +487,7 @@ useEffect(() => {
                         <button
                             key={item.id}
                             onClick={() => setCurrentPage(item.id)}
-                            className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
+                            className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                             }`}
@@ -504,7 +504,7 @@ useEffect(() => {
                                 <button
                                     key={item.id}
                                     onClick={() => setCurrentPage(item.id)}
-                                    className={`w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
+                                    className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
                                         ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
                                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                                     }`}

@@ -1,12 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle } from 'lucide-react'; 
-// NOTE: Ensure your API config path is correct
 import API from '../config/api'; 
-
-// Default Walk-in Customer for UPI sales
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" option
-
 /**
  * Sub-component for Payment Modal: Handles Cash, Full Credit, or Partial/Mixed Payments
  * @param {object} props
@@ -20,11 +16,8 @@ export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" op
  * @param {object} props.apiClient - The initialized API client for making requests.
  */
 const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, onAddNewCustomer, apiClient }) => {
-    // 1-2. Refs
     const dropdownRef = useRef(null);
     const searchInputRef = useRef(null); 
-    
-    // 3-8. State
     const [localSelectedCustomer, setLocalSelectedCustomer] = useState(WALK_IN_CUSTOMER);
     const [amountPaidInput, setAmountPaidInput] = useState(totalAmount.toFixed(2));
     const [paymentType, setPaymentType] = useState('UPI');
@@ -35,22 +28,26 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-
-    // 9. useEffect - Reset state when modal opens/total changes
+    // --- EFFECT: Reset state on modal open and set initial payment type ---
     useEffect(() => {
         if (isOpen) {
             setAmountPaidInput(totalAmount.toFixed(2));
-            setPaymentType('UPI');
-            setLocalSelectedCustomer(WALK_IN_CUSTOMER); 
+            // Determine initial payment type
+            const initialPaymentType = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI';
+            setPaymentType(initialPaymentType);
+            
+            // Note: localSelectedCustomer state is maintained between opens unless explicitly reset
+            // If you want to reset customer to WALK_IN on every open, uncomment the line below:
+            // setLocalSelectedCustomer(WALK_IN_CUSTOMER); 
+
             setSearchTerm(''); 
             setIsNewCustomerFormOpen(false); 
             setNewCustomerName('');
             setNewCustomerPhone('');
             setIsSubmitting(false); // Reset submitting state on open
         }
-    }, [isOpen, totalAmount]);
-    
-    // 10. useEffect - Close dropdown if user clicks outside and autofocus search when opened
+    }, [isOpen, totalAmount, localSelectedCustomer.id]); // Added localSelectedCustomer.id to dependencies
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -62,66 +59,50 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         if (isDropdownOpen) {
             setTimeout(() => searchInputRef.current?.focus(), 10);
         }
-
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isDropdownOpen]);
 
-
     const khataDue = localSelectedCustomer.outstandingCredit || 0;
     const isCreditCustomerSelected = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id;
-    // Ensure amountPaid is always parsed as a number, defaulting to 0
     const amountPaid = parseFloat(amountPaidInput) || 0;
-    
-    // 11. useEffect - Credit payment check
+
+    // --- EFFECT: Logic to prevent 'Credit' selection if Walk-in is selected ---
     useEffect(() => {
         if (paymentType === 'Credit' && !isCreditCustomerSelected) {
             setPaymentType('UPI');
-            showToast('Select a credit customer first to use the "Full Khata" option.', 'info');
+            showToast({ message: 'Select a credit customer first to use the "Full Khata" option.', type: 'info' });
         }
     }, [paymentType, isCreditCustomerSelected, showToast]);
 
-
-    // 12. useMemo - Calculations based on user input - CONTAINS THE FIX
     const {
         amountCredited, 
         changeDue,      
         newKhataBalance, 
         paymentMethod,
-        effectiveAmountPaid // <--- ADDED: The actual amount to record as paid
+        effectiveAmountPaid // <--- The actual amount to record as paid
     } = useMemo(() => {
         const total = totalAmount;
-
         let amountCredited = 0; // Amount of the CURRENT SALE to be added to Khata
         let changeDue = 0;
         let effectiveAmountPaid = amountPaid; // Default: use the value from the input
         let method = paymentType;
-        
-        // --- FIX APPLIED HERE ---
+
         if (paymentType === 'Credit') {
-            // SCENARIO 1: Full sale amount is explicitly put on credit (Full Khata button)
             amountCredited = total;
-            // FIX: When full Khata is selected, the amount paid must be ZERO, regardless of input field value.
             effectiveAmountPaid = 0; 
             method = 'Credit';
         }
         else { // UPI / Mixed
             if (amountPaid >= total) {
-                // SCENARIO 2: Overpayment/Exact payment
                 changeDue = Math.max(0, amountPaid - total);
                 method = 'UPI'; 
             } else if (amountPaid < total) {
-                // SCENARIO 3: Partial payment or 0 payment
                 amountCredited = total - amountPaid;
-                // Determine if it's Mixed (partial payment) or Full Credit (0 paid in UPI mode)
                 method = amountPaid > 0 ? 'Mixed' : 'Credit'; 
             }
-            // If none of the above, amountCredited remains 0 (i.e., exact payment)
         }
-        
-        // This calculation is correct for the final outstanding balance
-        // New Outstanding = Old Outstanding + (Portion of CURRENT SALE put on credit)
-        const newKhataBalance = khataDue + amountCredited;
 
+        const newKhataBalance = khataDue + amountCredited;
         return { 
             amountCredited, 
             changeDue, 
@@ -129,11 +110,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             paymentMethod: method,
             effectiveAmountPaid // Return the corrected value
         };
-        
     }, [amountPaid, totalAmount, paymentType, khataDue]);
 
-
-    // --- Customer Options Memoization and Filtering ---
     const filteredOptions = useMemo(() => {
         const options = [];
         
@@ -149,26 +127,21 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             key: WALK_IN_CUSTOMER.id,
             display: 'Walk-in Customer'
         });
-
         const regularCustomers = (allCustomers || []).filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id);
-
         regularCustomers.forEach(c => {
              options.push({
                 ...c, 
-                // CRITICAL FIX: Ensure the 'id' field used for comparison is set
-                // to the unique identifier (_id or id from API).
                 id: c._id || c.id, 
                 key: c._id || c.id, 
                 display: `${c.name} ${c.outstandingCredit > 0 ? `(DUE: ₹${c.outstandingCredit.toFixed(0)})` : ''}`
             });
         });
-        
+
         if (!searchTerm) {
             return options; 
         }
-        
+
         const lowerCaseSearch = searchTerm.toLowerCase();
-        
         const specialOptions = options.slice(0, 2); 
         const searchableCustomers = options.slice(2); 
         
@@ -177,12 +150,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             (c.phone && c.phone.includes(searchTerm)) || 
             (c.mobile && c.mobile.includes(searchTerm))
         );
-        
+
         return [...specialOptions, ...filteredCustomers];
     }, [allCustomers, searchTerm]); 
-
-
-    // Handle selection from the custom list
+    
+    // --- UPDATED: Automatically set to 'Credit' if a credit customer is selected ---
     const handleCustomerSelect = (customer) => {
         setIsDropdownOpen(false); 
         setSearchTerm(''); 
@@ -194,22 +166,23 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         
         setLocalSelectedCustomer(customer);
         
-        if (customer.id === WALK_IN_CUSTOMER.id && paymentType === 'Credit') {
+        if (customer.id !== WALK_IN_CUSTOMER.id) {
+            // New requirement: If any credit customer is selected, default to Full Khata
+            setPaymentType('Credit');
+        } else {
+            // If Walk-in is selected, default back to UPI (Cash/Mixed)
             setPaymentType('UPI');
         }
     };
+    // --- END UPDATED LOGIC ---
 
-    // Handler for the local "Add New Customer" form submission
     const handleAddNewCustomerSubmit = async (e) => {
         e.preventDefault();
-        
         if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
-            showToast('Name and Phone Number are required.', 'error');
+            showToast({ message: 'Name and Phone Number are required.', type: 'error' });
             return;
         }
-
         setIsSubmitting(true);
-        
         try {
             const dataToSend = {
                 name: newCustomerName.trim(),
@@ -217,63 +190,54 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                 creditLimit: 0, 
                 initialDue: 0
             };
-
             const response = await apiClient.post(API.customers, dataToSend);
-
             if (response.data && response.data.customer) {
                 const newCustomer = response.data.customer;
+                showToast({ message: `Customer "${newCustomer.name}" added successfully!`, type: 'success' });
                 
-                showToast(`Customer "${newCustomer.name}" added successfully!`, 'success');
+                // --- Set new customer and default payment to Credit ---
                 setLocalSelectedCustomer(newCustomer);
+                setPaymentType('Credit'); // Set to credit by default for new credit customer
+                // --- End Update ---
+                
                 onAddNewCustomer(newCustomer);
                 setNewCustomerName('');
                 setNewCustomerPhone('');
                 setIsNewCustomerFormOpen(false);
             } else {
-                 showToast('Customer created but response format was unexpected.', 'warning');
+                 showToast({ message: 'Customer created but response format was unexpected.', type: 'warning' });
             }
         } catch (error) {
             const errorMessage = error.response?.data?.message || 'Failed to add new customer due to a network or server error.';
-            showToast(errorMessage, 'error');
+            showToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Handler for the main payment confirmation
     const handleConfirmPayment = async () => {
         if (totalAmount <= 0) {
-            showToast('Cart is empty. Cannot process payment.', 'error');
+            showToast({ message: 'Cart is empty. Cannot process payment.', type: 'error' });
             return;
         }
-
         if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
-            showToast('Please select a specific customer to add the remaining amount to Khata/Credit.', 'error');
+            showToast({ message: 'Please select a specific customer to add the remaining amount to Khata/Credit.', type: 'error' });
             return;
         }
-
-        // FIX APPLIED: Use the effectively paid amount calculated in useMemo
         if (effectiveAmountPaid < 0) {
-             showToast('Amount paid cannot be negative.', 'error');
+             showToast({ message: 'Amount paid cannot be negative.', type: 'error' });
              return;
         }
-        
         setIsSubmitting(true);
-        
         try {
-             // FIX APPLIED HERE: Pass effectiveAmountPaid instead of the raw amountPaid
              await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer);
         } catch (e) {
-            showToast('Payment processing failed. Please try again.', 'error');
+            showToast({ message: 'Payment processing failed. Please try again.', type: 'error' });
             setIsSubmitting(false); 
         }
-       
     };
 
-
-    // Conditional Render: MUST be after all hooks
     if (!isOpen) return null;
-
 
     const currentCustomerDisplay = 
         localSelectedCustomer.id === WALK_IN_CUSTOMER.id 
@@ -285,16 +249,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     
     const isWalkInSelected = localSelectedCustomer.id === WALK_IN_CUSTOMER.id;
 
-    // -----------------------------------------------------------------------
-    // START: New Customer Form Component (Inline Render)
-    // -----------------------------------------------------------------------
-
     if (isNewCustomerFormOpen) {
         return (
             <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-teal-700">
-                    
-                    {/* Header */}
                     <div className="p-5 border-b border-gray-700 flex justify-between items-center">
                         <h2 className="text-xl font-bold text-white flex items-center">
                             <UserPlus className="w-6 h-6 text-teal-400 mr-2" />
@@ -304,11 +262,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-
-                    {/* Form Body */}
                     <form onSubmit={handleAddNewCustomerSubmit} className="p-5 space-y-6">
-                        
-                        {/* Name Input */}
                         <div>
                             <label htmlFor="new-customer-name" className="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
                             <div className="relative">
@@ -325,8 +279,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 />
                             </div>
                         </div>
-
-                        {/* Phone Input */}
                         <div>
                             <label htmlFor="new-customer-phone" className="block text-sm font-medium text-gray-300 mb-1">Phone Number (Required for Credit)</label>
                             <div className="relative">
@@ -343,8 +295,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 />
                             </div>
                         </div>
-                        
-                        {/* Action Button */}
                         <button 
                             type="submit"
                             className="w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
@@ -360,7 +310,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             )}
                             {isSubmitting ? 'Saving...' : 'Save Customer'}
                         </button>
-                        
                         <button 
                             type="button"
                             onClick={() => setIsNewCustomerFormOpen(false)}
@@ -369,22 +318,14 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         >
                             Cancel and Go Back
                         </button>
-
                     </form>
                 </div>
             </div>
         );
     }
-    // -----------------------------------------------------------------------
-    // END: New Customer Form Component
-    // -----------------------------------------------------------------------
-
-
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-indigo-700">
-                
-                {/* Modal Header */}
                 <div className="p-5 border-b border-gray-700 flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-white flex items-center">
                         <IndianRupee className="w-6 h-6 text-teal-400 mr-2" />
@@ -394,17 +335,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-
-                {/* Modal Body */}
                 <div className="p-5 space-y-5">
-                    
-                    {/* CUSTOM Customer Selection Dropdown with Search */}
                     <div className="relative" ref={dropdownRef}>
                         <h3 className="text-sm font-semibold flex items-center text-gray-300 mb-2">
                             <User className="w-4 h-4 mr-1 text-teal-400" /> Bill To Customer:
                         </h3>
-                        
-                        {/* Custom Dropdown Input/Button */}
                         <button
                             type="button"
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -417,12 +352,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <span className="truncate">{currentCustomerDisplay}</span>
                             <List className="w-5 h-5 ml-2 text-indigo-400" />
                         </button>
-                        
-                        {/* Custom Dropdown List (Styled <div>) */}
                         {isDropdownOpen && (
                             <div className="absolute z-10 w-full mt-1 rounded-lg shadow-2xl bg-gray-700 border border-indigo-500 max-h-60 overflow-y-auto">
-                                
-                                {/* Search Input Field */}
                                 <div className="p-2 sticky top-0 bg-gray-700 border-b border-gray-600">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -438,8 +369,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                         />
                                     </div>
                                 </div>
-                                
-                                {/* List of Filtered Options */}
                                 {filteredOptions.length > 0 ? (
                                     filteredOptions.map((customer) => (
                                         <div
@@ -447,7 +376,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                             onClick={() => handleCustomerSelect(customer)}
                                             className={`px-4 py-3 cursor-pointer text-sm font-medium transition-colors border-b border-gray-600 last:border-b-0 flex items-center justify-between
                                                 ${
-                                                    // CRITICAL FIX: Only apply the selected style if the customer ID matches
                                                     customer.id === localSelectedCustomer.id 
                                                         ? 'bg-indigo-600 text-white' // SELECTED Customer color
                                                         
@@ -467,7 +395,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                                 {customer.id !== ADD_NEW_CUSTOMER_ID && customer.id !== WALK_IN_CUSTOMER.id && <User className="w-4 h-4 inline mr-2 text-indigo-300" />}
                                                 {customer.display}
                                             </span>
-                                            {/* Only show SELECTED text for the *actual* localSelectedCustomer */}
                                             {customer.id === localSelectedCustomer.id && (
                                                 <span className="text-xs font-bold text-teal-300">✓ SELECTED</span>
                                             )}
@@ -481,17 +408,12 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             </div>
                         )}
                     </div>
-
-
-                    {/* Total Due */}
                     <div className="p-4 bg-indigo-900/60 rounded-xl shadow-xl border border-indigo-600">
                         <p className="flex justify-between items-center text-xl font-medium text-gray-200">
                             <span>Sale Total:</span>
                             <span className="text-4xl font-extrabold text-teal-400">₹{totalAmount.toFixed(2)}</span>
                         </p>
                     </div>
-
-                    {/* Khata Status - OLD DUE (khataDue) */}
                     {isCreditCustomerSelected && (
                         <div className="flex justify-between items-center p-2 border-b border-gray-700 text-sm">
                             <span className="font-medium text-gray-300">Customer <strong>Old</strong> Outstanding Khata:</span>
@@ -500,12 +422,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             </span>
                         </div>
                     )}
-                    
-                    {/* Payment Type Toggle (Full Credit vs Cash/Mixed) */}
                     <div className="flex rounded-xl overflow-hidden shadow-2xl">
                         <button
                             onClick={() => setPaymentType('UPI')}
-                            className={`flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
+                            className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
                                 paymentType === 'UPI' 
                                     ? 'bg-teal-600 text-white shadow-inner shadow-teal-900' 
                                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -517,7 +437,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         <button
                             onClick={() => setPaymentType('Credit')}
                             disabled={!isCreditCustomerSelected || isSubmitting}
-                            className={`flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
+                            className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
                                 paymentType === 'Credit' 
                                     ? 'bg-red-600 text-white shadow-inner shadow-red-900' 
                                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -527,8 +447,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <CreditCard className="w-5 h-5 inline-block mr-1" /> Full Khata
                         </button>
                     </div>
-
-                    {/* Amount Paid Input (Visible only for Cash/Mixed) */}
                     {paymentType === 'UPI' && (
                         <div className="space-y-2">
                             <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received</label>
@@ -544,18 +462,13 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             />
                         </div>
                     )}
-                    
-                    {/* Transaction Summary */}
                     <div className="pt-2 space-y-3">
-                        {/* Change Due (Cash Overpayment) */}
                         {changeDue > 0.01 && (
                             <p className="flex justify-between font-bold text-xl text-green-400 p-3 bg-green-900/40 rounded-lg border border-green-700">
                                 <span>Change Due:</span>
                                 <span>₹{changeDue.toFixed(2)}</span>
                             </p>
                         )}
-
-                        {/* Amount Added to Khata (Credit/Partial Payment) */}
                         {amountCredited > 0.01 && (
                              <p className={`flex justify-between font-bold text-xl p-3 rounded-lg border ${
                                  amountCredited > 0 && isCreditCustomerSelected 
@@ -566,34 +479,25 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 <span className="text-2xl font-extrabold">₹{amountCredited.toFixed(2)}</span>
                             </p>
                         )}
-
-                        {/* New Khata Balance */}
-                        {/* Show New Khata Balance if a credit customer is selected and the transaction affects the Khata (credit added OR full payment). Note: >= 0 is used to show the balance even if credit is 0. */}
                         {isCreditCustomerSelected && (khataDue > 0 || amountCredited > 0) && (
                             <p className="flex justify-between text-sm text-gray-400 pt-3 border-t border-gray-700 mt-2">
                                 <span><strong>New</strong> Total Outstanding Khata Balance:</span>
                                 <span className="font-semibold text-white text-base">₹{newKhataBalance.toFixed(2)}</span>
                             </p>
                         )}
-                        
-                        {/* Status Message if paid 0 in UPI mode and not credit customer */}
                         {paymentType === 'UPI' && amountCredited > 0 && !isCreditCustomerSelected && (
                              <p className="text-xs text-center text-yellow-400 p-2 bg-yellow-900/30 rounded-lg">
                                 <strong>WARNING:</strong> No customer selected. The remaining Khata amount cannot be saved to a specific account.
                             </p>
                         )}
                     </div>
-
                 </div>
-
-                {/* Modal Footer (Action Button) */}
                 <div className="p-5 border-t border-gray-700">
                     <button 
                         onClick={handleConfirmPayment} 
-                        className="w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
+                        className="cursor-pointer w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
                         disabled={totalAmount <= 0 || isSubmitting} 
                     >
-                        {/* Added Loader for the main button */}
                         {isSubmitting ? (
                             <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -609,5 +513,4 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         </div>
     );
 };
-
 export default PaymentModal;

@@ -1,4 +1,3 @@
-// Centralized API Client with interceptors, caching, and performance optimizations
 import axios from 'axios';
 
 // Request cache to prevent duplicate calls
@@ -30,7 +29,8 @@ apiClient.interceptors.request.use(
     // Generate cache key
     const cacheKey = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}:${JSON.stringify(config.data || {})}`;
     
-    // Check cache for GET requests
+    // --- CACHING LOGIC DISABLED START ---
+    /* // Check cache for GET requests
     if (config.method === 'get' && !config.forceRefresh) {
       const cached = requestCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -46,6 +46,8 @@ apiClient.interceptors.request.use(
         return config;
       }
     }
+    */
+    // --- CACHING LOGIC DISABLED END ---
 
     // Cancel previous identical request if still pending
     if (activeRequests.has(cacheKey)) {
@@ -59,7 +61,8 @@ apiClient.interceptors.request.use(
 
     // Store cache key in config for response interceptor
     config.__cacheKey = cacheKey;
-    config.__cacheable = config.method === 'get' && !config.forceRefresh;
+    // config.__cacheable = config.method === 'get' && !config.forceRefresh; // <-- No longer needed
+    config.__cacheable = false; // Explicitly set to false
 
     return config;
   },
@@ -73,6 +76,8 @@ apiClient.interceptors.response.use(
   (response) => {
     const config = response.config;
     
+    // --- CACHING LOGIC DISABLED START ---
+    /*
     // Handle cached responses - return cached data immediately
     if (config.__fromCache && config.__cachedData) {
       // Return cached response
@@ -97,6 +102,8 @@ apiClient.interceptors.response.use(
         timestamp: Date.now(),
       });
     }
+    */
+    // --- CACHING LOGIC DISABLED END ---
 
     // Remove from active requests
     if (config.__cacheKey) {
@@ -106,6 +113,9 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    
+    // --- CACHING LOGIC DISABLED START ---
+    /*
     // Handle cached responses - if request was cancelled because we have cache
     if (error.config?.__fromCache && error.config?.__cachedData) {
       const cachedResponse = {
@@ -125,11 +135,6 @@ apiClient.interceptors.response.use(
       return Promise.resolve(cachedResponse);
     }
 
-    // Handle cancelled requests (ignore if it was for cache)
-    if (axios.isCancel(error) && !error.config?.__fromCache) {
-      return Promise.reject({ cancelled: true, message: error.message });
-    }
-    
     // If cancelled for cache, return cached data
     if (axios.isCancel(error) && error.config?.__fromCache && error.config?.__cachedData) {
       return Promise.resolve({
@@ -141,7 +146,15 @@ apiClient.interceptors.response.use(
         config: error.config,
       });
     }
-
+    */
+    // --- CACHING LOGIC DISABLED END ---
+    
+    // Handle cancelled requests (ignore if it was for cache)
+    // IMPORTANT: This check must remain to handle the 'Duplicate request cancelled' logic.
+    if (axios.isCancel(error) && !error.config?.__fromCache) {
+      return Promise.reject({ cancelled: true, message: error.message });
+    }
+    
     // Remove from active requests on error
     if (error.config?.__cacheKey) {
       activeRequests.delete(error.config.__cacheKey);
@@ -160,17 +173,8 @@ apiClient.interceptors.response.use(
 
 // Utility function to clear cache
 export const clearCache = (pattern = null) => {
-  if (!pattern) {
-    requestCache.clear();
-    return;
-  }
-  
-  // Clear cache entries matching pattern
-  for (const key of requestCache.keys()) {
-    if (key.includes(pattern)) {
-      requestCache.delete(key);
-    }
-  }
+  // requestCache.clear(); // <-- Logic removed as the cache is disabled
+  console.warn("clearCache called, but caching is currently disabled in apiClient.");
 };
 
 // Utility function to cancel all pending requests
@@ -182,4 +186,3 @@ export const cancelAllRequests = () => {
 };
 
 export default apiClient;
-

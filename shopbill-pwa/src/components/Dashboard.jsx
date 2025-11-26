@@ -19,6 +19,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   // 2. Data Fetching Function
   const fetchDashboardData = useCallback(async () => {
+    console.log('this fetchDashboardData function is invoking')
     setIsLoading(true);
     try {
       // Use Promise.all to fetch all data concurrently for efficiency
@@ -195,7 +196,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
               {allLowStockAlerts.length > 0 && (
                 <button
                   onClick={onViewAllInventory}
-                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                   title={allLowStockAlerts.length > 1 ? "View Full Inventory Report" : "View Inventory Alert"}
                 >
                   {allLowStockAlerts.length > 1 ? 'View All' : 'View'}
@@ -231,7 +232,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
               {customersWithCredit.length > 0 && (
                 <button
                   onClick={onViewAllCredit}
-                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                   title={customersWithCredit.length > 1 ? "View Full Credit Ledger" : "View Customer Credit"}
                 >
                   {customersWithCredit.length > 1 ? 'View All' : 'View'}
@@ -268,7 +269,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
               {sales.length > 0 && (
                 <button
                   onClick={onViewAllSales}
-                  className="flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
+                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                   title={sales.length > 1 ? "View Full Sales Report" : "View Recent Sales"}
                 >
                   {sales.length > 1 ? 'View All' : 'View'}

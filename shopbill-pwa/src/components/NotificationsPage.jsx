@@ -120,7 +120,8 @@ const NotificationsPage = ({ apiClient, API, showToast }) => {
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">View alerts, stock updates, and recent activity.</p>
 
-            <div className="space-y-4 max-w-3xl mx-auto">
+            {/* UPDATED: Removed max-w-3xl mx-auto to make the list full width */}
+            <div className="space-y-4">
                 {notifications.length > 0 ? (
                     notifications.map(notification => {
                         const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);

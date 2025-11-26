@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react'; 
 import { 
-    List, CreditCard, IndianRupee, DollarSign, History, AlertTriangle, Phone, Search, Loader 
+    List, CreditCard, IndianRupee, History, AlertTriangle, Phone, Search, Loader 
 } from 'lucide-react';
 
 /**
  * CustomerList Component: Renders the actual list of Khata customers.
+ * * CHANGE: Removed max-width container to allow component to fill the parent's width.
+ * CHANGE: Adjusted grid layout to support 3 columns on large screens (lg:grid-cols-3).
  */
 const CustomerList = ({ 
     sortedCustomers, 
@@ -110,7 +112,7 @@ const CustomerList = ({
                     {/* View History Button */}
                     <button 
                         onClick={() => openHistoryModal(customer)} 
-                        className="flex-1 py-2 text-xs sm:text-sm font-semibold text-indigo-300 bg-indigo-900/40 rounded-lg hover:bg-indigo-900/60 transition disabled:opacity-50 flex items-center justify-center"
+                        className="cursor-pointer flex-1 py-2 text-xs sm:text-sm font-semibold text-indigo-300 bg-indigo-900/40 rounded-lg hover:bg-indigo-900/60 transition disabled:opacity-50 flex items-center justify-center"
                         disabled={isProcessing}
                         title="View Transaction History"
                     >
@@ -120,7 +122,7 @@ const CustomerList = ({
                     {/* Record Payment Button (FIXED DESIGN - Corrected icon usage and alignment) */}
                     <button 
                         onClick={() => openPaymentModal(customer)} 
-                        className="flex-1 py-2 text-xs sm:text-sm font-bold text-white bg-teal-600 rounded-lg shadow-md shadow-teal-900/50 hover:bg-teal-500 transition disabled:opacity-50 disabled:bg-gray-700 disabled:text-gray-400 flex items-center justify-center" // Ensure flex classes are here
+                        className="cursor-pointer flex-1 py-2 text-xs sm:text-sm font-bold text-white bg-teal-600 rounded-lg shadow-md shadow-teal-900/50 hover:bg-teal-500 transition disabled:opacity-50 disabled:bg-gray-700 disabled:text-gray-400 flex items-center justify-center" // Ensure flex classes are here
                         disabled={isProcessing || outstandingAmount <= 0}
                         title="Record Payment Received"
                     >
@@ -134,7 +136,8 @@ const CustomerList = ({
     const displayCount = filteredCustomers.length;
 
     return (
-        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        // REMOVED: max-w-4xl mx-auto
+        <div className="space-y-4 sm:space-y-6">
             
             {/* --- 1. Search Bar --- */}
             <div className="relative mb-4">
@@ -159,11 +162,12 @@ const CustomerList = ({
             </div>
             
             {/* --- 3. Customer List (Grid Layout) --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {/* ADDED: lg:grid-cols-3 for wider screens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {filteredCustomers.length > 0 ? (
                     filteredCustomers.map(renderCustomerCard)
                 ) : (
-                    <div className="sm:col-span-2 p-10 text-center bg-gray-800 rounded-xl border border-gray-700 text-gray-400">
+                    <div className="sm:col-span-2 lg:col-span-3 p-10 text-center bg-gray-800 rounded-xl border border-gray-700 text-gray-400">
                         <Search className="w-8 h-8 mx-auto mb-3" />
                         <p className="font-semibold">
                             {searchTerm ? `No results found for "${searchTerm}".` : 'No customers found in the Khata ledger.'}

@@ -451,7 +451,7 @@ const InventoryContent = ({
                             <button
                                 type="button"
                                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                                className="w-full pl-3 pr-8 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 text-sm font-medium flex items-center"
+                                className="cursor-pointer w-full pl-3 pr-8 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 text-sm font-medium flex items-center"
                             >
                                 {currentSortLabel}
                                 <ListOrdered className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -462,7 +462,7 @@ const InventoryContent = ({
                                         <div
                                             key={option.value}
                                             onClick={() => handleSortSelect(option.value)}
-                                            className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
+                                            className={`cursor pointer px-4 py-2 cursor-pointer text-sm font-medium transition-colors 
                                                 ${option.value === sortOption 
                                                     ? 'bg-indigo-600 text-white' 
                                                     : 'text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -475,7 +475,7 @@ const InventoryContent = ({
                             )}
                         </div>
                         <button 
-                            className="bg-cyan-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-cyan-700 transition flex items-center disabled:opacity-50"
+                            className="cursor-pointer bg-cyan-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-cyan-700 transition flex items-center disabled:opacity-50"
                             onClick={openScannerModal} 
                             disabled={loading}
                             title="Scan Item Barcode/QR"
@@ -484,14 +484,14 @@ const InventoryContent = ({
                             <span className="ml-2">Scan</span>
                         </button>
                         <button 
-                            className="bg-teal-700 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-teal-800 transition flex items-center disabled:opacity-50"
+                            className="cursor-pointer bg-teal-700 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-teal-800 transition flex items-center disabled:opacity-50"
                             onClick={openBulkUploadModal}
                             disabled={loading}
                         >
                             <Upload className="w-4 h-4 mr-2" /> Bulk Upload
                         </button>
                         <button 
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-indigo-700 transition flex items-center disabled:opacity-50"
+                            className="cursor-pointer bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-indigo-700 transition flex items-center disabled:opacity-50"
                             onClick={openAddModal}
                             disabled={loading}
                         >
@@ -537,14 +537,14 @@ const InventoryContent = ({
                                         <td className="px-3 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-2">
                                                 <button 
-                                                    className="text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition"
+                                                    className="cursor-pointer text-indigo-400 hover:text-white hover:bg-indigo-600 p-2 rounded-full transition"
                                                     title="Edit Item"
                                                     onClick={() => handleEditClick(item)}
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                                 <button 
-                                                    className="text-red-400 hover:text-white hover:bg-red-600 p-2 rounded-full transition"
+                                                    className="cursor-pointer text-red-400 hover:text-white hover:bg-red-600 p-2 rounded-full transition"
                                                     title="Delete Item"
                                                     onClick={() => handleDeleteClick(itemId, item.name)}
                                                     disabled={loading}
@@ -669,7 +669,7 @@ const InventoryContent = ({
                                 {isEditing ? `Edit Item: ${formData.name}` : 'Add New Inventory Item'}
                             </h2>
                             <button type="button" onClick={closeFormModal} className="text-gray-400 hover:text-white p-1">
-                                <X className="w-6 h-6" />
+                                <X className="cursor-pointer w-6 h-6" />
                             </button>
                         </div>
                         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -682,7 +682,7 @@ const InventoryContent = ({
                         <div className="p-5 border-t border-gray-700">
                             <button 
                                 type="submit"
-                                className={`w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl hover:bg-teal-700 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99] ${
+                                className={`cursor-pointer w-full py-3 text-white rounded-xl font-extrabold text-lg shadow-2xl hover:bg-teal-700 transition flex items-center justify-center disabled:opacity-50 active:scale-[0.99] ${
                                     isEditing 
                                         ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/50' 
                                         : 'bg-teal-600 hover:bg-teal-700 shadow-teal-900/50'
