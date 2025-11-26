@@ -12,7 +12,7 @@ const API = {
     resetpassword: API_BASE_URL + '/auth/reset-password',
     sync: API_BASE_URL + '/auth/data/sync',
     uploadcloud: API_BASE_URL + '/auth/data/upload-to-cloud',
-    currentPlan: API_BASE_URL + '/auth/data/current-plan',
+    currentPlan: API_BASE_URL + '/auth/current-plan',
 
 
 

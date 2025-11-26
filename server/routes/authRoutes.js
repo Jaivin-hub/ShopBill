@@ -447,6 +447,7 @@ router.get('/current-plan', protect, async (req, res) => {
     try {
         // 'protect' middleware ensures req.user is populated with the authenticated user's details
         const userId = req.user.id; 
+        console.log('current plan called')
 
         // 1. Find the user by ID
         // We use .select('plan') to fetch only the plan field from the database, 

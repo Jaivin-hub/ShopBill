@@ -108,11 +108,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     
     // 3. CANCELLATION LOGIC (Implemented with API call)
     const handleCancelSubscription = async () => {
-        if (currentPlan === 'Basic' || currentPlan?.toLowerCase() === 'basic') {
-            showToast('The Basic plan cannot be cancelled.', 'warning');
-            setShowCancelModal(false);
-            return;
-        }
+        
         
         setIsCancelling(true);
 
