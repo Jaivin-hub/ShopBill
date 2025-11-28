@@ -70,7 +70,6 @@ router.post('/login', async (req, res) => {
 
         if (user && (await user.matchPassword(password))) {
             // Check if the user is active (especially important for staff)
-            // Assuming your User model has an 'isActive' field or similar logic
             if (user.isActive === false) { 
                  return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
             }
@@ -83,7 +82,8 @@ router.post('/login', async (req, res) => {
                     email: user.email,
                     role: user.role,
                     shopId: user.shopId,
-                    phone: user.phone
+                    phone: user.phone,
+                    plan: user.plan // Include plan in login response
                 }
             });
         } else {
@@ -101,7 +101,7 @@ router.post('/login', async (req, res) => {
  * @access Public
  */
 router.post('/signup', async (req, res) => {
-    // UPDATED: Destructure shopName
+    // UPDATED: Destructure shopName, plan, and transactionId
     const { email, password, phone, plan, transactionId, shopName } = req.body;
     
     // REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
@@ -116,8 +116,7 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ error: 'User already exists with this email or phone number.' });
         }
         
-        // Also check if a shop with this name already exists (as implemented by the schema's unique constraint, 
-        // but an explicit check provides a better error message)
+        // Also check if a shop with this name already exists
         const shopNameExists = await User.findOne({ shopName });
         if (shopNameExists) {
             return res.status(400).json({ error: 'A shop with this name is already registered. Please choose a different name.' });
@@ -131,9 +130,9 @@ router.post('/signup', async (req, res) => {
             role: 'owner', 
             // Temporary shopId, will be replaced by _id immediately after creation
             shopId: new mongoose.Types.ObjectId(), 
-            plan: plan,
-            transactionId: transactionId,
-            shopName: shopName, // NEW: Store shop name
+            plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
+            transactionId: transactionId, // Save the subscription ID
+            shopName: shopName, 
         });
         
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
@@ -151,7 +150,7 @@ router.post('/signup', async (req, res) => {
                 shopId: newUser.shopId,
                 phone: newUser.phone,
                 plan: newUser.plan,
-                shopName: newUser.shopName, // NEW: Return shop name in response
+                shopName: newUser.shopName, 
             }
         });
 
@@ -364,7 +363,6 @@ router.put('/password/change', protect,
     
     const { currentPassword, newPassword } = req.body;
     
-    // In a real application, userId would be extracted from the JWT via middleware (req.user.id)
     // We rely on 'protect' middleware to set req.user.id
     const userId = req.user?.id; // Safely access user ID
     if (!userId) {
@@ -416,15 +414,7 @@ router.post('/data/sync', protect, async (req, res) => {
 
         // --- Mock Data Sync Logic (Replace with actual data fetching/packaging) ---
         
-        // In a real MERN app, this would involve:
-        // 1. Calling a Data Service to fetch all required collections (Inventory, Customers, Sales, etc.) 
-        //    based on the req.user.shopId.
-        // 2. Packaging this data into a JSON structure.
-        // 3. Sending the packaged data back to the client.
-        
         // For now, we simulate the success response which the frontend expects:
-        
-        // const allShopData = await dataService.getSyncData(shopId); 
         
         res.json({ 
             success: true, 
@@ -450,8 +440,6 @@ router.get('/current-plan', protect, async (req, res) => {
         console.log('current plan called')
 
         // 1. Find the user by ID
-        // We use .select('plan') to fetch only the plan field from the database, 
-        // which improves performance and security.
         const user = await User.findById(userId).select('plan');
 
         if (!user) {
