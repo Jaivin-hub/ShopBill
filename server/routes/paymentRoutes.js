@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const { protect } = require('../middleware/authMiddleware'); // For future paid-user features
 const axios = require('axios');
+const User = require('../models/User')
 
 const router = express.Router();
 
