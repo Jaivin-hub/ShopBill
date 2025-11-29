@@ -551,32 +551,6 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     </div>
 
                                 </div>
-                                {/* <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 pt-4 border-t border-gray-300 dark:border-gray-600">
-                                    Secure Mandate Setup
-                                </h4>
-                                <div className="w-full h-48 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-xl p-5 shadow-2xl relative overflow-hidden text-white font-mono transition-all duration-300 border border-indigo-600">
-                                    <div className="absolute top-0 right-0 w-2/3 h-full rounded-l-full opacity-10 bg-teal-400 transform translate-x-1/2 -translate-y-1/2"></div>
-                                    <div className="absolute bottom-0 left-0 w-1/2 h-1/2 rounded-r-full opacity-10 bg-white transform -translate-x-1/4 translate-y-1/4"></div>
-                                    <div className="flex justify-between items-start mb-4 relative z-10">
-                                        <CreditCard className="w-7 h-7 text-white" />
-                                        <Wifi className="w-6 h-6 text-teal-400 transform rotate-90" />
-                                    </div>
-                                    <p className="text-2xl tracking-widest relative z-10 mb-4">
-                                        •••• •••• •••• ••••
-                                    </p>
-                                    <div className="flex justify-between items-center text-sm mt-5 relative z-10">
-                                        <div>
-                                            <p className="text-xs text-indigo-300 mb-1">Payment Processor</p>
-                                            <p className="font-semibold uppercase truncate w-32">Razorpay</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-indigo-300 mb-1">Secured by</p>
-                                            <p className="font-semibold flex items-center">
-                                                <Lock className='w-3 h-3 mr-1' /> HTTPS/SSL
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div> */}
                             </div>
                         </div>
                     </div>

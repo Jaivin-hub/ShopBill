@@ -14,7 +14,6 @@ const razorpay = new Razorpay({
 });
 
 // --- Constants for Payments (Updated to include Razorpay Plan IDs) ---
-// NOTE: These IDs MUST be created on your Razorpay Dashboard in Live Mode
 const PLAN_DETAILS = {
     BASIC: { 
         plan_id: process.env.BASIC_PLAN, 
@@ -42,14 +41,12 @@ const PLAN_DETAILS = {
 router.post('/create-subscription', async (req, res) => {
     const { plan } = req.body;
 
-    // 1. Basic validation
     if (!plan || !PLAN_DETAILS[plan]) {
         return res.status(400).json({ error: 'Invalid or missing plan selected.' });
     }
 
     const { plan_id, description } = PLAN_DETAILS[plan];
 
-    // CRITICAL PRE-CHECK: Ensure the Plan ID is actually loaded from environment variables
     if (!plan_id) {
         console.error(`Missing environment variable for ${plan} plan_id.`);
         return res.status(400).json({ 
@@ -59,18 +56,12 @@ router.post('/create-subscription', async (req, res) => {
     
     // --- 30-DAY FREE TRIAL LOGIC ---
     const trialDays = 30;
-    // Calculate the timestamp 30 days from now (in seconds)
     const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
     const subscriptionOptions = {
-        plan_id: plan_id, // The recurring plan created on the Razorpay Dashboard
-        customer_notify: 1, // Notify customer of successful mandate setup
-        
-        // FIX: Setting total_count to the maximum allowed (1200 cycles, or 100 years 
-        // for a monthly plan) to signify an indefinite subscription, as 9999 was too high.
+        plan_id: plan_id, 
+        customer_notify: 1, 
         total_count: 1200, 
-        
-        // This ensures the first full payment occurs 30 days from now
         start_at: startAtTimestamp, 
         
         // Add a small ₹1 charge for mandate setup verification
@@ -88,10 +79,8 @@ router.post('/create-subscription', async (req, res) => {
     };
 
     try {
-        // 2. Call Razorpay API to create the Subscription
         const subscription = await razorpay.subscriptions.create(subscriptionOptions);
 
-        // 3. Return the Subscription ID and other details to the frontend
         res.json({
             success: true,
             subscriptionId: subscription.id,
@@ -102,8 +91,6 @@ router.post('/create-subscription', async (req, res) => {
 
     } catch (error) {
         console.error('Razorpay Subscription Creation Error:', error);
-
-        // VERBOSE ERROR REPORTING: Extract and return the most specific error detail
         const specificApiError = error.error || error.message || 'Unknown Razorpay error.';
         const statusCode = error.statusCode || 500;
 
@@ -118,23 +105,23 @@ router.post('/create-subscription', async (req, res) => {
 
 /**
  * @route POST /api/payment/verify-subscription
- * @desc Verifies the signature, saves the subscription ID to the user record, and refunds the verification fee.
- * @access Private (Requires Authentication)
- * NOTE: This route MUST be called by an authenticated user (after login/signup)
+ * @desc Verifies the signature and refunds the verification fee.
+ * @access Public (Crucial for unauthenticated signup flow)
+ * * 🛑 CRITICAL FIX: Removed 'protect' middleware and database update logic.
+ * The client will now pass the returned transactionId to the '/signup' route.
  */
-router.post('/verify-subscription', protect, async (req, res) => { // <<< ADDED 'protect'
-    const userId = req.user._id; 
+router.post('/verify-subscription', async (req, res) => { 
     
     // 1. Extract verification data
     const { 
         razorpay_payment_id, 
         razorpay_signature,
         razorpay_subscription_id,
-        plan // <<< REQUIRED: Plan name (e.g., 'PREMIUM')
+        // The plan is optional here, but kept for future logging/debugging
     } = req.body;
 
-    if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id || !plan) {
-        return res.status(400).json({ success: false, error: 'Missing required payment verification data (payment ID, signature, subscription ID, or plan).' });
+    if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
+        return res.status(400).json({ success: false, error: 'Missing required payment verification data.' });
     }
 
     try {
@@ -161,30 +148,24 @@ router.post('/verify-subscription', protect, async (req, res) => { // <<< ADDED 
                     { amount: refundAmount },
                     { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
                 );
-                console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`, refundResponse.data);
+                console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
 
             } catch (refundError) {
-                console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`, refundError.response ? refundError.response.data : refundError.message);
+                console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
                 // Proceed with success as the mandate is verified.
             }
             
-            // --- 3. SAVE SUBSCRIPTION ID TO USER MODEL (CRITICAL NEW STEP) ---
-            await User.updateOne({ _id: userId }, {
-                $set: {
-                    plan: plan.toUpperCase(), // Save the chosen plan (e.g., 'PREMIUM')
-                    transactionId: razorpay_subscription_id, // Save the subscription ID
-                }
-            });
-
-            // --- 4. FINAL SUCCESS RESPONSE ---
+            // 🛑 REMOVED: User.updateOne() - User ID is not known yet.
+            
+            // --- 3. FINAL SUCCESS RESPONSE ---
             res.json({
                 success: true,
-                message: 'Subscription mandate verified and user record updated.',
-                transactionId: razorpay_subscription_id,
+                message: 'Subscription mandate verified and refund initiated.',
+                transactionId: razorpay_subscription_id, // Return the subscription ID for signup
             });
             
         } else {
-            // FAILURE: Signature mismatch (potential fraud attempt)
+            // FAILURE: Signature mismatch 
             res.status(400).json({
                 success: false,
                 error: 'Subscription mandate verification failed. Signature mismatch.',
@@ -199,30 +180,24 @@ router.post('/verify-subscription', protect, async (req, res) => { // <<< ADDED 
 
 
 router.post('/cancel-subscription', protect, async (req, res) => {
-    // Assumption: The protect middleware attaches the authenticated user to req.user
+    // This route remains unchanged as it requires an authenticated user (paid feature)
     const userId = req.user._id;
-    console.log('userId',userId)
 
     try {
-        // 1. Fetch the user to get the Subscription ID
         const user = await User.findById(userId);
         
-        // This check will now pass if the transactionId was saved in /verify-subscription
         if (!user || !user.transactionId) { 
             return res.status(404).json({ error: 'Subscription not found for this user. transactionId is missing.' });
         }
         
         const subscriptionId = user.transactionId;
         
-        // 2. Define cancellation options
         const cancelOptions = {
-            cancel_at_cycle_end: true // Cancels at the end of the current billing cycle
+            cancel_at_cycle_end: true
         };
 
-        // 3. Call Razorpay API to cancel the subscription
         const result = await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
 
-        // 4. Update the User model status (Optional but good practice)
         await User.updateOne({ _id: userId }, { 
             $set: { 
                 subscriptionStatus: 'cancellation_pending', 
