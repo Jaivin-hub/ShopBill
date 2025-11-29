@@ -1,7 +1,9 @@
+// paymentRoutes.js (Full file with the correct cancellation logic)
+
 const express = require('express');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
-const { protect } = require('../middleware/authMiddleware'); // For future paid-user features
+const { protect } = require('../middleware/authMiddleware'); 
 const axios = require('axios');
 const User = require('../models/User')
 
@@ -13,7 +15,7 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// --- Constants for Payments (Updated to include Razorpay Plan IDs) ---
+// --- Constants for Payments ---
 const PLAN_DETAILS = {
     BASIC: { 
         plan_id: process.env.BASIC_PLAN, 
@@ -106,9 +108,7 @@ router.post('/create-subscription', async (req, res) => {
 /**
  * @route POST /api/payment/verify-subscription
  * @desc Verifies the signature and refunds the verification fee.
- * @access Public (Crucial for unauthenticated signup flow)
- * * 🛑 CRITICAL FIX: Removed 'protect' middleware and database update logic.
- * The client will now pass the returned transactionId to the '/signup' route.
+ * @access Public
  */
 router.post('/verify-subscription', async (req, res) => { 
     
@@ -155,8 +155,6 @@ router.post('/verify-subscription', async (req, res) => {
                 // Proceed with success as the mandate is verified.
             }
             
-            // 🛑 REMOVED: User.updateOne() - User ID is not known yet.
-            
             // --- 3. FINAL SUCCESS RESPONSE ---
             res.json({
                 success: true,
@@ -179,14 +177,16 @@ router.post('/verify-subscription', async (req, res) => {
 });
 
 
+/**
+ * @route POST /api/payment/cancel-subscription
+ * @desc Cancels a Razorpay subscription dynamically based on trial or paid cycle.
+ * @access Private (Requires 'protect')
+ */
 router.post('/cancel-subscription', protect, async (req, res) => {
-    // This route remains unchanged as it requires an authenticated user (paid feature)
     const userId = req.user._id;
-    console.log('userId--',userId)
 
     try {
-        const user = await User.findById(userId);
-        console.log('user',user)
+        const user = await User.findById(userId).select('transactionId plan planEndDate');
         
         if (!user || !user.transactionId) { 
             return res.status(404).json({ error: 'Subscription not found for this user. transactionId is missing.' });
@@ -194,33 +194,66 @@ router.post('/cancel-subscription', protect, async (req, res) => {
         
         const subscriptionId = user.transactionId;
         
-        const cancelOptions = {
-            cancel_at_cycle_end: true
-        };
+        // 1. Fetch the Subscription details from Razorpay to check its status
+        const subscription = await razorpay.subscriptions.fetch(subscriptionId);
+        
+        // Determine if the subscription is still in its trial phase.
+        // If current_count is 0, only the addon (₹1 verification) was paid.
+        const isStillInTrial = subscription.current_count === 0 && user.planEndDate && user.planEndDate > new Date();
+        
+        let cancellationMessage;
+        let updateStatus;
+        let cancellationAction;
 
-        const result = await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
+        if (isStillInTrial) {
+            // 2A. TRIAL Cancellation: Cancel mandate immediately. Keep user's DB status as 'active' until planEndDate.
+            const cancelOptions = { cancel_at_cycle_end: false };
+            await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
+            
+            cancellationMessage = `Subscription mandate cancelled immediately. Your ${user.plan} access will continue until ${user.planEndDate.toLocaleDateString()}.`;
+            updateStatus = 'trial_cancellation_pending';
+            cancellationAction = 'immediate_mandate_end_access'; // Custom action flag
+            
+        } else {
+            // 2B. PAID Cancellation: Schedule cancellation for the end of the paid cycle.
+            const cancelOptions = { cancel_at_cycle_end: true };
+            await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
+            
+            cancellationMessage = 'Subscription scheduled for cancellation at the end of the current billing cycle. Access remains until then.';
+            updateStatus = 'cancellation_pending';
+            cancellationAction = 'end_of_cycle';
 
+            // NOTE: If cancelled at cycle end, the user's planEndDate will be determined by Razorpay's webhook
+            // when the subscription fully expires. We only update the status now.
+        }
+
+        // 3. Update the User model status
         await User.updateOne({ _id: userId }, { 
             $set: { 
-                subscriptionStatus: 'cancellation_pending', 
-                lastStatusUpdate: new Date(),
+                subscriptionStatus: updateStatus, 
             } 
         });
 
-        console.log(`[SUBSCRIPTION CANCELLED] Subscription ${subscriptionId} cancelled for user ${userId}.`);
+        console.log(`[SUBSCRIPTION CANCELLED] Subscription ${subscriptionId} - Action: ${cancellationAction}`);
 
         res.json({
             success: true,
-            message: 'Subscription will be cancelled at the end of the current billing cycle.',
-            razorpayStatus: result.status, 
+            message: cancellationMessage,
+            action: cancellationAction, // Return this flag to the frontend
+            planEndDate: user.planEndDate, // Pass the date for the trial case
         });
 
     } catch (error) {
         console.error('Razorpay Subscription Cancellation Error:', error);
+        
+        const apiError = error.error || {};
+        
+        // Handle common errors like already cancelled or invalid state
+        const errorMessage = apiError.description || error.message;
 
-        res.status(500).json({ 
-            error: 'Failed to cancel subscription.',
-            razorpayApiError: error.message, 
+        res.status(400).json({ 
+            error: 'Failed to process cancellation.',
+            razorpayApiError: errorMessage,
         });
     }
 });

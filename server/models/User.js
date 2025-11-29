@@ -1,3 +1,5 @@
+// models/User.js (Full code with the new field)
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -35,6 +37,11 @@ const UserSchema = new mongoose.Schema({
     plan: { type: String, enum: ['BASIC', 'PRO', 'PREMIUM'], default: null },
     transactionId: String, 
     
+    // === NEW FIELD: Tracks when plan access ends (Crucial for trial period) ===
+    planEndDate: { type: Date, default: null },
+    subscriptionStatus: { type: String, default: null }, // Added this field for consistency
+    // =========================================================================
+
 }, { timestamps: true });
 
 // Pre-save hook to hash password before saving

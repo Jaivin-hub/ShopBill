@@ -122,6 +122,10 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ error: 'A shop with this name is already registered. Please choose a different name.' });
         }
 
+        // --- NEW: Calculate the initial plan end date (30 days from now for the trial) ---
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 30);
+        // ----------------------------------------------------------------------------------
 
         const newUser = await User.create({
             email,
@@ -133,6 +137,8 @@ router.post('/signup', async (req, res) => {
             plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
             transactionId: transactionId, // Save the subscription ID
             shopName: shopName, 
+            planEndDate: trialEndDate, // 🔥 INITIALIZE THE END DATE
+            subscriptionStatus: 'active',
         });
         
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
@@ -435,21 +441,21 @@ router.post('/data/sync', protect, async (req, res) => {
 
 router.get('/current-plan', protect, async (req, res) => {
     try {
-        // 'protect' middleware ensures req.user is populated with the authenticated user's details
         const userId = req.user.id; 
-        console.log('current plan called')
-
-        // 1. Find the user by ID
-        const user = await User.findById(userId).select('plan');
+        
+        // 1. Find the user by ID and SELECT the new fields
+        const user = await User.findById(userId).select('plan planEndDate subscriptionStatus');
 
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        // 2. Return the plan
+        // 2. Return the plan and end date
         res.json({ 
             success: true,
-            plan: user.plan || 'BASIC' // Default to BASIC if plan is null/undefined
+            plan: user.plan || 'BASIC', // Default to BASIC if plan is null/undefined
+            planEndDate: user.planEndDate, // 🔥 Include the end date
+            subscriptionStatus: user.subscriptionStatus, // Include status
         });
 
     } catch (error) {
