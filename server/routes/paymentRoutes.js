@@ -182,9 +182,11 @@ router.post('/verify-subscription', async (req, res) => {
 router.post('/cancel-subscription', protect, async (req, res) => {
     // This route remains unchanged as it requires an authenticated user (paid feature)
     const userId = req.user._id;
+    console.log('userId--',userId)
 
     try {
         const user = await User.findById(userId);
+        console.log('user',user)
         
         if (!user || !user.transactionId) { 
             return res.status(404).json({ error: 'Subscription not found for this user. transactionId is missing.' });
