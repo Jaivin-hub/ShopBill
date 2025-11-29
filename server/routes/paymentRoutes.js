@@ -194,37 +194,42 @@ router.post('/cancel-subscription', protect, async (req, res) => {
         
         const subscriptionId = user.transactionId;
         
-        // 1. Fetch the Subscription details from Razorpay to check its status
+        // 1. Fetch the Subscription details from Razorpay
         const subscription = await razorpay.subscriptions.fetch(subscriptionId);
         
-        // Determine if the subscription is still in its trial phase.
-        // If current_count is 0, only the addon (₹1 verification) was paid.
-        const isStillInTrial = subscription.current_count === 0 && user.planEndDate && user.planEndDate > new Date();
+        // 🛑 NEW CHECK: Determine if the subscription is still in its trial/pre-billing phase.
+        const isPreBilling = subscription.status === 'created' || subscription.status === 'authenticated';
         
+        // Check if the subscription is actively running a paid cycle (current_count > 0)
+        // OR if it's past the pre-billing state but before the first charge is due
+        const isStillInTrial = subscription.current_count === 0 && user.planEndDate && user.planEndDate > new Date();
+
         let cancellationMessage;
         let updateStatus;
         let cancellationAction;
 
-        if (isStillInTrial) {
-            // 2A. TRIAL Cancellation: Cancel mandate immediately. Keep user's DB status as 'active' until planEndDate.
-            const cancelOptions = { cancel_at_cycle_end: false };
-            await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
+        if (isPreBilling && isStillInTrial) {
+            // 2A. PRE-BILLING/TRIAL CANCELLATION: No API call needed to cancel mandate, 
+            // as no cycle has started, and we prevent the first charge by doing nothing further
+            // (The mandate is likely already authenticated but not active/billable yet).
             
-            cancellationMessage = `Subscription mandate cancelled immediately. Your ${user.plan} access will continue until ${user.planEndDate.toLocaleDateString()}.`;
+            cancellationMessage = `Subscription mandate cancellation confirmed (no charge). Your ${user.plan} access will continue until ${user.planEndDate.toLocaleDateString()}.`;
             updateStatus = 'trial_cancellation_pending';
-            cancellationAction = 'immediate_mandate_end_access'; // Custom action flag
+            cancellationAction = 'immediate_mandate_end_access'; // Mandate action is local (prevention)
             
-        } else {
-            // 2B. PAID Cancellation: Schedule cancellation for the end of the paid cycle.
+        } else if (subscription.status === 'active') {
+            // 2B. ACTIVE/PAID CANCELLATION: Schedule cancellation for the end of the paid cycle.
             const cancelOptions = { cancel_at_cycle_end: true };
             await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
             
             cancellationMessage = 'Subscription scheduled for cancellation at the end of the current billing cycle. Access remains until then.';
             updateStatus = 'cancellation_pending';
             cancellationAction = 'end_of_cycle';
-
-            // NOTE: If cancelled at cycle end, the user's planEndDate will be determined by Razorpay's webhook
-            // when the subscription fully expires. We only update the status now.
+        } else {
+            // 2C. FALLBACK: Handle other states (e.g., cancelled, expired, pending).
+             cancellationMessage = `Subscription status is already ${subscription.status}. No action taken.`;
+             updateStatus = subscription.status; // Use the Razorpay status as a fallback
+             cancellationAction = 'no_action_needed';
         }
 
         // 3. Update the User model status
@@ -240,7 +245,7 @@ router.post('/cancel-subscription', protect, async (req, res) => {
             success: true,
             message: cancellationMessage,
             action: cancellationAction, // Return this flag to the frontend
-            planEndDate: user.planEndDate, // Pass the date for the trial case
+            planEndDate: user.planEndDate, 
         });
 
     } catch (error) {
@@ -248,7 +253,6 @@ router.post('/cancel-subscription', protect, async (req, res) => {
         
         const apiError = error.error || {};
         
-        // Handle common errors like already cancelled or invalid state
         const errorMessage = apiError.description || error.message;
 
         res.status(400).json({ 

@@ -1,10 +1,10 @@
 // PlanUpgrade.jsx (Full file with necessary updates)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    ArrowLeft, CheckCircle, Crown, Zap, Building2, 
-    Loader, CreditCard, AlertCircle, IndianRupee, 
-    Users, Package, XCircle, 
+import {
+    ArrowLeft, CheckCircle, Crown, Zap, Building2,
+    Loader, CreditCard, AlertCircle, IndianRupee,
+    Users, Package, XCircle,
 } from 'lucide-react';
 import API from '../config/api';
 
@@ -39,7 +39,7 @@ const DEMO_PLANS = [
 ];
 
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
-    const [currentPlan, setCurrentPlan] = useState(null); 
+    const [currentPlan, setCurrentPlan] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpgrading, setIsUpgrading] = useState(false);
@@ -47,10 +47,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
-    
+
     // 🔥 NEW STATE: Store current plan details for dynamic messaging
     const [planDetails, setPlanDetails] = useState({
-        planEndDate: null, 
+        planEndDate: null,
         subscriptionStatus: null,
     });
     const [cancellationMessage, setCancellationMessage] = useState(''); // Stores the message shown inside the modal
@@ -59,41 +59,41 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     // 1. INTEGRATED DATA FETCHING
     const fetchPlanData = useCallback(async () => {
         setIsLoading(true);
-        
+
         // 1A. Fetch Current Plan and Subscription Details from API
         try {
             const planResponse = await apiClient.get(API.currentPlan);
-            
-            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase(); 
+
+            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase();
             const fetchedPlanEndDate = planResponse?.data?.planEndDate ? new Date(planResponse.data.planEndDate) : null;
             const fetchedSubscriptionStatus = planResponse?.data?.subscriptionStatus || null;
 
-            setCurrentPlan(fetchedPlanName); 
-            setPlanDetails({ 
+            setCurrentPlan(fetchedPlanName);
+            setPlanDetails({
                 planEndDate: fetchedPlanEndDate,
                 subscriptionStatus: fetchedSubscriptionStatus,
             });
-            
+
             // 1B. Set Available Plans (Simulated from hardcoded data)
             setAvailablePlans(DEMO_PLANS);
-            
+
         } catch (error) {
             console.error("Error fetching plan data:", error);
-            setCurrentPlan('BASIC'); 
+            setCurrentPlan('BASIC');
             setAvailablePlans(DEMO_PLANS);
             showToast('Failed to fetch current plan. Defaulting to Basic.', 'error');
         } finally {
             setIsLoading(false);
         }
 
-    }, [apiClient, showToast]); 
+    }, [apiClient, showToast]);
 
     useEffect(() => {
         fetchPlanData();
     }, [fetchPlanData]);
 
     const handleUpgradeClick = (plan) => {
-        if (plan.id === currentPlan?.toLowerCase()) { 
+        if (plan.id === currentPlan?.toLowerCase()) {
             showToast('This is your current plan.', 'info');
             return;
         }
@@ -110,25 +110,25 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
     const handlePrepareCancellation = () => {
         if (currentPlan === 'BASIC') {
-             showToast('The Basic plan cannot be cancelled.', 'warning');
-             return;
-         }
+            showToast('The Basic plan cannot be cancelled.', 'warning');
+            return;
+        }
 
         const planName = currentPlan;
         const endDateString = planDetails.planEndDate ? planDetails.planEndDate.toLocaleDateString('en-IN') : 'the end of the period';
-        
+
         let msg = '';
         let isTrial = isCurrentlyInTrial();
-        
+
         if (isTrial) {
             // Trial Cancellation Message (Access stops at the end of trial)
-            msg = `Your current **${planName}** plan is in the **Free Trial** period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on **${endDateString}**.`;
+            msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
         } else if (planDetails.subscriptionStatus === 'cancellation_pending') {
             // Already Cancelled Message
-            msg = `Your subscription is already scheduled for cancellation. Access will end on **${endDateString}**. You don't need to take any further action.`;
+            msg = `Your subscription is already scheduled for cancellation. Access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
         } else {
             // Paid Cycle Cancellation Message (Access stops at the end of the paid cycle)
-            msg = `Your **${planName}** subscription is currently in a paid cycle. By confirming cancellation, your plan will be scheduled to revert to the Basic tier at the end of the current paid billing cycle. You will retain full access until **${endDateString}** (or the end of the cycle).`;
+            msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your plan will be scheduled to revert to the Basic tier at the end of the current paid billing cycle. You will retain full access until <strong>${endDateString}</strong> (or the end of the cycle).`;
         }
 
         setCancellationMessage(msg);
@@ -138,38 +138,38 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     // 3. CANCELLATION LOGIC (Implemented with API call)
     const handleConfirmCancellation = async () => {
         if (currentPlan === 'BASIC' || planDetails.subscriptionStatus === 'cancellation_pending') {
-             setShowCancelModal(false);
-             return;
-         }
-        
+            setShowCancelModal(false);
+            return;
+        }
+
         setIsCancelling(true);
 
         try {
             const response = await apiClient.post(API.cancelSubscription);
-            
+
             const { action, message, planEndDate } = response.data;
-            
+
             if (response.data.success) {
-                
+
                 showToast(message, 'success');
-                
+
                 if (action === 'immediate_mandate_end_access') {
                     // Trial Cancellation: Mandate is gone, but access stays until planEndDate.
                     // The backend has updated status to 'trial_cancellation_pending'
                     setPlanDetails(prev => ({
-                         ...prev,
-                         subscriptionStatus: 'trial_cancellation_pending',
+                        ...prev,
+                        subscriptionStatus: 'trial_cancellation_pending',
                     }));
 
                 } else if (action === 'end_of_cycle') {
                     // Paid Cancellation: Mandate stays, but payment is scheduled to stop.
                     // The backend has updated status to 'cancellation_pending'
                     setPlanDetails(prev => ({
-                         ...prev,
-                         subscriptionStatus: 'cancellation_pending',
+                        ...prev,
+                        subscriptionStatus: 'cancellation_pending',
                     }));
                 }
-                
+
                 // Close modal and reset message
                 setCancellationMessage('');
 
@@ -187,20 +187,20 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', { 
-            style: 'currency', 
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
             currency: 'INR',
             maximumFractionDigits: 0
         }).format(amount);
     };
-    
+
     const formatDate = (date) => {
         if (!date) return 'N/A';
         return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
     // ... (rest of helper functions: getPlanIcon, getPlanColor, etc.) ...
-    
+
     // 4. FIX: Use standard plan IDs for icon lookup
     const getPlanIcon = (planId) => {
         switch (planId) {
@@ -236,7 +236,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
     const isUpgrade = (plan) => {
         // FIX: Ensure planOrder keys match plan.id (lowercase)
-        const planOrder = { basic: 1, pro: 2, premium: 3 }; 
+        const planOrder = { basic: 1, pro: 2, premium: 3 };
         const currentOrder = planOrder[currentPlan?.toLowerCase()] || 0;
         const planOrderValue = planOrder[plan.id] || 0;
         return planOrderValue > currentOrder;
@@ -253,7 +253,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             </div>
         );
     }
-    
+
     const isCancellationPending = planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending';
     const isPlanExpiring = isCancellationPending && planDetails.planEndDate && planDetails.planEndDate > new Date();
 
@@ -301,11 +301,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                             {currentPlan !== 'BASIC' && (
                                 <button
                                     onClick={handlePrepareCancellation}
-                                    className={`cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${
-                                        isCancellationPending 
-                                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
-                                            : 'bg-red-600 hover:bg-red-700 text-white'
-                                    }`}
+                                    className={`cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${isCancellationPending
+                                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                        : 'bg-red-600 hover:bg-red-700 text-white'
+                                        }`}
                                     disabled={isCancelling}
                                 >
                                     <XCircle className="w-4 h-4" />
@@ -328,11 +327,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                     return (
                         <div
                             key={plan.id}
-                            className={`relative bg-gray-800/50 rounded-xl p-6 border-2 transition-all duration-300 ${
-                                isCurrent
-                                    ? 'border-indigo-500 shadow-lg shadow-indigo-500/20'
-                                    : 'border-gray-700/50 hover:border-gray-600'
-                            }`}
+                            className={`relative bg-gray-800/50 rounded-xl p-6 border-2 transition-all duration-300 ${isCurrent
+                                ? 'border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                : 'border-gray-700/50 hover:border-gray-600'
+                                }`}
                         >
                             {isCurrent && (
                                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -385,13 +383,12 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                             <button
                                 onClick={() => handleUpgradeClick(plan)}
                                 disabled={isCurrent || isUpgrading || isCancelling}
-                                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
-                                    isCurrent
-                                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                                        : isUpgradePlan
+                                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${isCurrent
+                                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                                    : isUpgradePlan
                                         ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
                                         : 'bg-gray-700 hover:bg-gray-600 text-white cursor-pointer'
-                                }`}
+                                    }`}
                             >
                                 {isCurrent ? 'Current Plan' : isUpgradePlan ? 'Upgrade Now' : 'Switch Plan'}
                             </button>
@@ -403,10 +400,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             {/* Confirmation Modal (Upgrade/Switch - Unchanged) */}
             {showConfirmModal && selectedPlan && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                {/* ... (Modal content for Upgrade/Switch) ... */}
+                    {/* ... (Modal content for Upgrade/Switch) ... */}
                 </div>
             )}
-            
+
             {/* Cancellation Confirmation Modal */}
             {showCancelModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -422,12 +419,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
                             <div className="bg-red-700/30 rounded-lg p-4 mb-4 flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                                <p className="text-sm text-red-300 font-semibold">
-                                    {isCurrentlyInTrial() 
-                                        ? `The recurring payment mandate has been **canceled**. No further charge will occur.`
-                                        : `You will **not** be billed for the next cycle. Access will stop on ${formatDate(planDetails.planEndDate)}.`
-                                    }
-                                </p>
+                                <p
+                                    className="text-sm text-red-300 font-semibold"
+                                    dangerouslySetInnerHTML={{
+                                        __html: isCurrentlyInTrial()
+                                            ? `The recurring payment mandate has been <strong>canceled</strong>. No further charge will occur.`
+                                            : `You will <strong>not</strong> be billed for the next cycle. Access will stop on ${formatDate(planDetails.planEndDate)}.`
+                                    }}
+                                />
                             </div>
                         </div>
                         <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
