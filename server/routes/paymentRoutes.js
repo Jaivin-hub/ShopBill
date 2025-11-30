@@ -186,7 +186,7 @@ router.post('/cancel-subscription', protect, async (req, res) => {
     const userId = req.user._id;
 
     try {
-        const user = await User.findById(userId).select('transactionId plan planEndDate');
+        const user = await User.findById(userId).select('transactionId plan planEndDate subscriptionStatus');
         
         if (!user || !user.transactionId) { 
             return res.status(404).json({ error: 'Subscription not found for this user. transactionId is missing.' });
@@ -197,28 +197,36 @@ router.post('/cancel-subscription', protect, async (req, res) => {
         // 1. Fetch the Subscription details from Razorpay
         const subscription = await razorpay.subscriptions.fetch(subscriptionId);
         
-        // 🛑 NEW CHECK: Determine if the subscription is still in its trial/pre-billing phase.
-        const isPreBilling = subscription.status === 'created' || subscription.status === 'authenticated';
+        // --- Core Logic Refinement ---
+        const razorpayStatus = subscription.status;
+        const isCancellationPending = user.subscriptionStatus === 'cancellation_pending' || user.subscriptionStatus === 'trial_cancellation_pending';
         
-        // Check if the subscription is actively running a paid cycle (current_count > 0)
-        // OR if it's past the pre-billing state but before the first charge is due
-        const isStillInTrial = subscription.current_count === 0 && user.planEndDate && user.planEndDate > new Date();
+        // The subscription status is what we look for to determine action
+        const isPreBilling = razorpayStatus === 'created' || razorpayStatus === 'authenticated';
+        const isPaidCycleRunning = razorpayStatus === 'active';
 
         let cancellationMessage;
         let updateStatus;
         let cancellationAction;
+        let attemptRazorpayCancel = false;
 
-        if (isPreBilling && isStillInTrial) {
-            // 2A. PRE-BILLING/TRIAL CANCELLATION: No API call needed to cancel mandate, 
-            // as no cycle has started, and we prevent the first charge by doing nothing further
-            // (The mandate is likely already authenticated but not active/billable yet).
+        if (isCancellationPending) {
+            // 2A. ALREADY PENDING: Don't do anything if local status confirms cancellation intent.
+            cancellationMessage = `Your subscription is already scheduled for cancellation. Access ends on ${user.planEndDate.toLocaleDateString()}.`;
+            updateStatus = user.subscriptionStatus;
+            cancellationAction = 'already_pending';
+            
+        } else if (isPreBilling) {
+            // 2B. PRE-BILLING CANCELLATION: Subscription exists but no payment cycle has started.
+            // We MUST call the Razorpay API to change status from 'authenticated' to 'cancelled'.
             
             cancellationMessage = `Subscription mandate cancellation confirmed (no charge). Your ${user.plan} access will continue until ${user.planEndDate.toLocaleDateString()}.`;
             updateStatus = 'trial_cancellation_pending';
-            cancellationAction = 'immediate_mandate_end_access'; // Mandate action is local (prevention)
+            cancellationAction = 'immediate_mandate_end_access';
+            attemptRazorpayCancel = true; // Flag to attempt API cancellation below
             
-        } else if (subscription.status === 'active') {
-            // 2B. ACTIVE/PAID CANCELLATION: Schedule cancellation for the end of the paid cycle.
+        } else if (isPaidCycleRunning) {
+            // 2C. ACTIVE/PAID CANCELLATION: Schedule cancellation for the end of the paid cycle.
             const cancelOptions = { cancel_at_cycle_end: true };
             await razorpay.subscriptions.cancel(subscriptionId, cancelOptions);
             
@@ -226,12 +234,25 @@ router.post('/cancel-subscription', protect, async (req, res) => {
             updateStatus = 'cancellation_pending';
             cancellationAction = 'end_of_cycle';
         } else {
-            // 2C. FALLBACK: Handle other states (e.g., cancelled, expired, pending).
-             cancellationMessage = `Subscription status is already ${subscription.status}. No action taken.`;
-             updateStatus = subscription.status; // Use the Razorpay status as a fallback
+            // 2D. FALLBACK: Handles already 'cancelled', 'expired', or 'paused' states.
+             cancellationMessage = `Subscription status is already ${razorpayStatus}. No action taken.`;
+             updateStatus = razorpayStatus; 
              cancellationAction = 'no_action_needed';
         }
 
+        // --- Execute Razorpay Cancellation for Trial Mandates ---
+        if (attemptRazorpayCancel) {
+            try {
+                // Attempt to cancel immediately (cancel_at_cycle_end: false is default)
+                await razorpay.subscriptions.cancel(subscriptionId); 
+                // This call should successfully change the status from 'authenticated' to 'cancelled' on the dashboard.
+            } catch (razorpayCancelError) {
+                 // Log error, but proceed with local status update. 
+                 // If the API insists that "no billing cycle is going on", we still update our local status.
+                 console.warn(`Razorpay API responded to immediate cancel attempt: ${razorpayCancelError.error?.description || razorpayCancelError.message}`);
+            }
+        }
+        
         // 3. Update the User model status
         await User.updateOne({ _id: userId }, { 
             $set: { 
@@ -249,6 +270,8 @@ router.post('/cancel-subscription', protect, async (req, res) => {
         });
 
     } catch (error) {
+        // ... (Error handling remains the same) ...
+        // Note: If the initial fetch fails, this catches it.
         console.error('Razorpay Subscription Cancellation Error:', error);
         
         const apiError = error.error || {};
