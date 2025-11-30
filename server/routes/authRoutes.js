@@ -138,7 +138,7 @@ router.post('/signup', async (req, res) => {
             transactionId: transactionId, // Save the subscription ID
             shopName: shopName, 
             planEndDate: trialEndDate, // 🔥 INITIALIZE THE END DATE
-            subscriptionStatus: 'active',
+            subscriptionStatus: 'authenticated',
         });
         
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle, Mail } from 'lucide-react';
 
 // Define roles for staff count (for display purposes)
 const STAFF_ROLES = {
@@ -20,8 +20,6 @@ const SHOP_PLANS = {
 const formatDate = (isoString) => {
     if (!isoString || isoString === 'N/A') return 'N/A';
     try {
-        // Use the original ISO string for date sorting in the main component if possible, 
-        // but this function is for display only.
         return new Date(isoString).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'short', 
@@ -102,74 +100,82 @@ const PerformanceTrendIndicator = ({ performance }) => {
     );
 };
 
-// Generate current month payment status (dummy data)
-const generateCurrentMonthPaymentStatus = () => {
-    const statuses = ['paid', 'pending', 'failed', 'overdue'];
-    const weights = [0.7, 0.15, 0.1, 0.05]; // 70% paid, 15% pending, 10% failed, 5% overdue
-    const random = Math.random();
-    let cumulative = 0;
-    
-    for (let i = 0; i < statuses.length; i++) {
-        cumulative += weights[i];
-        if (random < cumulative) {
-            return statuses[i];
-        }
-    }
-    return 'paid'; // fallback
-};
-
-// Payment Status Badge Component
-const PaymentStatusBadge = ({ status }) => {
+// 🛑 RENAMED & REFACTORED: Subscription Status Badge Component
+const SubscriptionStatusBadge = ({ status }) => {
     let icon, color, bgColor, borderColor, text;
     
-    switch (status) {
-        case 'paid':
+    // Normalize status to lowercase for robust comparison
+    const normalizedStatus = status ? status.toLowerCase() : 'unknown';
+
+    switch (normalizedStatus) {
+        case 'active':
             icon = CheckCircle;
             color = 'text-green-400';
             bgColor = 'bg-green-500/10';
             borderColor = 'border-green-500/30';
-            text = 'Paid';
+            text = 'Active';
             break;
-        case 'pending':
+        case 'authenticated':
+            icon = Shield;
+            color = 'text-blue-400';
+            bgColor = 'bg-blue-500/10';
+            borderColor = 'border-blue-500/30';
+            text = 'Authenticated'; // Trial/Mandate Active
+            break;
+        case 'created':
+            icon = Plus;
+            color = 'text-cyan-400';
+            bgColor = 'bg-cyan-500/10';
+            borderColor = 'border-cyan-500/30';
+            text = 'Created'; // Mandate not yet authenticated
+            break;
+        case 'cancellation_pending':
             icon = Clock;
             color = 'text-yellow-400';
             bgColor = 'bg-yellow-500/10';
             borderColor = 'border-yellow-500/30';
-            text = 'Pending';
+            text = 'Cancelling'; // Scheduled to cancel at cycle end
             break;
-        case 'failed':
+        case 'trial_cancellation_pending':
+            icon = Clock;
+            color = 'text-yellow-400';
+            bgColor = 'bg-yellow-500/10';
+            borderColor = 'border-yellow-500/30';
+            text = 'Trial Cancelled'; // Mandate cancelled during trial
+            break;
+        case 'cancelled':
             icon = XCircle;
             color = 'text-red-400';
             bgColor = 'bg-red-500/10';
             borderColor = 'border-red-500/30';
-            text = 'Failed';
+            text = 'Cancelled';
             break;
-        case 'overdue':
+        case 'halted':
             icon = AlertCircle;
             color = 'text-orange-400';
             bgColor = 'bg-orange-500/10';
             borderColor = 'border-orange-500/30';
-            text = 'Overdue';
+            text = 'Halted'; // Failed payments
             break;
         default:
             icon = Clock;
             color = 'text-gray-400';
             bgColor = 'bg-gray-500/10';
             borderColor = 'border-gray-500/30';
-            text = 'Unknown';
+            text = status; // Fallback to raw status string
     }
     
     const IconComponent = icon;
     
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${bgColor} ${color} border ${borderColor} transition-all duration-200`}>
+        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${bgColor} ${color} border ${borderColor} min-w-[120px] transition-all duration-200`}>
             <IconComponent className="w-3.5 h-3.5" />
             {text}
         </span>
     );
 };
 
-// Generate dummy payment data
+// Generate dummy payment data (kept for fallback)
 const generateDummyPaymentData = (shopName, plan) => {
     const planPrices = {
         [SHOP_PLANS.BASIC]: 499,
@@ -219,8 +225,9 @@ const generateDummyPaymentData = (shopName, plan) => {
     };
 };
 
-// Payment Modal Component
+// Payment Modal Component (no changes needed here as it deals with history)
 const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, API, showToast }) => {
+    // ... (PaymentModal logic remains the same) ...
     const [paymentData, setPaymentData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     
@@ -416,28 +423,26 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     const [shops, setShops] = useState([]); 
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    // 💥 FIX 1: Set default sort to 'dateJoined' and 'descending' for LIFO/newest first
     const [sortBy, setSortBy] = useState({ key: 'dateJoined', direction: 'descending' });
     const [paymentModal, setPaymentModal] = useState({ isOpen: false, shopName: null, shopPlan: null, shopId: null });
 
-    // --- Data Fetching Logic ---
+    // --- Data Mapping Logic ---
     const mapUserToShop = (user) => ({
         id: user._id, 
-        // 💥 FIX 2: Store the ISO date for reliable sorting
         dateSortValue: user.createdAt,
         dateJoined: formatDate(user.createdAt), 
-        // 💥 Extraction Fix: Deriving shop name from email
-        name: user.email.split('@')[0].trim() || user._id, 
+        // 🚨 UPDATE: Use actual user fields for email/phone if available
+        name: user.shopName || user.email.split('@')[0].trim() || user._id, 
+        email: user.email || 'N/A', // 👈 NEW FIELD
+        phone: user.phone || 'N/A', // 👈 NEW FIELD
         
-        // Using sensible defaults for currently missing fields
-        location: user.location || 'N/A', 
         status: user.isActive !== false ? 'Active' : 'Inactive', 
         plan: user.plan || SHOP_PLANS.BASIC, 
-        phone: user.phone || 'N/A',
         staffCount: { owner: 1, manager: user.managerCount || 0, cashier: user.cashierCount || 0 }, 
-        tenureDays: user.tenureDays || 'N/A', // Assuming 0 or N/A if not calculated by backend
+        // 🛑 REMOVED: tenureDays
         performanceTrend: user.performanceTrend || { metric: "N/A", trend: 'flat' }, 
-        paymentStatus: user.paymentStatus || generateCurrentMonthPaymentStatus(), // Current month payment status (from API or generated)
+        // 🛑 subscriptionStatus is now the actual status from the backend
+        subscriptionStatus: user.subscriptionStatus || 'created', 
         apiEndpoint: `/api/superadmin/shops/${user._id}`,
     });
 
@@ -446,8 +451,6 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         try {
             const response = await apiClient.get(API.superadminShops);
             if (response.data.success) {
-                // Payment status is now included in the shops response
-                // Ensure data structure is flat and map to shop object
                 const mappedShops = response.data.data.map(mapUserToShop);
                 setShops(mappedShops);
                 showToast(`Loaded ${mappedShops.length} shops successfully.`, 'success');
@@ -482,26 +485,18 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
 
     const filteredAndSortedShops = useMemo(() => {
         let filtered = shops.filter(shop => 
+            // 🚨 UPDATE: Filter by email and phone instead of location
             shop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            shop.location.toLowerCase().includes(searchTerm.toLowerCase())
+            shop.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            shop.phone.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
         return filtered.sort((a, b) => {
             let aValue = a[sortBy.key];
             let bValue = b[sortBy.key];
             
-            // --- FIX: Ensure Numeric Sorting for tenureDays ---
-            if (sortBy.key === 'tenureDays') {
-                // Convert to number, defaulting to 0 if 'N/A' or invalid
-                const aNum = isNaN(Number(aValue)) ? 0 : Number(aValue);
-                const bNum = isNaN(Number(bValue)) ? 0 : Number(bValue);
-
-                if (aNum < bNum) return sortBy.direction === 'ascending' ? -1 : 1;
-                if (aNum > bNum) return sortBy.direction === 'ascending' ? 1 : -1;
-                return 0;
-            }
-            // --- End FIX ---
-
+            // 🛑 REMOVED: tenureDays sorting logic
+            
             // 💥 FIX 3: Reliable date comparison using the stored ISO string (dateSortValue)
             if (sortBy.key === 'dateJoined') {
                 const aDate = new Date(a.dateSortValue).getTime();
@@ -512,29 +507,37 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                 return 0;
             }
 
-            // Handle payment status sorting with priority order
-            if (sortBy.key === 'paymentStatus') {
-                const statusPriority = { 'paid': 1, 'pending': 2, 'failed': 3, 'overdue': 4 };
-                const aPriority = statusPriority[aValue] || 5;
-                const bPriority = statusPriority[bValue] || 5;
+            // ✅ UPDATE: Subscription status sorting with priority order
+            if (sortBy.key === 'subscriptionStatus') {
+                const statusPriority = { 
+                    'active': 1, 
+                    'authenticated': 2, 
+                    'cancellation_pending': 3,
+                    'trial_cancellation_pending': 4,
+                    'created': 5,
+                    'halted': 6, 
+                    'cancelled': 7, 
+                    'unknown': 8 
+                };
+                const aPriority = statusPriority[String(aValue).toLowerCase()] || 8;
+                const bPriority = statusPriority[String(bValue).toLowerCase()] || 8;
                 
                 if (aPriority < bPriority) return sortBy.direction === 'ascending' ? -1 : 1;
                 if (aPriority > bPriority) return sortBy.direction === 'ascending' ? 1 : -1;
                 return 0;
             }
 
-            // Default string comparison (for name, location, plan, status, etc.)
+            // Default string comparison (for name, email, phone, plan, status, etc.)
             const result = String(aValue).toLowerCase().localeCompare(String(bValue).toLowerCase());
             return sortBy.direction === 'ascending' ? result : -result;
         });
     }, [shops, searchTerm, sortBy]);
 
 
-    // --- 💥 API Integration: Delete Shop (DELETE) FIX 💥 ---
+    // --- API Integration: Delete Shop (DELETE) ---
     const handleDeleteShop = async (shopId, shopName) => {
         console.log(`[DELETE] Attempting to delete shop: ${shopName} (ID: ${shopId})`);
 
-        // IMPORTANT: Use a custom modal instead of window.confirm in production
         if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE the shop and all its data for: ${shopName}? This action cannot be undone.`)) {
             console.log('[DELETE] Deletion cancelled by user.');
             return;
@@ -542,20 +545,19 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
 
         setIsLoading(true);
         try {
-            // FIX: Ensure API.superadminShopDetails is called as a function to get the full URL
             const deleteUrl = API.superadminShopDetails(shopId); 
             const response = await apiClient.delete(deleteUrl);
             
             if (response.data.success) {
                 setShops(prev => prev.filter(s => s.id !== shopId));
-                showToast(`Shop ${shopName} deleted successfully.`, 'success'); // SUCCESS TOAST ADDED
+                showToast(`Shop ${shopName} deleted successfully.`, 'success'); 
             } else {
-                 showToast(response.data.message || `Failed to delete shop ${shopName}.`, 'error'); // ERROR TOAST ADDED
+                 showToast(response.data.message || `Failed to delete shop ${shopName}.`, 'error'); 
             }
         } catch (error) {
             console.error('Delete Shop Error:', error);
             const errorMessage = error.response?.data?.error || 'Failed to delete shop due to a network or server error.';
-            showToast(errorMessage, 'error'); // ERROR TOAST ADDED
+            showToast(errorMessage, 'error'); 
         } finally {
             setIsLoading(false);
         }
@@ -589,7 +591,8 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             <div className="pt-4 pb-6">
                 <input
                     type="text"
-                    placeholder="Search by Shop Name or Location..."
+                    // 🚨 UPDATED PLACEHOLDER
+                    placeholder="Search by Shop Name, Email, or Phone..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
@@ -617,15 +620,27 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="name" />
                                         </div>
                                     </th>
+                                    {/* 🚨 NEW COLUMN: Email */}
                                     <th 
                                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
-                                        onClick={() => handleSort('location')}
+                                        onClick={() => handleSort('email')}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <span>Location</span>
-                                            <SortIcon columnKey="location" />
+                                            <span>Email</span>
+                                            <SortIcon columnKey="email" />
                                         </div>
                                     </th>
+                                    {/* 🚨 NEW COLUMN: Phone */}
+                                    <th 
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
+                                        onClick={() => handleSort('phone')}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span>Phone</span>
+                                            <SortIcon columnKey="phone" />
+                                        </div>
+                                    </th>
+                                    {/* Date Joined (Kept) */}
                                     <th 
                                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('dateJoined')}
@@ -635,15 +650,8 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="dateJoined" />
                                         </div>
                                     </th>
-                                    <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
-                                        onClick={() => handleSort('tenureDays')}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span>Tenure</span>
-                                            <SortIcon columnKey="tenureDays" />
-                                        </div>
-                                    </th>
+                                    {/* 🛑 REMOVED: Tenure Column */}
+
                                     <th 
                                         className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('plan')}
@@ -664,11 +672,12 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     </th>
                                     <th 
                                         className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
-                                        onClick={() => handleSort('paymentStatus')}
+                                        onClick={() => handleSort('subscriptionStatus')}
                                     >
                                         <div className="flex justify-center items-center gap-2">
-                                            <span>Payment Status</span>
-                                            <SortIcon columnKey="paymentStatus" />
+                                            {/* 🚨 UPDATED HEADER */}
+                                            <span>Subscription Status</span>
+                                            <SortIcon columnKey="subscriptionStatus" />
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -707,11 +716,18 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     </div>
                                                 </div>
                                             </td>
-                                            {/* Location */}
+                                            {/* 🚨 NEW CELL: Email */}
                                             <td className="px-6 py-5 whitespace-nowrap hidden md:table-cell">
                                                 <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                    <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                                    <span className="truncate max-w-[150px]">{shop.location}</span>
+                                                    <Mail className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span className="truncate max-w-[150px]">{shop.email}</span>
+                                                </div>
+                                            </td>
+                                            {/* 🚨 NEW CELL: Phone */}
+                                            <td className="px-6 py-5 whitespace-nowrap hidden md:table-cell">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                    <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span className="font-medium">{shop.phone}</span>
                                                 </div>
                                             </td>
                                             {/* Date Joined */}
@@ -721,13 +737,8 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     <span>{shop.dateJoined}</span>
                                                 </div>
                                             </td>
-                                            {/* Tenure (Days) */}
-                                            <td className="px-6 py-5 whitespace-nowrap text-left hidden lg:table-cell">
-                                                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                    <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                                    <span className="font-medium">{shop.tenureDays}</span>
-                                                </div>
-                                            </td>
+                                            {/* 🛑 REMOVED: Tenure Cell */}
+
                                             {/* Plan */}
                                             <td className="px-6 py-5 whitespace-nowrap text-center">
                                                 <span 
@@ -759,9 +770,10 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     {shop.status}
                                                 </span>
                                             </td>
-                                            {/* Payment Status */}
+                                            {/* Subscription Status */}
                                             <td className="px-6 py-5 whitespace-nowrap text-center">
-                                                <PaymentStatusBadge status={shop.paymentStatus} />
+                                                {/* 🚨 UPDATED COMPONENT NAME */}
+                                                <SubscriptionStatusBadge status={shop.subscriptionStatus} />
                                             </td>
                                             {/* Action Column */}
                                             <td className="px-6 py-5 whitespace-nowrap text-center text-sm font-medium">
