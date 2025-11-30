@@ -30,6 +30,7 @@ router.get('/shops', superadminProtect, async (req, res) => {
         // 1. SORTING: Add .sort({ createdAt: -1 }) for Last-In, First-Out order.
         const shops = await User.find({ role: 'owner' })
             .sort({ createdAt: -1 }) // Sort by creation date descending (newest first)
+            // Ensure subscriptionStatus is selected for the response
             .select('-password -resetPasswordToken -resetPasswordExpire');
 
         if (!shops.length) {
@@ -77,22 +78,9 @@ router.get('/shops', superadminProtect, async (req, res) => {
             // --- CORE LOGIC FOR TENURE ---
             const daysActive = Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24));
             
-            // --- PAYMENT STATUS LOGIC (Mocked, but using transactionId for stability) ---
-            let paymentStatus = 'paid';
-            
-            // Generate a 'deterministic' random value based on the transactionId or shopId
-            // This makes the mock status stick to the shop entry across multiple API calls.
-            const hash = shopObject.transactionId ? shopObject.transactionId.charCodeAt(0) : shopObject._id.toString().charCodeAt(0);
-            
-            if (hash % 10 === 0) {
-                paymentStatus = 'overdue'; // ~10% chance
-            } else if (hash % 7 === 0) {
-                paymentStatus = 'failed'; // ~14% chance
-            } else if (hash % 5 === 0) {
-                paymentStatus = 'pending'; // ~20% chance
-            } else {
-                paymentStatus = 'paid';
-            }
+            // 🛑 SUBSCRIPTION STATUS LOGIC (Using the real data from the User model)
+            const subscriptionStatus = shop.subscriptionStatus || 'created';
+            // Defaulting to 'created' if the field is missing, as that is the earliest state.
             // --------------------------------------------------------------------------
 
             // Mock Performance Trend (0: flat, 1: up, 2: down) - Still uses pure random as it's time-based data
@@ -110,7 +98,6 @@ router.get('/shops', superadminProtect, async (req, res) => {
 
             return {
                 ...shopObject, 
-                // shopName is now available because it's on the User schema and returned by find()
                 shopName: shopObject.shopName, 
                 dateJoined: shop.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
                 tenureDays: daysActive, 
@@ -119,7 +106,8 @@ router.get('/shops', superadminProtect, async (req, res) => {
                 managerCount: staffCount.managerCount,
                 cashierCount: staffCount.cashierCount,
                 location: shop.location || 'N/A', 
-                paymentStatus: paymentStatus, 
+                // ✅ Using the actual subscription status from the User model
+                subscriptionStatus: subscriptionStatus, 
             };
         });
 
