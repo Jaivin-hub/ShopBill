@@ -390,8 +390,6 @@ router.put('/config', superadminProtect, async (req, res) => {
  */
 // salesRouter.js (Updated /dashboard route)
 
-// salesRouter.js (Updated /dashboard route)
-
 router.get('/dashboard', superadminProtect, async (req, res) => {
     try {
         // --- Date Helpers ---
@@ -412,8 +410,8 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             allTimeSalesAggregation,
             newShopsThisMonth,
             newUsersThisMonth,
-            // 🛑 NEW: Fetch Actual Subscription Revenue for This Month
-            monthlySubscriptionRevenue
+            monthlySubscriptionRevenue,
+            monthlyPlanRevenueBreakdown 
         ] = await Promise.all([
             // 1. Shop Counts and Plan Distribution (Owners only)
             User.aggregate([
@@ -459,10 +457,10 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             // 6. New Shops This Month
             User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
 
-            // 7. New Users This Month
+            // 7. New Users This Month (The variable that caused the redeclaration issue)
             User.countDocuments({ role: { $in: ['owner', 'manager', 'cashier'] }, createdAt: { $gte: thisMonthStart } }),
 
-            // 🛑 NEW: Calculate Total Subscription Revenue for the current month
+            // 8. Total Subscription Revenue for the current month
             Payment.aggregate([
                 { 
                     $match: { 
@@ -476,14 +474,38 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                         totalSubscriptionRevenue: { $sum: '$amount' } 
                     } 
                 }
-            ])
+            ]),
+
+            // 9. Monthly Revenue per Shop/Plan (for Plan Distribution)
+            Payment.aggregate([
+                { 
+                    $match: { 
+                        paymentDate: { $gte: thisMonthStart }, 
+                        status: 'paid' 
+                    } 
+                },
+                { 
+                    $lookup: {
+                        from: 'users', 
+                        localField: 'shopId',
+                        foreignField: '_id',
+                        as: 'ownerDetails'
+                    }
+                },
+                { $unwind: '$ownerDetails' },
+                {
+                    $group: {
+                        _id: '$ownerDetails.plan',
+                        revenue: { $sum: '$amount' }
+                    }
+                }
+            ]),
         ]);
 
         // 🛑 Set Actual Total Plan Revenue
         const totalPlanRevenue = monthlySubscriptionRevenue[0]?.totalSubscriptionRevenue || 0;
         
         // --- Revenue Trend (Last 6 months) ---
-        // Fetch sales data for the last 6 months (POS sales only)
         const monthlyTrendData = await Sale.aggregate([
             { $match: { timestamp: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
             {
@@ -509,23 +531,28 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             planCountsMap.set(plan, {
                 count: stat.count,
                 activeCount: stat.activeCount,
-                // 🛑 FIX: Remove mocked revenue calculation here
-                revenue: 0 // Will be calculated separately or shown as potential if needed
+                revenue: 0 // Will be calculated from actual payment data
             });
             totalShops += stat.count;
             activeShops += stat.activeCount;
         });
+        
+        // Map actual monthly paid revenue by plan
+        const actualPlanRevenueMap = new Map();
+        monthlyPlanRevenueBreakdown.forEach(item => {
+            if (item._id) {
+                actualPlanRevenueMap.set(item._id, item.revenue);
+            }
+        });
+
 
         // Structure Plan Distribution
         const planDistribution = PLANS.reduce((acc, plan) => {
             const data = planCountsMap.get(plan) || { count: 0 };
             
-            // 🛑 FIX: Only show the counted shops/percentage, set revenue to 0 for now.
-            // We can later look up actual payments per plan if necessary, but for now, 
-            // the focus is on fixing the totalPlanRevenue.
             acc[plan.toLowerCase()] = {
                 count: data.count,
-                revenue: 0, // Set to 0 to avoid showing mock numbers from trial users
+                revenue: actualPlanRevenueMap.get(plan) || 0, 
                 percentage: totalShops > 0 ? Math.round((data.count / totalShops) * 100) : 0
             };
             return acc;
@@ -543,14 +570,15 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         // --- Users ---
         const totalUsers = allUserStats[0]?.totalUsers || 0;
         const activeUsers = allUserStats[0]?.activeUsers || 0;
-
+        // 🛑 FIX: Use the variable fetched in Promise.all
+        // const newUsersThisMonth = newUsersThisMonth; // Removed this redeclaration
+        
         // --- Growth Metrics ---
         const shopsGrowth = (totalShops - newShopsThisMonth) > 0
             ? (newShopsThisMonth / (totalShops - newShopsThisMonth)) * 100
             : 0;
 
-        // --- Payment Status (Mocked based on totalShops) ---
-        // Note: This is still a mock based on percentages, but uses the correct totalShops
+        // --- Payment Status (Mocked) ---
         const paymentStatus = {
             paid: Math.floor(totalShops * 0.75),
             pending: Math.floor(totalShops * 0.20),
@@ -565,7 +593,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         
         for (let i = 5; i >= 0; i--) {
             const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthIndex = date.getMonth() + 1; // 1 to 12
+            const monthIndex = date.getMonth() + 1;
             const monthKey = monthNames[date.getMonth()] + ' ' + date.getFullYear().toString().substring(2);
 
             const data = trendMap.get(monthIndex);
@@ -584,7 +612,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 monthlySalesRevenue: monthlyRevenue,
                 revenueGrowth: revenueGrowth.toFixed(2), 
                 
-                // SUBSCRIPTION REVENUE (Now CORRECTLY calculated from Payments)
+                // SUBSCRIPTION REVENUE (Actual Paid)
                 totalPlanRevenue: totalPlanRevenue, 
                 
                 // Shops
@@ -596,10 +624,10 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 // Users
                 totalUsers,
                 activeUsers,
-                newUsersThisMonth,
+                newUsersThisMonth, // This is the corrected variable usage
                 
                 // Distribution & Status
-                planDistribution,
+                planDistribution, 
                 paymentStatus,
                 monthlyTrend 
             }
