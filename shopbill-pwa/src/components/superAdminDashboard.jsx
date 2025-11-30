@@ -11,14 +11,15 @@ import API from '../config/api';
 const generateDummyDashboardData = () => {
     const now = new Date();
     
-    // Generate POS revenue data (in INR)
+    // POS revenue data (in INR)
     const totalSalesRevenue = 105000000 + Math.random() * 42000000; // ~1.05-1.47 Cr
     const monthlySalesRevenue = 12180000 + Math.random() * 4200000; // ~1.22-1.64 Cr
     const lastMonthRevenue = 11088000 + Math.random() * 3360000; // ~1.11-1.44 Cr
     const revenueGrowth = ((monthlySalesRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
     
-    // Monthly Plan Revenue (Dynamic from our backend logic)
+    // Plan Revenue (Dynamic from our backend logic)
     const totalPlanRevenue = 841544; // Example subscription revenue
+    const totalLifetimePlanRevenue = 8415440 + Math.random() * 2000000; // Example total subscription revenue
     
     // Generate shop statistics
     const totalShops = 156;
@@ -66,10 +67,11 @@ const generateDummyDashboardData = () => {
     }
     
     return {
-        totalSalesRevenue, // Renamed for clarity, matches backend
-        monthlySalesRevenue, // Renamed for clarity, matches backend
+        totalSalesRevenue,
+        monthlySalesRevenue,
         revenueGrowth,
-        totalPlanRevenue, // Added from backend
+        totalPlanRevenue,
+        totalLifetimePlanRevenue, // Added total subscription revenue
         totalShops,
         activeShops,
         newShopsThisMonth,
@@ -188,9 +190,11 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 
             setDashboardData({
                 // MAPPING: Ensure client keys match backend keys
-                totalRevenue: apiData.totalSalesRevenue || 0, // Using totalSalesRevenue from backend
-                monthlyRevenue: apiData.monthlySalesRevenue || 0, // Using monthlySalesRevenue from backend
-                totalPlanRevenue: apiData.totalPlanRevenue || 0, // CRITICAL: Added subscription revenue
+                // We assume backend provides totalSalesRevenue and monthlySalesRevenue
+                totalRevenue: apiData.totalSalesRevenue || 0,
+                monthlyRevenue: apiData.monthlySalesRevenue || 0, 
+                totalPlanRevenue: apiData.totalPlanRevenue || 0, // Monthly Subscription revenue
+                totalLifetimePlanRevenue: apiData.totalLifetimePlanRevenue || 0, // Total Subscription revenue
                 ...apiData,
                 recentActivity: Array.isArray(apiData.recentActivity)
                     ? apiData.recentActivity
@@ -216,7 +220,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
         }
     }, [fetchDashboardData, currentUser]);
     
-    // 5. useMemo (MOVED HERE to ensure consistent calling order)
+    // 5. useMemo 
     // Dynamic Calculations
     const userGrowth = useMemo(() => {
         // Use optional chaining for safe access since dashboardData can be null initially
@@ -271,9 +275,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             {/* Key Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 
-                {/* 1. Total POS Revenue (All Time) */}
-                <StatCard
-                    title="Total POS Revenue"
+                {/* 1. Total Revenue (POS + Plan) */}
+                {/* <StatCard
+                    title="Total Revenue (POS)"
+                    // Using totalSalesRevenue which we mapped to totalRevenue
                     value={formatCurrency(dashboardData.totalRevenue || 0)}
                     unit="₹"
                     icon={IndianRupee}
@@ -281,11 +286,12 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     trendValue={Math.abs(revenueGrowth).toFixed(1)}
                     color="green"
                     subtitle="All time POS sales"
-                />
+                /> */}
                 
-                {/* 2. Monthly POS Revenue */}
-                <StatCard
-                    title="Monthly POS Revenue"
+                {/* 2. Monthly Revenue (POS) */}
+                {/* <StatCard
+                    title="Monthly Revenue (POS)"
+                    // Using monthlySalesRevenue which we mapped to monthlyRevenue
                     value={formatCurrency(dashboardData.monthlyRevenue || 0)}
                     unit="₹"
                     icon={TrendingUp}
@@ -293,21 +299,31 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     trendValue={Math.abs(revenueGrowth).toFixed(1)}
                     color="purple"
                     subtitle="This month POS sales"
+                /> */}
+
+                {/* 3. Total Plan Revenue (Subscription) */}
+                <StatCard
+                    title="Total Plan Revenue"
+                    value={formatCurrency(dashboardData.totalLifetimePlanRevenue || 0)}
+                    unit="₹"
+                    icon={CreditCard}
+                    trend="up" 
+                    trendValue={0} // Placeholder, assuming growth unless we have last month's plan revenue
+                    color="teal"
+                    subtitle="All time subscription fees"
                 />
 
-                {/* 3. Monthly Subscription Revenue (CRITICAL: Added the dynamic plan revenue) */}
+                {/* 4. Monthly Plan Revenue (Subscription) */}
                 <StatCard
                     title="Monthly Plan Revenue"
                     value={formatNumber(dashboardData.totalPlanRevenue || 0)}
                     unit="₹"
                     icon={CreditCard}
-                    trend="up" // Placeholder, assuming growth unless we have last month's plan revenue
+                    trend="up" 
                     trendValue={0} 
                     color="orange"
                     subtitle="This month subscription fees"
                 />
-
-                {/* 4. Total Shops */}
                 <StatCard
                     title="Total Shops"
                     value={dashboardData.totalShops || 0}
@@ -317,11 +333,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     color="indigo"
                     subtitle={`${dashboardData.activeShops || 0} active | +${dashboardData.newShopsThisMonth || 0} new`}
                 />
-            </div>
 
-            {/* SECONDARY METRICS: Total Users Grid */}
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                 {/* 1. Total Users */}
+                 {/* 2. Total Users */}
                 <StatCard
                     title="Total Users"
                     value={formatNumber(dashboardData.totalUsers || 0)}
@@ -332,10 +345,6 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     color="blue"
                     subtitle={`${dashboardData.activeUsers || 0} active | +${dashboardData.newUsersThisMonth || 0} new`}
                 />
-                {/* Placeholder for expansion */}
-                <div className='hidden md:block'/>
-                <div className='hidden md:block'/>
-                <div className='hidden md:block'/>
             </div>
 
             {/* Secondary Metrics and Charts */}
@@ -346,7 +355,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <PieChart className="w-5 h-5 text-indigo-400" />
-                            Plan Distribution (Revenue: {formatNumber(dashboardData.totalPlanRevenue)})
+                            Plan Distribution (Monthly Revenue: ₹{formatNumber(dashboardData.totalPlanRevenue)})
                         </h2>
                     </div>
                     <div className="space-y-4">
@@ -372,7 +381,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                             <span className="text-sm text-gray-600 dark:text-gray-400">{data.count || 0} shops</span>
                                         </div>
                                         {/* Display revenue in clean format here */}
-                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatNumber(data.revenue || 0)}/mo</span>
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">₹{formatNumber(data.revenue || 0)}/mo</span>
                                     </div>
                                     <div className="w-full bg-gray-200 dark:bg-gray-700/30 rounded-full h-2">
                                         <div
@@ -468,7 +477,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         )}
                     </div>
                 </div>
-                
+
                 {/* Recent Activity */}
                 <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
@@ -505,11 +514,11 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                     case 'shop_created':
                                         return `New shop "${activity.shop}" created`;
                                     case 'payment_received':
-                                        return `Payment received from "${activity.shop}" - ${formatCurrency(activity.amount)}`;
+                                        return `Payment received from "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
                                     case 'shop_suspended':
                                         return `Shop "${activity.shop}" suspended`;
                                     case 'payment_failed':
-                                        return `Payment failed for "${activity.shop}" - ${formatCurrency(activity.amount)}`;
+                                        return `Payment failed for "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
                                     case 'plan_upgraded':
                                         // Ensure 'from' and 'to' fields are available in the activity payload
                                         return `"${activity.shop}" upgraded from ${activity.from || 'a plan'} to ${activity.to || 'a new plan'}`;
