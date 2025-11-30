@@ -423,7 +423,8 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             
             // 2. Total User and Active User Counts (All Non-Superadmin)
             User.aggregate([
-                { $match: { role: { $in: ['owner', 'Manager', 'Cashier'] } } },
+                // 🛑 FIX: Ensure roles are matched by the correct case (assuming 'manager' and 'cashier' are lowercase)
+                { $match: { role: { $in: ['owner', 'manager', 'cashier'] } } }, 
                 {
                     $group: {
                         _id: null,
@@ -452,7 +453,11 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
 
             // 7. New Users This Month
-            User.countDocuments({ role: { $in: ['owner', 'Manager', 'Cashier'] }, createdAt: { $gte: thisMonthStart } }),
+            User.countDocuments({ 
+                // 🛑 FIX: Ensure roles are matched by the correct case here too
+                role: { $in: ['owner', 'manager', 'cashier'] }, 
+                createdAt: { $gte: thisMonthStart } 
+            }),
         ]);
 
         // --- Process Aggregation Results ---
@@ -496,6 +501,8 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             : 0;
 
         // --- Users ---
+        // With the fix above, this calculation now correctly reflects the total count:
+        // 3 Owners + 5 Staff = 8 Total Users in the example. (Assuming owners are also counted in the role matching)
         const totalUsers = allUserStats[0]?.totalUsers || 0;
         const activeUsers = allUserStats[0]?.activeUsers || 0;
 

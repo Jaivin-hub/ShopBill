@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle, Mail } from 'lucide-react';
+import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle, Mail, RotateCw } from 'lucide-react';
 
 // Define roles for staff count (for display purposes)
 const STAFF_ROLES = {
@@ -9,9 +9,9 @@ const STAFF_ROLES = {
 };
 // Define available plans
 const SHOP_PLANS = {
-    BASIC: 'Basic',
-    PRO: 'Pro',
-    Premium: 'Premium',
+    BASIC: 'BASIC', // Ensure these match the database casing
+    PRO: 'PRO',
+    PREMIUM: 'PREMIUM',
 };
 
 // --- Utility Functions ---
@@ -31,8 +31,8 @@ const formatDate = (isoString) => {
 };
 
 const getPlanStyles = (plan) => {
-    switch (plan) {
-        case SHOP_PLANS.Premium:
+    switch (String(plan).toUpperCase()) { // Ensure case insensitivity
+        case SHOP_PLANS.PREMIUM:
             return 'bg-purple-800/50 text-purple-300 border-purple-700';
         case SHOP_PLANS.PRO:
             return 'bg-indigo-800/50 text-indigo-300 border-indigo-700';
@@ -43,7 +43,7 @@ const getPlanStyles = (plan) => {
 };
 
 /**
- * FINAL: Clean Staff Summary - Managers and Cashiers only
+ * Staff Summary Component
  */
 const StaffPill = ({ count }) => {
     return (
@@ -120,7 +120,7 @@ const SubscriptionStatusBadge = ({ status }) => {
             color = 'text-blue-400';
             bgColor = 'bg-blue-500/10';
             borderColor = 'border-blue-500/30';
-            text = 'Authenticated'; // Trial/Mandate Active
+            text = 'Trial/Auth'; // Mandate Auth, Trial Active
             break;
         case 'created':
             icon = Plus;
@@ -180,7 +180,7 @@ const generateDummyPaymentData = (shopName, plan) => {
     const planPrices = {
         [SHOP_PLANS.BASIC]: 499,
         [SHOP_PLANS.PRO]: 799,
-        [SHOP_PLANS.Premium]: 999,
+        [SHOP_PLANS.PREMIUM]: 999,
     };
     
     const price = planPrices[plan] || planPrices[SHOP_PLANS.BASIC];
@@ -225,9 +225,8 @@ const generateDummyPaymentData = (shopName, plan) => {
     };
 };
 
-// Payment Modal Component (no changes needed here as it deals with history)
+// Payment Modal Component 
 const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, API, showToast }) => {
-    // ... (PaymentModal logic remains the same) ...
     const [paymentData, setPaymentData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     
@@ -431,17 +430,15 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         id: user._id, 
         dateSortValue: user.createdAt,
         dateJoined: formatDate(user.createdAt), 
-        // 🚨 UPDATE: Use actual user fields for email/phone if available
         name: user.shopName || user.email.split('@')[0].trim() || user._id, 
         email: user.email || 'N/A', // 👈 NEW FIELD
         phone: user.phone || 'N/A', // 👈 NEW FIELD
         
         status: user.isActive !== false ? 'Active' : 'Inactive', 
-        plan: user.plan || SHOP_PLANS.BASIC, 
+        plan: (user.plan || SHOP_PLANS.BASIC).toUpperCase(), // Ensure uppercase for style matching
         staffCount: { owner: 1, manager: user.managerCount || 0, cashier: user.cashierCount || 0 }, 
-        // 🛑 REMOVED: tenureDays
         performanceTrend: user.performanceTrend || { metric: "N/A", trend: 'flat' }, 
-        // 🛑 subscriptionStatus is now the actual status from the backend
+        // subscriptionStatus is now the actual status from the backend
         subscriptionStatus: user.subscriptionStatus || 'created', 
         apiEndpoint: `/api/superadmin/shops/${user._id}`,
     });
@@ -466,6 +463,11 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         }
     }, [apiClient, API, showToast]); 
 
+    // 🚨 NEW HANDLER: Combined refresh and initial load
+    const handleRefresh = () => {
+        fetchShops();
+    };
+
     useEffect(() => {
         if (currentUser && currentUser.role === 'superadmin') {
             fetchShops();
@@ -485,7 +487,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
 
     const filteredAndSortedShops = useMemo(() => {
         let filtered = shops.filter(shop => 
-            // 🚨 UPDATE: Filter by email and phone instead of location
+            // 🚨 UPDATED FILTER: Search by email and phone instead of location
             shop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             shop.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
             shop.phone.toLowerCase().includes(searchTerm.toLowerCase())
@@ -495,9 +497,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             let aValue = a[sortBy.key];
             let bValue = b[sortBy.key];
             
-            // 🛑 REMOVED: tenureDays sorting logic
-            
-            // 💥 FIX 3: Reliable date comparison using the stored ISO string (dateSortValue)
+            // Reliable date comparison using the stored ISO string (dateSortValue)
             if (sortBy.key === 'dateJoined') {
                 const aDate = new Date(a.dateSortValue).getTime();
                 const bDate = new Date(b.dateSortValue).getTime();
@@ -585,6 +585,19 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             <div className="pb-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                 <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                     <Building className="w-7 h-7 mr-3 text-indigo-400" /> Shop Management
+                    {/* 🚨 REFRESH BUTTON */}
+                    <button 
+                        onClick={handleRefresh}
+                        disabled={isLoading}
+                        title="Refresh Shop List"
+                        className={`cursor-pointer ml-4 p-2 rounded-lg transition-all duration-200 ${
+                            isLoading 
+                                ? 'text-gray-500 bg-gray-200 dark:bg-gray-700 cursor-not-allowed' 
+                                : 'text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10'
+                        }`}
+                    >
+                        <RotateCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
                 </h1>
             </div>
             
@@ -601,7 +614,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
 
             {/* Table */}
             <div className="flex-grow overflow-y-auto">
-                {isLoading ? (
+                {isLoading && shops.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-600 dark:text-gray-400">
                         <Loader className="w-10 h-10 animate-spin text-indigo-400" />
                         <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading shop list...</p>
@@ -650,8 +663,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="dateJoined" />
                                         </div>
                                     </th>
-                                    {/* 🛑 REMOVED: Tenure Column */}
-
+                                    {/* Plan (Now Clickable) */}
                                     <th 
                                         className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('plan')}
@@ -737,9 +749,8 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     <span>{shop.dateJoined}</span>
                                                 </div>
                                             </td>
-                                            {/* 🛑 REMOVED: Tenure Cell */}
 
-                                            {/* Plan */}
+                                            {/* 🚨 UPDATED CELL: Plan with Color Indication */}
                                             <td className="px-6 py-5 whitespace-nowrap text-center">
                                                 <span 
                                                     className={`px-3 py-1.5 inline-flex items-center text-xs font-semibold rounded-lg border transition-all duration-200 ${getPlanStyles(shop.plan)}`}
