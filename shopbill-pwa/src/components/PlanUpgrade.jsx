@@ -1,4 +1,4 @@
-// PlanUpgrade.jsx (Full file with necessary updates)
+// PlanUpgrade.jsx (Full file with necessary updates for BASIC plan cancellation)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -64,7 +64,8 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         try {
             const planResponse = await apiClient.get(API.currentPlan);
 
-            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase();
+            // Default to 'BASIC' if plan is null, but if it's not null, use its value.
+            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || 'BASIC';
             const fetchedPlanEndDate = planResponse?.data?.planEndDate ? new Date(planResponse.data.planEndDate) : null;
             const fetchedSubscriptionStatus = planResponse?.data?.subscriptionStatus || null;
 
@@ -103,32 +104,37 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
     // Helper to check if the user is currently in the trial period
     const isCurrentlyInTrial = () => {
-        // If planEndDate is set and it's in the future, it's a trial or a paid period that ends on that date.
-        // We assume any period before the *first* payment is a trial.
-        return planDetails.planEndDate && planDetails.planEndDate > new Date() && planDetails.subscriptionStatus === 'active';
+        // If planEndDate is set and in the future, AND it's NOT already cancelled/pending
+        const isNotCancelled = planDetails.subscriptionStatus !== 'cancellation_pending' && planDetails.subscriptionStatus !== 'trial_cancellation_pending';
+
+        // We assume it's a trial if the end date is future, and no paid cycles have run (handled by backend's current_count=0 logic)
+        // The key is confirming the period is still active and has a future end date.
+        return planDetails.planEndDate && planDetails.planEndDate > new Date() && isNotCancelled;
     };
 
     const handlePrepareCancellation = () => {
-        if (currentPlan === 'BASIC') {
-            showToast('The Basic plan cannot be cancelled.', 'warning');
-            return;
-        }
+
+        // 🛑 REMOVED: if (currentPlan === 'BASIC') { ... } 
+        // BASIC plan can now be cancelled.
 
         const planName = currentPlan;
-        const endDateString = planDetails.planEndDate ? planDetails.planEndDate.toLocaleDateString('en-IN') : 'the end of the period';
+        // 🛑 USE formatDate helper here for consistency
+        const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'the end of the current billing cycle';
 
         let msg = '';
         let isTrial = isCurrentlyInTrial();
 
+        // Determine the message based on the current subscription state
         if (isTrial) {
             // Trial Cancellation Message (Access stops at the end of trial)
             msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
-        } else if (planDetails.subscriptionStatus === 'cancellation_pending') {
+        } else if (planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending') {
             // Already Cancelled Message
-            msg = `Your subscription is already scheduled for cancellation. Access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
+            msg = `Your subscription is already scheduled for cancellation. Your access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
         } else {
-            // Paid Cycle Cancellation Message (Access stops at the end of the paid cycle)
-            msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your plan will be scheduled to revert to the Basic tier at the end of the current paid billing cycle. You will retain full access until <strong>${endDateString}</strong> (or the end of the cycle).`;
+            // Paid Cycle Cancellation Message (Applies to BASIC, PRO, PREMIUM if they are past the trial)
+            // 🛑 MODIFIED MESSAGE to be generic since BASIC is paid
+            msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your subscription will be scheduled to cancel at the end of the current billing cycle. You will retain full access until <strong>${endDateString}</strong>.`;
         }
 
         setCancellationMessage(msg);
@@ -137,7 +143,8 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
     // 3. CANCELLATION LOGIC (Implemented with API call)
     const handleConfirmCancellation = async () => {
-        if (currentPlan === 'BASIC' || planDetails.subscriptionStatus === 'cancellation_pending') {
+        // 🛑 Keep this check simple: prevent action if already pending.
+        if (planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending') {
             setShowCancelModal(false);
             return;
         }
@@ -154,21 +161,22 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 showToast(message, 'success');
 
                 if (action === 'immediate_mandate_end_access') {
-                    // Trial Cancellation: Mandate is gone, but access stays until planEndDate.
-                    // The backend has updated status to 'trial_cancellation_pending'
+                    // Trial Cancellation - Set status to reflect local cancellation
                     setPlanDetails(prev => ({
                         ...prev,
+                        // 🛑 Using the status sent by the backend logic
                         subscriptionStatus: 'trial_cancellation_pending',
                     }));
 
                 } else if (action === 'end_of_cycle') {
-                    // Paid Cancellation: Mandate stays, but payment is scheduled to stop.
-                    // The backend has updated status to 'cancellation_pending'
+                    // Paid Cancellation
                     setPlanDetails(prev => ({
                         ...prev,
+                        // 🛑 Using the status sent by the backend logic
                         subscriptionStatus: 'cancellation_pending',
                     }));
                 }
+                // If action is 'no_action_needed', we don't change the status since the backend confirmed no change was necessary.
 
                 // Close modal and reset message
                 setCancellationMessage('');
@@ -298,19 +306,18 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 </p>
                             </div>
                             {/* Cancel Subscription Button */}
-                            {currentPlan !== 'BASIC' && (
-                                <button
-                                    onClick={handlePrepareCancellation}
-                                    className={`cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${isCancellationPending
-                                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                        : 'bg-red-600 hover:bg-red-700 text-white'
-                                        }`}
-                                    disabled={isCancelling}
-                                >
-                                    <XCircle className="w-4 h-4" />
-                                    {isCancellationPending ? 'Manage Cancellation' : 'Cancel Subscription'}
-                                </button>
-                            )}
+                            {/* 🛑 MODIFIED: Removed the check for currentPlan !== 'BASIC' */}
+                            <button
+                                onClick={handlePrepareCancellation}
+                                className={`cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${isCancellationPending
+                                    ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                    : 'bg-red-600 hover:bg-red-700 text-white'
+                                    }`}
+                                disabled={isCancelling}
+                            >
+                                <XCircle className="w-4 h-4" />
+                                {isCancellationPending ? 'Manage Cancellation' : 'Cancel Subscription'}
+                            </button>
                         </div>
                     </div>
                 </div>

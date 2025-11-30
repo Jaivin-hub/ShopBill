@@ -63,8 +63,8 @@ const Header = ({
         const isActive = currentPage === pageName;
         return `${baseButtonClasses} ${
             isActive 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/50' 
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'cursor-pointer bg-indigo-600 text-white shadow-lg shadow-indigo-500/50' 
+                : 'cursor-pointer bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
         }`;
     };
     // NOTE: Simplified classes to only use dark mode variants (e.g., removed dark:bg-gray-800 from initial state as it's the only state now).
