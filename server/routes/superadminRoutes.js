@@ -395,20 +395,19 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         // --- Date Helpers ---
         const now = new Date();
         const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        // ... (rest of date helpers)
         
         // Plan Mapping (Must match UserSchema)
         const PLANS = ['BASIC', 'PRO', 'PREMIUM'];
 
         // --- Parallel Data Fetching & Aggregation ---
-        // POS sales aggregation steps (3, 4, 5, 8, and monthly trend) have been removed.
         const [
             shopStats,
             allUserStats,
             newShopsThisMonth,
             newUsersThisMonth,
-            allTimeSubscriptionRevenue, // Added to get lifetime plan revenue
-            monthlyPlanRevenueBreakdown // Monthly plan revenue and breakdown
+            allTimeSubscriptionRevenue,
+            monthlyPlanRevenueBreakdown
         ] = await Promise.all([
             // 1. Shop Counts and Activity
             User.aggregate([
@@ -420,18 +419,18 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 { $match: { role: { $in: ['owner', 'manager', 'cashier'] } } }, 
                 { $group: { _id: null, totalUsers: { $sum: 1 }, activeUsers: { $sum: { $cond: ['$isActive', 1, 0] } } } }
             ]),
-            // 3. New Shops This Month (was 6)
+            // 3. New Shops This Month
             User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
-            // 4. New Users This Month (was 7)
+            // 4. New Users This Month
             User.countDocuments({ role: { $in: ['owner', 'manager', 'cashier'] }, createdAt: { $gte: thisMonthStart } }),
 
-            // 5. Total Lifetime Subscription Revenue (New Step)
+            // 5. Total Lifetime Subscription Revenue
             Payment.aggregate([
                 { $match: { status: 'paid' } },
                 { $group: { _id: null, totalLifetime: { $sum: '$amount' } } }
             ]),
 
-            // 6. Monthly Subscription Revenue Aggregation and Breakdown (was 9)
+            // 6. Monthly Subscription Revenue Aggregation and Breakdown
             Payment.aggregate([
                 { 
                     $match: { 
@@ -444,7 +443,6 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                     $group: {
                         _id: '$shopId',
                         latestAmount: { $last: '$amount' }, 
-                        plan: { $last: '$plan' } // Assuming 'plan' field is now stored on Payment model (as it would be needed for accurate historical plan revenue)
                     }
                 },
                 // Join with User to get plan if not available on Payment model
@@ -460,7 +458,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 // Group by the plan and sum the latest amounts
                 {
                     $group: {
-                        _id: '$ownerDetails.plan', // Use plan from User as the primary source for current breakdown
+                        _id: '$ownerDetails.plan',
                         revenue: { $sum: '$latestAmount' }
                     }
                 }
@@ -478,15 +476,10 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             }
         });
 
-        // The total monthly subscription revenue
         const monthlyPlanRevenue = calculatedMonthlyPlanRevenue;
-        
-        // The total lifetime subscription revenue
         const totalPlanRevenue = allTimeSubscriptionRevenue[0]?.totalLifetime || 0;
         
-        // --- Revenue Trend (Last 6 months - Now for PLAN Revenue) ---
-        // Note: For accurate plan revenue trend, we should aggregate Payment model, not Sale.
-        // I'll reuse the logic but point it at the Payment model.
+        // --- Revenue Trend (Last 6 months - Plan Revenue) ---
         const monthlyTrendData = await Payment.aggregate([
             { 
                 $match: { 
@@ -494,16 +487,17 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                     status: 'paid'
                 } 
             },
-            // Group payments by the month they occurred
             {
+                // FIX IS HERE: The $group _id must be an object with fields pointing to expressions.
                 $group: {
-                    _id: { $month: '$paymentDate', year: { $year: '$paymentDate' } },
-                    year: { $first: { $year: '$paymentDate' } },
-                    month: { $first: { $month: '$paymentDate' } },
+                    _id: { 
+                        month: { $month: '$paymentDate' }, // Group by month
+                        year: { $year: '$paymentDate' }   // And year
+                    },
                     revenue: { $sum: '$amount' }
                 }
             },
-            { $sort: { year: 1, month: 1 } }
+            { $sort: { '_id.year': 1, '_id.month': 1 } } // Sort by the grouped fields
         ]);
         
         // --- Process Aggregation Results ---
@@ -520,21 +514,20 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             activeShops += stat.activeCount;
         });
         
-        // Structure Plan Distribution (Uses the calculated total and map)
+        // Structure Plan Distribution
         const planDistribution = PLANS.reduce((acc, plan) => {
             const data = planCountsMap.get(plan) || { count: 0 };
             
             acc[plan.toLowerCase()] = {
                 count: data.count,
-                revenue: actualPlanRevenueMap.get(plan) || 0, // Monthly revenue from this plan
+                revenue: actualPlanRevenueMap.get(plan) || 0,
                 percentage: totalShops > 0 ? Math.round((data.count / totalShops) * 100) : 0
             };
             return acc;
         }, {});
         
         // --- Remaining Metrics ---
-        // No POS revenue, so we remove those calculations.
-        const revenueGrowth = 0; // Set to 0 since POS sales growth is removed
+        const revenueGrowth = 0; 
         
         const totalUsers = allUserStats[0]?.totalUsers || 0;
         const activeUsers = allUserStats[0]?.activeUsers || 0;
@@ -550,27 +543,30 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             overdue: Math.max(0, totalShops - Math.floor(totalShops * 0.75) - Math.floor(totalShops * 0.20) - Math.floor(totalShops * 0.03))
         };
         
+        // Map trend data
         const monthlyTrend = [];
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const trendMap = new Map(monthlyTrendData.map(d => [d.month, d]));
+        // Create a map key based on the correct grouping structure: { month: M, year: Y }
+        const trendMap = new Map(monthlyTrendData.map(d => [`${d._id.year}-${d._id.month}`, d]));
         
         for (let i = 5; i >= 0; i--) {
             const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthIndex = date.getMonth() + 1;
+            const monthIndex = date.getMonth() + 1; // 1-indexed month
+            const year = date.getFullYear();
+            const key = `${year}-${monthIndex}`;
 
             monthlyTrend.push({
                 month: monthNames[date.getMonth()],
-                revenue: trendMap.get(monthIndex) ? trendMap.get(monthIndex).revenue : 0
+                revenue: trendMap.get(key) ? trendMap.get(key).revenue : 0
             });
         }
         
         res.json({
             success: true,
             data: {
-                // POS fields removed entirely, replaced by plan revenue fields
-                totalPlanRevenue: totalPlanRevenue, // Total lifetime plan revenue
-                monthlyPlanRevenue: monthlyPlanRevenue, // Total current month plan revenue
-                revenueGrowth: 0, // Set to 0 since POS revenue trend is removed
+                totalPlanRevenue: totalPlanRevenue,
+                monthlyPlanRevenue: monthlyPlanRevenue,
+                revenueGrowth: 0, 
                 totalShops,
                 activeShops,
                 newShopsThisMonth,
@@ -580,7 +576,6 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 newUsersThisMonth, 
                 planDistribution, 
                 paymentStatus,
-                // Monthly trend now reflects Plan Revenue, not Sales Revenue
                 monthlyTrend 
             }
         });
