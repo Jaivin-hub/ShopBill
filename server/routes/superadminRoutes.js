@@ -410,7 +410,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             newShopsThisMonth,
             newUsersThisMonth,
             monthlySubscriptionRevenue,
-            monthlyPlanRevenueBreakdown 
+            monthlyPlanRevenueBreakdown // This aggregation is now our single source of truth for revenue breakdown
         ] = await Promise.all([
             // 1-7. (No Change)
             User.aggregate([
@@ -435,31 +435,12 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
             User.countDocuments({ role: { $in: ['owner', 'manager', 'cashier'] }, createdAt: { $gte: thisMonthStart } }),
 
-            // 8. 🚀 FIXED: Total Subscription Revenue (De-duplicated)
-            Payment.aggregate([
-                { 
-                    $match: { 
-                        paymentDate: { $gte: thisMonthStart }, 
-                        status: 'paid' 
-                    } 
-                },
-                // Group by shopId to find the latest payment for each shop this month
-                { 
-                    $group: {
-                        _id: '$shopId',
-                        latestAmount: { $last: '$amount' } // Get the amount of the last payment in the group
-                    }
-                },
-                // Sum the latest amounts from all unique shops
-                { 
-                    $group: { 
-                        _id: null, 
-                        totalSubscriptionRevenue: { $sum: '$latestAmount' } 
-                    } 
-                }
-            ]),
+            // 8. 🛑 CRITICAL FIX: Total Subscription Revenue (REMOVED - We will calculate it from Aggregation 9)
+            // To ensure consistency, we will derive the total from the breakdown, which already has the de-duplication and lookup logic. 
+            // We keep this placeholder, but the result will be empty/zero, and the logic will be moved below.
+            Promise.resolve([{ totalSubscriptionRevenue: 0 }]), 
 
-            // 9. 🚀 FIXED: Monthly Revenue per Plan (De-duplicated)
+            // 9. 🚀 Final Revenue Aggregation (Used for BOTH breakdown and total)
             Payment.aggregate([
                 { 
                     $match: { 
@@ -467,18 +448,18 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                         status: 'paid' 
                     } 
                 },
-                // 1. Group by shopId to get the latest payment per shop
+                // 1. De-duplication: Group by shopId to get the latest payment per shop
                 { 
                     $group: {
                         _id: '$shopId',
                         latestAmount: { $last: '$amount' }, 
                     }
                 },
-                // 2. Join with User to get the plan name
+                // 2. Filter: Join with User to ensure the shop exists and get the plan name
                 { 
                     $lookup: {
                         from: 'users', 
-                        localField: '_id', // The shopId from the previous group
+                        localField: '_id', 
                         foreignField: '_id',
                         as: 'ownerDetails'
                     }
@@ -487,15 +468,25 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 // 3. Group by the plan and sum the latest amounts
                 {
                     $group: {
-                        _id: '$ownerDetails.plan', // Group by the plan found on the User
+                        _id: '$ownerDetails.plan', 
                         revenue: { $sum: '$latestAmount' }
                     }
                 }
             ]),
         ]);
 
-        // 🛑 totalPlanRevenue should now match the sum of planDistribution revenues
-        const totalPlanRevenue = monthlySubscriptionRevenue[0]?.totalSubscriptionRevenue || 0;
+        // --- Calculate totalPlanRevenue from the breakdown result ---
+        const actualPlanRevenueMap = new Map();
+        let calculatedTotalPlanRevenue = 0;
+
+        monthlyPlanRevenueBreakdown.forEach(item => {
+            if (item._id) {
+                actualPlanRevenueMap.set(item._id, item.revenue);
+                calculatedTotalPlanRevenue += item.revenue;
+            }
+        });
+
+        const totalPlanRevenue = calculatedTotalPlanRevenue; // Use the sum calculated from the clean data
         
         // --- Revenue Trend (Last 6 months - No Change) ---
         const monthlyTrendData = await Sale.aggregate([
@@ -525,22 +516,13 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             activeShops += stat.activeCount;
         });
         
-        // Map actual monthly paid revenue by plan
-        const actualPlanRevenueMap = new Map();
-        monthlyPlanRevenueBreakdown.forEach(item => {
-            if (item._id) {
-                actualPlanRevenueMap.set(item._id, item.revenue);
-            }
-        });
-
-
-        // Structure Plan Distribution
+        // Structure Plan Distribution (Uses the calculated total and map)
         const planDistribution = PLANS.reduce((acc, plan) => {
             const data = planCountsMap.get(plan) || { count: 0 };
             
             acc[plan.toLowerCase()] = {
                 count: data.count,
-                revenue: actualPlanRevenueMap.get(plan) || 0, 
+                revenue: actualPlanRevenueMap.get(plan) || 0, // Revenue comes from the clean Aggregation 9 map
                 percentage: totalShops > 0 ? Math.round((data.count / totalShops) * 100) : 0
             };
             return acc;
@@ -592,7 +574,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 totalSalesRevenue: totalRevenue, 
                 monthlySalesRevenue: monthlyRevenue,
                 revenueGrowth: revenueGrowth.toFixed(2), 
-                totalPlanRevenue: totalPlanRevenue, 
+                totalPlanRevenue: totalPlanRevenue, // This is now guaranteed to be the sum of the breakdown
                 totalShops,
                 activeShops,
                 newShopsThisMonth,
