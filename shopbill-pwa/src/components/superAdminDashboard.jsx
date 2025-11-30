@@ -7,23 +7,24 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 
-// Generate dummy data for super admin dashboard
+// Generate dummy data for super admin dashboard (Updated to include totalPlanRevenue)
 const generateDummyDashboardData = () => {
     const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     
-    // Generate revenue data (in INR)
-    const totalRevenue = 105000000 + Math.random() * 42000000; // ~1.05-1.47 Cr
-    const monthlyRevenue = 12180000 + Math.random() * 4200000; // ~1.22-1.64 Cr
+    // Generate POS revenue data (in INR)
+    const totalSalesRevenue = 105000000 + Math.random() * 42000000; // ~1.05-1.47 Cr
+    const monthlySalesRevenue = 12180000 + Math.random() * 4200000; // ~1.22-1.64 Cr
     const lastMonthRevenue = 11088000 + Math.random() * 3360000; // ~1.11-1.44 Cr
-    const revenueGrowth = ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+    const revenueGrowth = ((monthlySalesRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+    
+    // Monthly Plan Revenue (Dynamic from our backend logic)
+    const totalPlanRevenue = 841544; // Example subscription revenue
     
     // Generate shop statistics
     const totalShops = 156;
     const activeShops = 142;
     const newShopsThisMonth = 12;
-    const shopsGrowth = (newShopsThisMonth / (totalShops - newShopsThisMonth)) * 100;
+    const shopsGrowth = (newShopsThisMonth / Math.max(totalShops - newShopsThisMonth, 1)) * 100;
     
     // Generate user statistics
     const totalUsers = 1245;
@@ -47,11 +48,11 @@ const generateDummyDashboardData = () => {
     
     // Generate recent activity
     const recentActivity = [
-        { type: 'shop_created', shop: 'ABC Store', time: new Date(now - 2 * 60 * 60 * 1000), status: 'success' },
-        { type: 'payment_received', shop: 'XYZ Mart', amount: 6999, time: new Date(now - 5 * 60 * 60 * 1000), status: 'success' },
-        { type: 'shop_suspended', shop: 'DEF Shop', time: new Date(now - 8 * 60 * 60 * 1000), status: 'warning' },
-        { type: 'payment_failed', shop: 'GHI Store', amount: 2499, time: new Date(now - 12 * 60 * 60 * 1000), status: 'error' },
-        { type: 'plan_upgraded', shop: 'JKL Mart', from: 'Basic', to: 'Pro', time: new Date(now - 15 * 60 * 60 * 1000), status: 'success' },
+        { type: 'shop_created', shop: 'ABC Store', time: new Date(now.getTime() - 2 * 60 * 60 * 1000), status: 'success' },
+        { type: 'payment_received', shop: 'XYZ Mart', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
+        { type: 'shop_suspended', shop: 'DEF Shop', time: new Date(now.getTime() - 8 * 60 * 60 * 1000), status: 'warning' },
+        { type: 'payment_failed', shop: 'GHI Store', amount: 2499, time: new Date(now.getTime() - 12 * 60 * 60 * 1000), status: 'error' },
+        { type: 'plan_upgraded', shop: 'JKL Mart', from: 'Basic', to: 'Pro', time: new Date(now.getTime() - 15 * 60 * 60 * 1000), status: 'success' },
     ];
     
     // Generate monthly revenue trend (last 6 months) in INR
@@ -65,9 +66,10 @@ const generateDummyDashboardData = () => {
     }
     
     return {
-        totalRevenue,
-        monthlyRevenue,
+        totalSalesRevenue, // Renamed for clarity, matches backend
+        monthlySalesRevenue, // Renamed for clarity, matches backend
         revenueGrowth,
+        totalPlanRevenue, // Added from backend
         totalShops,
         activeShops,
         newShopsThisMonth,
@@ -91,6 +93,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
         purple: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
         orange: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
         teal: 'text-teal-400 bg-teal-500/10 border-teal-500/30',
+        red: 'text-red-400 bg-red-500/10 border-red-500/30', // Added red for negative trend cards
     };
     
     const colorClass = colorClasses[color] || colorClasses.indigo;
@@ -114,7 +117,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
                 <div className="flex items-baseline gap-1">
                     {unit && <span className="text-lg text-gray-500">{unit}</span>}
-                    <h3 className="text-2xl font-bold text-white">{value}</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
                 </div>
                 {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
             </div>
@@ -129,7 +132,15 @@ const formatNumber = (num) => {
 
 // Format currency
 const formatCurrency = (num) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(num);
+    // Check if the number is large enough for crore formatting
+    if (num >= 10000000) {
+        return (num / 10000000).toFixed(2) + ' Cr';
+    }
+    // Check if the number is large enough for lakh formatting
+    if (num >= 100000) {
+        return (num / 100000).toFixed(2) + ' L';
+    }
+    return new Intl.NumberFormat('en-IN').format(Math.floor(num));
 };
 
 // Format time ago
@@ -145,58 +156,83 @@ const formatTimeAgo = (date) => {
 };
 
 const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
+    // 1. useState
     const [dashboardData, setDashboardData] = useState(null);
+    // 2. useState
     const [isLoading, setIsLoading] = useState(true);
     
     // Fetch dashboard data
+    // 3. useCallback
     const fetchDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        // Fetch dashboard stats and recent activity in parallel. Recent activity failure is non-fatal.
-        const [dashResp, activityResp] = await Promise.all([
-            apiClient.get(API.superadminDashboard),
-            apiClient.get(API.superadminRecentActivity).catch(() => null)
-        ]);
+        setIsLoading(true);
+        try {
+            // Fetch dashboard stats and recent activity in parallel. Recent activity failure is non-fatal.
+            const [dashResp, activityResp] = await Promise.all([
+                apiClient.get(API.superadminDashboard),
+                apiClient.get(API.superadminRecentActivity).catch(() => null)
+            ]);
 
-        if (!dashResp || !dashResp.data || !dashResp.data.success) {
-            throw new Error((dashResp && dashResp.data && dashResp.data.message) || 'Failed to load dashboard data');
+            if (!dashResp || !dashResp.data || !dashResp.data.success) {
+                throw new Error((dashResp && dashResp.data && dashResp.data.message) || 'Failed to load dashboard data');
+            }
+
+            const apiData = dashResp.data.data || {};
+            const activityData = activityResp && activityResp.data && activityResp.data.success ? activityResp.data.data : null;
+
+            // Fallback activity if API doesn't provide any
+            const now = new Date();
+            const fallbackActivity = [
+                { type: 'shop_created', shop: 'New Shop', time: new Date(now.getTime() - 2 * 60 * 60 * 1000), status: 'success' },
+                { type: 'payment_received', shop: 'Shop Payment', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
+            ];
+
+            setDashboardData({
+                // MAPPING: Ensure client keys match backend keys
+                totalRevenue: apiData.totalSalesRevenue || 0, // Using totalSalesRevenue from backend
+                monthlyRevenue: apiData.monthlySalesRevenue || 0, // Using monthlySalesRevenue from backend
+                totalPlanRevenue: apiData.totalPlanRevenue || 0, // CRITICAL: Added subscription revenue
+                ...apiData,
+                recentActivity: Array.isArray(apiData.recentActivity)
+                    ? apiData.recentActivity
+                    : Array.isArray(activityData)
+                        ? activityData
+                        : fallbackActivity,
+            });
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            // Fallback to dummy data on error
+            const data = generateDummyDashboardData();
+            setDashboardData(data);
+            if (typeof showToast === 'function') showToast('Using dummy data. API connection failed.', 'warning');
+        } finally {
+            setIsLoading(false);
         }
-
-        const apiData = dashResp.data.data || {};
-        const activityData = activityResp && activityResp.data && activityResp.data.success ? activityResp.data.data : null;
-
-        // Fallback activity if API doesn't provide any
-        const now = new Date();
-        const fallbackActivity = [
-            { type: 'shop_created', shop: 'New Shop', time: new Date(now.getTime() - 2 * 60 * 60 * 1000), status: 'success' },
-            { type: 'payment_received', shop: 'Shop Payment', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
-        ];
-
-        setDashboardData({
-            ...apiData,
-            recentActivity: Array.isArray(apiData.recentActivity)
-                ? apiData.recentActivity
-                : Array.isArray(activityData)
-                    ? activityData
-                    : fallbackActivity,
-        });
-    } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-        // Fallback to dummy data on error
-        const data = generateDummyDashboardData();
-        setDashboardData(data);
-        if (typeof showToast === 'function') showToast('Using cached data. API connection failed.', 'warning');
-    } finally {
-        setIsLoading(false);
-    }
-}, [apiClient, API, showToast]);
+    }, [apiClient, API, showToast]);
     
+    // 4. useEffect
     useEffect(() => {
         if (currentUser && currentUser.role === 'superadmin') {
             fetchDashboardData();
         }
     }, [fetchDashboardData, currentUser]);
     
+    // 5. useMemo (MOVED HERE to ensure consistent calling order)
+    // Dynamic Calculations
+    const userGrowth = useMemo(() => {
+        // Use optional chaining for safe access since dashboardData can be null initially
+        const total = dashboardData?.totalUsers || 0;
+        const newUsers = dashboardData?.newUsersThisMonth || 0;
+        const previousTotal = Math.max(total - newUsers, 1);
+        return ((newUsers / previousTotal) * 100);
+    }, [dashboardData]); // Depend on the whole object to recalculate when data changes
+
+    // These variables are now safe to access after the useMemo call
+    const revenueGrowth = dashboardData?.revenueGrowth || 0;
+    const shopsGrowth = dashboardData?.shopsGrowth || 0;
+
+    // Determine the total revenue for the trend chart scale
+    const maxMonthlyRevenue = Math.max(...(dashboardData?.monthlyTrend || []).map(t => t.revenue || 0));
+
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
@@ -234,54 +270,83 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             
             {/* Key Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                
+                {/* 1. Total POS Revenue (All Time) */}
                 <StatCard
-                    title="Total Revenue"
-                    value={formatNumber(dashboardData.totalRevenue || 0)}
+                    title="Total POS Revenue"
+                    value={formatCurrency(dashboardData.totalRevenue || 0)}
                     unit="₹"
                     icon={IndianRupee}
-                    trend={dashboardData.revenueGrowth >= 0 ? "up" : "down"}
-                    trendValue={Math.abs(dashboardData.revenueGrowth || 0).toFixed(1)}
+                    trend={revenueGrowth >= 0 ? "up" : "down"}
+                    trendValue={Math.abs(revenueGrowth).toFixed(1)}
                     color="green"
-                    subtitle="All time"
+                    subtitle="All time POS sales"
                 />
+                
+                {/* 2. Monthly POS Revenue */}
+                <StatCard
+                    title="Monthly POS Revenue"
+                    value={formatCurrency(dashboardData.monthlyRevenue || 0)}
+                    unit="₹"
+                    icon={TrendingUp}
+                    trend={revenueGrowth >= 0 ? "up" : "down"}
+                    trendValue={Math.abs(revenueGrowth).toFixed(1)}
+                    color="purple"
+                    subtitle="This month POS sales"
+                />
+
+                {/* 3. Monthly Subscription Revenue (CRITICAL: Added the dynamic plan revenue) */}
+                <StatCard
+                    title="Monthly Plan Revenue"
+                    value={formatNumber(dashboardData.totalPlanRevenue || 0)}
+                    unit="₹"
+                    icon={CreditCard}
+                    trend="up" // Placeholder, assuming growth unless we have last month's plan revenue
+                    trendValue={0} 
+                    color="orange"
+                    subtitle="This month subscription fees"
+                />
+
+                {/* 4. Total Shops */}
                 <StatCard
                     title="Total Shops"
                     value={dashboardData.totalShops || 0}
                     icon={Building}
-                    trend={dashboardData.shopsGrowth >= 0 ? "up" : "down"}
-                    trendValue={Math.abs(dashboardData.shopsGrowth || 0).toFixed(1)}
+                    trend={shopsGrowth >= 0 ? "up" : "down"}
+                    trendValue={Math.abs(shopsGrowth).toFixed(1)}
                     color="indigo"
-                    subtitle={`${dashboardData.activeShops || 0} active`}
+                    subtitle={`${dashboardData.activeShops || 0} active | +${dashboardData.newShopsThisMonth || 0} new`}
                 />
+            </div>
+
+            {/* SECONDARY METRICS: Total Users Grid */}
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                 {/* 1. Total Users */}
                 <StatCard
                     title="Total Users"
                     value={formatNumber(dashboardData.totalUsers || 0)}
                     icon={Users}
-                    trend="up"
-                    trendValue={dashboardData.newUsersThisMonth && dashboardData.totalUsers ? ((dashboardData.newUsersThisMonth / Math.max(dashboardData.totalUsers - dashboardData.newUsersThisMonth, 1)) * 100).toFixed(1) : 0}
+                    trend={userGrowth >= 0 ? "up" : "down"}
+                    // Use the calculated userGrowth
+                    trendValue={Math.abs(userGrowth).toFixed(1)}
                     color="blue"
-                    subtitle={`${dashboardData.activeUsers || 0} active`}
+                    subtitle={`${dashboardData.activeUsers || 0} active | +${dashboardData.newUsersThisMonth || 0} new`}
                 />
-                <StatCard
-                    title="Monthly Revenue"
-                    value={formatNumber(dashboardData.monthlyRevenue || 0)}
-                    unit="₹"
-                    icon={TrendingUp}
-                    trend={dashboardData.revenueGrowth >= 0 ? "up" : "down"}
-                    trendValue={Math.abs(dashboardData.revenueGrowth || 0).toFixed(1)}
-                    color="purple"
-                    subtitle="This month"
-                />
+                {/* Placeholder for expansion */}
+                <div className='hidden md:block'/>
+                <div className='hidden md:block'/>
+                <div className='hidden md:block'/>
             </div>
-            
+
             {/* Secondary Metrics and Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                
                 {/* Plan Distribution */}
                 <div className="lg:col-span-2 bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <PieChart className="w-5 h-5 text-indigo-400" />
-                            Plan Distribution
+                            Plan Distribution (Revenue: {formatNumber(dashboardData.totalPlanRevenue)})
                         </h2>
                     </div>
                     <div className="space-y-4">
@@ -306,7 +371,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                             </span>
                                             <span className="text-sm text-gray-600 dark:text-gray-400">{data.count || 0} shops</span>
                                         </div>
-                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(data.revenue || 0)}/mo</span>
+                                        {/* Display revenue in clean format here */}
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatNumber(data.revenue || 0)}/mo</span>
                                     </div>
                                     <div className="w-full bg-gray-200 dark:bg-gray-700/30 rounded-full h-2">
                                         <div
@@ -343,21 +409,21 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                 <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
                                     <div className="flex items-center gap-2">
                                         <Clock className="w-4 h-4 text-yellow-400" />
-                                        <span className="text-sm text-gray-300">Pending</span>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">Pending</span>
                                     </div>
                                     <span className="text-sm font-semibold text-yellow-400">{dashboardData.paymentStatus.pending || 0}</span>
                                 </div>
                                 <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/30">
                                     <div className="flex items-center gap-2">
                                         <XCircle className="w-4 h-4 text-red-400" />
-                                        <span className="text-sm text-gray-300">Failed</span>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">Failed</span>
                                     </div>
                                     <span className="text-sm font-semibold text-red-400">{dashboardData.paymentStatus.failed || 0}</span>
                                 </div>
                                 <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
                                     <div className="flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4 text-orange-400" />
-                                        <span className="text-sm text-gray-300">Overdue</span>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">Overdue</span>
                                     </div>
                                     <span className="text-sm font-semibold text-orange-400">{dashboardData.paymentStatus.overdue || 0}</span>
                                 </div>
@@ -373,13 +439,13 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                 <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                         <BarChart3 className="w-5 h-5 text-indigo-400" />
-                        Monthly Revenue Trend
+                        Monthly Revenue Trend (POS Sales)
                     </h2>
                     <div className="space-y-3">
                         {dashboardData.monthlyTrend && dashboardData.monthlyTrend.length > 0 ? (
                             dashboardData.monthlyTrend.map((item, index) => {
-                                const maxRevenue = Math.max(...dashboardData.monthlyTrend.map(t => t.revenue || 0));
-                                const percentage = maxRevenue > 0 ? ((item.revenue || 0) / maxRevenue) * 100 : 0;
+                                // Calculate percentage based on the max revenue for scale
+                                const percentage = maxMonthlyRevenue > 0 ? ((item.revenue || 0) / maxMonthlyRevenue) * 100 : 0;
                                 
                                 return (
                                     <div key={index} className="flex items-center gap-3">
@@ -412,19 +478,25 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                         {dashboardData.recentActivity.map((activity, index) => {
                             const getActivityIcon = () => {
+                                // Use dynamic status color if available
+                                const statusColor = activity.status === 'success' ? 'text-green-400' :
+                                                    activity.status === 'warning' ? 'text-yellow-400' :
+                                                    activity.status === 'error' ? 'text-red-400' :
+                                                    'text-gray-400';
+
                                 switch (activity.type) {
                                     case 'shop_created':
-                                        return <Store className="w-4 h-4 text-green-400" />;
+                                        return <Store className={`w-4 h-4 ${statusColor}`} />;
                                     case 'payment_received':
-                                        return <CreditCard className="w-4 h-4 text-green-400" />;
+                                        return <CreditCard className={`w-4 h-4 ${statusColor}`} />;
                                     case 'shop_suspended':
-                                        return <AlertCircle className="w-4 h-4 text-yellow-400" />;
+                                        return <AlertCircle className={`w-4 h-4 ${statusColor}`} />;
                                     case 'payment_failed':
-                                        return <XCircle className="w-4 h-4 text-red-400" />;
+                                        return <XCircle className={`w-4 h-4 ${statusColor}`} />;
                                     case 'plan_upgraded':
-                                        return <TrendingUp className="w-4 h-4 text-blue-400" />;
+                                        return <TrendingUp className={`w-4 h-4 ${statusColor}`} />;
                                     default:
-                                        return <Activity className="w-4 h-4 text-gray-400" />;
+                                        return <Activity className={`w-4 h-4 ${statusColor}`} />;
                                 }
                             };
                             
@@ -439,9 +511,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                     case 'payment_failed':
                                         return `Payment failed for "${activity.shop}" - ${formatCurrency(activity.amount)}`;
                                     case 'plan_upgraded':
-                                        return `"${activity.shop}" upgraded from ${activity.from} to ${activity.to}`;
+                                        // Ensure 'from' and 'to' fields are available in the activity payload
+                                        return `"${activity.shop}" upgraded from ${activity.from || 'a plan'} to ${activity.to || 'a new plan'}`;
                                     default:
-                                        return 'Activity';
+                                        return 'System Activity';
                                 }
                             };
                             
@@ -464,7 +537,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                 </div>
             </div>
             
-            {/* System Health & Quick Stats */}
+            {/* System Health & Quick Stats (Static/Mocked Data) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center gap-3 mb-3">
@@ -473,7 +546,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         </div>
                         <div>
                             <p className="text-sm text-gray-400">System Status</p>
-                            <p className="text-lg font-semibold text-white">Operational</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">Operational</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -489,7 +562,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         </div>
                         <div>
                             <p className="text-sm text-gray-400">Database</p>
-                            <p className="text-lg font-semibold text-white">Healthy</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">Healthy</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -505,7 +578,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         </div>
                         <div>
                             <p className="text-sm text-gray-400">API Response</p>
-                            <p className="text-lg font-semibold text-white">Fast</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">Fast</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -519,4 +592,3 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 };
 
 export default SuperAdminDashboard;
-
