@@ -104,87 +104,99 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
     // Helper to check if the user is currently in the trial period
     const isCurrentlyInTrial = () => {
-    // Determine if the subscription is in its trial period based on local data.
-    // We assume a trial is active if the end date is future, the status is active, and no cancellation is pending.
-    const isNotCancelled = planDetails.subscriptionStatus !== 'cancellation_pending' && planDetails.subscriptionStatus !== 'trial_cancellation_pending';
-    
-    // Note: The most reliable trial check is often on the backend using subscription.current_count === 0, 
-    // but this client-side check is fine for display purposes.
-    return planDetails.planEndDate && planDetails.planEndDate > new Date() && isNotCancelled;
-};
+        // We assume a trial is running if:
+        // 1. The plan has an end date in the future.
+        // 2. The subscription status is 'active' (or similar, indicating the mandate is live).
+        // 3. The local status is NOT already marked as pending/cancelled.
+
+        const isFutureDate = planDetails.planEndDate && planDetails.planEndDate > new Date();
+        const isNotCancelled = planDetails.subscriptionStatus !== 'cancellation_pending' && planDetails.subscriptionStatus !== 'trial_cancellation_pending';
+
+        // Since the backend doesn't explicitly tell us if this is the FIRST cycle, 
+        // we must rely on the backend to tell us the current status.
+        // If you initially set the User.subscriptionStatus = 'trial_active' upon mandate creation, 
+        // you could check for that here. Assuming 'active' is set upon creation:
+
+        if (isFutureDate && isNotCancelled && planDetails.subscriptionStatus === 'active') {
+            // This *could* be a paid cycle too, but the UI assumes it's a trial
+            // UNTIL a successful subscription.charged webhook updates the status.
+            return true;
+        }
+        return false;
+    };
 
     const handlePrepareCancellation = () => {
-    
-    const planName = currentPlan;
-    const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'the end of the current billing cycle';
-    
-    // Check if cancellation is already pending based on local status
-    const isAlreadyPending = planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending';
 
-    let msg = '';
-    let isTrial = isCurrentlyInTrial();
+        const planName = currentPlan;
+        const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'the end of the current billing cycle';
 
-    if (isAlreadyPending) {
-        // Already Cancelled Message
-        msg = `Your subscription is already scheduled for cancellation. Your access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
-    } else if (isTrial) {
-        // Trial Cancellation Message
-        msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
-    } else {
-        // Paid Cycle Cancellation Message (Applies to BASIC, PRO, PREMIUM)
-        msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your subscription will be scheduled to cancel at the end of the current billing cycle. You will retain full access until <strong>${endDateString}</strong>.`;
-    }
+        // Check if cancellation is already pending based on local status
+        const isAlreadyPending = planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending';
 
-    setCancellationMessage(msg);
-    setShowCancelModal(true);
-};
+        let msg = '';
+        let isTrial = isCurrentlyInTrial();
+
+        if (isAlreadyPending) {
+            // Already Cancelled Message
+            msg = `Your subscription is already scheduled for cancellation. Your access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
+        } else if (isTrial) {
+            // Trial Cancellation Message
+            msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
+        } else {
+            // Paid Cycle Cancellation Message (Applies to BASIC, PRO, PREMIUM)
+            msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your subscription will be scheduled to cancel at the end of the current billing cycle. You will retain full access until <strong>${endDateString}</strong>.`;
+        }
+
+        setCancellationMessage(msg);
+        setShowCancelModal(true);
+    };
 
     // 3. CANCELLATION LOGIC (Implemented with API call)
     const handleConfirmCancellation = async () => {
-    // 🛑 Keep this check simple: prevent action if already pending.
-    if (planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending') {
-        setShowCancelModal(false);
-        return;
-    }
-
-    setIsCancelling(true);
-
-    try {
-        const response = await apiClient.post(API.cancelSubscription);
-
-        const { action, message } = response.data;
-
-        if (response.data.success) {
-
-            showToast(message, 'success');
-
-            // Update local status based on the action flag returned by the server
-            if (action === 'immediate_mandate_end_access') {
-                setPlanDetails(prev => ({
-                    ...prev,
-                    subscriptionStatus: 'trial_cancellation_pending',
-                }));
-
-            } else if (action === 'end_of_cycle') {
-                setPlanDetails(prev => ({
-                    ...prev,
-                    subscriptionStatus: 'cancellation_pending',
-                }));
-            } 
-            // 'no_action_needed' means the Razorpay status didn't change, but local status was also not updated, so we don't need a change here.
-
-            setCancellationMessage('');
-
-        } else {
-            showToast(response.error || 'Failed to cancel subscription due to an unknown error.', 'error');
+        // 🛑 Keep this check simple: prevent action if already pending.
+        if (planDetails.subscriptionStatus === 'cancellation_pending' || planDetails.subscriptionStatus === 'trial_cancellation_pending') {
+            setShowCancelModal(false);
+            return;
         }
-    } catch (error) {
-        // ... (Error handling remains the same) ...
-    } finally {
-        setShowCancelModal(false);
-        setIsCancelling(false);
-    }
-};
+
+        setIsCancelling(true);
+
+        try {
+            const response = await apiClient.post(API.cancelSubscription);
+
+            const { action, message } = response.data;
+
+            if (response.data.success) {
+
+                showToast(message, 'success');
+
+                // Update local status based on the action flag returned by the server
+                if (action === 'immediate_mandate_end_access') {
+                    setPlanDetails(prev => ({
+                        ...prev,
+                        subscriptionStatus: 'trial_cancellation_pending',
+                    }));
+
+                } else if (action === 'end_of_cycle') {
+                    setPlanDetails(prev => ({
+                        ...prev,
+                        subscriptionStatus: 'cancellation_pending',
+                    }));
+                }
+                // 'no_action_needed' means the Razorpay status didn't change, but local status was also not updated, so we don't need a change here.
+
+                setCancellationMessage('');
+
+            } else {
+                showToast(response.error || 'Failed to cancel subscription due to an unknown error.', 'error');
+            }
+        } catch (error) {
+            // ... (Error handling remains the same) ...
+        } finally {
+            setShowCancelModal(false);
+            setIsCancelling(false);
+        }
+    };
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-IN', {
