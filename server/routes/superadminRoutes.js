@@ -388,6 +388,10 @@ router.put('/config', superadminProtect, async (req, res) => {
  * @desc Get superadmin dashboard statistics
  * @access Private (Superadmin only)
  */
+// salesRouter.js (Updated /dashboard route)
+
+// salesRouter.js (Updated /dashboard route)
+
 router.get('/dashboard', superadminProtect, async (req, res) => {
     try {
         // --- Date Helpers ---
@@ -405,11 +409,12 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             allUserStats,
             monthlySales,
             lastMonthSales,
-            allTimeSales,
+            allTimeSalesAggregation, // 🛑 RENAMED to reflect aggregation
             newShopsThisMonth,
             newUsersThisMonth
         ] = await Promise.all([
             // 1. Shop Counts and Plan Distribution (Owners only)
+            // ... (No change)
             User.aggregate([
                 { $match: { role: 'owner' } },
                 {
@@ -422,8 +427,8 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             ]),
             
             // 2. Total User and Active User Counts (All Non-Superadmin)
+            // ... (No change from previous fix)
             User.aggregate([
-                // 🛑 FIX: Ensure roles are matched by the correct case (assuming 'manager' and 'cashier' are lowercase)
                 { $match: { role: { $in: ['owner', 'manager', 'cashier'] } } }, 
                 {
                     $group: {
@@ -434,51 +439,66 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 }
             ]),
             
-            // 3. Current Month Sales
+            // 3. Current Month Sales (No change)
             Sale.aggregate([
                 { $match: { timestamp: { $gte: thisMonthStart } } },
                 { $group: { _id: null, totalAmount: { $sum: '$totalAmount' } } }
             ]),
 
-            // 4. Last Month Sales
+            // 4. Last Month Sales (No change)
             Sale.aggregate([
                 { $match: { timestamp: { $gte: lastMonthStart, $lt: thisMonthStart } } },
                 { $group: { _id: null, totalAmount: { $sum: '$totalAmount' } } }
             ]),
 
-            // 5. All Sales (Used for trend, will optimize later if volume is huge)
-            Sale.find({}).select('totalAmount timestamp'),
+            // 5. 🛑 CRITICAL FIX: Use MongoDB aggregation for accurate total revenue.
+            Sale.aggregate([
+                { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' } } }
+            ]),
             
-            // 6. New Shops This Month
+            // 6. New Shops This Month (No change)
             User.countDocuments({ role: 'owner', createdAt: { $gte: thisMonthStart } }),
 
-            // 7. New Users This Month
-            User.countDocuments({ 
-                // 🛑 FIX: Ensure roles are matched by the correct case here too
-                role: { $in: ['owner', 'manager', 'cashier'] }, 
-                createdAt: { $gte: thisMonthStart } 
-            }),
+            // 7. New Users This Month (No change)
+            User.countDocuments({ role: { $in: ['owner', 'manager', 'cashier'] }, createdAt: { $gte: thisMonthStart } }),
         ]);
 
+        // --- Revenue Trend (Last 6 months) ---
+        // ⚠️ Since the original Sale.find({}) is gone, we must re-calculate or 
+        // fetch the 6-month trend data separately using aggregation.
+        const monthlyTrendData = await Sale.aggregate([
+            { $match: { timestamp: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
+            {
+                $group: {
+                    _id: { $month: '$timestamp' },
+                    year: { $first: { $year: '$timestamp' } },
+                    month: { $first: { $month: '$timestamp' } },
+                    revenue: { $sum: '$totalAmount' }
+                }
+            },
+            { $sort: { year: 1, month: 1 } }
+        ]);
+        
         // --- Process Aggregation Results ---
         
         // --- Shops and Plans ---
+        // ... (No change)
         const planCountsMap = new Map();
         let totalShops = 0;
         let activeShops = 0;
         
         shopStats.forEach(stat => {
-            const plan = stat._id || 'BASIC'; // Handle null plan as BASIC
+            const plan = stat._id || 'BASIC'; 
             planCountsMap.set(plan, {
                 count: stat.count,
                 activeCount: stat.activeCount,
-                revenue: (stat.activeCount || 0) * (planPrices[plan] || 0) // Mock subscription revenue
+                revenue: (stat.activeCount || 0) * (planPrices[plan] || 0)
             });
             totalShops += stat.count;
             activeShops += stat.activeCount;
         });
 
-        // Structure Plan Distribution
+        // Structure Plan Distribution (No change)
         const planDistribution = PLANS.reduce((acc, plan) => {
             const data = planCountsMap.get(plan) || { count: 0, revenue: 0 };
             acc[plan.toLowerCase()] = {
@@ -494,15 +514,15 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         // --- Revenue and Growth ---
         const monthlyRevenue = monthlySales[0]?.totalAmount || 0;
         const lastMonthRevenue = lastMonthSales[0]?.totalAmount || 0;
-        const totalRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0); // Still relying on JS reduction of a large array for this single field
+        
+        // 🛑 USE DEDICATED AGGREGATION RESULT
+        const totalRevenue = allTimeSalesAggregation[0]?.totalRevenue || 0; 
         
         const revenueGrowth = lastMonthRevenue > 0
             ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
             : 0;
 
         // --- Users ---
-        // With the fix above, this calculation now correctly reflects the total count:
-        // 3 Owners + 5 Staff = 8 Total Users in the example. (Assuming owners are also counted in the role matching)
         const totalUsers = allUserStats[0]?.totalUsers || 0;
         const activeUsers = allUserStats[0]?.activeUsers || 0;
 
@@ -512,7 +532,6 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             : 0;
 
         // --- Payment Status (Mocked) ---
-        // Using fixed percentages for dashboard view (75% Paid, 20% Pending, 3% Failed, 2% Overdue)
         const paymentStatus = {
             paid: Math.floor(totalShops * 0.75),
             pending: Math.floor(totalShops * 0.20),
@@ -520,21 +539,21 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             overdue: totalShops - Math.floor(totalShops * 0.75) - Math.floor(totalShops * 0.20) - Math.floor(totalShops * 0.03)
         };
         
-        // --- Monthly Revenue Trend (Last 6 months) ---
+        // --- Process Monthly Trend Data ---
         const monthlyTrend = [];
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const trendMap = new Map(monthlyTrendData.map(d => [d.month, d]));
+        
         for (let i = 5; i >= 0; i--) {
-            const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-            monthEnd.setHours(23, 59, 59, 999);
+            const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthIndex = date.getMonth() + 1; // 1 to 12
+            const monthKey = monthNames[date.getMonth()] + ' ' + date.getFullYear().toString().substring(2);
 
-            // Filter sales for this specific month (O(N) operation on the allTimeSales array)
-            const monthSales = allTimeSales.filter(sale =>
-                sale.timestamp >= monthStart && sale.timestamp <= monthEnd
-            );
-
+            const data = trendMap.get(monthIndex);
+            
             monthlyTrend.push({
-                month: monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-                revenue: monthSales.reduce((sum, sale) => sum + sale.totalAmount, 0)
+                month: monthKey,
+                revenue: data ? data.revenue : 0 // Use revenue from aggregation, or 0 if no sales
             });
         }
         
@@ -542,16 +561,16 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             success: true,
             data: {
                 // Revenue
-                totalSalesRevenue: totalRevenue, // Renamed for clarity
+                totalSalesRevenue: totalRevenue, 
                 monthlySalesRevenue: monthlyRevenue,
-                revenueGrowth: revenueGrowth.toFixed(2), // Sales Revenue Growth %
-                totalPlanRevenue: totalPlanRevenue, // Mocked Subscription Revenue
+                revenueGrowth: revenueGrowth.toFixed(2), 
+                totalPlanRevenue: totalPlanRevenue, 
                 
                 // Shops
                 totalShops,
                 activeShops,
                 newShopsThisMonth,
-                shopsGrowth: shopsGrowth.toFixed(2), // Shop Growth %
+                shopsGrowth: shopsGrowth.toFixed(2), 
                 
                 // Users
                 totalUsers,
@@ -561,7 +580,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 // Distribution & Status
                 planDistribution,
                 paymentStatus,
-                monthlyTrend // Last 6 months sales trend
+                monthlyTrend 
             }
         });
     } catch (error) {
