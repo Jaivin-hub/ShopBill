@@ -69,10 +69,12 @@ router.post('/razorpay', async (req, res) => {
         console.log(`[WEBHOOK SUBSCRIPTION ID] ${subscriptionId}`); 
 
         // 3. Find the Shop/Owner associated with this subscription ID
+        // CRITICAL FIX: Ensure _id is selected, which will be used as the shopId.
         const owner = await User.findOne({ 
             role: 'owner', 
             transactionId: subscriptionId 
-        }).select('shopName plan subscriptionStatus planEndDate'); // Select key fields for logging
+        }).select('_id shopName plan subscriptionStatus planEndDate'); // Added _id
+        //      ^^^^^
 
         if (!owner) {
             console.error(`[WEBHOOK LOG] Owner not found for Subscription ID: ${subscriptionId}`);
@@ -80,7 +82,7 @@ router.post('/razorpay', async (req, res) => {
         }
         
         // 🔥 DEBUG: Log the user found
-        console.log(`[WEBHOOK USER FOUND] Shop: ${owner.shopName}, Current Plan: ${owner.plan}, Status: ${owner.subscriptionStatus}`);
+        console.log(`[WEBHOOK USER FOUND] Shop: ${owner.shopName}, Current Plan: ${owner.plan}, Status: ${owner.subscriptionStatus}, Shop ID (User _id): ${owner._id}`);
 
         // 4. Handle Subscription Status Changes (Updates the User model)
         if (event === 'subscription.activated') {
@@ -157,7 +159,7 @@ router.post('/razorpay', async (req, res) => {
 
             // Save the Payment Record
             const paymentRecord = await Payment.create({
-                shopId: owner.shopId,
+                shopId: owner._id, // ✅ FIXED: Use the user's Mongoose _id as the shopId
                 subscriptionId: subscriptionId,
                 paymentId: paymentId,
                 eventType: event,
