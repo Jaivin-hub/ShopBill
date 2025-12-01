@@ -303,8 +303,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 
                 {/* 3. Total Plan Revenue (Subscription) */}
                 <StatCard
-                    title="Total Plan Revenue"
-                    value={formatCurrency(dashboardData.totalLifetimePlanRevenue || 0)}
+                    title="Total Revenue"
+                    value={formatCurrency(dashboardData.totalPlanRevenue || 0)}
                     unit="₹"
                     icon={CreditCard}
                     trend="up" 
@@ -315,7 +315,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 
                 {/* 4. Monthly Plan Revenue (Subscription) */}
                 <StatCard
-                    title="Monthly Plan Revenue"
+                    title="Monthly Revenue"
                     value={formatNumber(dashboardData.totalPlanRevenue || 0)}
                     unit="₹"
                     icon={CreditCard}
@@ -355,7 +355,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <PieChart className="w-5 h-5 text-indigo-400" />
-                            Plan Distribution (Monthly Revenue: ₹{formatNumber(dashboardData.totalPlanRevenue)})
+                            Plan Distribution
                         </h2>
                     </div>
                     <div className="space-y-4">
@@ -381,6 +381,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                             <span className="text-sm text-gray-600 dark:text-gray-400">{data.count || 0} shops</span>
                                         </div>
                                         {/* Display revenue in clean format here */}
+                                        {console.log('data', data)}
                                         <span className="text-sm font-semibold text-gray-900 dark:text-white">₹{formatNumber(data.revenue || 0)}/mo</span>
                                     </div>
                                     <div className="w-full bg-gray-200 dark:bg-gray-700/30 rounded-full h-2">
@@ -444,107 +445,112 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             
             {/* Monthly Revenue Trend and Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Monthly Revenue Trend */}
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-                        <BarChart3 className="w-5 h-5 text-indigo-400" />
-                        Monthly Revenue Trend (POS Sales)
-                    </h2>
-                    <div className="space-y-3">
-                        {dashboardData.monthlyTrend && dashboardData.monthlyTrend.length > 0 ? (
-                            dashboardData.monthlyTrend.map((item, index) => {
-                                // Calculate percentage based on the max revenue for scale
-                                const percentage = maxMonthlyRevenue > 0 ? ((item.revenue || 0) / maxMonthlyRevenue) * 100 : 0;
-                                
-                                return (
-                                    <div key={index} className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-600 dark:text-gray-400 w-12">{item.month}</span>
-                                        <div className="flex-1 bg-gray-200 dark:bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
-                                            <div
-                                                className="h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
-                                                style={{ width: `${percentage}%` }}
-                                            >
-                                                <span className="text-xs font-semibold text-white">
-                                                    {formatCurrency(item.revenue || 0)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">No revenue data available</p>
-                        )}
-                    </div>
-                </div>
+    
+    {/* 1. Monthly Revenue Trend (Updated for "Progress Bar" look) */}
+    <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <BarChart3 className="w-5 h-5 text-indigo-400" />
+            Monthly Revenue Trend (POS Sales)
+        </h2>
+        <div className="space-y-3">
+            {dashboardData.monthlyTrend && dashboardData.monthlyTrend.length > 0 ? (
+                dashboardData.monthlyTrend.map((item, index) => {
+                    // Calculate raw percentage based on the max revenue for scale
+                    const rawPercentage = maxMonthlyRevenue > 0 ? ((item.revenue || 0) / maxMonthlyRevenue) * 100 : 0;
+                    
+                    // --- UPDATED LOGIC: Cap the max display width at 90% (by multiplying by 0.9)
+                    // This creates the "progress bar" look where even the highest value doesn't fully fill the row.
+                    const percentage = Math.min(100, rawPercentage * 0.9);
 
-                {/* Recent Activity */}
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-                        <Activity className="w-5 h-5 text-indigo-400" />
-                        Recent Activity
-                    </h2>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {dashboardData.recentActivity.map((activity, index) => {
-                            const getActivityIcon = () => {
-                                // Use dynamic status color if available
-                                const statusColor = activity.status === 'success' ? 'text-green-400' :
-                                                    activity.status === 'warning' ? 'text-yellow-400' :
-                                                    activity.status === 'error' ? 'text-red-400' :
-                                                    'text-gray-400';
-
-                                switch (activity.type) {
-                                    case 'shop_created':
-                                        return <Store className={`w-4 h-4 ${statusColor}`} />;
-                                    case 'payment_received':
-                                        return <CreditCard className={`w-4 h-4 ${statusColor}`} />;
-                                    case 'shop_suspended':
-                                        return <AlertCircle className={`w-4 h-4 ${statusColor}`} />;
-                                    case 'payment_failed':
-                                        return <XCircle className={`w-4 h-4 ${statusColor}`} />;
-                                    case 'plan_upgraded':
-                                        return <TrendingUp className={`w-4 h-4 ${statusColor}`} />;
-                                    default:
-                                        return <Activity className={`w-4 h-4 ${statusColor}`} />;
-                                }
-                            };
-                            
-                            const getActivityText = () => {
-                                switch (activity.type) {
-                                    case 'shop_created':
-                                        return `New shop "${activity.shop}" created`;
-                                    case 'payment_received':
-                                        return `Payment received from "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
-                                    case 'shop_suspended':
-                                        return `Shop "${activity.shop}" suspended`;
-                                    case 'payment_failed':
-                                        return `Payment failed for "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
-                                    case 'plan_upgraded':
-                                        // Ensure 'from' and 'to' fields are available in the activity payload
-                                        return `"${activity.shop}" upgraded from ${activity.from || 'a plan'} to ${activity.to || 'a new plan'}`;
-                                    default:
-                                        return 'System Activity';
-                                }
-                            };
-                            
-                            return (
+                    return (
+                        <div key={index} className="flex items-center gap-3">
+                            <span className="text-xs text-gray-600 dark:text-gray-400 w-12">{item.month}</span>
+                            <div className="flex-1 bg-gray-200 dark:bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
                                 <div
-                                    key={index}
-                                    className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg border border-gray-600/30 hover:border-gray-500/50 transition-all duration-200"
+                                    className="h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                                    style={{ width: `${percentage}%` }}
                                 >
-                                    <div className="flex-shrink-0">
-                                        {getActivityIcon()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{getActivityText()}</p>
-                                        <p className="text-xs text-gray-500 mt-0.5">{formatTimeAgo(activity.time)}</p>
-                                    </div>
+                                    <span className="text-xs font-semibold text-white">
+                                        {formatCurrency(item.revenue || 0)}
+                                    </span>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        </div>
+                    );
+                })
+            ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">No revenue data available</p>
+            )}
+        </div>
+    </div>
+
+    {/* 2. Recent Activity (No Changes Applied - Included as requested) */}
+    <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <Activity className="w-5 h-5 text-indigo-400" />
+            Recent Activity
+        </h2>
+        <div className="space-y-3 max-h-64 overflow-y-auto">
+            {dashboardData.recentActivity.map((activity, index) => {
+                const getActivityIcon = () => {
+                    // Use dynamic status color if available
+                    const statusColor = activity.status === 'success' ? 'text-green-400' :
+                                        activity.status === 'warning' ? 'text-yellow-400' :
+                                        activity.status === 'error' ? 'text-red-400' :
+                                        'text-gray-400';
+
+                    switch (activity.type) {
+                        case 'shop_created':
+                            return <Store className={`w-4 h-4 ${statusColor}`} />;
+                        case 'payment_received':
+                            return <CreditCard className={`w-4 h-4 ${statusColor}`} />;
+                        case 'shop_suspended':
+                            return <AlertCircle className={`w-4 h-4 ${statusColor}`} />;
+                        case 'payment_failed':
+                            return <XCircle className={`w-4 h-4 ${statusColor}`} />;
+                        case 'plan_upgraded':
+                            return <TrendingUp className={`w-4 h-4 ${statusColor}`} />;
+                        default:
+                            return <Activity className={`w-4 h-4 ${statusColor}`} />;
+                    }
+                };
+                
+                const getActivityText = () => {
+                    switch (activity.type) {
+                        case 'shop_created':
+                            return `New shop "${activity.shop}" created`;
+                        case 'payment_received':
+                            return `Payment received from "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
+                        case 'shop_suspended':
+                            return `Shop "${activity.shop}" suspended`;
+                        case 'payment_failed':
+                            return `Payment failed for "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
+                        case 'plan_upgraded':
+                            // Ensure 'from' and 'to' fields are available in the activity payload
+                            return `"${activity.shop}" upgraded from ${activity.from || 'a plan'} to ${activity.to || 'a new plan'}`;
+                        default:
+                            return 'System Activity';
+                    }
+                };
+                
+                return (
+                    <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg border border-gray-600/30 hover:border-gray-500/50 transition-all duration-200"
+                    >
+                        <div className="flex-shrink-0">
+                            {getActivityIcon()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{getActivityText()}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{formatTimeAgo(activity.time)}</p>
+                        </div>
                     </div>
-                </div>
-            </div>
+                );
+            })}
+        </div>
+    </div>
+</div>
             
             {/* System Health & Quick Stats (Static/Mocked Data) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

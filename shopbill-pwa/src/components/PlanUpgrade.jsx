@@ -1,4 +1,4 @@
-// PlanUpgrade.jsx (Full file with necessary updates for BASIC plan cancellation)
+// PlanUpgrade.jsx (Full file with necessary updates for BASIC plan cancellation and corrected messaging)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -103,26 +103,16 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     };
 
     // Helper to check if the user is currently in the trial period
+    // CORRECTED: Uses "authenticated" status to determine trial/mandate setup period
     const isCurrentlyInTrial = () => {
-        // We assume a trial is running if:
-        // 1. The plan has an end date in the future.
-        // 2. The subscription status is 'active' (or similar, indicating the mandate is live).
-        // 3. The local status is NOT already marked as pending/cancelled.
-
         const isFutureDate = planDetails.planEndDate && planDetails.planEndDate > new Date();
         const isNotCancelled = planDetails.subscriptionStatus !== 'cancellation_pending' && planDetails.subscriptionStatus !== 'trial_cancellation_pending';
-
-        // Since the backend doesn't explicitly tell us if this is the FIRST cycle, 
-        // we must rely on the backend to tell us the current status.
-        // If you initially set the User.subscriptionStatus = 'trial_active' upon mandate creation, 
-        // you could check for that here. Assuming 'active' is set upon creation:
-
-        if (isFutureDate && isNotCancelled && planDetails.subscriptionStatus === 'active') {
-            // This *could* be a paid cycle too, but the UI assumes it's a trial
-            // UNTIL a successful subscription.charged webhook updates the status.
-            return true;
-        }
-        return false;
+        
+        // If status is 'authenticated', it means the mandate is set up but the first payment hasn't been charged,
+        // which corresponds to the Free Trial period.
+        const isTrialStatus = planDetails.subscriptionStatus === 'authenticated';
+        
+        return isFutureDate && isNotCancelled && isTrialStatus;
     };
 
     const handlePrepareCancellation = () => {
@@ -138,13 +128,16 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
         if (isAlreadyPending) {
             // Already Cancelled Message
+            // UPDATED MESSAGE: Use strong tag for emphasis
             msg = `Your subscription is already scheduled for cancellation. Your access will end on <strong>${endDateString}</strong>. You don't need to take any further action.`;
         } else if (isTrial) {
-            // Trial Cancellation Message
-            msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period. By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
+            // Trial Cancellation Message (Status: 'authenticated')
+            // UPDATED MESSAGE: Clarify immediate mandate cancellation and access retention
+            msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period (Mandate Authenticated). By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
         } else {
-            // Paid Cycle Cancellation Message (Applies to BASIC, PRO, PREMIUM)
-            msg = `Your <strong>${planName}</strong> subscription is currently in a paid cycle. By confirming cancellation, your subscription will be scheduled to cancel at the end of the current billing cycle. You will retain full access until <strong>${endDateString}</strong>.`;
+            // Paid Cycle Cancellation Message (Status: 'active')
+            // UPDATED MESSAGE: Clarify paid cycle cancellation
+            msg = `Your <strong>${planName}</strong> subscription is currently in a <strong>paid cycle</strong>. By confirming cancellation, your subscription will be scheduled to cancel at the end of the current billing cycle. You will retain full access until <strong>${endDateString}</strong>.`;
         }
 
         setCancellationMessage(msg);
@@ -172,12 +165,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
 
                 // Update local status based on the action flag returned by the server
                 if (action === 'immediate_mandate_end_access') {
+                    // This action typically corresponds to cancelling during the trial/authenticated phase
                     setPlanDetails(prev => ({
                         ...prev,
                         subscriptionStatus: 'trial_cancellation_pending',
                     }));
 
                 } else if (action === 'end_of_cycle') {
+                    // This action corresponds to cancelling a paid/active cycle
                     setPlanDetails(prev => ({
                         ...prev,
                         subscriptionStatus: 'cancellation_pending',
@@ -191,7 +186,8 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 showToast(response.error || 'Failed to cancel subscription due to an unknown error.', 'error');
             }
         } catch (error) {
-            // ... (Error handling remains the same) ...
+            console.error("Cancellation error:", error);
+            showToast('An unexpected error occurred during cancellation.', 'error');
         } finally {
             setShowCancelModal(false);
             setIsCancelling(false);
@@ -210,8 +206,6 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         if (!date) return 'N/A';
         return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     }
-
-    // ... (rest of helper functions: getPlanIcon, getPlanColor, etc.) ...
 
     // 4. FIX: Use standard plan IDs for icon lookup
     const getPlanIcon = (planId) => {
@@ -310,7 +304,6 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 </p>
                             </div>
                             {/* Cancel Subscription Button */}
-                            {/* 🛑 MODIFIED: Removed the check for currentPlan !== 'BASIC' */}
                             <button
                                 onClick={handlePrepareCancellation}
                                 className={`cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${isCancellationPending
@@ -434,8 +427,9 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                     className="text-sm text-red-300 font-semibold"
                                     dangerouslySetInnerHTML={{
                                         __html: isCurrentlyInTrial()
-                                            ? `The recurring payment mandate has been <strong>canceled</strong>. No further charge will occur.`
-                                            : `You will <strong>not</strong> be billed for the next cycle. Access will stop on ${formatDate(planDetails.planEndDate)}.`
+                                            // CORRECTED MODAL MESSAGE
+                                            ? `The recurring payment mandate has been <strong>canceled</strong>. Your trial access will end on ${formatDate(planDetails.planEndDate)}, and no charge will occur.`
+                                            : `You will <strong>not</strong> be billed for the next cycle. Full access will continue until the current billing cycle ends on ${formatDate(planDetails.planEndDate)}.`
                                     }}
                                 />
                             </div>
