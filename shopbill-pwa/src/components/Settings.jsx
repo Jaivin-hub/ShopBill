@@ -385,7 +385,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                     {currentUser?.role?.toLowerCase() === 'owner' && (
                         <SettingItem 
                             icon={Crown} 
-                            title="Upgrade Plan" 
+                            title="Manage Plan" 
                             description="Upgrade or change your subscription plan to unlock more features." 
                             onClick={handlePlanUpgradeClick} 
                             accentColor="text-yellow-600 dark:text-yellow-400"
