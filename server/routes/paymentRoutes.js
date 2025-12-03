@@ -110,79 +110,14 @@ router.post('/create-subscription', async (req, res) => {
  * @desc Verifies the signature and refunds the verification fee.
  * @access Public
  */
-// router.post('/verify-subscription', async (req, res) => { 
-    
-//     // 1. Extract verification data
-//     const { 
-//         razorpay_payment_id, 
-//         razorpay_signature,
-//         razorpay_subscription_id,
-//         // The plan is optional here, but kept for future logging/debugging
-//     } = req.body;
-
-//     if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
-//         return res.status(400).json({ success: false, error: 'Missing required payment verification data.' });
-//     }
-
-//     try {
-//         // --- MANDATE VERIFICATION ---
-//         const body = razorpay_payment_id + '|' + razorpay_subscription_id;
-
-//         const expectedSignature = crypto
-//             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-//             .update(body.toString())
-//             .digest('hex');
-            
-//         const isAuthentic = expectedSignature === razorpay_signature;
-
-//         if (isAuthentic) {
-            
-//             // --- 2. INSTANT REFUND LOGIC ---
-//             const refundAmount = 100; 
-//             const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
-//             const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
-            
-//             try {
-//                 const refundResponse = await axios.post(
-//                     `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/refunds`,
-//                     { amount: refundAmount },
-//                     { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
-//                 );
-//                 console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
-
-//             } catch (refundError) {
-//                 console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
-//                 // Proceed with success as the mandate is verified.
-//             }
-            
-//             // --- 3. FINAL SUCCESS RESPONSE ---
-//             res.json({
-//                 success: true,
-//                 message: 'Subscription mandate verified and refund initiated.',
-//                 transactionId: razorpay_subscription_id, // Return the subscription ID for signup
-//             });
-            
-//         } else {
-//             // FAILURE: Signature mismatch 
-//             res.status(400).json({
-//                 success: false,
-//                 error: 'Subscription mandate verification failed. Signature mismatch.',
-//             });
-//         }
-
-//     } catch (error) {
-//         console.error('Razorpay Subscription Verification Error:', error);
-//         res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
-//     }
-// });
-
 router.post('/verify-subscription', async (req, res) => { 
     
-    // ... (1. Extract verification data remains the same)
+    // 1. Extract verification data
     const { 
         razorpay_payment_id, 
         razorpay_signature,
         razorpay_subscription_id,
+        // The plan is optional here, but kept for future logging/debugging
     } = req.body;
 
     if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
@@ -190,49 +125,54 @@ router.post('/verify-subscription', async (req, res) => {
     }
 
     try {
-        // --- MANDATE VERIFICATION (remains the same) ---
-        // ... (Signature verification logic)
+        // --- MANDATE VERIFICATION ---
+        const body = razorpay_payment_id + '|' + razorpay_subscription_id;
+
+        const expectedSignature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest('hex');
             
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
             
             // --- 2. INSTANT REFUND LOGIC ---
-            const refundAmount = 100; // 100 paise = ₹1.00
+            const refundAmount = 100; 
             const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
             const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
             
             try {
-                // Ensure keyId is used as username and keySecret as password for Basic Auth
                 const refundResponse = await axios.post(
                     `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/refunds`,
                     { amount: refundAmount },
-                    { auth: { username: razorpayKeyId, password: razorpayKeySecret } } 
-                    // This is the correct setup for axios Basic Auth. 
-                    // If it is still failing, check the environment variables.
+                    { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
                 );
                 console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
 
             } catch (refundError) {
-                // Log the actual error response from Razorpay if available
-                const rzpError = refundError.response?.data?.error?.description || refundError.message;
-                console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}. RZP Error: ${rzpError}`);
+                console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
                 // Proceed with success as the mandate is verified.
             }
             
-            // --- 3. FINAL SUCCESS RESPONSE (remains the same) ---
+            // --- 3. FINAL SUCCESS RESPONSE ---
             res.json({
                 success: true,
                 message: 'Subscription mandate verified and refund initiated.',
-                transactionId: razorpay_subscription_id, 
+                transactionId: razorpay_subscription_id, // Return the subscription ID for signup
             });
             
         } else {
-            // ... (Signature mismatch logic)
+            // FAILURE: Signature mismatch 
+            res.status(400).json({
+                success: false,
+                error: 'Subscription mandate verification failed. Signature mismatch.',
+            });
         }
 
     } catch (error) {
-        // ... (Error handling remains the same)
+        console.error('Razorpay Subscription Verification Error:', error);
+        res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
     }
 });
 
