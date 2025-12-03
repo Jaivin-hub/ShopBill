@@ -315,47 +315,71 @@ router.post('/upgrade-plan', protect, async (req, res) => {
     try {
         const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
         
+        // 1A. Check if user has an old transaction ID saved (even if cancelled)
         if (!user || !user.transactionId) {
-            return res.status(404).json({ error: 'Current subscription not found for this user.' });
-        }
-        
-        const oldSubscriptionId = user.transactionId;
-        const currentPlan = user.plan;
-        
-        // --- Prevent self-downgrade/upgrade (Optional check) ---
-        if (currentPlan?.toUpperCase() === newPlan.toUpperCase()) {
-             return res.status(400).json({ error: `You are already subscribed to the ${newPlan} plan.` });
-        }
-        
-        // ---------------------------------------------------------------------
-        // 2. CANCEL OLD SUBSCRIPTION IMMEDIATELY
-        // ---------------------------------------------------------------------
+             // If they don't have a transactionId, they should use the /create-subscription route (initial signup flow).
+             // However, for robustness in the upgrade flow, we can just skip the cancellation step.
+             console.log('[PLAN CHANGE] User has no previous transaction ID. Skipping old subscription cancellation.');
+             // Set a dummy ID to proceed to creation
+             const oldSubscriptionId = 'SKIP_CANCEL';
+             
+        } else {
+             // User has a transaction ID, proceed with checking/cancelling
+             const oldSubscriptionId = user.transactionId;
+             const currentPlan = user.plan;
+             
+             // --- Prevent self-downgrade/upgrade (Optional check) ---
+             if (currentPlan?.toUpperCase() === newPlan.toUpperCase()) {
+                  return res.status(400).json({ error: `You are already subscribed to the ${newPlan} plan.` });
+             }
 
-        try {
-            // Cancel immediately. This stops future charges on the old subscription.
-            // Note: The client-side logic must handle the refund/proration manually if required.
-            await razorpay.subscriptions.cancel(oldSubscriptionId); 
-            console.log(`[SUBSCRIPTION CANCELLED] Old Subscription ${oldSubscriptionId} cancelled for plan change.`);
+             // ---------------------------------------------------------------------
+             // 2. CANCEL OLD SUBSCRIPTION CONDITIONALLY (The Fix)
+             // ---------------------------------------------------------------------
 
-            // Important: Mark the old subscription as cancelled locally
-            await User.updateOne({ _id: userId }, { 
-                $set: { 
-                    subscriptionStatus: 'cancelled_replaced', 
-                    // Do NOT update plan/planEndDate until the new mandate is verified.
-                } 
-            });
+             // 2A. Fetch the current status of the old subscription from Razorpay
+             let oldSubscription;
+             try {
+                oldSubscription = await razorpay.subscriptions.fetch(oldSubscriptionId);
+             } catch (fetchError) {
+                // If fetch fails (e.g., subscription ID not found/expired/malformed), assume it's safe to skip cancellation.
+                console.warn(`[RZP WARN - PLAN CHANGE] Failed to fetch old RZP Subscription ID: ${oldSubscriptionId}. Assuming cancelled/expired.`);
+                oldSubscription = { status: 'expired' }; 
+             }
+             
+             const oldSubscriptionStatus = oldSubscription.status; 
+             
+             // Only attempt cancellation if the subscription is active or authenticated
+             const shouldAttemptCancellation = ['active', 'authenticated', 'pending'].includes(oldSubscriptionStatus);
 
-        } catch (razorpayCancelError) {
-             console.error(`[RZP ERROR - PLAN CHANGE] Failed to cancel old RZP Subscription ID: ${oldSubscriptionId}. Error: ${razorpayCancelError.message}`);
-             // If cancellation fails, we must not proceed with the new subscription.
-             return res.status(500).json({ 
-                 error: `Failed to cancel your old plan's billing. Please try again or contact support.`,
-                 razorpayApiError: razorpayCancelError.message
+             if (shouldAttemptCancellation) {
+                 try {
+                     // Cancel immediately. This stops future charges on the old subscription.
+                     await razorpay.subscriptions.cancel(oldSubscriptionId); 
+                     console.log(`[SUBSCRIPTION CANCELLED] Old Subscription ${oldSubscriptionId} cancelled for plan change.`);
+
+                 } catch (razorpayCancelError) {
+                      // If cancellation fails, we must not proceed with the new subscription.
+                      console.error(`[RZP ERROR - PLAN CHANGE] Failed to cancel old RZP Subscription ID: ${oldSubscriptionId}. Error: ${razorpayCancelError.message}`);
+                      return res.status(500).json({ 
+                          error: `Failed to cancel your old plan's billing. Please try again or contact support.`,
+                          razorpayApiError: razorpayCancelError.message
+                      });
+                 }
+             } else {
+                 console.log(`[SUBSCRIPTION SKIP] Old Subscription ${oldSubscriptionId} is already ${oldSubscriptionStatus}. Skipping cancellation.`);
+             }
+             
+             // 2C. Mark the old subscription as cancelled locally
+             await User.updateOne({ _id: userId }, { 
+                 $set: { 
+                     subscriptionStatus: 'cancelled_replaced', 
+                 } 
              });
         }
         
         // ---------------------------------------------------------------------
-        // 3. CREATE NEW SUBSCRIPTION MANDATE
+        // 3. CREATE NEW SUBSCRIPTION MANDATE (This step is unchanged and always runs)
         // ---------------------------------------------------------------------
         
         // Use the same 30-DAY FREE TRIAL LOGIC as the initial sign-up route
@@ -379,7 +403,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             notes: {
                 plan_name: newPlan,
                 description: description,
-                change_from: currentPlan
+                change_from: user.plan // Use the plan stored in the user document
             }
         };
 
@@ -391,7 +415,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 
         res.json({
             success: true,
-            message: `Old plan (${currentPlan}) cancelled. Please complete the mandate setup for the new ${newPlan} plan.`,
+            message: `Old plan (${user.plan}) handled. Please complete the mandate setup for the new ${newPlan} plan.`,
             subscriptionId: newSubscription.id,
             currency: newSubscription.currency,
             amount: newSubscription.amount, 
