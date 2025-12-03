@@ -329,6 +329,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 
             let oldSubscription;
             try {
+                // Fetch the status of the old subscription
                 oldSubscription = await razorpay.subscriptions.fetch(oldSubscriptionId);
             } catch (fetchError) {
                 console.warn(`[RZP WARN - PLAN CHANGE] Failed to fetch old RZP Subscription ID: ${oldSubscriptionId}. Assuming cancelled/expired. Error: ${fetchError.message}`);
@@ -336,6 +337,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             }
 
             const oldSubscriptionStatus = oldSubscription.status;
+            // Only attempt cancellation if the subscription is still active or pending authentication
             const shouldAttemptCancellation = ['active', 'authenticated', 'pending'].includes(oldSubscriptionStatus);
 
             if (shouldAttemptCancellation) {
@@ -366,23 +368,23 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         }
 
         // ---------------------------------------------------------------------
-        // 3. CREATE NEW SUBSCRIPTION MANDATE (NO TRIAL PERIOD)
+        // 3. CREATE NEW SUBSCRIPTION MANDATE (₹1 VERIFICATION FEE)
         // ---------------------------------------------------------------------
 
-        // The 'start_at' field is intentionally omitted to make the subscription start immediately upon payment/authentication.
         const subscriptionOptions = {
             plan_id: plan_id,
             customer_notify: 1,
             total_count: 1200,
+            
+            // FIX: Set the initial payment amount to 100 paise (₹1.00). 
+            // This overrides the plan's price for the first payment, ensuring 
+            // only the mandate verification fee is charged initially.
+            amount: 100, // 100 paise = ₹1.00
 
-            // Add a small ₹1 charge for mandate setup verification
-            addons: [{
-                item: {
-                    name: 'Verification Charge',
-                    amount: 100, // 100 paise = ₹1.00
-                    currency: 'INR'
-                }
-            }],
+            // The 'addons' section for the ₹1 verification charge has been removed, 
+            // as setting 'amount: 100' is the standard way to handle the first payment 
+            // being only the verification fee.
+
             notes: {
                 plan_name: newPlan,
                 description: description,
@@ -393,7 +395,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         const newSubscription = await razorpay.subscriptions.create(subscriptionOptions);
 
         // ---------------------------------------------------------------------
-        // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE (FIX FOR DATA PERSISTENCE)
+        // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE
         // ---------------------------------------------------------------------
 
         // CRITICAL FIX: Save the new Subscription ID to a temporary field for the verification route to find the user
@@ -409,7 +411,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             message: `Old plan (${user?.plan || 'NONE'}) handled. Please complete the mandate setup for the new ${newPlan} plan.`,
             subscriptionId: newSubscription.id,
             currency: newSubscription.currency,
-            amount: newSubscription.amount,
+            amount: newSubscription.amount, // This will be 100 (₹1) for the first charge
             keyId: process.env.RAZORPAY_KEY_ID,
         });
 
