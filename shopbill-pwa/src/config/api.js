@@ -49,7 +49,9 @@ const API = {
     // Payment Routes
     createSubscription: API_BASE_URL + '/payment/create-subscription', // POST (Creates a recurring subscription mandate)
     verifySubscription: API_BASE_URL + '/payment/verify-subscription', // POST (Verifies the mandate setup signature)
-    cancelSubscription: API_BASE_URL + '/payment/cancel-subscription' // POST (Cancels the active subscription)
+    cancelSubscription: API_BASE_URL + '/payment/cancel-subscription', // POST (Cancels the active subscription)
+    upgradePlan: API_BASE_URL + '/payment/upgrade-plan', // POST (Cancels old, creates new mandate)
+    verifyPlanChange: API_BASE_URL + '/payment/verify-plan-change' // POST (Verifies new mandate and updates user)
     // ------------------------------------------
 }
 

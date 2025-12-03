@@ -1,5 +1,3 @@
-// PlanUpgrade.jsx (Full file with button alignment and recommended logic fixes)
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     ArrowLeft, CheckCircle, Crown, Zap, Building2,
@@ -38,6 +36,17 @@ const DEMO_PLANS = [
     }
 ];
 
+// Helper to dynamically load the Razorpay script
+const loadRazorpayScript = (src) => {
+    return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
+};
+
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     const [currentPlan, setCurrentPlan] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
@@ -58,6 +67,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         setIsLoading(true);
 
         try {
+            // NOTE: API.currentPlan should ideally fetch the full plan details including RZP status.
             const planResponse = await apiClient.get(API.currentPlan);
 
             const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || 'BASIC';
@@ -95,6 +105,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         return currentPlan?.toLowerCase() === plan.id && !isExpiring;
     };
 
+    const isUpgrade = (plan) => {
+        const planOrder = { basic: 1, pro: 2, premium: 3 };
+        const currentOrder = planOrder[currentPlan?.toLowerCase()] || 0;
+        const planOrderValue = planOrder[plan.id] || 0;
+
+        return planOrderValue > currentOrder;
+    };
+
     const handleUpgradeClick = (plan) => {
         if (isCurrentPlanNotExpiring(plan) && plan.id === currentPlan?.toLowerCase()) {
             showToast('This is your current plan.', 'info');
@@ -103,6 +121,114 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         setSelectedPlan(plan);
         setShowConfirmModal(true);
     };
+
+    // ---------------------------------------------------------------------
+    // --- RAZORPAY & UPGRADE/DOWNGRADE LOGIC ---
+    // ---------------------------------------------------------------------
+
+    const handleVerifyPlanChange = async (response, newPlan) => {
+        setIsUpgrading(true);
+        setShowConfirmModal(false);
+        try {
+            const verificationResponse = await apiClient.post(API.verifyPlanChange, {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                newPlan: newPlan.toUpperCase(),
+            });
+
+            if (verificationResponse.data.success) {
+                // Update local state after successful verification
+                const trialEndDate = new Date();
+                trialEndDate.setDate(trialEndDate.getDate() + 30);
+                
+                setCurrentPlan(newPlan.toUpperCase());
+                setPlanDetails({
+                    planEndDate: trialEndDate,
+                    subscriptionStatus: 'authenticated',
+                });
+                
+                showToast(`Successfully switched to ${newPlan.toUpperCase()}! You are now on a 30-day trial.`, 'success');
+                
+            } else {
+                showToast(verificationResponse.data.error || 'Plan change verification failed.', 'error');
+            }
+        } catch (error) {
+            console.error("Verification error after plan change:", error);
+            showToast('An unexpected error occurred during verification. Please contact support.', 'error');
+        } finally {
+            setIsUpgrading(false);
+            fetchPlanData(); // Re-fetch data to ensure all UI is consistent
+        }
+    };
+
+    const startUpgradeFlow = async (newPlan) => {
+        setIsUpgrading(true);
+        setShowConfirmModal(false);
+
+        // 1. Load Razorpay script
+        const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
+        if (!res) {
+            showToast('Razorpay SDK failed to load. Are you offline?', 'error');
+            setIsUpgrading(false);
+            return;
+        }
+
+        try {
+            // 2. Call server to cancel old plan and create new mandate
+            const serverResponse = await apiClient.post(API.upgradePlan, {
+                newPlan: newPlan.id.toUpperCase(),
+            });
+            
+            if (!serverResponse.data.success) {
+                showToast(serverResponse.data.error || 'Failed to initiate plan change.', 'error');
+                setIsUpgrading(false);
+                return;
+            }
+
+            const { subscriptionId, amount, currency, keyId } = serverResponse.data;
+            
+            // 3. Configure and open Razorpay modal for new mandate authentication
+            const options = {
+                key: keyId, 
+                amount: amount, 
+                currency: currency,
+                name: "Pocket POS Plan Upgrade",
+                description: `Mandate verification for ${newPlan.name} Plan`,
+                subscription_id: subscriptionId,
+                handler: function (response) {
+                    // Success callback: Mandate authenticated
+                    handleVerifyPlanChange(response, newPlan.id);
+                },
+                modal: {
+                    ondismiss: function () {
+                        // User closed the modal
+                        showToast('Plan change canceled by user.', 'info');
+                        setIsUpgrading(false);
+                    }
+                },
+                prefill: {
+                    name: currentUser?.name || "Customer",
+                    email: currentUser?.email || "",
+                },
+                theme: {
+                    color: "#4f46e5" // Indigo color
+                }
+            };
+
+            const rzp1 = new window.Razorpay(options);
+            rzp1.open();
+
+        } catch (error) {
+            console.error("Upgrade/Downgrade initiation error:", error);
+            showToast('An unexpected error occurred during plan change initiation.', 'error');
+            setIsUpgrading(false);
+        }
+    };
+
+    // ---------------------------------------------------------------------
+    // --- CANCELLATION LOGIC (UNCHANGED) ---
+    // ---------------------------------------------------------------------
 
     const isCurrentlyInTrial = () => {
         const isFutureDate = planDetails.planEndDate && planDetails.planEndDate > new Date();
@@ -234,15 +360,6 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         }
     };
 
-    const isUpgrade = (plan) => {
-        const planOrder = { basic: 1, pro: 2, premium: 3 };
-        const currentOrder = planOrder[currentPlan?.toLowerCase()] || 0;
-        const planOrderValue = planOrder[plan.id] || 0;
-
-        return planOrderValue > currentOrder;
-    };
-
-
     if (isLoading || currentPlan === null) {
         return (
             <div className="min-h-screen p-4 pb-20 md:p-8 bg-gray-100 dark:bg-gray-950">
@@ -255,7 +372,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
     }
 
     const isPlanExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() && 
-                           !['active', 'authenticated'].includes(planDetails.subscriptionStatus);
+                           !['active', 'authenticated', 'cancelled_replaced'].includes(planDetails.subscriptionStatus);
     
     const isCancellationPending = isPlanExpiring;
     
@@ -326,25 +443,24 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                     // Determine button text
                     const buttonText = isCurrent
                         ? 'Current Plan'
-                        : (currentPlan?.toLowerCase() === plan.id)
+                        : (currentPlan?.toLowerCase() === plan.id) 
                             ? 'Re-subscribe'
                             : isUpgradePlan
                                 ? 'Upgrade Now'
-                                : 'Switch Plan';
+                                : 'Downgrade Now'; 
 
-                    // 🔥 FIX 1: Show Recommended badge only for PREMIUM
+                    // Show Recommended badge only for PREMIUM
                     const showRecommended = plan.id === 'premium';
                     
-                    // Determine if the button should be disabled (only if it's the current, active, non-expiring plan)
+                    // Determine if the button should be disabled (only if it's the current, active, non-expiring plan or during operation)
                     const buttonDisabled = isCurrent || isUpgrading || isCancelling;
 
 
                     return (
-                        // 🔥 FIX 2: Added flex-col to enable button alignment at the bottom
                         <div
                             key={plan.id}
                             className={`relative bg-gray-800/50 rounded-xl p-6 border-2 transition-all duration-300 flex flex-col ${isCurrent
-                                ? 'border-indigo-500 shadow-lg shadow-indigo-500/20' // Highlight only if truly active
+                                ? 'border-indigo-500 shadow-lg shadow-indigo-500/20' 
                                 : 'border-gray-700/50 hover:border-gray-600'
                                 }`}
                         >
@@ -409,7 +525,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                     ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                                     : (isUpgradePlan || currentPlan?.toLowerCase() === plan.id)
                                         ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
-                                        : 'bg-gray-700 hover:bg-gray-600 text-white cursor-pointer'
+                                        : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
                                     }`}
                             >
                                 {buttonText}
@@ -419,7 +535,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 })}
             </div>
 
-            {/* Confirmation Modal (Upgrade/Switch - Unchanged) */}
+            {/* Confirmation Modal (Upgrade/Switch) */}
             {showConfirmModal && selectedPlan && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
@@ -431,13 +547,17 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                         </div>
                         <div className="p-6">
                             <p className="text-gray-300 mb-4">
-                                You are about to {currentPlan?.toLowerCase() === selectedPlan.id ? 're-subscribe' : 'upgrade'} to the 
+                                You are about to {isUpgrade(selectedPlan) ? 'upgrade' : 'downgrade'} to the 
                                 <strong> {selectedPlan.name}</strong> plan for 
                                 <strong> {formatCurrency(selectedPlan.price)}/month</strong>.
                             </p>
-                            <p className="text-sm text-gray-400">
-                                This action will initiate the necessary payment process through the Razorpay gateway.
-                            </p>
+                            <div className="bg-blue-700/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+                                <IndianRupee className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                                <p className="text-sm text-blue-300">
+                                    Your current subscription will be canceled immediately, and you will set up a new 
+                                    mandate for the new plan, which includes a <strong>new 30-day free trial</strong>. A ₹1 verification fee applies.
+                                </p>
+                            </div>
                         </div>
                         <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
                             <button
@@ -448,19 +568,28 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 Cancel
                             </button>
                             <button
-                                onClick={() => { /* In a real app, this would trigger the RZP payment flow */ setShowConfirmModal(false); showToast(`Simulating subscription to ${selectedPlan.name}...`, 'info'); }}
+                                onClick={() => startUpgradeFlow(selectedPlan)}
                                 disabled={isUpgrading}
                                 className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                             >
-                                <CreditCard className="w-4 h-4" />
-                                {isUpgrading ? 'Processing...' : 'Proceed to Payment'}
+                                {isUpgrading ? (
+                                    <>
+                                        <Loader className="w-4 h-4 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CreditCard className="w-4 h-4" />
+                                        Proceed to Mandate Setup
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Cancellation Confirmation Modal */}
+            {/* Cancellation Confirmation Modal (Unchanged) */}
             {showCancelModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
@@ -477,7 +606,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                                 <p
                                     className="text-sm text-red-300 font-semibold"
-                                    dangerouslySetInnerHTML={{
+                                    dangeriouslySetInnerHTML={{
                                         __html: isCurrentlyInTrial()
                                             ? `The recurring payment mandate has been <strong>canceled</strong>. Your trial access will end on ${formatDate(planDetails.planEndDate)}, and no charge will occur.`
                                             : `The subscription has been cancelled. Full access will continue until the current billing cycle ends on <strong>${formatDate(planDetails.planEndDate)}</strong>.`

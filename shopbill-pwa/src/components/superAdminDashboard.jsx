@@ -7,85 +7,6 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 
-// Generate dummy data for super admin dashboard (Updated to include totalPlanRevenue)
-const generateDummyDashboardData = () => {
-    const now = new Date();
-    
-    // POS revenue data (in INR)
-    const totalSalesRevenue = 105000000 + Math.random() * 42000000; // ~1.05-1.47 Cr
-    const monthlySalesRevenue = 12180000 + Math.random() * 4200000; // ~1.22-1.64 Cr
-    const lastMonthRevenue = 11088000 + Math.random() * 3360000; // ~1.11-1.44 Cr
-    const revenueGrowth = ((monthlySalesRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
-    
-    // Plan Revenue (Dynamic from our backend logic)
-    const totalPlanRevenue = 841544; // Example subscription revenue
-    const totalLifetimePlanRevenue = 8415440 + Math.random() * 2000000; // Example total subscription revenue
-    
-    // Generate shop statistics
-    const totalShops = 156;
-    const activeShops = 142;
-    const newShopsThisMonth = 12;
-    const shopsGrowth = (newShopsThisMonth / Math.max(totalShops - newShopsThisMonth, 1)) * 100;
-    
-    // Generate user statistics
-    const totalUsers = 1245;
-    const activeUsers = 1180;
-    const newUsersThisMonth = 45;
-    
-    // Generate plan distribution (in INR)
-    const planDistribution = {
-        basic: { count: 89, revenue: 222611, percentage: 57 },
-        pro: { count: 52, revenue: 363948, percentage: 33 },
-        premium: { count: 15, revenue: 254985, percentage: 10 }
-    };
-    
-    // Generate payment status
-    const paymentStatus = {
-        paid: 98,
-        pending: 28,
-        failed: 12,
-        overdue: 4
-    };
-    
-    // Generate recent activity
-    const recentActivity = [
-        { type: 'shop_created', shop: 'ABC Store', time: new Date(now.getTime() - 2 * 60 * 60 * 1000), status: 'success' },
-        { type: 'payment_received', shop: 'XYZ Mart', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
-        { type: 'shop_suspended', shop: 'DEF Shop', time: new Date(now.getTime() - 8 * 60 * 60 * 1000), status: 'warning' },
-        { type: 'payment_failed', shop: 'GHI Store', amount: 2499, time: new Date(now.getTime() - 12 * 60 * 60 * 1000), status: 'error' },
-        { type: 'plan_upgraded', shop: 'JKL Mart', from: 'Basic', to: 'Pro', time: new Date(now.getTime() - 15 * 60 * 60 * 1000), status: 'success' },
-    ];
-    
-    // Generate monthly revenue trend (last 6 months) in INR
-    const monthlyTrend = [];
-    for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        monthlyTrend.push({
-            month: date.toLocaleDateString('en-US', { month: 'short' }),
-            revenue: 10080000 + Math.random() * 3360000, // ~1-1.34 Cr
-        });
-    }
-    
-    return {
-        totalSalesRevenue,
-        monthlySalesRevenue,
-        revenueGrowth,
-        totalPlanRevenue,
-        totalLifetimePlanRevenue, // Added total subscription revenue
-        totalShops,
-        activeShops,
-        newShopsThisMonth,
-        shopsGrowth,
-        totalUsers,
-        activeUsers,
-        newUsersThisMonth,
-        planDistribution,
-        paymentStatus,
-        recentActivity,
-        monthlyTrend,
-    };
-};
-
 // Stat Card Component
 const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, subtitle }) => {
     const colorClasses = {
@@ -205,8 +126,6 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
             // Fallback to dummy data on error
-            const data = generateDummyDashboardData();
-            setDashboardData(data);
             if (typeof showToast === 'function') showToast('Using dummy data. API connection failed.', 'warning');
         } finally {
             setIsLoading(false);

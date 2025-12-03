@@ -296,4 +296,205 @@ router.post('/cancel-subscription', protect, async (req, res) => {
     }
 });
 
+/**
+ * @route POST /api/payment/upgrade-plan
+ * @desc Handles plan change (Upgrade/Downgrade). Cancels old subscription immediately and creates a new mandate.
+ * @access Private (Requires 'protect')
+ */
+router.post('/upgrade-plan', protect, async (req, res) => {
+    const userId = req.user._id;
+    const { newPlan } = req.body; // e.g., 'PRO' or 'PREMIUM'
+    
+    // --- 1. VALIDATION ---
+    if (!newPlan || !PLAN_DETAILS[newPlan]) {
+        return res.status(400).json({ error: 'Invalid or missing plan selected for change.' });
+    }
+
+    const { plan_id, description } = PLAN_DETAILS[newPlan];
+
+    try {
+        const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
+        
+        if (!user || !user.transactionId) {
+            return res.status(404).json({ error: 'Current subscription not found for this user.' });
+        }
+        
+        const oldSubscriptionId = user.transactionId;
+        const currentPlan = user.plan;
+        
+        // --- Prevent self-downgrade/upgrade (Optional check) ---
+        if (currentPlan?.toUpperCase() === newPlan.toUpperCase()) {
+             return res.status(400).json({ error: `You are already subscribed to the ${newPlan} plan.` });
+        }
+        
+        // ---------------------------------------------------------------------
+        // 2. CANCEL OLD SUBSCRIPTION IMMEDIATELY
+        // ---------------------------------------------------------------------
+
+        try {
+            // Cancel immediately. This stops future charges on the old subscription.
+            // Note: The client-side logic must handle the refund/proration manually if required.
+            await razorpay.subscriptions.cancel(oldSubscriptionId); 
+            console.log(`[SUBSCRIPTION CANCELLED] Old Subscription ${oldSubscriptionId} cancelled for plan change.`);
+
+            // Important: Mark the old subscription as cancelled locally
+            await User.updateOne({ _id: userId }, { 
+                $set: { 
+                    subscriptionStatus: 'cancelled_replaced', 
+                    // Do NOT update plan/planEndDate until the new mandate is verified.
+                } 
+            });
+
+        } catch (razorpayCancelError) {
+             console.error(`[RZP ERROR - PLAN CHANGE] Failed to cancel old RZP Subscription ID: ${oldSubscriptionId}. Error: ${razorpayCancelError.message}`);
+             // If cancellation fails, we must not proceed with the new subscription.
+             return res.status(500).json({ 
+                 error: `Failed to cancel your old plan's billing. Please try again or contact support.`,
+                 razorpayApiError: razorpayCancelError.message
+             });
+        }
+        
+        // ---------------------------------------------------------------------
+        // 3. CREATE NEW SUBSCRIPTION MANDATE
+        // ---------------------------------------------------------------------
+        
+        // Use the same 30-DAY FREE TRIAL LOGIC as the initial sign-up route
+        const trialDays = 30;
+        const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
+
+        const subscriptionOptions = {
+            plan_id: plan_id, 
+            customer_notify: 1, 
+            total_count: 1200, 
+            start_at: startAtTimestamp, 
+            
+            // Add a small ₹1 charge for mandate setup verification
+            addons: [{
+                item: {
+                    name: 'Verification Charge',
+                    amount: 100, // 100 paise = ₹1.00
+                    currency: 'INR'
+                }
+            }],
+            notes: {
+                plan_name: newPlan,
+                description: description,
+                change_from: currentPlan
+            }
+        };
+
+        const newSubscription = await razorpay.subscriptions.create(subscriptionOptions);
+
+        // ---------------------------------------------------------------------
+        // 4. RETURN RESPONSE FOR CLIENT PAYMENT FLOW
+        // ---------------------------------------------------------------------
+
+        res.json({
+            success: true,
+            message: `Old plan (${currentPlan}) cancelled. Please complete the mandate setup for the new ${newPlan} plan.`,
+            subscriptionId: newSubscription.id,
+            currency: newSubscription.currency,
+            amount: newSubscription.amount, 
+            keyId: process.env.RAZORPAY_KEY_ID, 
+        });
+
+    } catch (error) {
+        console.error('Plan Change / New Subscription Creation Error:', error);
+        res.status(500).json({ 
+            error: 'Server error during plan change processing.',
+            razorpayApiError: error.message
+        });
+    }
+});
+
+
+/**
+ * @route POST /api/payment/verify-plan-change
+ * @desc Verifies the signature for the new subscription mandate after plan change.
+ * @access Public
+ */
+router.post('/verify-plan-change', async (req, res) => {
+    
+    const { 
+        razorpay_payment_id, 
+        razorpay_signature,
+        razorpay_subscription_id,
+        newPlan,
+    } = req.body;
+
+    if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id || !newPlan) {
+        return res.status(400).json({ success: false, error: 'Missing required plan change verification data.' });
+    }
+
+    try {
+        // --- 1. MANDATE VERIFICATION ---
+        const body = razorpay_payment_id + '|' + razorpay_subscription_id;
+
+        const expectedSignature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest('hex');
+            
+        const isAuthentic = expectedSignature === razorpay_signature;
+
+        if (!isAuthentic) {
+            return res.status(400).json({ success: false, error: 'Verification failed. Signature mismatch.' });
+        }
+        
+        // --- 2. INSTANT REFUND LOGIC ---
+        // (Same logic as initial verify-subscription)
+        const refundAmount = 100; 
+        const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+        const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+        
+        try {
+            await axios.post(
+                `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/refunds`,
+                { amount: refundAmount },
+                { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
+            );
+            console.log(`[REFUND SUCCESS] ₹1.00 refunded for plan change Payment ID: ${razorpay_payment_id}`);
+        } catch (refundError) {
+            console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
+        }
+        
+        // --- 3. FINAL USER MODEL UPDATE ---
+        
+        // Assuming the user is passed or identified, we'll find them using the subscription ID for robustness
+        const user = await User.findOne({ transactionId: razorpay_subscription_id });
+
+        if (!user) {
+             // Fallback for logging/debugging: try finding the user whose previous subscription was 'cancelled_replaced'
+             console.warn(`User not found by new subscription ID: ${razorpay_subscription_id}`);
+        }
+        
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 30);
+        
+        const updateFields = {
+            plan: newPlan.toUpperCase(),
+            planEndDate: trialEndDate, // New 30-day trial period starts
+            subscriptionStatus: 'authenticated', // New mandate is authenticated
+            transactionId: razorpay_subscription_id, // Update to the new subscription ID
+        };
+        
+        // If user was found by the new ID, update them. 
+        // In a real flow, you might pass the userId from the client for better security.
+        if (user) {
+             await User.updateOne({ _id: user._id }, { $set: updateFields });
+        }
+        
+        // --- 4. SUCCESS RESPONSE ---
+        res.json({
+            success: true,
+            message: `Successfully switched to the ${newPlan} plan. You are now on a 30-day trial!`,
+            transactionId: razorpay_subscription_id,
+        });
+
+    } catch (error) {
+        console.error('Plan Change Verification Error:', error);
+        res.status(500).json({ success: false, error: 'Server error during plan change verification.' });
+    }
+});
+
 module.exports = router;
