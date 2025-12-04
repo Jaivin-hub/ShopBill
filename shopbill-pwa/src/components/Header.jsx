@@ -25,19 +25,19 @@ const Header = ({
     // 2. Function to fetch the current alert count (memoized with useCallback)
     const fetchAlertCount = useCallback(async () => {
         // Prevent concurrent requests if the previous one is still running
-        if (isFetching) return; 
+        // if (isFetching) return; 
         
-        setIsFetching(true);
-        try {
-            // Use the API client to call the notification endpoint
-            const response = await apiClient.get(API.notificationalert);
-            setNotificationCount(response.data.count || 0);
-        } catch (error) {
-            console.error("Failed to fetch notification count:", error);
-            // Gracefully fail: keep count at 0
-        } finally {
-            setIsFetching(false);
-        }
+        // setIsFetching(true);
+        // try {
+        //     // Use the API client to call the notification endpoint
+        //     const response = await apiClient.get(API.notificationalert);
+        //     setNotificationCount(response.data.count || 0);
+        // } catch (error) {
+        //     console.error("Failed to fetch notification count:", error);
+        //     // Gracefully fail: keep count at 0
+        // } finally {
+        //     setIsFetching(false);
+        // }
     // Dependency array ensures this function is only recreated if these dependencies change
     }, [apiClient, API.notificationalert]); 
 

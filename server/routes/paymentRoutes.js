@@ -298,30 +298,35 @@ router.post('/cancel-subscription', protect, async (req, res) => {
 
 /**
  * @route POST /api/payment/upgrade-plan
- * @desc Handles plan change (Upgrade/Downgrade). Cancels old subscription immediately and creates a new mandate.
+ * @desc Handles plan change (Upgrade/Downgrade/Re-subscribe). Cancels old subscription immediately and creates a new mandate.
  * @access Private (Requires 'protect')
  */
 router.post('/upgrade-plan', protect, async (req, res) => {
     const userId = req.user._id;
     const { newPlan } = req.body; // e.g., 'PRO' or 'PREMIUM'
-    const currentPlan = req.user.plan; // Access current plan from req.user if populated by protect middleware
+
+    // Fetch user with current plan and status for robust checks
+    const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
+    const currentPlan = user.plan;
+    const currentStatus = user.subscriptionStatus;
 
     // --- 1. VALIDATION ---
     if (!newPlan || !PLAN_DETAILS[newPlan]) {
         return res.status(400).json({ error: 'Invalid or missing plan selected for change.' });
     }
-    if (currentPlan?.toUpperCase() === newPlan.toUpperCase()) {
-        return res.status(400).json({ error: `You are already subscribed to the ${newPlan} plan.` });
+
+    // ⭐ FIX 1: Allow re-subscription if the user is selecting the same plan AND it is already cancelled/expired
+    const isSamePlan = currentPlan?.toUpperCase() === newPlan.toUpperCase();
+    const isTerminalStatus = ['cancelled', 'expired', 'cancellation_no_refund', 'cancellation_pending', 'trial_cancellation_pending', 'cancelled_replaced'].includes(currentStatus);
+
+    if (isSamePlan && !isTerminalStatus) {
+        return res.status(400).json({ error: `You are currently active on the ${newPlan} plan.` });
     }
 
     const { plan_id, description } = PLAN_DETAILS[newPlan];
+    const oldSubscriptionId = user?.transactionId;
 
     try {
-        // Fetch the necessary user details including the old transactionId
-        const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
-        const oldSubscriptionId = user?.transactionId;
-
-
         if (oldSubscriptionId) {
             // ---------------------------------------------------------------------
             // 2. CANCEL OLD SUBSCRIPTION
@@ -376,14 +381,8 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             customer_notify: 1,
             total_count: 1200,
             
-            // FIX: Set the initial payment amount to 100 paise (₹1.00). 
-            // This overrides the plan's price for the first payment, ensuring 
-            // only the mandate verification fee is charged initially.
-            amount: 100, // 100 paise = ₹1.00
-
-            // The 'addons' section for the ₹1 verification charge has been removed, 
-            // as setting 'amount: 100' is the standard way to handle the first payment 
-            // being only the verification fee.
+            // Set the initial payment amount to 100 paise (₹1.00) for mandate verification
+            amount: 100, 
 
             notes: {
                 plan_name: newPlan,
@@ -398,7 +397,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE
         // ---------------------------------------------------------------------
 
-        // CRITICAL FIX: Save the new Subscription ID to a temporary field for the verification route to find the user
+        // Save the new Subscription ID to a temporary field for the verification route to find the user
         await User.updateOne({ _id: userId }, {
             $set: {
                 pendingTransactionId: newSubscription.id
@@ -472,7 +471,7 @@ router.post('/verify-plan-change', async (req, res) => {
         
         // --- 3. FINAL USER MODEL UPDATE (FIXED LOGIC) ---
 
-        // CRITICAL FIX: Find the user based on the temporary field set in /upgrade-plan
+        // Find the user based on the temporary field set in /upgrade-plan
         const userToUpdate = await User.findOne({ 
             pendingTransactionId: razorpay_subscription_id 
         });
@@ -482,14 +481,14 @@ router.post('/verify-plan-change', async (req, res) => {
              return res.status(404).json({ success: false, error: 'Could not find user for plan verification. Please contact support.' });
         }
 
-        // New plan starts immediately. Set planEndDate 30 days from now
-        // to represent the end of the first billing cycle.
-        const newPlanEndDate = new Date();
-        newPlanEndDate.setDate(newPlanEndDate.getDate() + 30); 
+        // ⭐ FIX 2: Remove the 30-day trial logic for plan changes. The plan starts immediately, 
+        // and the next charge date is set 30 days from now (end of the first month).
+        const nextBillingDate = new Date();
+        nextBillingDate.setDate(nextBillingDate.getDate() + 30); 
 
         const updateFields = {
             plan: newPlan.toUpperCase(),
-            planEndDate: newPlanEndDate, // New cycle end date
+            planEndDate: nextBillingDate, // New cycle end date (30 days from now)
             subscriptionStatus: 'active', // New mandate is authenticated and active
             transactionId: razorpay_subscription_id, // Update to the new subscription ID
         };
@@ -503,7 +502,8 @@ router.post('/verify-plan-change', async (req, res) => {
         // --- 4. SUCCESS RESPONSE ---
         res.json({
             success: true,
-            message: `Successfully switched to the ${newPlan} plan. Your new plan starts immediately!`,
+            // Updated message to reflect immediate start without trial
+            message: `Successfully switched to the ${newPlan} plan. Your new plan starts immediately! Your first full charge is scheduled for ${nextBillingDate.toLocaleDateString('en-IN')}.`,
             transactionId: razorpay_subscription_id,
         });
 

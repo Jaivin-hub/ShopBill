@@ -536,9 +536,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                 (Verification Charge)
                                             </span>
                                         </div>
-                                        <p className="text-xs text-white/70 mt-1">
+                                        {/* <p className="text-xs text-white/70 mt-1">
                                             This amount is <strong>instantly refunded</strong> after successful card verification.
-                                        </p>
+                                        </p> */}
                                     </div>
 
                                     {/* Section 2: Full Plan Charge (Trial Information) */}
