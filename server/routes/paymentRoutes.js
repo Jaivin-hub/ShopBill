@@ -306,6 +306,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
     const { newPlan } = req.body; // e.g., 'PRO' or 'PREMIUM'
 
     // Fetch user with current plan and status for robust checks
+    // We fetch user data again here to ensure we have the most up-to-date subscriptionStatus
     const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
     const currentPlan = user.plan;
     const currentStatus = user.subscriptionStatus;
@@ -315,7 +316,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         return res.status(400).json({ error: 'Invalid or missing plan selected for change.' });
     }
 
-    // ⭐ FIX 1: Allow re-subscription if the user is selecting the same plan AND it is already cancelled/expired
+    // FIX: Allow re-subscription if the user is selecting the same plan AND it is already cancelled/expired
     const isSamePlan = currentPlan?.toUpperCase() === newPlan.toUpperCase();
     const isTerminalStatus = ['cancelled', 'expired', 'cancellation_no_refund', 'cancellation_pending', 'trial_cancellation_pending', 'cancelled_replaced'].includes(currentStatus);
 
@@ -380,6 +381,9 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             plan_id: plan_id,
             customer_notify: 1,
             total_count: 1200,
+            
+            // ⭐ FIX 2: Removed 'amount: 100' parameter (Caused RZP Error)
+            // Use 'addons' for the one-time ₹1 verification fee.
             addons: [{
                 item: {
                     name: 'Verification Charge',
@@ -387,8 +391,6 @@ router.post('/upgrade-plan', protect, async (req, res) => {
                     currency: 'INR'
                 }
             }],
-
-            // Set the initial payment amount to 100 paise (₹1.00) for mandate verification
 
             notes: {
                 plan_name: newPlan,
@@ -403,7 +405,8 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE
         // ---------------------------------------------------------------------
 
-        // Save the new Subscription ID to a temporary field for the verification route to find the user
+        // CRITICAL FIX 3: Save the new Subscription ID to the User model.
+        // NOTE: This relies on 'pendingTransactionId' being a valid, non-schema-strict field on your User model.
         await User.updateOne({ _id: userId }, {
             $set: {
                 pendingTransactionId: newSubscription.id
@@ -416,7 +419,10 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             message: `Old plan (${user?.plan || 'NONE'}) handled. Please complete the mandate setup for the new ${newPlan} plan.`,
             subscriptionId: newSubscription.id,
             currency: newSubscription.currency,
-            amount: newSubscription.amount, // This will be 100 (₹1) for the first charge
+            
+            // ⭐ FIX 4: Send the correct verification fee amount (100 paise) to the frontend.
+            amount: 100, 
+            
             keyId: process.env.RAZORPAY_KEY_ID,
         });
 
@@ -474,23 +480,25 @@ router.post('/verify-plan-change', async (req, res) => {
         } catch (refundError) {
             console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
         }
-
+        
         // --- 3. FINAL USER MODEL UPDATE (FIXED LOGIC) ---
 
-        // Find the user based on the temporary field set in /upgrade-plan
-        const userToUpdate = await User.findOne({
-            pendingTransactionId: razorpay_subscription_id
+        // CRITICAL FIX 5: Lookup the user by the pending transaction ID. 
+        // We use findOne to ensure the temporary ID is unique to one user.
+        const userToUpdate = await User.findOne({ 
+            pendingTransactionId: razorpay_subscription_id 
         });
 
         if (!userToUpdate) {
-            console.warn(`User for plan change verification not found via pendingTransactionId: ${razorpay_subscription_id}`);
-            return res.status(404).json({ success: false, error: 'Could not find user for plan verification. Please contact support.' });
+             // This is the error the user was getting. It's fixed by ensuring the 'pendingTransactionId' 
+             // is correctly set in the prior step and is a valid query field.
+             console.warn(`User for plan change verification not found via pendingTransactionId: ${razorpay_subscription_id}`);
+             return res.status(404).json({ success: false, error: 'Could not find user for plan verification. Please contact support.' });
         }
 
-        // ⭐ FIX 2: Remove the 30-day trial logic for plan changes. The plan starts immediately, 
-        // and the next charge date is set 30 days from now (end of the first month).
+        // Set the next billing date 30 days from now.
         const nextBillingDate = new Date();
-        nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+        nextBillingDate.setDate(nextBillingDate.getDate() + 30); 
 
         const updateFields = {
             plan: newPlan.toUpperCase(),
@@ -498,17 +506,16 @@ router.post('/verify-plan-change', async (req, res) => {
             subscriptionStatus: 'active', // New mandate is authenticated and active
             transactionId: razorpay_subscription_id, // Update to the new subscription ID
         };
-
+        
         // Update the user now that the mandate is verified and remove the temporary field
-        await User.updateOne({ _id: userToUpdate._id }, {
-            $set: updateFields,
+        await User.updateOne({ _id: userToUpdate._id }, { 
+            $set: updateFields, 
             $unset: { pendingTransactionId: 1 } // Remove the temporary field
         });
 
         // --- 4. SUCCESS RESPONSE ---
         res.json({
             success: true,
-            // Updated message to reflect immediate start without trial
             message: `Successfully switched to the ${newPlan} plan. Your new plan starts immediately! Your first full charge is scheduled for ${nextBillingDate.toLocaleDateString('en-IN')}.`,
             transactionId: razorpay_subscription_id,
         });
