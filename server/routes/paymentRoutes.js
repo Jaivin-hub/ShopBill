@@ -447,6 +447,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 * @access Public
 */
 router.post('/verify-plan-change', async (req, res) => {
+    console.log('consoling')
     const {
         razorpay_payment_id,
         razorpay_signature,
