@@ -1,4 +1,4 @@
-// models/User.js (Full code with the new field)
+// models/User.js (Final Code: No pendingTransactionId field needed)
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -17,14 +17,12 @@ const UserSchema = new mongoose.Schema({
         required: true 
     }, 
     
-    // === NEW FIELD FOR SHOP NAME ===
     shopName: { 
         type: String, 
-        required: function() { return this.role === 'owner'; }, // Required only for owners
-        unique: function() { return this.role === 'owner'; }, // Shop name must be unique across all owners
+        required: function() { return this.role === 'owner'; },
+        unique: function() { return this.role === 'owner'; },
         trim: true 
     },
-    // ===============================
     
     isActive: { 
         type: Boolean, 
@@ -35,12 +33,14 @@ const UserSchema = new mongoose.Schema({
     resetPasswordExpire: Date,
     
     plan: { type: String, enum: ['BASIC', 'PRO', 'PREMIUM'], default: null },
+    // transactionId holds the current ACTIVE Razorpay Subscription ID
     transactionId: String, 
     
-    // === NEW FIELD: Tracks when plan access ends (Crucial for trial period) ===
     planEndDate: { type: Date, default: null },
-    subscriptionStatus: { type: String, default: null }, // Added this field for consistency
-    // =========================================================================
+    subscriptionStatus: { type: String, default: null }, 
+    
+    // NOTE: The temporary 'pendingTransactionId' field is intentionally removed/excluded
+    // as the plan change verification now uses the secure User ID stored in Razorpay notes.
 
 }, { timestamps: true });
 
@@ -53,7 +53,7 @@ UserSchema.pre('save', async function (next) {
     next();
 });
 
-// Instance methods (getResetPasswordToken and matchPassword remain unchanged)
+// Instance methods 
 UserSchema.methods.getResetPasswordToken = function () {
     const resetToken = crypto.randomBytes(32).toString('hex');
 
