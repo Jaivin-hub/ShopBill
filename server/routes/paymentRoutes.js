@@ -306,7 +306,6 @@ router.post('/upgrade-plan', protect, async (req, res) => {
     const { newPlan } = req.body; // e.g., 'PRO' or 'PREMIUM'
 
     // Fetch user with current plan and status for robust checks
-    // We fetch user data again here to ensure we have the most up-to-date subscriptionStatus
     const user = await User.findById(userId).select('transactionId plan subscriptionStatus');
     const currentPlan = user.plan;
     const currentStatus = user.subscriptionStatus;
@@ -316,7 +315,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         return res.status(400).json({ error: 'Invalid or missing plan selected for change.' });
     }
 
-    // FIX: Allow re-subscription if the user is selecting the same plan AND it is already cancelled/expired
+    // Allow re-subscription if the user is selecting the same plan AND it is already cancelled/expired
     const isSamePlan = currentPlan?.toUpperCase() === newPlan.toUpperCase();
     const isTerminalStatus = ['cancelled', 'expired', 'cancellation_no_refund', 'cancellation_pending', 'trial_cancellation_pending', 'cancelled_replaced'].includes(currentStatus);
 
@@ -374,16 +373,22 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         }
 
         // ---------------------------------------------------------------------
-        // 3. CREATE NEW SUBSCRIPTION MANDATE (₹1 VERIFICATION FEE)
+        // 3. CREATE NEW SUBSCRIPTION MANDATE (₹1 VERIFICATION FEE + 30-DAY DEFERRAL)
         // ---------------------------------------------------------------------
+
+        // >> NEW LOGIC START: Standard 30-day deferral for all new mandates <<
+        const trialDays = 30;
+        const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
 
         const subscriptionOptions = {
             plan_id: plan_id,
             customer_notify: 1,
             total_count: 1200,
             
-            // ⭐ FIX 2: Removed 'amount: 100' parameter (Caused RZP Error)
-            // Use 'addons' for the one-time ₹1 verification fee.
+            // Set the first full charge date 30 days in the future
+            start_at: startAtTimestamp, 
+            
+            // Only charge the one-time ₹1 verification fee immediately using 'addons'.
             addons: [{
                 item: {
                     name: 'Verification Charge',
@@ -400,13 +405,13 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         };
 
         const newSubscription = await razorpay.subscriptions.create(subscriptionOptions);
+        // >> NEW LOGIC END <<
 
         // ---------------------------------------------------------------------
         // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE
         // ---------------------------------------------------------------------
 
-        // CRITICAL FIX 3: Save the new Subscription ID to the User model.
-        // NOTE: This relies on 'pendingTransactionId' being a valid, non-schema-strict field on your User model.
+        // Save the new Subscription ID to the User model.
         await User.updateOne({ _id: userId }, {
             $set: {
                 pendingTransactionId: newSubscription.id
@@ -416,11 +421,11 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 
         res.json({
             success: true,
-            message: `Old plan (${user?.plan || 'NONE'}) handled. Please complete the mandate setup for the new ${newPlan} plan.`,
+            message: `Old plan (${user?.plan || 'NONE'}) handled. Please complete the mandate setup for the new ${newPlan} plan. You will be charged ₹1 now, and your first full charge will be in 30 days.`,
             subscriptionId: newSubscription.id,
             currency: newSubscription.currency,
             
-            // ⭐ FIX 4: Send the correct verification fee amount (100 paise) to the frontend.
+            // Send the correct verification fee amount (100 paise) to the frontend.
             amount: 100, 
             
             keyId: process.env.RAZORPAY_KEY_ID,
@@ -438,7 +443,7 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 
 /**
 * @route POST /api/payment/verify-plan-change
-* @desc Verifies the signature for the new subscription mandate after plan change.
+* @desc Verifies the signature for the new subscription mandate after plan change and sets the new 30-day planEndDate.
 * @access Public
 */
 router.post('/verify-plan-change', async (req, res) => {
@@ -481,24 +486,22 @@ router.post('/verify-plan-change', async (req, res) => {
             console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
         }
         
-        // --- 3. FINAL USER MODEL UPDATE (FIXED LOGIC) ---
+        // --- 3. FINAL USER MODEL UPDATE (30-DAY DEFERRAL LOGIC) ---
 
-        // CRITICAL FIX 5: Lookup the user by the pending transaction ID. 
-        // We use findOne to ensure the temporary ID is unique to one user.
+        // Lookup the user by the pending transaction ID. 
         const userToUpdate = await User.findOne({ 
             pendingTransactionId: razorpay_subscription_id 
         });
 
         if (!userToUpdate) {
-             // This is the error the user was getting. It's fixed by ensuring the 'pendingTransactionId' 
-             // is correctly set in the prior step and is a valid query field.
              console.warn(`User for plan change verification not found via pendingTransactionId: ${razorpay_subscription_id}`);
              return res.status(404).json({ success: false, error: 'Could not find user for plan verification. Please contact support.' });
         }
 
-        // Set the next billing date 30 days from now.
+        // >> NEW LOGIC START: Set the new plan end date 30 days from now <<
         const nextBillingDate = new Date();
         nextBillingDate.setDate(nextBillingDate.getDate() + 30); 
+        // >> NEW LOGIC END <<
 
         const updateFields = {
             plan: newPlan.toUpperCase(),
