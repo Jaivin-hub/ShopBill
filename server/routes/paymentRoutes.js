@@ -1,4 +1,4 @@
-// paymentRoutes.js (Full file with the correct cancellation logic and final verification fix)
+
 
 const express = require('express');
 const crypto = require('crypto');
@@ -400,7 +400,9 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             notes: {
                 plan_name: newPlan,
                 description: description,
-                change_from: user.plan || 'NONE'
+                change_from: user.plan || 'NONE',
+                // ⭐ CRITICAL FIX: Save the user's MongoDB ID here for stable verification lookup
+                userId: userId.toString() 
             }
         };
 
@@ -411,12 +413,14 @@ router.post('/upgrade-plan', protect, async (req, res) => {
         // 4. TEMPORARILY STORE NEW ID & RETURN RESPONSE
         // ---------------------------------------------------------------------
 
-        // Save the new Subscription ID to the User model.
+        // ❌ REMOVED: Remove the unstable pendingTransactionId update
+        /*
         await User.updateOne({ _id: userId }, {
             $set: {
                 pendingTransactionId: newSubscription.id
             }
         });
+        */
 
 
         res.json({
@@ -447,11 +451,10 @@ router.post('/upgrade-plan', protect, async (req, res) => {
 * @access Public
 */
 router.post('/verify-plan-change', async (req, res) => {
-    console.log('consoling')
     const {
         razorpay_payment_id,
         razorpay_signature,
-        razorpay_subscription_id, // This is the new subscription ID (e.g., sub_RntJcYA5V1gWqB)
+        razorpay_subscription_id, // This is the new subscription ID
         newPlan,
     } = req.body;
 
@@ -460,29 +463,68 @@ router.post('/verify-plan-change', async (req, res) => {
     }
 
     try {
-        // ... (Mandate Verification and Refund Logic remains the same) ...
+        // --- MANDATE VERIFICATION ---
+        const body = razorpay_payment_id + '|' + razorpay_subscription_id;
+
+        const expectedSignature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest('hex');
+
+        const isAuthentic = expectedSignature === razorpay_signature;
+        
+        if (!isAuthentic) {
+            // FAILURE: Signature mismatch 
+            return res.status(400).json({
+                success: false,
+                error: 'Subscription mandate verification failed. Signature mismatch.',
+            });
+        }
+        
+        // --- 2. INSTANT REFUND LOGIC ---
+        const refundAmount = 100;
+        const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+        const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+        try {
+            await axios.post(
+                `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/refunds`,
+                { amount: refundAmount },
+                { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
+            );
+            console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
+
+        } catch (refundError) {
+            console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
+            // Proceed with success as the mandate is verified.
+        }
 
         // --- 3. FINAL USER MODEL UPDATE (FIXED LOGIC) ---
+        
+        // ⭐ CRITICAL FIX: Fetch the subscription details to get the User ID from the notes
+        const subscriptionDetails = await razorpay.subscriptions.fetch(razorpay_subscription_id);
+        const storedUserId = subscriptionDetails.notes?.userId;
+        
+        if (!storedUserId) {
+            console.error(`[VERIFY ERROR] Subscription ${razorpay_subscription_id} missing stored userId in RZP notes.`);
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Could not find user information in transaction data. Please contact support.' 
+            });
+        }
 
-        // FIX: Lookup the user by the pending transaction ID (which is the Razorpay Subscription ID). 
-        // We ensure we search the correct field with the correct ID.
-        const userToUpdate = await User.findOne({ 
-            pendingTransactionId: razorpay_subscription_id 
-        });
+        // Use the permanently stored User ID for the stable lookup
+        const userToUpdate = await User.findById(storedUserId);
 
         if (!userToUpdate) {
-             // THIS IS THE ERROR SOURCE: If the lookup fails, it means 
-             // 1. pendingTransactionId field is missing from User schema OR
-             // 2. The ID was not correctly saved in the previous step OR
-             // 3. Data type mismatch (e.g., one is a string, the other is not)
-             console.warn(`CRITICAL WARNING: User for plan change verification not found. Query ID: ${razorpay_subscription_id}`);
+             console.warn(`CRITICAL WARNING: User for plan change verification not found. Query ID: ${storedUserId}`);
              return res.status(404).json({ 
                  success: false, 
-                 error: 'Could not find user for plan verification. Please contact support. (Database lookup failed).' 
+                 error: 'Could not find user for plan verification. Please contact support. (Database lookup failed via User ID).' 
              });
         }
         
-        // --- If userToUpdate is found, proceed with update ---
+        // --- Update the user ---
 
         // Set the next billing date 30 days from now.
         const nextBillingDate = new Date();
@@ -495,10 +537,9 @@ router.post('/verify-plan-change', async (req, res) => {
             transactionId: razorpay_subscription_id, // Update to the new subscription ID
         };
         
-        // Update the user now that the mandate is verified and remove the temporary field
+        // Update the user now that the mandate is verified. 
         await User.updateOne({ _id: userToUpdate._id }, { 
-            $set: updateFields, 
-            $unset: { pendingTransactionId: 1 } // Remove the temporary field
+            $set: updateFields
         });
 
         // --- 4. SUCCESS RESPONSE ---
@@ -510,7 +551,7 @@ router.post('/verify-plan-change', async (req, res) => {
 
     } catch (error) {
         console.error('Plan Change Verification Error:', error);
-        res.status(500).json({ success: false, error: 'Server error during plan change verification.' });
+        res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
     }
 });
 

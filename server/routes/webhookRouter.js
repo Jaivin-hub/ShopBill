@@ -1,3 +1,5 @@
+// webhooks/razorpay.js (FINAL FIXED VERSION)
+
 const express = require('express');
 const crypto = require('crypto');
 const User = require('../models/User');
@@ -69,17 +71,15 @@ router.post('/razorpay', async (req, res) => {
         console.log(`[WEBHOOK SUBSCRIPTION ID] ${subscriptionId}`); 
 
         // 3. Find the Shop/Owner associated with this subscription ID
-        // ⭐ CRITICAL FIX: Use $or to search both transactionId and pendingTransactionId
+        // ⭐ CLEANUP FIX: Since pendingTransactionId is removed from the User model, 
+        // we clean up the lookup. This is simpler and more robust.
         const owner = await User.findOne({ 
             role: 'owner', 
-            $or: [
-                { transactionId: subscriptionId },
-                { pendingTransactionId: subscriptionId }
-            ]
-        }).select('_id shopName plan subscriptionStatus planEndDate transactionId pendingTransactionId'); // Select both for logic checks
+            transactionId: subscriptionId
+        }).select('_id shopName plan subscriptionStatus planEndDate transactionId');
 
         if (!owner) {
-            console.error(`[WEBHOOK LOG] Owner not found for Subscription ID: ${subscriptionId}`);
+            console.warn(`[WEBHOOK LOG] Owner not found for current Subscription ID: ${subscriptionId}. This might be an old or replacement subscription. Skipping update.`);
             return res.json({ success: true, message: 'Owner not found. Ignoring event.' }); 
         }
         
@@ -88,28 +88,18 @@ router.post('/razorpay', async (req, res) => {
 
         // 4. Handle Subscription Status Changes (Updates the User model)
 
-        // 🚨 FIX CONFIRMED: Sets status to 'authenticated' for trial/mandate confirmation
         if (event === 'subscription.activated') {
             
-            // Check if this ID is currently in the pending field (means it's a new mandate verification)
-            const isNewMandateVerification = owner.pendingTransactionId === subscriptionId;
+            // This event handles the initial mandate activation. Since the client is responsible
+            // for the final database update via /verify-plan-change (which gets the plan details and User ID),
+            // this webhook does NOT need to do heavy lifting, preventing race conditions.
             
-            const updateFields = {
-                subscriptionStatus: 'authenticated', 
-                lastStatusUpdate: new Date(),
-            };
-            
-            if (isNewMandateVerification) {
-                // If this webhook arrives *before* the client hits /verify-plan-change, 
-                // we temporarily update the main transactionId to the new one.
-                updateFields.transactionId = subscriptionId;
-                // We DO NOT unset pendingTransactionId here. The client /verify-plan-change handles that.
-                
-                console.log(`[WEBHOOK ACTIVATED] New mandate confirmed. Updating main transactionId temporarily.`);
-            }
-
+            // We just ensure the status is 'authenticated' (or similar pending state)
             await User.updateOne({ _id: owner._id }, {
-                $set: updateFields
+                $set: {
+                    subscriptionStatus: 'authenticated', 
+                    lastStatusUpdate: new Date(),
+                }
             });
             
             console.log(`[WEBHOOK SUCCESS] Subscription ACTIVATED (Mandate confirmed) for ${owner.shopName}. Status updated to 'authenticated'.`);
@@ -117,17 +107,26 @@ router.post('/razorpay', async (req, res) => {
             return res.json({ success: true, message: 'Subscription mandate activated and user status updated.' });
             
         } else if (event === 'subscription.cancelled') {
-            await User.updateOne({ _id: owner._id }, {
-                $set: {
-                    subscriptionStatus: 'cancelled',
-                    lastStatusUpdate: new Date(),
-                }
-            });
-            console.log(`[WEBHOOK SUCCESS] Subscription CANCELLED for ${owner.shopName}. Status updated to 'cancelled'.`);
+            
+            // ⭐ CRITICAL FIX: Only set to generic 'cancelled' if the status is NOT 'cancelled_replaced'.
+            // This prevents a webhook for the old plan overriding the upgrade state.
+            if (owner.subscriptionStatus !== 'cancelled_replaced') {
+                await User.updateOne({ _id: owner._id }, {
+                    $set: {
+                        subscriptionStatus: 'cancelled',
+                        lastStatusUpdate: new Date(),
+                    }
+                });
+                console.log(`[WEBHOOK SUCCESS] Subscription CANCELLED for ${owner.shopName}. Status updated to 'cancelled'.`);
+            } else {
+                 console.log(`[WEBHOOK LOG] Subscription CANCELLED event received for old subscription, but status is 'cancelled_replaced'. Skipping database update.`);
+            }
+
             // Stop processing further
-            return res.json({ success: true, message: 'Subscription cancelled and user status updated.' });
+            return res.json({ success: true, message: 'Subscription cancelled event handled.' });
 
         } else if (event === 'subscription.halted') {
+            // ... (Halted logic remains the same, still falls through to payment record step)
             await User.updateOne({ _id: owner._id }, {
                 $set: {
                     subscriptionStatus: 'halted',
@@ -135,11 +134,10 @@ router.post('/razorpay', async (req, res) => {
                 }
             });
             console.log(`[WEBHOOK SUCCESS] Subscription HALTED for ${owner.shopName}. Status updated to 'halted'.`);
-            // FALL THROUGH to the payment record step to log the failed charge that caused the halt.
         }
 
         // --- 5. Handle Payment Attempt Events (Creates a Payment history record) ---
-
+        
         // Only run for charged or failed events
         if (event === 'subscription.charged' || event === 'payment.failed' || event === 'subscription.halted') {
             const paymentEntity = payload.payment?.entity;
