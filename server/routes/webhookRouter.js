@@ -69,10 +69,14 @@ router.post('/razorpay', async (req, res) => {
         console.log(`[WEBHOOK SUBSCRIPTION ID] ${subscriptionId}`); 
 
         // 3. Find the Shop/Owner associated with this subscription ID
+        // ⭐ CRITICAL FIX: Use $or to search both transactionId and pendingTransactionId
         const owner = await User.findOne({ 
             role: 'owner', 
-            transactionId: subscriptionId 
-        }).select('_id shopName plan subscriptionStatus planEndDate'); 
+            $or: [
+                { transactionId: subscriptionId },
+                { pendingTransactionId: subscriptionId }
+            ]
+        }).select('_id shopName plan subscriptionStatus planEndDate transactionId pendingTransactionId'); // Select both for logic checks
 
         if (!owner) {
             console.error(`[WEBHOOK LOG] Owner not found for Subscription ID: ${subscriptionId}`);
@@ -86,16 +90,32 @@ router.post('/razorpay', async (req, res) => {
 
         // 🚨 FIX CONFIRMED: Sets status to 'authenticated' for trial/mandate confirmation
         if (event === 'subscription.activated') {
-            await User.updateOne({ _id: owner._id }, {
-                $set: {
-                    subscriptionStatus: 'authenticated', 
-                    lastStatusUpdate: new Date(),
-                }
-            });
-            console.log(`[WEBHOOK SUCCESS] Subscription ACTIVATED (Mandate confirmed) for ${owner.shopName}. Status updated to 'authenticated'.`);
-            // Stop processing further to avoid hitting payment attempt logic
-            return res.json({ success: true, message: 'Subscription mandate activated and user status updated.' });
+            
+            // Check if this ID is currently in the pending field (means it's a new mandate verification)
+            const isNewMandateVerification = owner.pendingTransactionId === subscriptionId;
+            
+            const updateFields = {
+                subscriptionStatus: 'authenticated', 
+                lastStatusUpdate: new Date(),
+            };
+            
+            if (isNewMandateVerification) {
+                // If this webhook arrives *before* the client hits /verify-plan-change, 
+                // we temporarily update the main transactionId to the new one.
+                updateFields.transactionId = subscriptionId;
+                // We DO NOT unset pendingTransactionId here. The client /verify-plan-change handles that.
+                
+                console.log(`[WEBHOOK ACTIVATED] New mandate confirmed. Updating main transactionId temporarily.`);
+            }
 
+            await User.updateOne({ _id: owner._id }, {
+                $set: updateFields
+            });
+            
+            console.log(`[WEBHOOK SUCCESS] Subscription ACTIVATED (Mandate confirmed) for ${owner.shopName}. Status updated to 'authenticated'.`);
+            
+            return res.json({ success: true, message: 'Subscription mandate activated and user status updated.' });
+            
         } else if (event === 'subscription.cancelled') {
             await User.updateOne({ _id: owner._id }, {
                 $set: {
