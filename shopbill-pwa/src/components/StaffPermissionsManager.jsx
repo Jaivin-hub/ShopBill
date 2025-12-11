@@ -116,14 +116,14 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, showToast, isSubmitting })
                         <button 
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition font-semibold"
+                            className="cursor-pointer px-4 py-2 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition font-semibold"
                             disabled={isSubmitting}
                         >
                             Cancel
                         </button>
                         <button 
                             type="submit"
-                            className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-md flex items-center disabled:opacity-75"
+                            className="cursor-pointer px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-md flex items-center disabled:opacity-75"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -314,7 +314,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     return (
         <div className="p-4 md:p-6 min-h-screen-safe bg-gray-900 rounded-xl">
             
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-8xl mx-auto">
                 <button 
                     onClick={onBack} 
                     className="flex items-center text-indigo-400 hover:underline mb-6 font-medium text-sm"
@@ -330,10 +330,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             </div>
 
 
-            <div className="max-w-4xl mx-auto space-y-4"> 
+            <div className="max-w-8xl mx-auto space-y-4"> 
                 
                 <button 
-                    className="w-full sm:w-auto flex items-center justify-center p-3 rounded-xl transition font-semibold shadow-md 
+                    className="cursor-pointer w-full sm:w-auto flex items-center justify-center p-3 rounded-xl transition font-semibold shadow-md 
                         ${hasWriteAccess ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}
                         disabled:opacity-50 disabled:bg-gray-800"
                     onClick={handleAddStaffClick}

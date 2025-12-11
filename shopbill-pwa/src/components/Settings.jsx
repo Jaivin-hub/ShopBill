@@ -469,7 +469,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         if (currentView === 'main') {
             return (
                 // 💥 UPDATED: Applied max-w-4xl mx-auto to Header
-                <header className="mb-8 pt-1 md:pt-0 max-w-4xl mx-auto">
+                <header className="mb-8 pt-1 md:pt-0 max-w-8xl mx-auto">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                         Settings
                     </h1>
@@ -494,7 +494,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
             default:
                 // 💥 WRAPPER: Applied max-w-4xl mx-auto here to contain the settings list
                 return (
-                    <div className="max-w-4xl mx-auto"> 
+                    <div className="max-w-8xl mx-auto"> 
                         {renderSettingsList()}
                     </div>
                 );

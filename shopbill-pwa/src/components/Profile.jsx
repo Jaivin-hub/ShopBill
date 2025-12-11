@@ -66,8 +66,8 @@ function Profile() {
     return (
         <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-white dark:bg-gray-950 transition-colors duration-300 font-sans">
             
-            {/* ⭐️ NEW HEADER LAYOUT: The main header now contains the title/caption and the button, using flex for horizontal alignment. */}
-            <header className="mb-8 pt-4 md:pt-0 max-w-xl mx-auto">
+            {/* ⭐️ MODIFIED: Changed max-w-xl to max-w-3xl to increase content width */}
+            <header className="mb-8 pt-4 md:pt-0 max-w-8xl mx-auto">
                 <div className="flex justify-between items-center">
                     {/* Header Text Block */}
                     <div>
@@ -93,7 +93,8 @@ function Profile() {
                 </div>
             </header>
             
-            <main className="space-y-6 max-w-xl mx-auto">
+            {/* ⭐️ MODIFIED: Changed max-w-xl to max-w-3xl to increase content width */}
+            <main className="space-y-6 max-w-8xl mx-auto">
                 
                 {/* 1. Personal Account Information */}
                 <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
