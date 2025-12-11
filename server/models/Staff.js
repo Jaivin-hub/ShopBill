@@ -1,100 +1,61 @@
-// models/User.js (Updated & Finalized)
-
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+const Schema = mongoose.Schema;
 
-const UserSchema = new mongoose.Schema({
-    email: { 
-        type: String, 
+// Define the allowed roles for type safety and validation
+const allowedRoles = ['owner', 'Manager', 'Cashier']; 
+
+const StaffSchema = new Schema({
+    // Link to the shop this staff member belongs to (CRITICAL for multi-tenancy)
+    // Ref points to the Shop collection/model.
+    shopId: {
+        type: Schema.Types.ObjectId,
+        required: true,
+        ref: 'Shop' 
+    },
+    // The user's ID from the main 'User' collection (for login credentials)
+    // Links to the User collection/model.
+    userId: {
+        type: Schema.Types.ObjectId,
         required: true, 
-        unique: true, 
-        trim: true, 
-        lowercase: true 
+        ref: 'User'
     },
-    password: { 
-        type: String, 
-        required: false 
-    }, 
-    phone: { 
-        type: String, 
-        trim: true 
+    // Display Name
+    name: {
+        type: String,
+        required: [true, 'Staff member name is required.'],
+        trim: true,
+        maxlength: 100
     },
-    
-    role: { 
-        type: String, 
-        enum: ['superadmin', 'owner', 'Manager', 'Cashier'], 
-        required: true 
-    }, 
-    
-    // CRITICAL FIX: The `ref` now points to the 'Shop' model 
-    // (assuming you have a Shop model for your multi-tenancy setup).
-    // The shopName field is removed, resolving the E11000 error.
-    shopId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Shop', // <-- FIXED: Changed from 'User' to 'Shop'
-        required: true 
-    }, 
-    
-    // shopName field removed entirely.
-    
-    isActive: { 
-        type: Boolean, 
-        default: true 
+    // Unique identifier for login/setup
+    email: {
+        type: String,
+        required: [true, 'Email is required.'],
+        // Set to false here, but uniqueness is enforced by the compound index below.
+        unique: false, 
+        lowercase: true,
+        match: [/.+\@.+\..+/, 'Please fill a valid email address']
     },
-
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
-    
-    plan: { 
-        type: String, 
-        enum: ['BASIC', 'PRO', 'PREMIUM'], 
-        default: null 
+    // Role for permissions (owner, Manager, Cashier)
+    role: {
+        type: String,
+        required: true,
+        enum: allowedRoles,
+        default: 'Cashier'
     },
-    // transactionId holds the current ACTIVE Razorpay Subscription ID
-    transactionId: String, 
-    
-    planEndDate: { 
-        type: Date, 
-        default: null 
+    // Status to enable/disable access without deletion
+    active: {
+        type: Boolean,
+        default: true
     },
-    subscriptionStatus: { 
-        type: String, 
-        default: null 
-    }, 
-
-}, { timestamps: true });
-
-// Pre-save hook to hash password before saving
-UserSchema.pre('save', async function (next) {
-    // Only hash the password if it's new or modified and is not null/empty
-    if (this.isModified('password') && this.password) { 
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
-    }
-    next();
+    // Date the staff member was added
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
 });
 
-// Instance methods 
-// Method to generate a token for password reset/account activation
-UserSchema.methods.getResetPasswordToken = function () {
-    const resetToken = crypto.randomBytes(32).toString('hex');
+// ✅ Compound index: This is the correct way to ensure an email is unique 
+// only within the context of a single shop (shopId).
+StaffSchema.index({ shopId: 1, email: 1 }, { unique: true });
 
-    this.resetPasswordToken = crypto
-        .createHash('sha256')
-        .update(resetToken)
-        .digest('hex');
-
-    // Token expires in 10 minutes (or 24 hours for staff setup, depending on usage)
-    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
-
-    return resetToken;
-};
-
-// Method to compare entered password with hashed password
-UserSchema.methods.matchPassword = async function (enteredPassword) {
-    if (!this.password) return false; // Handle case where password is not set yet (new staff)
-    return await bcrypt.compare(enteredPassword, this.password);
-};
-
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('Staff', StaffSchema);
