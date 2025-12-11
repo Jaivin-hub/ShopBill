@@ -1,4 +1,4 @@
-// models/User.js (ShopName Restored & Index Fixed)
+// models/User.js (ShopName Restored & Index Fixed - Sparse Index Null Fix)
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -35,12 +35,10 @@ const UserSchema = new mongoose.Schema({
     }, 
     
     // shopName is RESTORED for business needs.
-    // The conditional unique property is removed from the field definition.
     shopName: { 
         type: String, 
         required: function() { return this.role === 'owner'; },
         trim: true 
-        // DO NOT set 'unique: true' here, we manage uniqueness via an index below.
     },
     
     isActive: { 
@@ -71,15 +69,28 @@ const UserSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // === CRITICAL FIX for E11000 Duplicate Key Error ===
-// We define a unique index on shopName but add the 'sparse: true' option.
-// sparse: true ensures the index only applies to documents where shopName
-// *actually exists*. Staff users without a shopName (i.e., shopName is null/undefined)
-// will bypass this index, allowing unlimited staff to be created.
+// sparse: true ensures the index only applies to documents where shopName 
+// *actually exists* (is not undefined).
 UserSchema.index({ shopName: 1 }, { unique: true, sparse: true });
 // ===================================================
 
-// Pre-save hook to hash password before saving
+// NEW HOOK: Ensure non-owner accounts do NOT have a shopName field (it must be undefined).
+UserSchema.pre('save', function (next) {
+    // Only run this logic if the role is being modified or this is a new document
+    if (this.isModified('role') || this.isNew) {
+        if (this.role !== 'owner') {
+            // Explicitly set shopName to undefined. This tells Mongoose to
+            // use the $unset operator, ensuring the field is removed from the document,
+            // which satisfies the sparse index condition.
+            this.shopName = undefined; 
+        }
+    }
+    next();
+});
+
+// Existing Pre-save hook to hash password before saving
 UserSchema.pre('save', async function (next) {
+    // Only hash if the password field is modified and actually has a value
     if (this.isModified('password') && this.password) { 
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -89,5 +100,5 @@ UserSchema.pre('save', async function (next) {
 
 // Instance methods (omitted for brevity, they remain unchanged)
 
-// FIX for OverwriteModelError (from previous discussion)
+// FIX for OverwriteModelError
 module.exports = mongoose.models.User || mongoose.model('User', UserSchema);
