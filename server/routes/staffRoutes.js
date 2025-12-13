@@ -64,21 +64,22 @@ router.post('/', protect, async (req, res) => {
     let newStaff = null;
     
     try {
-        // --- 1. Check for Existing Staff/User ---
-        // Check if a User account already exists with this email (prevents staff using existing owner email)
+        // --- 1. Check for Existing Staff/User (UPDATED ERROR MESSAGE) ---
         const existingUser = await User.findOne({ email });
         if (existingUser && existingUser.shopId.toString() === req.user.shopId.toString()) {
-            return res.status(409).json({ error: 'A user account with this email already exists in your shop.' });
+            return res.status(409).json({ 
+                error: `Staff creation failed. The email address **${email}** is already registered for an existing user or staff member in this shop. Please use a different email.` 
+            });
         }
         
         // --- 2. Create the User Login Record (No Password) ---
-        // This is the CRITICAL step for staff login capability
+        // Includes the temporary fix for the shopName unique index issue
         newUser = await User.create({
             email,
             phone: phone || null,
             shopId: req.user.shopId,
             role, // Manager or Cashier
-            shopName: `staff-temp-${newUser._id}`
+            shopName: `staff-temp-${req.user.shopId}-${email}` // Temporary unique value
             // password is not set here, it will be set by the activation link
         });
 
@@ -91,6 +92,8 @@ router.post('/', protect, async (req, res) => {
             role,
             active: true 
         });
+        
+        // ... (Steps 4 and 5: Token Generation and Email Sending) ...
 
         // --- 4. Generate Activation Token ---
         const activationToken = crypto.randomBytes(32).toString('hex');
@@ -144,7 +147,6 @@ router.post('/', protect, async (req, res) => {
         res.status(500).json({ error: error.message || 'Failed to add new staff member.' });
     }
 });
-
 
 // ====================================================================
 // @route   PUT /api/staff/:id/toggle
