@@ -78,7 +78,7 @@ router.post('/', protect, async (req, res) => {
             phone: phone || null,
             shopId: req.user.shopId,
             role, // Manager or Cashier
-            shopName: `staff-temp-${req.user.shopId}`
+            shopName: `staff-temp-${newUser._id}`
             // password is not set here, it will be set by the activation link
         });
 
