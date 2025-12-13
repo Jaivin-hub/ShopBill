@@ -421,7 +421,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
             </section>
 
             {/* 3. Data Management Section - NEWLY ADDED */}
-            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
                     <Server className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" /> Data & Sync
                 </h2>
@@ -461,7 +461,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                         accentColor="text-red-600 dark:text-red-400"
                     />
                 </div>
-            </section>
+            </section> */}
         </main>
     );
 

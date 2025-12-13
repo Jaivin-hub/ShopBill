@@ -42,7 +42,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, showToast, isSubmitting })
                         Add New Staff Member
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition p-1 rounded-full hover:bg-gray-700" disabled={isSubmitting}>
-                        <X className="w-6 h-6" />
+                        <X className="cursor-pointer w-6 h-6" />
                     </button>
                 </div>
                 
@@ -317,7 +317,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             <div className="max-w-8xl mx-auto">
                 <button 
                     onClick={onBack} 
-                    className="flex items-center text-indigo-400 hover:underline mb-6 font-medium text-sm"
+                    className="cursor-pointer flex items-center text-indigo-400 hover:underline mb-6 font-medium text-sm"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to Settings
                 </button>
@@ -395,7 +395,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                             {/* Status Indicator / Toggle (Indigo for ACTIVE) */}
                                             <button
                                                 onClick={() => handleToggleActive(s)}
-                                                className={`flex-1 sm:flex-none text-sm font-semibold px-4 py-2 rounded-xl transition shadow-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
+                                                className={`cursor-pointer flex-1 sm:flex-none text-sm font-semibold px-4 py-2 rounded-xl transition shadow-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
                                                     s.active 
                                                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-900/50'
                                                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -410,7 +410,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                             {/* Remove Button (Red for destructive action, dark background on hover) */}
                                             <button
                                                 onClick={() => handleRemoveStaff(s)}
-                                                className="p-3 text-red-400 hover:text-white hover:bg-red-600 rounded-xl transition bg-gray-700/50 border border-red-700/50 flex-none disabled:opacity-30 disabled:cursor-not-allowed"
+                                                className="cursor-pointer p-3 text-red-400 hover:text-white hover:bg-red-600 rounded-xl transition bg-gray-700/50 border border-red-700/50 flex-none disabled:opacity-30 disabled:cursor-not-allowed"
                                                 title={s.role === 'owner' ? "Cannot remove owner" : isActionDisabled ? `Only owner can remove staff (Your role: ${currentUserRole})` : "Remove Staff"}
                                                 // Disabled if the staff member is the owner OR the current user lacks write access
                                                 disabled={isActionDisabled} 

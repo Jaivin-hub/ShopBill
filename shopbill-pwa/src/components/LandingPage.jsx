@@ -276,45 +276,70 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-indigo-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-900/50 text-indigo-400 mb-4">
-                                    <Receipt className="w-6 h-6" />
+
+                                {/* NEW ROW: Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    {/* Icon Container (Far Left) */}
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-indigo-900/50 text-indigo-400">
+                                        <Receipt className="w-6 h-6" />
+                                    </div>
+
+                                    {/* Heading (Next to Icon) */}
+                                    <h3 className="text-xl font-bold text-white">{t.fastPOS}</h3>
+                                    {/* Removed 'mb-2' from h3 since we added 'mb-4' to the parent flex container */}
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.fastPOS}</h3>
+
+                                {/* Description (Below the new row) */}
                                 <p className="text-gray-400">{t.fastPOSDesc}</p>
                             </div>
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-teal-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-900/50 text-teal-400 mb-4">
-                                    <Package className="w-6 h-6" />
+                                {/* Updated Row for Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-teal-900/50 text-teal-400">
+                                        <Package className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{t.stockControl}</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.stockControl}</h3>
                                 <p className="text-gray-400">{t.stockControlDesc}</p>
                             </div>
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-amber-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-900/50 text-amber-400 mb-4">
-                                    <Users className="w-6 h-6" />
+                                {/* Updated Row for Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-amber-900/50 text-amber-400">
+                                        <Users className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{t.khata}</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.khata}</h3>
                                 <p className="text-gray-400">{t.khataDesc}</p>
                             </div>
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-purple-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-900/50 text-purple-400 mb-4">
-                                    <LineChart className="w-6 h-6" />
+                                {/* Updated Row for Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-purple-900/50 text-purple-400">
+                                        <LineChart className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{t.reports}</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.reports}</h3>
                                 <p className="text-gray-400">{t.reportsDesc}</p>
                             </div>
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-pink-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-900/50 text-pink-400 mb-4">
-                                    <UserCog className="w-6 h-6" />
+                                {/* Updated Row for Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-pink-900/50 text-pink-400">
+                                        <UserCog className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{t.staff}</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.staff}</h3>
                                 <p className="text-gray-400">{t.staffDesc}</p>
                             </div>
                             <div className="feature-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-900/50 hover:shadow-2xl">
-                                <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-900/50 text-blue-400 mb-4">
-                                    <Cloud className="w-6 h-6" />
+                                {/* Updated Row for Icon and Heading */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 inline-flex items-center justify-center rounded-full bg-blue-900/50 text-blue-400">
+                                        <Cloud className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{t.cloudSync}</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t.cloudSync}</h3>
                                 <p className="text-gray-400">{t.cloudSyncDesc}</p>
                             </div>
                         </div>
