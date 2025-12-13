@@ -33,6 +33,10 @@ const UserSchema = new mongoose.Schema({
 
         type: String,
 
+        required: function () { return this.role === 'owner'; },
+
+        unique: function () { return this.role === 'owner'; },
+
         trim: true
 
     },
