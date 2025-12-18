@@ -334,30 +334,35 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
     }
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans">
-            <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
-                <div className="text-center mb-8">
-                    <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
+            <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
+                <div className="text-center mb-6">
+                    <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                         Complete Registration & Start Free Trial
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">Secure your subscription mandate to begin your 30-day free trial.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Secure your subscription mandate to begin your 30-day free trial.</p>
                 </div>
                 {paymentError && (
-                    <div className="p-4 mb-6 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
+                    <div className="p-3 mb-5 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
                         {paymentError}
                     </div>
                 )}
                 <form onSubmit={handlePaymentSubmit}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                        <div className="h-full">
-                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col">
+                    {/* Updated grid for mobile: stacks vertically, switches to 2 columns on larger screens (lg) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch">
+                        
+                        {/* Section 1: Owner & Shop Details */}
+                        <div className="h-full order-2 lg:order-1"> {/* Order change for better mobile flow */}
+                            <div className="space-y-5 p-5 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col">
                                 <div className='flex-grow'>
-                                    <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                                         Owner & Shop Details
                                     </h4>
-                                    <div className="mb-6">
-                                        <label htmlFor="shopName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Shop/Business Name</label>
+                                    
+                                    {/* Shop Name Input */}
+                                    <div className="mb-5">
+                                        <label htmlFor="shopName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Shop/Business Name</label>
                                         <div className='relative'>
-                                            <Building className='w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' />
+                                            <Building className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' />
                                             <input
                                                 type="text"
                                                 id="shopName"
@@ -367,15 +372,17 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     setShopNameError(null);
                                                 }}
                                                 placeholder="Ex: Sharma General Store"
-                                                className={`w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                                className={`w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                                 required
                                                 disabled={isProcessing}
                                             />
                                         </div>
                                         {shopNameError && <p className="text-red-500 text-xs mt-1">{shopNameError}</p>}
                                     </div>
-                                    <div className="mb-6">
-                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address (for Login)</label>
+
+                                    {/* Email Input */}
+                                    <div className="mb-5">
+                                        <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address (for Login)</label>
                                         <input
                                             type="email"
                                             id="email"
@@ -385,14 +392,16 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                 setEmailError(null);
                                             }}
                                             placeholder="your@email.com"
-                                            className={`w-full px-4 py-3 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                            className={`w-full px-3 py-2.5 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                             required
                                             disabled={isProcessing}
                                         />
                                         {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
                                     </div>
-                                    <div className="mb-6">
-                                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
+                                    
+                                    {/* Phone Number Input (Complex) */}
+                                    <div className="mb-5">
+                                        <label htmlFor="phone" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
                                         <div className={`
                                             w-full flex rounded-lg transition duration-150 bg-white dark:bg-gray-800
                                             ${phoneError ? 'border border-red-500' : 'border border-gray-300 dark:border-gray-600'}
@@ -404,10 +413,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     type="button"
                                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                                     className={`
-                                                        bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-[0.865rem] pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
+                                                        bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-3 pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
                                                         focus:outline-none rounded-l-lg cursor-pointer flex items-center justify-between
-                                                        w-auto min-w-[80px] max-w-[120px]
-                                                        text-sm truncate hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150
+                                                        w-auto min-w-[70px] max-w-[100px]
+                                                        text-xs sm:text-sm truncate hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150
                                                         ${isDropdownOpen ? 'bg-gray-200 dark:bg-gray-600' : ''}
                                                     `}
                                                     disabled={countryCodes.length === 0 || isProcessing}
@@ -418,12 +427,12 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                         <>
                                                             <span>{selectedCountry?.flag}</span>
                                                             <span className="mx-1 font-semibold">{selectedCountry?.code}</span>
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
                                                         </>
                                                     )}
                                                 </button>
                                                 {isDropdownOpen && countryCodes.length > 0 && (
-                                                    <div className="absolute z-10 top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
+                                                    <div className="absolute z-10 top-full left-0 mt-1 w-64 sm:w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
                                                         <div className="p-2 sticky top-0 bg-white dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 z-20">
                                                             <input
                                                                 type="text"
@@ -462,7 +471,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                 placeholder="Enter phone number"
                                                 value={localNumber}
                                                 onChange={handleNumberChange}
-                                                className="w-full px-4 py-3 bg-transparent text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none rounded-r-lg"
+                                                className="w-full px-3 py-2.5 bg-transparent text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none rounded-r-lg text-sm"
                                                 required
                                                 autoComplete="tel-national"
                                                 disabled={countryCodes.length === 0 || isProcessing}
@@ -477,8 +486,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                             <p className="text-red-500 text-xs mt-1">{phoneError}</p>
                                         )}
                                     </div>
+                                    
+                                    {/* Password Input */}
                                     <div>
-                                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password (for Login)</label>
+                                        <label htmlFor="password" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password (for Login)</label>
                                         <div className="relative">
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
@@ -489,7 +500,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     setPasswordError(null);
                                                 }}
                                                 placeholder="Minimum 8 characters"
-                                                className={`w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                                className={`w-full px-3 py-2.5 pr-10 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                                 required
                                                 disabled={isProcessing}
                                             />
@@ -499,7 +510,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition duration-150"
                                                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                                             >
-                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
                                         </div>
                                         {passwordError && <p className="text-red-500 text-xs mt-1">{passwordError}</p>}
@@ -507,45 +518,43 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 </div>
                             </div>
                         </div>
-                        <div className="h-full">
-                            <div className="space-y-6 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-start">
-                                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+
+                        {/* Section 2: Plan Details (Order 1 for mobile visibility) */}
+                        <div className="h-full order-1 lg:order-2">
+                            <div className="space-y-6 p-5 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-start">
+                                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                                     Your Subscription
                                 </h4>
-                                <div className={`p-6 mt-2 rounded-xl ${plan.color} text-white shadow-2xl flex flex-col justify-between`}>
+                                <div className={`p-5 rounded-xl ${plan.color} text-white shadow-2xl flex flex-col justify-between`}>
 
                                     {/* Header: Plan Name and Interval */}
                                     <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-2xl font-bold flex items-center">
-                                            {/* Replace with your actual imported icon component, e.g., <ShoppingCart className="w-6 h-6 mr-3" /> */}
-                                            <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                        <h4 className="text-xl font-bold flex items-center">
+                                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                             {plan.name}
                                         </h4>
-                                        <span className="text-sm font-medium uppercase border border-white/70 px-3 py-1 rounded-full bg-white/10">
+                                        <span className="text-xs font-medium uppercase border border-white/70 px-2 py-0.5 rounded-full bg-white/10">
                                             {plan.interval}
                                         </span>
                                     </div>
 
-                                    {/* Section 1: Verification Charge (Prominently Displayed) */}
-                                    <div className="border-t border-white/30 pt-4 pb-4">
-                                        <p className="text-sm text-white/90 mb-2 font-medium">Total Due Today (Start of Trial):</p>
+                                    {/* Section 1: Verification Charge */}
+                                    <div className="border-t border-white/30 pt-3 pb-3">
+                                        <p className="text-xs text-white/90 mb-1 font-medium">Total Due Today (Start of Trial):</p>
 
                                         <div className="flex items-baseline">
-                                            <p className="text-5xl font-extrabold mr-3">{formatCurrency(1)}</p>
-                                            <span className="text-lg font-semibold text-green-300">
+                                            <p className="text-4xl font-extrabold mr-3">{formatCurrency(1)}</p>
+                                            <span className="text-sm font-semibold text-green-300">
                                                 (Verification Charge)
                                             </span>
                                         </div>
-                                        {/* <p className="text-xs text-white/70 mt-1">
-                                            This amount is <strong>instantly refunded</strong> after successful card verification.
-                                        </p> */}
                                     </div>
 
                                     {/* Section 2: Full Plan Charge (Trial Information) */}
-                                    <div className="border-t border-white/30 pt-4">
-                                        <p className="text-sm text-white/90 mb-1 font-medium">Monthly Charge After Trial:</p>
-                                        <p className="text-4xl font-extrabold">{formatCurrency(plan.price)}</p>
-                                        <p className="text-sm text-white/80 mt-2">
+                                    <div className="border-t border-white/30 pt-3">
+                                        <p className="text-xs text-white/90 mb-1 font-medium">Monthly Charge After Trial:</p>
+                                        <p className="text-3xl font-extrabold">{formatCurrency(plan.price)}</p>
+                                        <p className="text-xs text-white/80 mt-2">
                                             Full plan charge will begin <strong>after your 30-day free trial</strong> ends.
                                         </p>
                                     </div>
@@ -554,36 +563,38 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                             </div>
                         </div>
                     </div>
-                    <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    
+                    {/* Submission and Footer */}
+                    <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
                         <button
                             type="submit"
-                            className="cursor-pointer w-full py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.005] duration-300 ease-in-out disabled:bg-indigo-400 disabled:shadow-none flex items-center justify-center"
+                            className="cursor-pointer w-full py-3 bg-indigo-600 text-white text-base font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.005] duration-300 ease-in-out disabled:bg-indigo-400 disabled:shadow-none flex items-center justify-center"
                             disabled={isProcessing || !plan}
                         >
                             {isProcessing ? (
                                 <>
-                                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                                    <Loader className="w-4 h-4 mr-2 animate-spin" />
                                     {window.Razorpay ? 'Processing Mandate...' : 'Creating Mandate...'}
                                 </>
                             ) : (
                                 <>
-                                    <Lock className="w-5 h-5 mr-2" />
+                                    <Lock className="w-4 h-4 mr-2" />
                                     Setup Mandate & Start Free Trial
                                 </>
                             )}
                         </button>
-                        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4 flex items-center justify-center">
-                            <Lock className="w-4 h-4 mr-1" />
+                        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-3 flex items-center justify-center">
+                            <Lock className="w-3 h-3 mr-1" />
                             By clicking 'Setup Mandate', you agree to our Terms and Conditions.
                         </p>
-                        <div className="text-center pt-4">
+                        <div className="text-center pt-3">
                             <button
                                 type="button"
                                 onClick={onBackToDashboard}
-                                className="cursor-pointer text-sm text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
+                                className="cursor-pointer text-xs text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
                                 disabled={isProcessing}
                             >
-                                <ArrowLeft className="w-4 h-4 mr-1 cursor-pointer" /> Cancel and go back to plans
+                                <ArrowLeft className="w-3 h-3 mr-1 cursor-pointer" /> Cancel and go back to plans
                             </button>
                         </div>
                     </div>

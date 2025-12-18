@@ -181,7 +181,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                 <div className="flex items-center justify-between mb-2">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
                         <Shield className="w-8 h-8 text-indigo-400" />
-                        Super Admin Dashboard
+                        Super Admin
                     </h1>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <Calendar className="w-4 h-4" />
