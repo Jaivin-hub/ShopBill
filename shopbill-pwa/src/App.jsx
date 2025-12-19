@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { CreditCard, DollarSign, Home, Package, Barcode, Loader, TrendingUp, AlertTriangle, X, Plus, Trash2, Edit, Settings, CheckCircle, User, ShoppingCart, Minus, LogOut, Bell, Smartphone, Shield, Users } from 'lucide-react';
+import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users } from 'lucide-react';
+import { io } from 'socket.io-client';
 import NotificationToast from './components/NotificationToast';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
@@ -25,7 +26,7 @@ import SystemConfig from './components/SystemConfig';
 import GlobalReport from './components/GlobalReport';
 import Checkout from './components/Checkout';
 
-// --- UTILITY NAVIGATION ITEMS (New for Header/Utility area) ---
+// --- UTILITY NAVIGATION ITEMS ---
 const UTILITY_NAV_ITEMS_CONFIG = [
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
     { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
@@ -39,20 +40,11 @@ const SUPERADMIN_NAV_ITEMS = [
     { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
-// --- END SUPERADMIN CONFIG ---
 
-// Helper to check the URL for deep link routes on initial load
 const checkDeepLinkPath = () => {
     const path = window.location.pathname;
-    
-    if (path.startsWith('/staff-setup/')) {
-        return 'staffSetPassword'; 
-    }
-    
-    if (path.startsWith('/reset-password/')) {
-        return 'resetPassword'; 
-    }
-    
+    if (path.startsWith('/staff-setup/')) return 'staffSetPassword'; 
+    if (path.startsWith('/reset-password/')) return 'resetPassword'; 
     return null; 
 };
 
@@ -62,24 +54,21 @@ const App = () => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  
   const [isViewingLogin, setIsViewingLogin] = useState(false);
+  
+  // --- NEW: Persistent Notification State ---
+  const [notifications, setNotifications] = useState([]);
 
-  // Handler passed to LandingPage for paid subscriptions
-  // NEW FLOW: Go directly to checkout, signup happens after payment
   const handleSelectPlan = useCallback((plan) => {
     setSelectedPlan(plan);
-    setCurrentPage('checkout'); // Go directly to checkout
-}, []);
+    setCurrentPage('checkout');
+  }, []);
 
-  
-  // Dark Mode State - Load from localStorage or default to false (light mode)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
   
-  // Toggle dark mode and save to localStorage
   const toggleDarkMode = useCallback(() => {
     setIsDarkMode(prev => {
       const newValue = !prev;
@@ -88,7 +77,6 @@ const App = () => {
     });
   }, []);
   
-  // Apply dark mode class to document root on mount and when it changes
   useEffect(() => {
     const html = document.documentElement;
     if (isDarkMode) {
@@ -99,23 +87,7 @@ const App = () => {
       html.style.colorScheme = 'light';
     }
   }, [isDarkMode]);
-  
-  // Ensure dark mode is applied immediately on mount (sync with localStorage)
-  useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    const savedDarkMode = saved ? JSON.parse(saved) : false;
-    const html = document.documentElement;
-    
-    if (savedDarkMode) {
-      html.classList.add('dark');
-      html.style.colorScheme = 'dark';
-    } else {
-      html.classList.remove('dark');
-      html.style.colorScheme = 'light';
-    }
-  }, []); // Run only on mount
-  
-  // Normalized user role access
+
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
   const showToast = useCallback((message, type = 'info') => {
@@ -126,7 +98,43 @@ const App = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- LOGOUT HANDLER ---
+  // --- NEW: Fetch Notification History from API ---
+  const fetchNotificationHistory = useCallback(async () => {
+    try {
+        const response = await apiClient.get('/notifications/alerts');
+        if (response.data && response.data.alerts) {
+            setNotifications(response.data.alerts);
+        }
+    } catch (error) {
+        console.error("Error fetching notification history:", error);
+    }
+  }, []);
+
+  // --- UPDATED: GLOBAL SOCKET CONNECTION ---
+  useEffect(() => {
+    if (!currentUser?.shopId) return;
+
+    // Load existing alerts first
+    fetchNotificationHistory();
+
+    // Connect to backend root
+    const socket = io(`https://shopbill-1-frontend.onrender.com`);
+
+    socket.emit('join_shop', currentUser.shopId);
+
+    socket.on('new_notification', (newAlert) => {
+        // Show immediate toast
+        showToast(newAlert.message, 'info');
+        // Add to persistent list for the Notifications Page
+        setNotifications(prev => [newAlert, ...prev]);
+    });
+
+    return () => {
+        socket.off('new_notification');
+        socket.disconnect();
+    };
+  }, [currentUser?.shopId, showToast, fetchNotificationHistory]);
+
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
@@ -137,68 +145,42 @@ const App = () => {
     setIsLoadingAuth(false);
   }, [showToast]);
 
-  // --- LOGIN HANDLER (called from Login.js) ---
   const handleLoginSuccess = useCallback((user, token, planToCheckout = null) => {
     const userWithNormalizedRole = { ...user, role: user.role.toLowerCase() }; 
-    
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(userWithNormalizedRole));
-
     setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
-    
-    // NEW FLOW: If signup happened after checkout (planToCheckout exists), go to dashboard
-    // Otherwise, if it's a regular login, go to dashboard
     if (planToCheckout) {
-        // User just signed up after payment, go to dashboard
         showToast('Account created successfully! Your plan is now active.', 'success');
-        setSelectedPlan(null); // Clear the plan state
+        setSelectedPlan(null);
     } else {
         showToast('Welcome back!', 'success');
     }
-    
     setCurrentPage('dashboard');
-}, [showToast]);
+  }, [showToast]);
 
-
-  // --- INITIAL AUTH CHECK EFFECT (Runs once on mount) ---
-useEffect(() => {
+  useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
-    
     const deepLink = checkDeepLinkPath(); 
 
     if (token && userJson && token !== 'undefined' && token !== null) {
       try {
         let user = JSON.parse(userJson);
-        // Normalize role on load
         user = { ...user, role: user.role.toLowerCase() };
         setCurrentUser(user);
-        
-        if (deepLink) {
-            setCurrentPage('dashboard');
-        } 
-
+        if (deepLink) setCurrentPage('dashboard');
       } catch (error) {
-        console.error("Error parsing user data from localStorage:", error);
+        console.error("Error parsing user data:", error);
         logout();
       }
     } else if (deepLink) {
         setCurrentPage(deepLink);
     }
-    
     setIsLoadingAuth(false); 
-}, [logout]);
+  }, [logout]);
 
-
-  // --- Dark Mode Enforcement Effect ---
-  useEffect(() => {
-    const html = document.documentElement;
-    html.classList.add('dark');
-    html.style.colorScheme = 'dark'; 
-  }, []); 
-
-  // Action Functions (Simplified) - These are placeholders
   const addSale = useCallback(async (saleData) => {
     try {
       showToast('Sale successfully recorded!', 'success');
@@ -215,23 +197,11 @@ useEffect(() => {
     }
   }, [showToast]);
 
-  // --- NAVIGATION HANDLERS ---
-  const handleViewAllSales = useCallback(() => {
-    setCurrentPage('salesActivity');
-  }, []);
+  const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
+  const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
+  const handleViewAllInventory = useCallback(() => setCurrentPage('inventory'), []);
 
-  const handleViewAllCredit = useCallback(() => {
-    setCurrentPage('khata'); 
-  }, []);
-
-  const handleViewAllInventory = useCallback(() => {
-    setCurrentPage('inventory'); 
-  }, []);
-  // --- END NAVIGATION HANDLERS ---
-
-  // Main Navigation Menu Items with Access Control
   const navItems = useMemo(() => {
-    // 1. Define standard (non-superadmin) menu items
     const standardNav = [
         { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
@@ -239,31 +209,18 @@ useEffect(() => {
         { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
         { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
     ];
-
-    // 2. Return Superadmin menu if applicable
-    if (userRole === USER_ROLES.SUPERADMIN) {
-        return SUPERADMIN_NAV_ITEMS;
-    }
-
-    // 3. Otherwise, filter standard menu by user role
+    if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
-  // Utility Navigation Items with Access Control (for Header/Sidebar)
   const utilityNavItems = useMemo(() => {
-    // Superadmin has a different setup, only show Profile/Notifications
     if (userRole === USER_ROLES.SUPERADMIN) {
-        return UTILITY_NAV_ITEMS_CONFIG.filter(item => 
-            item.id === 'profile' || item.id === 'notifications'
-        );
+        return UTILITY_NAV_ITEMS_CONFIG.filter(item => item.id === 'profile' || item.id === 'notifications');
     }
-    
-    // Filter standard utility items
     return UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
   const renderContent = () => {
-    
     if (isLoadingAuth) {
          return (
              <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
@@ -272,20 +229,11 @@ useEffect(() => {
              </div>
         );
     }
-    
-    if (currentPage === 'staffSetPassword') {
-        return <StaffSetPassword />;
-    }
-    
-    if (currentPage === 'resetPassword') {
-        return <ResetPassword />;
-    }
+    if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
+    if (currentPage === 'resetPassword') return <ResetPassword />;
 
-    // --- CHECKOUT FLOW (Check first, before login/landing) ---
-    // NEW: Checkout can now be accessed by non-authenticated users
     if (currentPage === 'checkout') {
         if (!selectedPlan) {
-            // Should not happen, but ensure a fallback
             showToast('No plan selected. Redirecting to landing page.', 'error');
             setCurrentPage('dashboard');
             setIsViewingLogin(false);
@@ -295,276 +243,112 @@ useEffect(() => {
             <Checkout 
                 plan={selectedPlan}
                 onPaymentSuccess={(data) => {
-                    // NEW FLOW: Payment and signup completed - redirect to login
-                    if (data && data.success) {
-                        // Show success message and redirect to login
-                        showToast(data.message || 'Account created successfully! Please login to continue.', 'success');
-                        setCurrentPage('dashboard');
-                        setSelectedPlan(null);
-                        setIsViewingLogin(true); // Show login page
-                    } else {
-                        // Fallback: should not happen, but handle gracefully
-                        showToast('Account created successfully! Please login to continue.', 'success');
-                        setCurrentPage('dashboard');
-                        setSelectedPlan(null);
-                        setIsViewingLogin(true);
-                    }
+                    showToast(data.message || 'Account created successfully! Please login to continue.', 'success');
+                    setCurrentPage('dashboard');
+                    setSelectedPlan(null);
+                    setIsViewingLogin(true);
                 }}
                 onBackToDashboard={() => {
-                    // If user is not authenticated, go back to landing page
-                    if (!currentUser) {
-                        setCurrentPage('dashboard'); // Reset to default, which will show landing page
-                        setIsViewingLogin(false);
-                        setSelectedPlan(null);
-                    } else {
-                        setCurrentPage('dashboard');
-                        setSelectedPlan(null);
-                    }
+                    setCurrentPage('dashboard');
+                    setSelectedPlan(null);
+                    if (!currentUser) setIsViewingLogin(false);
                 }}
             />
         );
     }
-    // --- END CHECKOUT FLOW ---
 
-    // --- LANDING/LOGIN FLOW ---
     if (!currentUser) {
         if (isViewingLogin) {
-            // Show login page
             return <Login 
                 onLogin={handleLoginSuccess} 
                 showToast={showToast} 
                 onBackToLanding={() => {
-                    // *** CRITICAL UPDATE: Update state FIRST, then defer the hash navigation. ***
-                    
-                    // 1. Update state to switch from Login to LandingPage view
                     setIsViewingLogin(false);
                     setSelectedPlan(null); 
                     setCurrentPage('dashboard'); 
-
-                    // 2. Defer the hash navigation using setTimeout to ensure the LandingPage
-                    //    component has finished rendering before the browser attempts to scroll.
-                    setTimeout(() => {
-                        // If the URL is already on the root path, just setting the hash works.
-                        // We use a full assignment to ensure scroll happens.
-                        window.location.href = '#pricing';
-                    }, 100); // 100ms should be enough for component transition
+                    setTimeout(() => { window.location.href = '#pricing'; }, 100);
                 }} 
-                // initialPlan is no longer used - checkout handles signup now
                 initialPlan={null} 
             />;
         }
-        // Show landing page
-        return (
-            <LandingPage 
-                onStartApp={() => {
-                    setIsViewingLogin(true);
-                    setCurrentPage('dashboard'); // Ensure we're not on checkout
-                }} 
-                // PASS THE NEW HANDLER HERE
-                onSelectPlan={handleSelectPlan} 
-            />
-        );
+        return <LandingPage onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} onSelectPlan={handleSelectPlan} />;
     }
-    // --- END LANDING/LOGIN FLOW ---
     
-    const commonProps = {
-      currentUser, 
-      addSale,
-      updateCustomerCredit,
-      userRole,
-      showToast,
-      apiClient, 
-      API, 
-      onLogout:logout,
-      isDarkMode,
-      toggleDarkMode,
+    // Updated: Pass notifications state to sub-components
+    const commonProps = { 
+        currentUser, 
+        addSale, 
+        updateCustomerCredit, 
+        userRole, 
+        showToast, 
+        apiClient, 
+        API, 
+        onLogout:logout, 
+        isDarkMode, 
+        toggleDarkMode,
+        notifications,
+        setNotifications
     };
     
     switch (currentPage) {
       case 'dashboard':
-        // Show SuperAdminDashboard for superadmin, regular Dashboard for others
-        return userRole === USER_ROLES.SUPERADMIN ? (
-            <SuperAdminDashboard {...commonProps} />
-        ) : (
-            <Dashboard 
-                {...commonProps} 
-                onViewAllSales={handleViewAllSales}
-                onViewAllCredit={handleViewAllCredit}
-                onViewAllInventory={handleViewAllInventory}
-            />
-        );
-      case 'billing':
-        return <BillingPOS {...commonProps} />;
-      case 'khata':
-        return <Ledger {...commonProps} />;
-      case 'inventory':
-        // Only render InventoryManager if user is NOT Superadmin
-        return userRole !== USER_ROLES.SUPERADMIN 
-            ? <InventoryManager {...commonProps} />
-            : <div className="p-8 text-center text-gray-400">Superadmin: Access to Inventory via system tools.</div>;
-      case 'reports':
-        // Show GlobalReport for superadmin, regular Reports for others
-        return userRole === USER_ROLES.SUPERADMIN ? (
-            <GlobalReport {...commonProps} />
-        ) : (
-            <Reports {...commonProps} />
-        );
-      case 'salesActivity':
-        return <SalesActivityPage {...commonProps} />;
-      case 'settings':
-        return <SettingsPage {...commonProps} />; 
-      case 'profile':
-        return <Profile {...commonProps} />;
-      case 'notifications':
-        return <NotificationsPage {...commonProps} />;
-        
-      // --- NEW SUPERADMIN ROUTES ---
-      case 'superadmin_users':
-        return <UserManagement {...commonProps} />; 
-      case 'superadmin_systems':
-        return <SystemConfig {...commonProps} />; 
-      // --- END NEW SUPERADMIN ROUTES ---
+        return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+      case 'billing': return <BillingPOS {...commonProps} />;
+      case 'khata': return <Ledger {...commonProps} />;
+      case 'inventory': return userRole !== USER_ROLES.SUPERADMIN ? <InventoryManager {...commonProps} /> : <div className="p-8 text-center text-gray-400">Superadmin: Access to Inventory via system tools.</div>;
+      case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
+      case 'salesActivity': return <SalesActivityPage {...commonProps} />;
+      case 'settings': return <SettingsPage {...commonProps} />; 
+      case 'profile': return <Profile {...commonProps} />;
+      case 'notifications': return <NotificationsPage notifications={notifications} setNotifications={setNotifications} />;
+      case 'superadmin_users': return <UserManagement {...commonProps} />; 
+      case 'superadmin_systems': return <SystemConfig {...commonProps} />; 
       default:
-        // Default to Dashboard for all roles (SuperAdminDashboard for superadmin)
-        return userRole === USER_ROLES.SUPERADMIN ? (
-            <SuperAdminDashboard {...commonProps} />
-        ) : (
-            <Dashboard 
-                {...commonProps}
-                onViewAllSales={handleViewAllSales}
-                onViewAllCredit={handleViewAllCredit}
-                onViewAllInventory={handleViewAllInventory}
-            />
-        );
+        return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
     }
   };
 
-  // CRITICAL FIX: Exclude 'checkout' from showAppUI so it renders full-screen, without the sidebar/header.
-  const showAppUI = currentUser && 
-                    currentPage !== 'resetPassword' && 
-                    currentPage !== 'staffSetPassword' &&
-                    currentPage !== 'checkout'; 
-  
-  // Helper to correctly capitalize role for display
+  const showAppUI = currentUser && currentPage !== 'resetPassword' && currentPage !== 'staffSetPassword' && currentPage !== 'checkout'; 
   const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
 
   return (
     <ApiProvider>
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
-        
-        {/* Desktop Header */}
+        {showAppUI && <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} onLogout={logout} apiClient={apiClient} API={API} currentPage={currentPage} utilityNavItems={utilityNavItems} notifications={notifications} />}
         {showAppUI && (
-            <Header
-                companyName="Pocket POS"
-                userRole={displayRole} 
-                setCurrentPage={setCurrentPage}
-                onLogout={logout}
-                apiClient={apiClient}
-                API={API}
-                // CRITICAL: Passing these props for mobile header highlighting
-                currentPage={currentPage}
-                utilityNavItems={utilityNavItems}
-            />
-        )}
-        
-        {/* Desktop Sidebar */}
-        {showAppUI && (
-            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full 
-                 bg-white dark:bg-gray-900 shadow-2xl dark:shadow-indigo-900/10 z-10 
-                 transition-colors duration-300 border-r border-gray-200 dark:border-gray-800"
-            >
+            <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-white dark:bg-gray-900 shadow-2xl dark:shadow-indigo-900/10 z-10 transition-colors duration-300 border-r border-gray-200 dark:border-gray-800">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-2xl font-extrabold text-indigo-400">
-                        <Smartphone className="inline-block w-6 h-6 mr-2 text-indigo-400" /> Pocket POS
-                    </h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
-                        User: {displayRole}
-                    </p>
+                    <h2 className="text-2xl font-extrabold text-indigo-400"><Smartphone className="inline-block w-6 h-6 mr-2 text-indigo-400" /> Pocket POS</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">User: {displayRole}</p>
                 </div>
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    {/* Main Navigation Items */}
                     {navItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => setCurrentPage(item.id)}
-                            className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
-                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            }`}
-                        >
-                            <item.icon className="w-5 h-5 mr-3" />
-                            {item.name}
-                        </button>
+                        <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                     ))}
-                    
-                    {/* Utility Navigation Items for Desktop Sidebar */}
                     {utilityNavItems.length > 0 && (
                         <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
                             {utilityNavItems.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setCurrentPage(item.id)}
-                                    className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id
-                                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                    }`}
-                                >
-                                    <item.icon className="w-5 h-5 mr-3" />
-                                    {item.name}
-                                </button>
+                                <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                             ))}
                         </div>
                     )}
                 </nav>
-                
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                    <button
-                        onClick={logout}
-                        className="cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"
-                    >
-                        <LogOut className="w-5 h-5 mr-3" />
-                        Logout
-                    </button>
+                    <button onClick={logout} className="cursor-pointer w-full flex items-center p-3 rounded-xl font-medium transition duration-150 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20"><LogOut className="w-5 h-5 mr-3" />Logout</button>
                 </div>
-
             </div>
         )}
-
-        {/* Main Content Area */}
-        {/* Adjust margin based on showAppUI state */}
-        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-0 pb-16 md:pb-0' : 'w-full pt-0'}`}>
-            {renderContent()}
-        </main>
-
-        {/* Mobile Footer Navigation */}
+        <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-0 pb-16 md:pb-0' : 'w-full pt-0'}`}>{renderContent()}</main>
         {showAppUI && (
-            <nav className="fixed bottom-0 left-0 right-0 h-16 
-                 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 
-                 shadow-2xl md:hidden z-30 transition-colors duration-300"
-            >
+            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-2xl md:hidden z-30 transition-colors duration-300">
                 <div className="flex justify-around items-center h-full px-1">
                     {navItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => setCurrentPage(item.id)}
-                            className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id
-                                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-300'
-                            }`}
-                        >
-                            <item.icon className="w-5 h-5" />
-                            <span className="text-xs mt-0.5 whitespace-nowrap truncate">{item.name.split('/')[0]}</span>
-                        </button>
+                        <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center p-1 transition duration-150 flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-300'}`}><item.icon className="w-5 h-5" /><span className="text-xs mt-0.5 whitespace-nowrap truncate">{item.name.split('/')[0]}</span></button>
                     ))}
                 </div>
             </nav>
         )}
-
-        <NotificationToast
-          message={toast?.message}
-          type={toast?.type}
-          onClose={() => setToast(null)}
-        />
+        <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       </div>
     </ApiProvider>
   );

@@ -7,99 +7,98 @@ const router = express.Router();
 
 /**
  * UTILITY: emitAlert
- * This function is exported so you can call it from salesRoutes.js or inventoryRoutes.js
- * to push real-time notifications to the frontend via Socket.io.
+ * Call this from salesRoutes.js or inventoryRoutes.js.
+ * It sends a real-time signal to the specific shop's room.
  */
 const emitAlert = (req, shopId, type, data) => {
     const io = req.app.get('socketio');
-    if (!io) return;
+    if (!io) {
+        console.error("Socket.io instance not found on req.app");
+        return;
+    }
 
     let alertData = null;
+    const timestamp = new Date();
+    const uniqueId = `${type}-${data._id || Math.random().toString(36).substr(2, 9)}-${timestamp.getTime()}`;
 
     if (type === 'inventory_low') {
         alertData = {
-            id: `inv-low-${data.name}-${Date.now()}`,
+            id: uniqueId,
             type: 'inventory_low',
             category: 'Critical',
             title: 'Low Stock Alert',
-            message: `${data.name} is critically low. Stock: ${data.quantity}`,
-            timestamp: new Date(),
+            message: `${data.name} is critically low. Remaining: ${data.quantity}`,
+            timestamp: timestamp,
         };
     } else if (type === 'credit_exceeded') {
         alertData = {
-            id: `cust-credit-${data.name}-${Date.now()}`,
+            id: uniqueId,
             type: 'credit_exceeded',
             category: 'Urgent',
             title: 'Credit Limit Exceeded',
-            message: `${data.name} has exceeded their limit of ₹${data.creditLimit}. Outstanding: ₹${data.outstandingCredit}`,
-            timestamp: new Date(),
+            message: `${data.name} has exceeded limit of ₹${data.creditLimit}. Outstanding: ₹${data.outstandingCredit}`,
+            timestamp: timestamp,
         };
     }
 
     if (alertData) {
-        // Emit specifically to the shop's room (multi-tenancy)
+        // Multi-tenancy: Only send to the specific shop's room
         io.to(shopId.toString()).emit('new_notification', alertData);
+        console.log(`📡 Alert Emitted to Shop ${shopId}: ${alertData.message}`);
     }
 };
 
 /**
  * @route GET /api/notifications/alerts
- * @desc Get historical/initial alerts for the dashboard (Initial load)
- * @access Private
+ * @desc Fetch current active alerts (Low stock & Exceeded credit)
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
         const shopId = req.user.shopId;
         const criticalAlerts = [];
         
-        // --- 1. Fetch Current Low Stock ---
+        // 1. Fetch Items where quantity <= reorderLevel
         const lowStockItems = await Inventory.find({ 
             shopId: shopId,
             $expr: { $lte: ["$quantity", "$reorderLevel"] }
-        })
-        .select('name quantity reorderLevel -_id')
-        .limit(10);
+        }).limit(15);
 
         lowStockItems.forEach(item => {
             criticalAlerts.push({
-                id: `inv-low-${item.name}-${Date.now()}`,
+                id: `inv-${item._id}`,
                 type: 'inventory_low',
                 category: 'Critical',
-                title: 'Low Stock Alert',
                 message: `${item.name} is critically low. Stock: ${item.quantity}`,
-                timestamp: new Date(),
+                timestamp: item.updatedAt || new Date(),
             });
         });
         
-        // --- 2. Fetch Current Exceeded Credit ---
-        const exceededCreditCustomers = await Customer.find({
+        // 2. Fetch Customers where outstanding > limit
+        const exceededCustomers = await Customer.find({
             shopId: shopId,
             $expr: { $gt: ["$outstandingCredit", "$creditLimit"] }
-        })
-        .select('name outstandingCredit creditLimit -_id')
-        .limit(5);
+        }).limit(10);
 
-        exceededCreditCustomers.forEach(cust => {
+        exceededCustomers.forEach(cust => {
             criticalAlerts.push({
-                id: `cust-credit-exceeded-${cust.name}-${Date.now()}`,
+                id: `cred-${cust._id}`,
                 type: 'credit_exceeded',
                 category: 'Urgent',
-                title: 'Credit Limit Exceeded',
-                message: `${cust.name} has exceeded their limit of ₹${cust.creditLimit.toFixed(0)}.`,
-                timestamp: new Date(),
+                message: `${cust.name} exceeded credit limit (₹${cust.creditLimit}).`,
+                timestamp: cust.updatedAt || new Date(),
             });
         });
 
+        // Sort by newest first
         res.json({
             count: criticalAlerts.length,
-            alerts: criticalAlerts.sort((a, b) => b.timestamp - a.timestamp)
+            alerts: criticalAlerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         });
 
     } catch (error) {
-        console.error('Notification Alert Error:', error.message || error);
-        res.status(500).json({ error: 'Failed to fetch critical alerts.' });
+        console.error('Notification Route Error:', error);
+        res.status(500).json({ error: 'Failed to fetch alerts.' });
     }
 });
 
-// We export the router for the app.use() and the utility for real-time triggers
 module.exports = { router, emitAlert };

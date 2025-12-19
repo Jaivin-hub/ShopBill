@@ -223,13 +223,13 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handlePhysicalScannerInput}
-            className="w-full pl-10 pr-20 sm:pr-24 py-3 border border-gray-300 dark:border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white shadow-xl"
+            className="w-full pl-10 pr-24 py-3 border border-gray-300 dark:border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white shadow-xl"
             autoFocus
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-full bg-gray-200 dark:bg-gray-700/50 transition-colors z-10"
+              className="absolute right-14 top-1/2 transform -translate-y-1/2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-full bg-gray-200 dark:bg-gray-700/50 transition-colors z-10"
               title="Clear Search"
             >
               <X className="w-4 h-4" />
