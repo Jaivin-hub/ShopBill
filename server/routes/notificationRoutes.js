@@ -1,103 +1,92 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
-const Inventory = require('../models/Inventory');
-const Customer = require('../models/Customer'); 
+const Notification = require('../models/Notification'); // New Model
 
 const router = express.Router();
 
 /**
  * UTILITY: emitAlert
- * Call this from salesRoutes.js or inventoryRoutes.js.
- * It sends a real-time signal to the specific shop's room.
+ * Saves the alert to the DB first, then pushes via Socket.
  */
-const emitAlert = (req, shopId, type, data) => {
+const emitAlert = async (req, shopId, type, data) => {
     const io = req.app.get('socketio');
-    if (!io) {
-        console.error("Socket.io instance not found on req.app");
-        return;
-    }
-
-    let alertData = null;
-    const timestamp = new Date();
-    const uniqueId = `${type}-${data._id || Math.random().toString(36).substr(2, 9)}-${timestamp.getTime()}`;
+    
+    let title = '';
+    let category = 'Info';
+    let message = '';
+    let metadata = {};
 
     if (type === 'inventory_low') {
-        alertData = {
-            id: uniqueId,
-            type: 'inventory_low',
-            category: 'Critical',
-            title: 'Low Stock Alert',
-            message: `${data.name} is critically low. Remaining: ${data.quantity}`,
-            timestamp: timestamp,
-        };
+        title = 'Low Stock Alert';
+        category = 'Critical';
+        message = `${data.name} is low. Remaining: ${data.quantity}`;
+        metadata = { itemId: data._id };
     } else if (type === 'credit_exceeded') {
-        alertData = {
-            id: uniqueId,
-            type: 'credit_exceeded',
-            category: 'Urgent',
-            title: 'Credit Limit Exceeded',
-            message: `${data.name} has exceeded limit of ₹${data.creditLimit}. Outstanding: ₹${data.outstandingCredit}`,
-            timestamp: timestamp,
-        };
+        title = 'Credit Limit Exceeded';
+        category = 'Urgent';
+        message = `${data.name} has exceeded limit of ₹${data.creditLimit}.`;
+        metadata = { customerId: data._id };
     }
 
-    if (alertData) {
-        // Multi-tenancy: Only send to the specific shop's room
-        io.to(shopId.toString()).emit('new_notification', alertData);
-        console.log(`📡 Alert Emitted to Shop ${shopId}: ${alertData.message}`);
+    try {
+        // 1. Persist to Database so it's available on other devices/refresh
+        const newNotification = await Notification.create({
+            shopId,
+            type,
+            category,
+            title,
+            message,
+            metadata
+        });
+
+        // 2. Push to Socket for real-time UI update
+        if (io) {
+            io.to(shopId.toString()).emit('new_notification', newNotification);
+            console.log(`📡 Real-time Socket Sent to Shop ${shopId}`);
+        }
+        
+        return newNotification;
+    } catch (error) {
+        console.error("❌ Failed to save/emit notification:", error);
     }
 };
 
 /**
  * @route GET /api/notifications/alerts
- * @desc Fetch current active alerts (Low stock & Exceeded credit)
+ * @desc Fetch persistent notifications from the DB
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
         const shopId = req.user.shopId;
-        const criticalAlerts = [];
         
-        // 1. Fetch Items where quantity <= reorderLevel
-        const lowStockItems = await Inventory.find({ 
-            shopId: shopId,
-            $expr: { $lte: ["$quantity", "$reorderLevel"] }
-        }).limit(15);
+        // Fetch last 30 notifications from the DB (read and unread)
+        const notifications = await Notification.find({ shopId })
+            .sort({ createdAt: -1 })
+            .limit(30);
 
-        lowStockItems.forEach(item => {
-            criticalAlerts.push({
-                id: `inv-${item._id}`,
-                type: 'inventory_low',
-                category: 'Critical',
-                message: `${item.name} is critically low. Stock: ${item.quantity}`,
-                timestamp: item.updatedAt || new Date(),
-            });
-        });
-        
-        // 2. Fetch Customers where outstanding > limit
-        const exceededCustomers = await Customer.find({
-            shopId: shopId,
-            $expr: { $gt: ["$outstandingCredit", "$creditLimit"] }
-        }).limit(10);
-
-        exceededCustomers.forEach(cust => {
-            criticalAlerts.push({
-                id: `cred-${cust._id}`,
-                type: 'credit_exceeded',
-                category: 'Urgent',
-                message: `${cust.name} exceeded credit limit (₹${cust.creditLimit}).`,
-                timestamp: cust.updatedAt || new Date(),
-            });
-        });
-
-        // Sort by newest first
         res.json({
-            count: criticalAlerts.length,
-            alerts: criticalAlerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            count: notifications.length,
+            alerts: notifications
         });
-
     } catch (error) {
         console.error('Notification Route Error:', error);
-        res.status(500).json({ error: 'Failed to fetch alerts.' });
+        res.status(500).json({ error: 'Failed to fetch notification history.' });
+    }
+});
+
+/**
+ * @route PUT /api/notifications/read-all
+ * @desc Mark all notifications as read for the shop
+ */
+router.put('/read-all', protect, async (req, res) => {
+    try {
+        await Notification.updateMany(
+            { shopId: req.user.shopId, isRead: false },
+            { $set: { isRead: true } }
+        );
+        res.json({ message: 'All notifications marked as read.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Update failed.' });
     }
 });
 

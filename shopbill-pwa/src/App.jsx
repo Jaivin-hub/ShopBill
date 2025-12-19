@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users } from 'lucide-react';
 import { io } from 'socket.io-client';
 import NotificationToast from './components/NotificationToast';
@@ -56,8 +56,11 @@ const App = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   
-  // --- NEW: Persistent Notification State ---
+  // --- Notification State ---
   const [notifications, setNotifications] = useState([]);
+
+  // --- Socket Reference to prevent listener loss on re-renders ---
+  const socketRef = useRef(null);
 
   const handleSelectPlan = useCallback((plan) => {
     setSelectedPlan(plan);
@@ -98,7 +101,7 @@ const App = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- NEW: Fetch Notification History from API ---
+  // --- Fetch Notification History from API ---
   const fetchNotificationHistory = useCallback(async () => {
     try {
         const response = await apiClient.get('/notifications/alerts');
@@ -110,42 +113,53 @@ const App = () => {
     }
   }, []);
 
-  // --- UPDATED: GLOBAL SOCKET CONNECTION ---
+  // --- ROBUST GLOBAL SOCKET CONNECTION ---
   useEffect(() => {
     if (!currentUser?.shopId) return;
 
-    // 1. Load historical notifications from the database
+    // 1. Initial Data Load
     fetchNotificationHistory();
 
-    // 2. Connect to the BACKEND server (NOT the frontend URL)
-    // Based on your logs, this is https://shopbill-3le1.onrender.com
-    const socket = io("https://shopbill-3le1.onrender.com", {
+    // 2. Initialize Socket with persistent Ref
+    socketRef.current = io("https://shopbill-3le1.onrender.com", {
         transports: ['websocket', 'polling'],
-        withCredentials: true
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: 10
     });
+
+    const socket = socketRef.current;
 
     // 3. Join the specific room for this shop
     socket.emit('join_shop', currentUser.shopId);
 
-    // 4. Listen for real-time events
+    // 4. Persistent Real-time Listener
     socket.on('new_notification', (newAlert) => {
-        // Trigger the temporary toast popup
+        console.log("Real-time alert received:", newAlert);
+        
+        // Show immediate toast
         showToast(newAlert.message, 'info');
         
-        // Update the notifications list state so the red badge 
-        // in the Header and the NotificationsPage update instantly
+        // Update persistent list for Header badge and Notifications page
         setNotifications(prev => {
-            // Avoid adding the same notification twice
-            const exists = prev.find(n => (n.id || n._id) === (newAlert.id || newAlert._id));
+            const exists = prev.some(n => (n.id || n._id) === (newAlert.id || newAlert._id));
             if (exists) return prev;
             return [newAlert, ...prev];
         });
     });
 
+    // Handle connection errors for debugging
+    socket.on('connect_error', (err) => {
+        console.error("Socket connection error:", err.message);
+    });
+
     // 5. Cleanup on unmount or user change
     return () => {
-        socket.off('new_notification');
-        socket.disconnect();
+        if (socket) {
+            socket.off('new_notification');
+            socket.disconnect();
+            socketRef.current = null;
+        }
     };
   }, [currentUser?.shopId, showToast, fetchNotificationHistory]);
 
@@ -288,7 +302,6 @@ const App = () => {
         return <LandingPage onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} onSelectPlan={handleSelectPlan} />;
     }
     
-    // Updated: Pass notifications state to sub-components
     const commonProps = { 
         currentUser, 
         addSale, 
@@ -328,7 +341,19 @@ const App = () => {
   return (
     <ApiProvider>
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
-        {showAppUI && <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} onLogout={logout} apiClient={apiClient} API={API} currentPage={currentPage} utilityNavItems={utilityNavItems} notifications={notifications} />}
+        {showAppUI && (
+          <Header 
+            companyName="Pocket POS" 
+            userRole={displayRole} 
+            setCurrentPage={setCurrentPage} 
+            onLogout={logout} 
+            apiClient={apiClient} 
+            API={API} 
+            currentPage={currentPage} 
+            utilityNavItems={utilityNavItems} 
+            notifications={notifications} 
+          />
+        )}
         {showAppUI && (
             <div className="hidden md:flex flex-col w-64 fixed top-0 left-0 h-full bg-white dark:bg-gray-900 shadow-2xl dark:shadow-indigo-900/10 z-10 transition-colors duration-300 border-r border-gray-200 dark:border-gray-800">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
