@@ -29,7 +29,7 @@ const API = {
     sales: API_BASE_URL + '/sales',
     reportsSummary: API_BASE_URL + '/reports/summary',
     reportsChartData: API_BASE_URL + '/reports/chart-data',
-    notificationalert: API_BASE_URL + '/notifications/alerts',
+    // notificationalert: API_BASE_URL + '/notifications/alerts',
 
     // 💥 NEW: SUPERADMIN MANAGEMENT ENDPOINTS 💥
     superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)

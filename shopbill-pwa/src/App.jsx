@@ -114,21 +114,35 @@ const App = () => {
   useEffect(() => {
     if (!currentUser?.shopId) return;
 
-    // Load existing alerts first
+    // 1. Load historical notifications from the database
     fetchNotificationHistory();
 
-    // Connect to backend root
-    const socket = io(`https://shopbill-1-frontend.onrender.com`);
-
-    socket.emit('join_shop', currentUser.shopId);
-
-    socket.on('new_notification', (newAlert) => {
-        // Show immediate toast
-        showToast(newAlert.message, 'info');
-        // Add to persistent list for the Notifications Page
-        setNotifications(prev => [newAlert, ...prev]);
+    // 2. Connect to the BACKEND server (NOT the frontend URL)
+    // Based on your logs, this is https://shopbill-3le1.onrender.com
+    const socket = io("https://shopbill-3le1.onrender.com", {
+        transports: ['websocket', 'polling'],
+        withCredentials: true
     });
 
+    // 3. Join the specific room for this shop
+    socket.emit('join_shop', currentUser.shopId);
+
+    // 4. Listen for real-time events
+    socket.on('new_notification', (newAlert) => {
+        // Trigger the temporary toast popup
+        showToast(newAlert.message, 'info');
+        
+        // Update the notifications list state so the red badge 
+        // in the Header and the NotificationsPage update instantly
+        setNotifications(prev => {
+            // Avoid adding the same notification twice
+            const exists = prev.find(n => (n.id || n._id) === (newAlert.id || newAlert._id));
+            if (exists) return prev;
+            return [newAlert, ...prev];
+        });
+    });
+
+    // 5. Cleanup on unmount or user change
     return () => {
         socket.off('new_notification');
         socket.disconnect();
