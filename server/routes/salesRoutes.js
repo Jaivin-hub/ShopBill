@@ -4,13 +4,50 @@ const Sale = require('../models/Sale');
 const Inventory = require('../models/Inventory'); 
 const Customer = require('../models/Customer');
 const mongoose = require('mongoose');
-// UPDATED: Import resolveLowStockAlert
-const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
+// IMPORT the notification utility
+const { emitAlert } = require('./notificationRoutes'); 
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
-// ... (GET routes remain the same)
+// GET all sales for the shop (LIST VIEW)
+router.get('/', protect, async (req, res) => {
+    const { startDate, endDate } = req.query;
+    const filter = { shopId: req.user.shopId };
+    
+    if (startDate || endDate) {
+        filter.timestamp = {};
+        if (startDate) filter.timestamp.$gte = new Date(startDate);
+        if (endDate) filter.timestamp.$lte = new Date(endDate);
+    }
+
+    try {
+        const sales = await Sale.find(filter)
+            .populate('customerId', 'name')
+            .sort({ timestamp: -1 });
+        res.json(sales);
+    } catch (error) {
+        console.error('Failed to fetch sales data:', error);
+        res.status(500).json({ error: 'Failed to fetch sales data.' });
+    }
+});
+
+// GET a single sale detail by ID
+router.get('/:id', protect, async (req, res) => {
+    const saleId = req.params.id;
+    if (!isValidObjectId(saleId)) return res.status(400).json({ error: 'Invalid Sale ID.' });
+
+    try {
+        const sale = await Sale.findOne({ _id: saleId, shopId: req.user.shopId })
+            .populate('items.itemId')
+            .populate('customerId', 'name');
+
+        if (!sale) return res.status(404).json({ error: 'Sale not found.' });
+        res.json(sale);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch sale detail.' });
+    }
+});
 
 // POST a new sale
 router.post('/', protect, async (req, res) => {
