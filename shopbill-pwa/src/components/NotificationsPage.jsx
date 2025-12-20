@@ -39,6 +39,7 @@ const getNotificationTypeDetails = (type) => {
 };
 
 const NotificationsPage = ({ notifications, setNotifications }) => {
+    console.log("notification page",notifications)
     
     /**
      * Mark all as read in the database and clear the local state

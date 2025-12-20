@@ -7,7 +7,6 @@ const router = express.Router();
 /**
  * UTILITY: emitAlert
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
- * This function can be called from any route (Inventory, Sales, etc.)
  */
 const emitAlert = async (req, shopId, type, data) => {
     const io = req.app.get('socketio');
@@ -17,7 +16,6 @@ const emitAlert = async (req, shopId, type, data) => {
     let message = '';
     let metadata = {};
 
-    // Standardizing types to match Frontend (NotificationsPage.js)
     switch (type) {
         case 'inventory_low':
             title = 'Low Stock Alert';
@@ -46,7 +44,6 @@ const emitAlert = async (req, shopId, type, data) => {
     }
 
     try {
-        // 1. Persist to Database (ensures it shows up on page refresh/fetch)
         const newNotification = await Notification.create({
             shopId: shopId.toString(),
             type,
@@ -54,13 +51,11 @@ const emitAlert = async (req, shopId, type, data) => {
             title,
             message,
             metadata,
-            isRead: false, // Explicitly set to false for Header badge counting
+            isRead: false,
             createdAt: new Date()
         });
 
-        // 2. Push to Socket.io Room (Real-time update)
         if (io) {
-            // We emit the object created by Mongoose so it includes the generated _id
             io.to(shopId.toString()).emit('new_notification', newNotification);
             console.log(`📡 [Socket] Alert sent to Shop ${shopId}: ${message}`);
         }
@@ -79,11 +74,14 @@ router.get('/alerts', protect, async (req, res) => {
     try {
         const shopId = req.user.shopId;
         
-        // Fetch last 30 notifications for this shop, newest first
         const notifications = await Notification.find({ shopId })
             .sort({ createdAt: -1 })
             .limit(30);
 
+        // --- FIX: Disable Caching ---
+        // 'no-store' tells the browser/client never to cache this response.
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        
         res.json({
             count: notifications.length,
             alerts: notifications
@@ -96,7 +94,6 @@ router.get('/alerts', protect, async (req, res) => {
 
 /**
  * @route PUT /api/notifications/read-all
- * @desc Mark all unread notifications as read for the current shop
  */
 router.put('/read-all', protect, async (req, res) => {
     try {

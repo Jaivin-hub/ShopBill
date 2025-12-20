@@ -86,10 +86,14 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
+  /**
+   * FIXED: Added timestamp to prevent 304 Not Modified caching issues
+   */
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser) return;
     try {
-        const response = await apiClient.get('/notifications/alerts');
+        // Appending Date.now() ensures the browser always fetches fresh data
+        const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
         if (response.data && response.data.alerts) {
             setNotifications(response.data.alerts);
         }
@@ -104,19 +108,19 @@ const App = () => {
 
     fetchNotificationHistory();
 
-    // Initialize Socket with Auth Token
+    // Initialize Socket with Auth Token and proper Transport sequence for Render
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
-    auth: { token: localStorage.getItem('userToken') },
-    // Remove the transports line or ensure 'polling' is first
-    transports: ['polling', 'websocket'], 
-    withCredentials: true,
-    reconnection: true,
-});
+        auth: { token: localStorage.getItem('userToken') },
+        transports: ['polling', 'websocket'], // Polling first is more stable on Render
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: 5
+    });
 
     const socket = socketRef.current;
 
     socket.on('connect', () => {
-        console.log("Connected to Real-time server");
+        console.log(`🔌 Connected to Real-time server using ${socket.io.engine.transport.name}`);
         socket.emit('join_shop', currentUser.shopId);
     });
 
@@ -244,7 +248,8 @@ const App = () => {
                   </div>
               </aside>
           )}
-          <main className={`flex-1 transition-all ${showAppUI ? 'md:ml-64' : ''}`}>
+          {/* pt-16 ensures mobile content starts below the fixed Header */}
+          <main className={`flex-1 transition-all ${showAppUI ? 'md:ml-64 pt-16 md:pt-4' : ''}`}>
               {renderContent()}
           </main>
         </div>
