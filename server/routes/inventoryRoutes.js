@@ -11,14 +11,28 @@ const router = express.Router();
  * Uses the centralized notification utility to alert the shop owner.
  */
 const checkAndNotifyLowStock = async (req, item) => {
+    if (!item) return;
+
+    // Force values to Numbers to ensure the comparison (<=) works correctly
+    const currentQty = Number(item.quantity);
+    const reorderLevel = Number(item.reorderLevel) || 5;
+
     // Check if current quantity is at or below reorder level
-    if (item.quantity <= (item.reorderLevel || 5)) {
+    if (currentQty <= reorderLevel) {
         try {
-            // This helper saves to DB and sends Socket event in one go
-            await emitAlert(req, item.shopId, 'inventory_low', item);
-            console.log(`📡 Low stock alert triggered for: ${item.name}`);
+            // Ensure shopId is a string and data passed matches expected frontend structure
+            const shopIdString = item.shopId.toString();
+            
+            await emitAlert(req, shopIdString, 'inventory_low', {
+                _id: item._id,
+                name: item.name,
+                quantity: currentQty,
+                reorderLevel: reorderLevel
+            });
+            
+            console.log(`📡 Low stock alert triggered for: ${item.name} (Qty: ${currentQty})`);
         } catch (err) {
-            console.error("Error triggering low stock notification:", err);
+            console.error("❌ Error triggering low stock notification:", err);
         }
     }
 };
@@ -62,10 +76,11 @@ router.delete('/:id', protect, async (req, res) => {
     }
 });
 
-// 4. PUT Update Inventory Item (Triggers Notification if stock is reduced)
+// 4. PUT Update Inventory Item
 router.put('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
+        // Use { new: true } to get the updated document after the save
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: id, shopId: req.user.shopId }, 
             { $set: req.body }, 
@@ -80,6 +95,7 @@ router.put('/:id', protect, async (req, res) => {
             res.status(404).json({ error: 'Item not found.' });
         }
     } catch (error) {
+        console.error("Update Error:", error);
         res.status(500).json({ error: 'Failed to update inventory item.' });
     }
 });
@@ -94,7 +110,6 @@ router.post('/bulk', protect, async (req, res) => {
     }
 
     try {
-        // Clean and prepare items
         const cleanedItems = items.map(item => ({
             ...item,
             shopId: shopId,
@@ -104,13 +119,11 @@ router.post('/bulk', protect, async (req, res) => {
             reorderLevel: parseInt(item.reorderLevel) || 5,
         })).filter(item => item.name);
 
-        // Perform insertion (Note: Make sure duplication logic is handled per your schema)
         const result = await Inventory.insertMany(cleanedItems, { ordered: false }); 
         
-        // Bulk check for low stock items in the newly uploaded list
-        result.forEach(item => {
-            checkAndNotifyLowStock(req, item);
-        });
+        // Loop through results and trigger notifications
+        // We use Promise.all to ensure all notifications are processed
+        await Promise.all(result.map(item => checkAndNotifyLowStock(req, item)));
 
         res.status(201).json({ 
             message: `${result.length} items added successfully.`,

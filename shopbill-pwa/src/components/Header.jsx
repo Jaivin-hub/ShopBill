@@ -6,19 +6,20 @@ const Header = ({
     userRole, 
     setCurrentPage,
     currentPage,
-    notifications = [], 
+    notifications = [], // Default to empty array
     onLogout, 
     apiClient,  
     API         
 }) => {
     
-    // IMPROVEMENT: Count only unread notifications if the property exists, 
-    // otherwise fallback to total length.
-    const unreadCount = notifications.filter(n => n.isRead === false).length;
-    const totalCount = notifications.length;
+    /**
+     * LOGIC: Count unread notifications.
+     * A notification is considered unread if isRead is explicitly false 
+     * OR if the isRead property is missing (common for new real-time alerts).
+     */
+    const unreadCount = (notifications || []).filter(n => n.isRead === false || n.isRead === undefined).length;
     
-    // We use unreadCount for the badge to match standard app behavior
-    // If you prefer total count, simply change this to 'totalCount'
+    // We use unreadCount for the badge to alert the user of new items only
     const displayCount = unreadCount;
 
     const baseButtonClasses = `p-2 rounded-full 
@@ -42,13 +43,16 @@ const Header = ({
                    md:hidden 
                    z-30 p-4 flex justify-between items-center transition-colors duration-300`}
         >
+            {/* Logo Section */}
             <h1 className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate flex items-center">
                 <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
                 {companyName}
             </h1>
 
+            {/* Action Icons */}
             <div className="flex space-x-3 items-center">
                 
+                {/* Notifications Button with Dynamic Badge */}
                 <button
                     onClick={() => setCurrentPage('notifications')} 
                     className={`${getButtonClasses('notifications')} relative`}
@@ -56,14 +60,14 @@ const Header = ({
                 >
                     <Bell className="w-5 h-5" />
                     
-                    {/* Updated Badge Logic: Safe check for count > 0 */}
                     {displayCount > 0 && (
-                        <span className="absolute top-0 right-0 block h-5 w-5 rounded-full ring-2 ring-white dark:ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center transform translate-x-1 -translate-y-1.5 animate-in zoom-in duration-300">
+                        <span className="absolute top-0 right-0 block h-5 w-5 rounded-full ring-2 ring-white dark:ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center transform translate-x-1 -translate-y-1.5 animate-pulse">
                             {displayCount > 9 ? '9+' : displayCount}
                         </span>
                     )}
                 </button>
 
+                {/* Settings Button */}
                 <button
                     onClick={() => setCurrentPage('settings')} 
                     className={getButtonClasses('settings')}
@@ -72,6 +76,7 @@ const Header = ({
                     <Settings className="w-5 h-5" />
                 </button>
 
+                {/* Profile Button */}
                 <button
                     onClick={() => setCurrentPage('profile')} 
                     className={`${getButtonClasses('profile')} flex items-center`}

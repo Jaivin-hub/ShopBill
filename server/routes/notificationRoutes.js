@@ -7,7 +7,7 @@ const router = express.Router();
 /**
  * UTILITY: emitAlert
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
- * Can be called from inventoryRoutes, salesRoutes, etc.
+ * This function can be called from any route (Inventory, Sales, etc.)
  */
 const emitAlert = async (req, shopId, type, data) => {
     const io = req.app.get('socketio');
@@ -33,6 +33,12 @@ const emitAlert = async (req, shopId, type, data) => {
             metadata = { customerId: data._id };
             break;
 
+        case 'success':
+            title = 'Action Successful';
+            category = 'Info';
+            message = data.message || 'Operation completed successfully.';
+            break;
+
         default:
             title = 'System Notification';
             category = 'Info';
@@ -40,22 +46,23 @@ const emitAlert = async (req, shopId, type, data) => {
     }
 
     try {
-        // 1. Persist to Database (so it shows up on page refresh)
+        // 1. Persist to Database (ensures it shows up on page refresh/fetch)
         const newNotification = await Notification.create({
-            shopId,
+            shopId: shopId.toString(),
             type,
             category,
             title,
             message,
             metadata,
+            isRead: false, // Explicitly set to false for Header badge counting
             createdAt: new Date()
         });
 
         // 2. Push to Socket.io Room (Real-time update)
         if (io) {
-            // Emit to the shop-specific room
+            // We emit the object created by Mongoose so it includes the generated _id
             io.to(shopId.toString()).emit('new_notification', newNotification);
-            console.log(`📡 Real-time Socket alert sent to Shop: ${shopId}`);
+            console.log(`📡 [Socket] Alert sent to Shop ${shopId}: ${message}`);
         }
         
         return newNotification;
@@ -107,5 +114,4 @@ router.put('/read-all', protect, async (req, res) => {
     }
 });
 
-// Export both the router for index.js and the utility function for other routes
 module.exports = { router, emitAlert };

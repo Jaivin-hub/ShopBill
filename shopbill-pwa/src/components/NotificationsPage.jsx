@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle, Info, X, BellOff } from 'lucide-react';
+import apiClient from '../lib/apiClient'; // Ensure this import path is correct
 
 /**
  * Helper to determine styling based on notification type
@@ -40,10 +41,24 @@ const getNotificationTypeDetails = (type) => {
 const NotificationsPage = ({ notifications, setNotifications }) => {
     
     /**
-     * Remove a single notification from the global state
+     * Mark all as read in the database and clear the local state
+     */
+    const handleClearAll = async () => {
+        try {
+            // Call the backend route we created in notificationRoutes.js
+            await apiClient.put('/notifications/read-all');
+            // Clear frontend state
+            setNotifications([]);
+        } catch (error) {
+            console.error("Failed to clear notifications:", error);
+        }
+    };
+
+    /**
+     * Remove a single notification (visually)
      */
     const dismissNotification = (id) => {
-        setNotifications(prev => prev.filter(n => (n.id || n._id || n.timestamp) !== id));
+        setNotifications(prev => prev.filter(n => (n.id || n._id) !== id));
     };
     
     /**
@@ -70,10 +85,10 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                 </div>
                 {notifications.length > 0 && (
                     <button 
-                        onClick={() => setNotifications([])}
-                        className="text-xs font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg"
+                        onClick={handleClearAll}
+                        className="text-xs font-bold uppercase tracking-wider text-red-500 hover:text-white hover:bg-red-600 transition-all bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg border border-red-200 dark:border-red-900/50"
                     >
-                        Clear All
+                        Mark All Read
                     </button>
                 )}
             </div>
@@ -83,13 +98,12 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
                         const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);
-                        // Ensure we have a valid key
-                        const uniqueId = notification.id || notification._id || `notif-${index}`;
+                        const uniqueId = notification._id || notification.id || `notif-${index}`;
 
                         return (
                             <div 
                                 key={uniqueId} 
-                                className={`flex items-start p-4 rounded-xl shadow-sm border ${borderColor} ${bgColor} transition duration-300 hover:shadow-md`}
+                                className={`flex items-start p-4 rounded-xl shadow-sm border ${borderColor} ${bgColor} transition duration-300 hover:shadow-md animate-in slide-in-from-right-5`}
                             >
                                 {/* Icon Container */}
                                 <div className={`flex-shrink-0 mr-4 ${color}`}>
@@ -106,7 +120,7 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                                             {notification.type?.replace('_', ' ')}
                                         </span>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {formatTime(notification.timestamp)}
+                                            {formatTime(notification.createdAt || notification.timestamp)}
                                         </p>
                                     </div>
                                 </div>
