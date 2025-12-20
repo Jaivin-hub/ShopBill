@@ -1,38 +1,50 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
-// We import emitAlert which handles both Database saving and Socket emitting
-const { emitAlert } = require('./notificationRoutes'); 
+// UPDATED: Import resolveLowStockAlert along with emitAlert
+const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
 
 const router = express.Router();
 
 /**
  * HELPER: checkAndNotifyLowStock
- * Uses the centralized notification utility to alert the shop owner.
+ * Handles both alerting for low stock AND resolving alerts when stock is replenished.
  */
 const checkAndNotifyLowStock = async (req, item) => {
     if (!item) return;
 
-    // Force values to Numbers to ensure the comparison (<=) works correctly
     const currentQty = Number(item.quantity);
     const reorderLevel = Number(item.reorderLevel) || 5;
+    const shopIdString = item.shopId.toString();
 
-    // Check if current quantity is at or below reorder level
     if (currentQty <= reorderLevel) {
+        // --- CASE 1: STOCK IS LOW ---
         try {
-            // Use String conversion to ensure compatibility with Socket.io rooms
-            const shopIdString = item.shopId.toString();
-            
             await emitAlert(req, shopIdString, 'inventory_low', {
                 _id: item._id,
                 name: item.name,
-                quantity: currentQty,
-                reorderLevel: reorderLevel
+                quantity: currentQty
             });
-            
-            console.log(`📡 [Low Stock Triggered] Item: ${item.name} | Qty: ${currentQty} | Shop: ${shopIdString}`);
+            console.log(`📡 [Low Stock Alert] ${item.name}: ${currentQty}`);
         } catch (err) {
-            console.error("❌ Error triggering low stock notification:", err);
+            console.error("❌ Error triggering alert:", err);
+        }
+    } else {
+        // --- CASE 2: STOCK IS REPLENISHED (GOOD) ---
+        try {
+            // 1. Remove any existing "Low Stock" notifications for this specific item
+            await resolveLowStockAlert(req, shopIdString, item._id);
+
+            // 2. (Optional) Only send a "Success" notification if this was an update or bulk add
+            // We don't want to spam "Success" during every single sale interaction
+            if (req.method === 'PUT' || req.originalUrl.includes('/bulk')) {
+                await emitAlert(req, shopIdString, 'success', {
+                    message: `Stock replenished for ${item.name} (Now: ${currentQty})`,
+                    _id: item._id
+                });
+            }
+        } catch (err) {
+            console.error("❌ Error resolving notification:", err);
         }
     }
 };
@@ -54,14 +66,10 @@ router.post('/', protect, async (req, res) => {
             ...req.body, 
             shopId: req.user.shopId 
         });
-
-        // Trigger check on new item creation (in case it's added with low stock)
         await checkAndNotifyLowStock(req, item);
-
         res.json({ message: 'Item added successfully', item });
     } catch (error) {
-        console.error("Add Item Error:", error);
-        res.status(500).json({ error: 'Failed to add new inventory item.' });
+        res.status(500).json({ error: 'Failed to add item.' });
     }
 });
 
@@ -70,10 +78,10 @@ router.delete('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await Inventory.findOneAndDelete({ _id: id, shopId: req.user.shopId });
-        if (result) res.json({ message: `Item ${id} deleted successfully.` });
+        if (result) res.json({ message: `Item deleted.` });
         else res.status(404).json({ error: 'Item not found.' });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to delete inventory item.' });
+        res.status(500).json({ error: 'Failed to delete.' });
     }
 });
 
@@ -81,7 +89,6 @@ router.delete('/:id', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
-        // Use { new: true } to get the document AFTER the update for accurate stock check
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: id, shopId: req.user.shopId }, 
             { $set: req.body }, 
@@ -89,15 +96,14 @@ router.put('/:id', protect, async (req, res) => {
         );
 
         if (updatedItem) {
-            // Trigger check on update
+            // This will now clear the "Low Stock" alert if quantity was increased
             await checkAndNotifyLowStock(req, updatedItem);
             res.json({ message: 'Item updated successfully', item: updatedItem });
         } else {
             res.status(404).json({ error: 'Item not found.' });
         }
     } catch (error) {
-        console.error("Update Error:", error);
-        res.status(500).json({ error: 'Failed to update inventory item.' });
+        res.status(500).json({ error: 'Failed to update.' });
     }
 });
 
@@ -107,7 +113,7 @@ router.post('/bulk', protect, async (req, res) => {
     const shopId = req.user.shopId;
 
     if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'Expected an array of items.' });
+        return res.status(400).json({ error: 'Expected an array.' });
     }
 
     try {
@@ -122,7 +128,7 @@ router.post('/bulk', protect, async (req, res) => {
 
         const result = await Inventory.insertMany(cleanedItems, { ordered: false }); 
         
-        // Loop through results and trigger notifications for any items that start below reorder level
+        // This will clear alerts for any items in the bulk list that have sufficient stock
         await Promise.all(result.map(item => checkAndNotifyLowStock(req, item)));
 
         res.status(201).json({ 
@@ -132,7 +138,6 @@ router.post('/bulk', protect, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Inventory BULK POST Error:', error);
         res.status(500).json({ error: 'Failed to process bulk upload.' });
     }
 });

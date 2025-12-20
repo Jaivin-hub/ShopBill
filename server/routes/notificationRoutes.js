@@ -9,15 +9,11 @@ const router = express.Router();
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
  */
 const emitAlert = async (req, shopId, type, data) => {
-    // Retrieve the shared Socket.io instance from the app context
     const io = req.app.get('socketio');
-    
     let title = '';
     let category = 'Info';
     let message = '';
     let metadata = {};
-
-    // Standardize the shopId to a string to match Socket.io room naming
     const shopIdStr = shopId.toString();
 
     switch (type) {
@@ -27,28 +23,25 @@ const emitAlert = async (req, shopId, type, data) => {
             message = `Low stock alert: ${data.name} (${data.quantity} remaining)`;
             metadata = { itemId: data._id };
             break;
-            
         case 'credit_exceeded':
             title = 'Credit Limit Exceeded';
             category = 'Urgent';
-            message = `${data.name} has exceeded their credit limit of ₹${data.creditLimit}.`;
+            message = `${data.name} has exceeded their credit limit.`;
             metadata = { customerId: data._id };
             break;
-
         case 'success':
-            title = 'Action Successful';
+            title = 'Stock Updated';
             category = 'Info';
-            message = data.message || 'Operation completed successfully.';
+            message = data.message || 'Operation successful.';
+            metadata = data._id ? { itemId: data._id } : {};
             break;
-
         default:
             title = 'System Notification';
             category = 'Info';
-            message = data.message || 'New system update available.';
+            message = data.message || 'New system update.';
     }
 
     try {
-        // 1. Persist to Database
         const newNotification = await Notification.create({
             shopId: shopIdStr,
             type,
@@ -60,64 +53,69 @@ const emitAlert = async (req, shopId, type, data) => {
             createdAt: new Date()
         });
 
-        // 2. Emit via Socket.io for Real-time UI updates
         if (io) {
-            // We emit to the specific room named after the shopId
             io.to(shopIdStr).emit('new_notification', newNotification);
-            console.log(`📡 [Socket] Alert emitted to Room ${shopIdStr}: ${message}`);
-        } else {
-            console.warn("⚠️ Socket.io instance not found on req.app");
         }
-        
         return newNotification;
     } catch (error) {
-        console.error("❌ Failed to save or emit notification:", error.message);
+        console.error("❌ Notification Emit Error:", error.message);
     }
 };
 
 /**
- * @route GET /api/notifications/alerts
- * @desc Fetch persistent notification history from the DB
+ * NEW UTILITY: resolveLowStockAlert
+ * Call this when stock is re-added to remove old warnings automatically.
  */
+const resolveLowStockAlert = async (req, shopId, itemId) => {
+    const io = req.app.get('socketio');
+    const shopIdStr = shopId.toString();
+
+    try {
+        // 1. Remove the "inventory_low" alerts for this specific item from DB
+        await Notification.deleteMany({
+            shopId: shopIdStr,
+            type: 'inventory_low',
+            'metadata.itemId': itemId
+        });
+
+        // 2. Tell the frontend to remove this item from the notification list
+        if (io) {
+            io.to(shopIdStr).emit('resolve_notification', { itemId });
+            console.log(`🧹 Resolved alerts for item: ${itemId}`);
+        }
+    } catch (error) {
+        console.error("❌ Failed to resolve alerts:", error.message);
+    }
+};
+
+// --- API ROUTES ---
+
 router.get('/alerts', protect, async (req, res) => {
     try {
-        const shopId = req.user.shopId;
-        
-        const notifications = await Notification.find({ shopId })
+        const notifications = await Notification.find({ shopId: req.user.shopId })
             .sort({ createdAt: -1 })
             .limit(30);
-
-        // Disable Caching to ensure the "Real-time" feel when navigating back
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-        
         res.json({
-            count: notifications.filter(n => !n.isRead).length, // Return unread count specifically
+            count: notifications.filter(n => !n.isRead).length,
             alerts: notifications
         });
     } catch (error) {
-        console.error('Notification Route Error:', error);
-        res.status(500).json({ error: 'Failed to fetch notification history.' });
+        res.status(500).json({ error: 'Failed to fetch notifications.' });
     }
 });
 
-/**
- * @route PUT /api/notifications/read-all
- * @desc Mark all notifications for a shop as read
- */
 router.put('/read-all', protect, async (req, res) => {
     try {
         const result = await Notification.updateMany(
             { shopId: req.user.shopId, isRead: false },
             { $set: { isRead: true } }
         );
-        res.json({ 
-            message: 'All notifications marked as read.',
-            updatedCount: result.modifiedCount 
-        });
+        res.json({ message: 'Success', updatedCount: result.modifiedCount });
     } catch (error) {
-        console.error('Read-all Route Error:', error);
-        res.status(500).json({ error: 'Failed to update notifications.' });
+        res.status(500).json({ error: 'Failed to update.' });
     }
 });
 
-module.exports = { router, emitAlert };
+// EXPORT resolveLowStockAlert so inventoryRoutes can use it
+module.exports = { router, emitAlert, resolveLowStockAlert };

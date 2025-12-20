@@ -104,7 +104,6 @@ const App = () => {
 
     fetchNotificationHistory();
 
-    // Initialize Socket with Auth Token
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
         auth: { token: localStorage.getItem('userToken') },
         transports: ['polling', 'websocket'],
@@ -116,20 +115,25 @@ const App = () => {
 
     socket.on('connect', () => {
         console.log(`🔌 Connected to Real-time server`);
-        // Force string conversion to match backend room join
         socket.emit('join_shop', String(currentUser.shopId));
     });
 
+    // 1. Listen for NEW alerts (Low stock, Credit hit)
     socket.on('new_notification', (newAlert) => {
-        // Real-time update: Add new alert to the top of the list
         setNotifications(prev => {
             const exists = prev.some(n => (n._id === newAlert._id));
             if (exists) return prev;
             return [newAlert, ...prev];
         });
-        
-        // Trigger Toast for immediate visibility
         showToast(newAlert.message, 'info');
+    });
+
+    // 2. NEW: Listen for RESOLVED alerts (Stock added/replenished)
+    socket.on('resolve_notification', (data) => {
+        console.log(`🧹 Real-time resolve for Item: ${data.itemId}`);
+        setNotifications(prev => 
+            prev.filter(n => n.metadata?.itemId !== data.itemId)
+        );
     });
 
     socket.on('disconnect', () => console.log("🔌 Socket Disconnected"));
@@ -268,12 +272,6 @@ const App = () => {
             </nav>
         )}
       </div>
-      {/* Toast Notification Renderer */}
-      {toast && (
-          <div className={`fixed top-5 right-5 z-[100] p-4 rounded-lg shadow-2xl text-white transition-all transform animate-in fade-in slide-in-from-top-4 ${toast.type === 'success' ? 'bg-green-600' : 'bg-indigo-600'}`}>
-              {toast.message}
-          </div>
-      )}
     </ApiProvider>
   );
 };

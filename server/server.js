@@ -3,7 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv'); 
-const jwt = require('jsonwebtoken'); // Added for socket auth security
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
 const connectDB = require('./db'); 
@@ -41,10 +41,10 @@ const io = new Server(server, {
     },
     transports: ['polling', 'websocket'], 
     allowEIO3: true,
-    pingTimeout: 60000, // Increase timeout for better stability on mobile/slow networks
+    pingTimeout: 60000, 
 });
 
-// IMPORTANT: Shared Socket.io instance for routes to access via req.app.get('socketio')
+// IMPORTANT: Shared Socket.io instance
 app.set('socketio', io);
 
 // API Routes
@@ -62,10 +62,9 @@ app.use('/api/webhooks', webhookRouter);
 
 // --- SOCKET.IO LOGIC ---
 
-// Optional but Recommended: Socket Middleware for Security
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    if (!token) return next(); // In dev, you can allow, but production should check
+    if (!token) return next();
     
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -73,19 +72,26 @@ io.use((socket, next) => {
         next();
     } catch (err) {
         console.error("Socket Auth Error:", err.message);
-        next(); // Allow connection but won't have socket.user
+        next(); 
     }
 });
 
 io.on('connection', (socket) => {
-    console.log(`🔌 Client connected: ${socket.id} using ${socket.conn.transport.name}`);
+    console.log(`🔌 Client connected: ${socket.id}`);
 
-    // The core of your real-time count: Users join a room named after their shopId
     socket.on('join_shop', (shopId) => {
         if (shopId) {
-            const roomName = shopId.toString();
+            const roomName = String(shopId); // Ensure string
             socket.join(roomName);
-            console.log(`🏠 User ${socket.id} joined shop room: ${roomName}`);
+            console.log(`🏠 Socket ${socket.id} joined Room: ${roomName}`);
+        }
+    });
+
+    // Handle manual leave if needed
+    socket.on('leave_shop', (shopId) => {
+        if (shopId) {
+            socket.leave(String(shopId));
+            console.log(`🚪 Socket ${socket.id} left Room: ${shopId}`);
         }
     });
 
@@ -100,7 +106,7 @@ const startServer = async () => {
         await connectDB(); 
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`📡 Socket.io Active and Room-ready`);
+            console.log(`📡 Socket.io Active for Alerts & Resolutions`);
         });
     } catch (error) {
         console.error('Startup Error:', error);
