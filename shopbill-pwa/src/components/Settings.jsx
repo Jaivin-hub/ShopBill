@@ -403,13 +403,13 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                     <Globe className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> App Preferences
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                    <SettingItem 
+                    {/* <SettingItem 
                         icon={isDarkMode ? Moon : Sun} 
                         title="Dark Mode" 
                         description={isDarkMode ? "Switch to light mode for a brighter interface." : "Switch to dark mode for a comfortable viewing experience."} 
                         actionComponent={<ToggleSwitch checked={isDarkMode} onChange={handleToggleDarkMode} />} 
                         accentColor={isDarkMode ? "text-indigo-600 dark:text-indigo-400" : "text-yellow-600 dark:text-yellow-400"} 
-                    />
+                    /> */}
                     <SettingItem 
                         icon={Bell} 
                         title="Notifications" 

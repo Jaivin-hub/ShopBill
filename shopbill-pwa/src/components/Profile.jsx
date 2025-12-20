@@ -14,15 +14,10 @@ function Profile() {
     const mockUserId = 'mock-user-1234567890';
     
     // 2. State Initialization: Removed 'name' and use actual 'email' and 'phone' from currentUser
+    console.log('currentUser',currentUser)
     const [profile, setProfile] = useState({
         email: currentUser.email || '',
         phone: currentUser.phone || '', 
-        shopName: 'AJ Retail Solutions',
-        taxId: 'MOCKGST123456',
-        address: '101 Mock Street, Bengaluru, 560001',
-        currency: 'INR - Indian Rupee',
-        timezone: 'Asia/Kolkata (GMT+5:30)',
-        profileImageUrl: 'https://placehold.co/120x120/1e293b/ffffff?text=L' 
     });
 
     const [isEditing, setIsEditing] = useState(false);
@@ -104,17 +99,17 @@ function Profile() {
                     
                     <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-6">
                         <div className="relative">
-                            <img src={profile.profileImageUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-600"/>
-                            {isEditing && (
+                            {/* <img src={profile.profileImageUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-600"/> */}
+                            {/* {isEditing && (
                                 <button className="absolute bottom-0 right-0 p-1 bg-indigo-600 rounded-full text-white hover:bg-indigo-700 transition shadow-lg">
                                     <UploadCloud className="w-4 h-4" />
                                 </button>
-                            )}
+                            )} */}
                         </div>
-                        <div className="text-center sm:text-left">
+                        {/* <div className="text-center sm:text-left"> */}
                             {/* Displaying Email as primary identity now */}
-                            <p className="text-xl font-bold text-gray-900 dark:text-white break-all">{profile.email || 'No Email Found'}</p>
-                        </div>
+                            {/* <p className="text-xl font-bold text-gray-900 dark:text-white break-all">{profile.shopName || 'No Email Found'}</p> */}
+                        {/* </div> */}
                     </div>
 
                     <div className="space-y-4">
@@ -125,7 +120,7 @@ function Profile() {
                 </section>
 
                 {/* 2. Essential Business Details */}
-                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+                {/* <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
                         <Building className="w-5 h-5 mr-2 text-amber-400" /> Essential Business Details
                     </h2>
@@ -136,7 +131,7 @@ function Profile() {
                         <ProfileInputField label="Default Currency (Core Setting - Read-Only)" name="currency" value={profile.currency} icon={IndianRupee} readOnly={true}/>
                         <ProfileInputField label="Timezone (Core Setting - Read-Only)" name="timezone" value={profile.timezone} icon={Clock} readOnly={true}/>
                     </div>
-                </section>
+                </section> */}
                 
             </main>
         </div>

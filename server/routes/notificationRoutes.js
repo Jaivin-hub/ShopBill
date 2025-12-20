@@ -9,12 +9,16 @@ const router = express.Router();
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
  */
 const emitAlert = async (req, shopId, type, data) => {
+    // Retrieve the shared Socket.io instance from the app context
     const io = req.app.get('socketio');
     
     let title = '';
     let category = 'Info';
     let message = '';
     let metadata = {};
+
+    // Standardize the shopId to a string to match Socket.io room naming
+    const shopIdStr = shopId.toString();
 
     switch (type) {
         case 'inventory_low':
@@ -44,8 +48,9 @@ const emitAlert = async (req, shopId, type, data) => {
     }
 
     try {
+        // 1. Persist to Database
         const newNotification = await Notification.create({
-            shopId: shopId.toString(),
+            shopId: shopIdStr,
             type,
             category,
             title,
@@ -55,14 +60,18 @@ const emitAlert = async (req, shopId, type, data) => {
             createdAt: new Date()
         });
 
+        // 2. Emit via Socket.io for Real-time UI updates
         if (io) {
-            io.to(shopId.toString()).emit('new_notification', newNotification);
-            console.log(`📡 [Socket] Alert sent to Shop ${shopId}: ${message}`);
+            // We emit to the specific room named after the shopId
+            io.to(shopIdStr).emit('new_notification', newNotification);
+            console.log(`📡 [Socket] Alert emitted to Room ${shopIdStr}: ${message}`);
+        } else {
+            console.warn("⚠️ Socket.io instance not found on req.app");
         }
         
         return newNotification;
     } catch (error) {
-        console.error("❌ Failed to save or emit notification:", error);
+        console.error("❌ Failed to save or emit notification:", error.message);
     }
 };
 
@@ -78,12 +87,11 @@ router.get('/alerts', protect, async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(30);
 
-        // --- FIX: Disable Caching ---
-        // 'no-store' tells the browser/client never to cache this response.
+        // Disable Caching to ensure the "Real-time" feel when navigating back
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         
         res.json({
-            count: notifications.length,
+            count: notifications.filter(n => !n.isRead).length, // Return unread count specifically
             alerts: notifications
         });
     } catch (error) {
@@ -94,6 +102,7 @@ router.get('/alerts', protect, async (req, res) => {
 
 /**
  * @route PUT /api/notifications/read-all
+ * @desc Mark all notifications for a shop as read
  */
 router.put('/read-all', protect, async (req, res) => {
     try {

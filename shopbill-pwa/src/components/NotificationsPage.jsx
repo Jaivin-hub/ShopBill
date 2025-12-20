@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Info, X, BellOff } from 'lucide-react';
-import apiClient from '../lib/apiClient'; // Ensure this import path is correct
+import apiClient from '../lib/apiClient';
 
 /**
  * Helper to determine styling based on notification type
@@ -39,16 +39,30 @@ const getNotificationTypeDetails = (type) => {
 };
 
 const NotificationsPage = ({ notifications, setNotifications }) => {
-    console.log("notification page",notifications)
     
+    // Auto-mark as read when the page is viewed to clear the Header badge
+    useEffect(() => {
+        const markAsReadOnMount = async () => {
+            if (notifications.some(n => !n.isRead)) {
+                try {
+                    await apiClient.put('/api/notifications/read-all');
+                    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                } catch (err) {
+                    console.error("Silent fail on marking read:", err);
+                }
+            }
+        };
+        markAsReadOnMount();
+    }, []); // Run once when user navigates to this page
+
     /**
      * Mark all as read in the database and clear the local state
      */
     const handleClearAll = async () => {
         try {
-            // Call the backend route we created in notificationRoutes.js
-            await apiClient.put('/notifications/read-all');
-            // Clear frontend state
+            // Updated path to include /api/ prefix
+            await apiClient.put('/api/notifications/read-all');
+            // We clear the list entirely for a "fresh start" feel
             setNotifications([]);
         } catch (error) {
             console.error("Failed to clear notifications:", error);
@@ -87,25 +101,29 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                 {notifications.length > 0 && (
                     <button 
                         onClick={handleClearAll}
-                        className="text-xs font-bold uppercase tracking-wider text-red-500 hover:text-white hover:bg-red-600 transition-all bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg border border-red-200 dark:border-red-900/50"
+                        className="text-xs font-bold uppercase tracking-wider text-red-500 hover:text-white hover:bg-red-600 transition-all bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg border border-red-200 dark:border-red-900/50 outline-none"
                     >
-                        Mark All Read
+                        Clear All
                     </button>
                 )}
             </div>
 
             {/* Notifications List */}
-            <div className="space-y-3">
+            <div className="space-y-3 pb-20 md:pb-8">
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
                         const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);
                         const uniqueId = notification._id || notification.id || `notif-${index}`;
+                        const isNew = notification.isRead === false || notification.isRead === undefined;
 
                         return (
                             <div 
                                 key={uniqueId} 
-                                className={`flex items-start p-4 rounded-xl shadow-sm border ${borderColor} ${bgColor} transition duration-300 hover:shadow-md animate-in slide-in-from-right-5`}
+                                className={`flex items-start p-4 rounded-xl shadow-sm border ${borderColor} ${bgColor} transition duration-300 hover:shadow-md animate-in slide-in-from-right-5 relative overflow-hidden`}
                             >
+                                {/* New Indicator Stripe */}
+                                {isNew && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />}
+
                                 {/* Icon Container */}
                                 <div className={`flex-shrink-0 mr-4 ${color}`}>
                                     <Icon className="w-6 h-6" />
@@ -113,14 +131,14 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                                 
                                 {/* Content */}
                                 <div className="flex-grow">
-                                    <p className="font-semibold text-gray-900 dark:text-gray-100 leading-snug">
+                                    <p className={`text-gray-900 dark:text-gray-100 leading-snug ${isNew ? 'font-bold' : 'font-medium'}`}>
                                         {notification.message}
                                     </p>
-                                    <div className="flex items-center mt-1 space-x-2">
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border ${borderColor} ${color}`}>
+                                    <div className="flex items-center mt-2 space-x-2">
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border ${borderColor} ${color} bg-white/50 dark:bg-black/20`}>
                                             {notification.type?.replace('_', ' ')}
                                         </span>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
                                             {formatTime(notification.createdAt || notification.timestamp)}
                                         </p>
                                     </div>
@@ -144,7 +162,7 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                             <BellOff className="w-10 h-10 text-gray-400" />
                         </div>
                         <p className="text-xl font-bold text-gray-800 dark:text-gray-200">All caught up!</p>
-                        <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-xs text-center">
+                        <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-xs text-center text-sm">
                             New inventory alerts and credit limit warnings will appear here in real-time.
                         </p>
                     </div>

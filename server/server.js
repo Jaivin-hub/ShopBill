@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv'); 
+const jwt = require('jsonwebtoken'); // Added for socket auth security
 
 dotenv.config();
 const connectDB = require('./db'); 
@@ -24,27 +25,26 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
-// --- UPDATED MIDDLEWARE ---
-// Allow multiple origins or use a fallback for development
+// --- MIDDLEWARE ---
 app.use(cors({
-    origin: true, // Dynamically allow the requesting origin
+    origin: true, 
     credentials: true
 }));
 app.use(express.json());
 
-// --- UPDATED SOCKET.IO CONFIG ---
+// --- SOCKET.IO CONFIG ---
 const io = new Server(server, {
     cors: {
-        origin: true, // Set to true to allow any origin in development
+        origin: true,
         methods: ["GET", "POST"],
         credentials: true
     },
-    // Adding these settings helps Render's proxy handle connections
     transports: ['polling', 'websocket'], 
-    allowEIO3: true // Support older socket clients if necessary
+    allowEIO3: true,
+    pingTimeout: 60000, // Increase timeout for better stability on mobile/slow networks
 });
 
-// IMPORTANT: Shared Socket.io instance
+// IMPORTANT: Shared Socket.io instance for routes to access via req.app.get('socketio')
 app.set('socketio', io);
 
 // API Routes
@@ -60,15 +60,32 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRouter);
 
-// Socket.io Logic
+// --- SOCKET.IO LOGIC ---
+
+// Optional but Recommended: Socket Middleware for Security
+io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) return next(); // In dev, you can allow, but production should check
+    
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.user = decoded;
+        next();
+    } catch (err) {
+        console.error("Socket Auth Error:", err.message);
+        next(); // Allow connection but won't have socket.user
+    }
+});
+
 io.on('connection', (socket) => {
-    // Log the transport type to see if it's 'polling' or 'websocket'
     console.log(`🔌 Client connected: ${socket.id} using ${socket.conn.transport.name}`);
 
+    // The core of your real-time count: Users join a room named after their shopId
     socket.on('join_shop', (shopId) => {
         if (shopId) {
-            socket.join(shopId.toString());
-            console.log(`🏠 User joined shop room: ${shopId}`);
+            const roomName = shopId.toString();
+            socket.join(roomName);
+            console.log(`🏠 User ${socket.id} joined shop room: ${roomName}`);
         }
     });
 
@@ -83,7 +100,7 @@ const startServer = async () => {
         await connectDB(); 
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`📡 Socket.io Active`);
+            console.log(`📡 Socket.io Active and Room-ready`);
         });
     } catch (error) {
         console.error('Startup Error:', error);

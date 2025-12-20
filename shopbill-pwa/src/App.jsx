@@ -50,7 +50,6 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
@@ -77,22 +76,19 @@ const App = () => {
     const html = document.documentElement;
     if (isDarkMode) {
       html.classList.add('dark');
-      html.style.colorScheme = 'dark';
     } else {
       html.classList.remove('dark');
-      html.style.colorScheme = 'light';
     }
   }, [isDarkMode]);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
   /**
-   * FIXED: Added timestamp to prevent 304 Not Modified caching issues
+   * Fetches the last 30 notifications from the database
    */
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser) return;
     try {
-        // Appending Date.now() ensures the browser always fetches fresh data
         const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
         if (response.data && response.data.alerts) {
             setNotifications(response.data.alerts);
@@ -108,30 +104,35 @@ const App = () => {
 
     fetchNotificationHistory();
 
-    // Initialize Socket with Auth Token and proper Transport sequence for Render
+    // Initialize Socket with Auth Token
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
         auth: { token: localStorage.getItem('userToken') },
-        transports: ['polling', 'websocket'], // Polling first is more stable on Render
+        transports: ['polling', 'websocket'],
         withCredentials: true,
-        reconnection: true,
-        reconnectionAttempts: 5
+        reconnection: true
     });
 
     const socket = socketRef.current;
 
     socket.on('connect', () => {
-        console.log(`🔌 Connected to Real-time server using ${socket.io.engine.transport.name}`);
-        socket.emit('join_shop', currentUser.shopId);
+        console.log(`🔌 Connected to Real-time server`);
+        // Force string conversion to match backend room join
+        socket.emit('join_shop', String(currentUser.shopId));
     });
 
     socket.on('new_notification', (newAlert) => {
-        showToast(newAlert.message, 'info');
+        // Real-time update: Add new alert to the top of the list
         setNotifications(prev => {
             const exists = prev.some(n => (n._id === newAlert._id));
             if (exists) return prev;
             return [newAlert, ...prev];
         });
+        
+        // Trigger Toast for immediate visibility
+        showToast(newAlert.message, 'info');
     });
+
+    socket.on('disconnect', () => console.log("🔌 Socket Disconnected"));
 
     return () => {
         if (socket) {
@@ -192,7 +193,7 @@ const App = () => {
 
   const renderContent = () => {
     if (isLoadingAuth) return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-gray-950">
+      <div className="flex items-center justify-center min-h-screen">
         <Loader className="w-10 h-10 animate-spin text-indigo-500" />
       </div>
     );
@@ -223,9 +224,15 @@ const App = () => {
 
   return (
     <ApiProvider>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans">
         {showAppUI && (
-          <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} />
+          <Header 
+            companyName="Pocket POS" 
+            userRole={displayRole} 
+            setCurrentPage={setCurrentPage} 
+            currentPage={currentPage} 
+            notifications={notifications} 
+          />
         )}
         <div className="flex flex-1">
           {showAppUI && (
@@ -235,11 +242,11 @@ const App = () => {
                   </div>
                   <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                       {navItems.map(item => (
-                          <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                          <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                       ))}
                       <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                           {utilityNavItems.map(item => (
-                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                           ))}
                       </div>
                   </nav>
@@ -248,11 +255,11 @@ const App = () => {
                   </div>
               </aside>
           )}
-          {/* pt-16 ensures mobile content starts below the fixed Header */}
-          <main className={`flex-1 transition-all ${showAppUI ? 'md:ml-64 pt-16 md:pt-4' : ''}`}>
+          <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-4' : ''}`}>
               {renderContent()}
           </main>
         </div>
+        {/* Mobile Navigation */}
         {showAppUI && (
             <nav className="fixed bottom-0 inset-x-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:hidden flex justify-around items-center px-2 z-30">
                 {navItems.map(item => (
@@ -261,6 +268,12 @@ const App = () => {
             </nav>
         )}
       </div>
+      {/* Toast Notification Renderer */}
+      {toast && (
+          <div className={`fixed top-5 right-5 z-[100] p-4 rounded-lg shadow-2xl text-white transition-all transform animate-in fade-in slide-in-from-top-4 ${toast.type === 'success' ? 'bg-green-600' : 'bg-indigo-600'}`}>
+              {toast.message}
+          </div>
+      )}
     </ApiProvider>
   );
 };

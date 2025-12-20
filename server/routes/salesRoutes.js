@@ -4,147 +4,128 @@ const Sale = require('../models/Sale');
 const Inventory = require('../models/Inventory'); 
 const Customer = require('../models/Customer');
 const mongoose = require('mongoose');
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+// IMPORT the notification utility
+const { emitAlert } = require('./notificationRoutes'); 
 
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
 // GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
-    // Extract date range from query parameters
     const { startDate, endDate } = req.query;
-    
-    // Build the query filter object
     const filter = { shopId: req.user.shopId };
     
-    // Add date range filtering if parameters are provided
     if (startDate || endDate) {
         filter.timestamp = {};
-        if (startDate) {
-            // Find sales with timestamp >= startDate
-            filter.timestamp.$gte = new Date(startDate);
-        }
-        if (endDate) {
-            // Find sales with timestamp <= endDate
-            filter.timestamp.$lte = new Date(endDate);
-        }
+        if (startDate) filter.timestamp.$gte = new Date(startDate);
+        if (endDate) filter.timestamp.$lte = new Date(endDate);
     }
 
     try {
-        // SCOPED QUERY: fetch sales for the user's shopId, applying date filters
-        const sales = await Sale.find(filter) // Use the constructed filter object
-            .populate('customerId', 'name') // Populate customerId, only retrieving the 'name' field
+        const sales = await Sale.find(filter)
+            .populate('customerId', 'name')
             .sort({ timestamp: -1 });
-            
-        // Sales objects will now look like: 
-        // { ..., customerId: { _id: '...', name: 'Customer Name' }, ... }
         res.json(sales);
     } catch (error) {
-        console.error('Failed to fetch sales data with date filter:', error);
+        console.error('Failed to fetch sales data:', error);
         res.status(500).json({ error: 'Failed to fetch sales data.' });
     }
 });
 
-// GET a single sale detail by ID (VIEW BILL MODAL)
+// GET a single sale detail by ID
 router.get('/:id', protect, async (req, res) => {
     const saleId = req.params.id;
-
-    if (!isValidObjectId(saleId)) {
-        return res.status(400).json({ error: 'Invalid Sale ID.' });
-    }
+    if (!isValidObjectId(saleId)) return res.status(400).json({ error: 'Invalid Sale ID.' });
 
     try {
-        // Fetch the sale, ensuring it belongs to the user's shop
-        // Populate item details AND customer details for the detailed view
         const sale = await Sale.findOne({ _id: saleId, shopId: req.user.shopId })
-            .populate('items.itemId') // Product details for the bill items
-            .populate('customerId', 'name'); // Customer name for the bill header
+            .populate('items.itemId')
+            .populate('customerId', 'name');
 
-        if (!sale) {
-            return res.status(404).json({ error: 'Sale not found or unauthorized.' });
-        }
-
+        if (!sale) return res.status(404).json({ error: 'Sale not found.' });
         res.json(sale);
     } catch (error) {
-        console.error('Sale GET by ID Error:', error.message);
         res.status(500).json({ error: 'Failed to fetch sale detail.' });
     }
 });
 
-
+// POST a new sale
 router.post('/', protect, async (req, res) => {
-    // Destructure all required fields, including the new payment split amounts
     const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid } = req.body; 
-    
-    // VALIDATION: Ensure amountCredited is a valid number, default to 0
     const saleAmountCredited = parseFloat(amountCredited) || 0;
-    
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
-    let schemaPaymentMethod = paymentMethod; // Assumes client sends 'UPI', 'Credit', or 'Mixed'
-    
+    const shopId = req.user.shopId;
+
     try {
         // --- 1. Stock Check & Validation ---
         if (items && items.length > 0) {
              for (const item of items) {
-                const inventoryItem = await Inventory.findOne({ _id: item.itemId, shopId: req.user.shopId }); 
-                
-                if (!inventoryItem) {
-                    throw new Error(`Validation failed: Inventory item ID ${item.itemId} not found for this shop.`);
-                }
+                const inventoryItem = await Inventory.findOne({ _id: item.itemId, shopId }); 
+                if (!inventoryItem) throw new Error(`Inventory item not found.`);
                 if (item.quantity > inventoryItem.quantity) {
-                    throw new Error(`Validation failed: Not enough stock for ${inventoryItem.name}. Only ${inventoryItem.quantity} available.`);
+                    throw new Error(`Not enough stock for ${inventoryItem.name}.`);
                 }
             }
         }
         
-        // --- 2. Customer Credit Limit Check (Server-side defense) ---
+        // --- 2. Customer Credit Limit Check ---
         if (saleAmountCredited > 0 && saleCustomerId) {
-            const customer = await Customer.findOne({ _id: saleCustomerId, shopId: req.user.shopId });
-            
-            if (!customer) {
-                throw new Error(`Credit error: Customer ID ${saleCustomerId} not found or does not belong to this shop.`);
-            }
+            const customer = await Customer.findOne({ _id: saleCustomerId, shopId });
+            if (!customer) throw new Error(`Customer not found.`);
             
             const khataDue = customer.outstandingCredit || 0;
             const creditLimit = customer.creditLimit || Infinity;
 
             if (khataDue + saleAmountCredited > creditLimit) {
-                throw new Error(`Credit limit of ₹${creditLimit.toFixed(0)} exceeded! Cannot add ₹${saleAmountCredited.toFixed(2)} to Khata.`);
+                throw new Error(`Credit limit of ₹${creditLimit} exceeded!`);
             }
         }
         
-        // --- 3. Create the new sale record ---
+        // --- 3. Create Sale Record ---
         const newSale = await Sale.create({
             totalAmount,
-            paymentMethod: schemaPaymentMethod,
+            paymentMethod,
             customerId: saleCustomerId, 
             items: items || [], 
-            amountPaid: amountPaid,          // Saved for audit
-            amountCredited: saleAmountCredited, // Saved for audit
-            shopId: req.user.shopId, // CRITICAL: SCOPE THE SALE TO THE SHOP
+            amountPaid,
+            amountCredited: saleAmountCredited,
+            shopId,
         });
 
-        // --- 4. Update Inventory ---
+        // --- 4. Update Inventory & Track for Notifications ---
+        let updatedInventoryDocs = [];
         if (items && items.length > 0) {
              const inventoryUpdates = items.map(item =>
                 Inventory.findOneAndUpdate(
-                    { _id: item.itemId, shopId: req.user.shopId }, 
+                    { _id: item.itemId, shopId }, 
                     { $inc: { quantity: -item.quantity } }, 
                     { new: true } 
                 )
             );
-            await Promise.all(inventoryUpdates);
+            updatedInventoryDocs = await Promise.all(inventoryUpdates);
         }
 
-        // --- 5. Update Customer Credit (The Single Fix for Khata) ---
+        // --- 5. Update Customer Credit ---
         if (saleAmountCredited > 0 && saleCustomerId) { 
-            const updatedCustomer = await Customer.findOneAndUpdate(
-                { _id: saleCustomerId, shopId: req.user.shopId },
-                { $inc: { outstandingCredit: saleAmountCredited } }, // Uses the precise credit amount (no double counting)
-                { new: true } 
+            await Customer.findOneAndUpdate(
+                { _id: saleCustomerId, shopId },
+                { $inc: { outstandingCredit: saleAmountCredited } }
             );
+        }
 
-            if (!updatedCustomer) {
-                 throw new Error(`Credit error: Customer ID ${saleCustomerId} not found or does not belong to this shop.`);
+        // --- 6. REAL-TIME LOW STOCK NOTIFICATION ---
+        // Check updated inventory docs and trigger alerts if stock is low
+        for (const item of updatedInventoryDocs) {
+            const currentQty = Number(item.quantity);
+            const reorderLevel = Number(item.reorderLevel) || 5;
+
+            if (currentQty <= reorderLevel) {
+                // This triggers the DB save and the Socket.io emit
+                await emitAlert(req, shopId, 'inventory_low', {
+                    _id: item._id,
+                    name: item.name,
+                    quantity: currentQty
+                });
             }
         }
 
@@ -152,7 +133,7 @@ router.post('/', protect, async (req, res) => {
 
     } catch (error) {
         console.error('Sale POST Error:', error.message);
-        const status = error.message.includes('Validation failed') || error.message.includes('Credit limit') || error.message.includes('Credit error') ? 400 : 500;
+        const status = error.message.includes('limit') || error.message.includes('stock') ? 400 : 500;
         res.status(status).json({ error: error.message || 'Failed to record sale.' });
     }
 });
