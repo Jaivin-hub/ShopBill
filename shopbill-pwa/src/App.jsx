@@ -106,11 +106,12 @@ const App = () => {
 
     // Initialize Socket with Auth Token
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
-        auth: { token: localStorage.getItem('userToken') },
-        transports: ['websocket', 'polling'],
-        withCredentials: true,
-        reconnection: true
-    });
+    auth: { token: localStorage.getItem('userToken') },
+    // Remove the transports line or ensure 'polling' is first
+    transports: ['polling', 'websocket'], 
+    withCredentials: true,
+    reconnection: true,
+});
 
     const socket = socketRef.current;
 

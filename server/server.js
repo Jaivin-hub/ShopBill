@@ -24,21 +24,28 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
-// Initialize Socket.io with updated CORS for Production
+// --- UPDATED MIDDLEWARE ---
+// Allow multiple origins or use a fallback for development
+app.use(cors({
+    origin: true, // Dynamically allow the requesting origin
+    credentials: true
+}));
+app.use(express.json());
+
+// --- UPDATED SOCKET.IO CONFIG ---
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "*", 
+        origin: true, // Set to true to allow any origin in development
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    // Adding these settings helps Render's proxy handle connections
+    transports: ['polling', 'websocket'], 
+    allowEIO3: true // Support older socket clients if necessary
 });
 
 // IMPORTANT: Shared Socket.io instance
 app.set('socketio', io);
-
-// Middleware
-app.use(cors());
-app.use(express.json());
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -55,7 +62,8 @@ app.use('/api/webhooks', webhookRouter);
 
 // Socket.io Logic
 io.on('connection', (socket) => {
-    console.log(`🔌 Client connected: ${socket.id}`);
+    // Log the transport type to see if it's 'polling' or 'websocket'
+    console.log(`🔌 Client connected: ${socket.id} using ${socket.conn.transport.name}`);
 
     socket.on('join_shop', (shopId) => {
         if (shopId) {
@@ -64,8 +72,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
-        console.log(`❌ Client disconnected: ${socket.id}`);
+    socket.on('disconnect', (reason) => {
+        console.log(`❌ Client disconnected: ${socket.id} (Reason: ${reason})`);
     });
 });
 
