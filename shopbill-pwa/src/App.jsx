@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users } from 'lucide-react';
 import { io } from 'socket.io-client';
-import NotificationToast from './components/NotificationToast';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
 import API from './config/api';
@@ -122,6 +121,7 @@ const App = () => {
 
     // 2. Initialize Socket with persistent Ref
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
+        auth: { token: localStorage.getItem('userToken') },
         transports: ['websocket', 'polling'],
         withCredentials: true,
         reconnection: true,
@@ -387,7 +387,6 @@ const App = () => {
                 </div>
             </nav>
         )}
-        <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       </div>
     </ApiProvider>
   );

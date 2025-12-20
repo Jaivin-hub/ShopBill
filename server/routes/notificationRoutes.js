@@ -1,12 +1,13 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
-const Notification = require('../models/Notification'); // New Model
+const Notification = require('../models/Notification');
 
 const router = express.Router();
 
 /**
  * UTILITY: emitAlert
- * Saves the alert to the DB first, then pushes via Socket.
+ * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
+ * Can be called from inventoryRoutes, salesRoutes, etc.
  */
 const emitAlert = async (req, shopId, type, data) => {
     const io = req.app.get('socketio');
@@ -16,50 +17,62 @@ const emitAlert = async (req, shopId, type, data) => {
     let message = '';
     let metadata = {};
 
-    if (type === 'inventory_low') {
-        title = 'Low Stock Alert';
-        category = 'Critical';
-        message = `${data.name} is low. Remaining: ${data.quantity}`;
-        metadata = { itemId: data._id };
-    } else if (type === 'credit_exceeded') {
-        title = 'Credit Limit Exceeded';
-        category = 'Urgent';
-        message = `${data.name} has exceeded limit of ₹${data.creditLimit}.`;
-        metadata = { customerId: data._id };
+    // Standardizing types to match Frontend (NotificationsPage.js)
+    switch (type) {
+        case 'inventory_low':
+            title = 'Low Stock Alert';
+            category = 'Critical';
+            message = `Low stock alert: ${data.name} (${data.quantity} remaining)`;
+            metadata = { itemId: data._id };
+            break;
+            
+        case 'credit_exceeded':
+            title = 'Credit Limit Exceeded';
+            category = 'Urgent';
+            message = `${data.name} has exceeded their credit limit of ₹${data.creditLimit}.`;
+            metadata = { customerId: data._id };
+            break;
+
+        default:
+            title = 'System Notification';
+            category = 'Info';
+            message = data.message || 'New system update available.';
     }
 
     try {
-        // 1. Persist to Database so it's available on other devices/refresh
+        // 1. Persist to Database (so it shows up on page refresh)
         const newNotification = await Notification.create({
             shopId,
             type,
             category,
             title,
             message,
-            metadata
+            metadata,
+            createdAt: new Date()
         });
 
-        // 2. Push to Socket for real-time UI update
+        // 2. Push to Socket.io Room (Real-time update)
         if (io) {
+            // Emit to the shop-specific room
             io.to(shopId.toString()).emit('new_notification', newNotification);
-            console.log(`📡 Real-time Socket Sent to Shop ${shopId}`);
+            console.log(`📡 Real-time Socket alert sent to Shop: ${shopId}`);
         }
         
         return newNotification;
     } catch (error) {
-        console.error("❌ Failed to save/emit notification:", error);
+        console.error("❌ Failed to save or emit notification:", error);
     }
 };
 
 /**
  * @route GET /api/notifications/alerts
- * @desc Fetch persistent notifications from the DB
+ * @desc Fetch persistent notification history from the DB
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
         const shopId = req.user.shopId;
         
-        // Fetch last 30 notifications from the DB (read and unread)
+        // Fetch last 30 notifications for this shop, newest first
         const notifications = await Notification.find({ shopId })
             .sort({ createdAt: -1 })
             .limit(30);
@@ -76,18 +89,23 @@ router.get('/alerts', protect, async (req, res) => {
 
 /**
  * @route PUT /api/notifications/read-all
- * @desc Mark all notifications as read for the shop
+ * @desc Mark all unread notifications as read for the current shop
  */
 router.put('/read-all', protect, async (req, res) => {
     try {
-        await Notification.updateMany(
+        const result = await Notification.updateMany(
             { shopId: req.user.shopId, isRead: false },
             { $set: { isRead: true } }
         );
-        res.json({ message: 'All notifications marked as read.' });
+        res.json({ 
+            message: 'All notifications marked as read.',
+            updatedCount: result.modifiedCount 
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Update failed.' });
+        console.error('Read-all Route Error:', error);
+        res.status(500).json({ error: 'Failed to update notifications.' });
     }
 });
 
+// Export both the router for index.js and the utility function for other routes
 module.exports = { router, emitAlert };
