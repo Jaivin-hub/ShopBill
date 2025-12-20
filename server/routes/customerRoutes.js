@@ -10,7 +10,6 @@ router.get('/', protect, async (req, res) => {
     try {
         // SCOPED QUERY: ONLY fetch customers for the user's shopId
         const customers = await Customer.find({ shopId: req.user.shopId });
-        console.log('customers',customers)
         res.json(customers);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch customers.' });
