@@ -46,7 +46,7 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
             const unreadIds = notifications.filter(n => !n.isRead).map(n => n._id);
             if (unreadIds.length > 0) {
                 try {
-                    await apiClient.put('/api/notifications/read-all');
+                    await apiClient.put('/notifications/read-all');
                     // Update local state so stripes disappear
                     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
                 } catch (err) {
