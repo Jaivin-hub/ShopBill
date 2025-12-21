@@ -147,47 +147,46 @@ router.get('/summary', protect, async (req, res) => {
 router.get('/chart-data', protect, async (req, res) => {
     try {
         const dateFilter = getSalesDateFilter(req);
-        const { viewType} = req.query; 
+        const { viewType } = req.query; 
         
-        const { id: aggregationId, label: labelName, sortKey } = getChartAggregation(viewType);
+        // We still call this to get the labelName (e.g., 'Day')
+        const { label: labelName } = getChartAggregation(viewType);
 
-        // SCOPED QUERY: Add shopId to the initial $match stage
+        // Define the date format based on viewType
+        let dateFormat = "%Y-%m-%d"; // Default for 'Day'
+        if (viewType === 'Month') dateFormat = "%Y-%m";
+        if (viewType === 'Week') dateFormat = "%Y-W%U";
+
         const matchStage = { $match: { 
             ...dateFilter, 
             shopId: req.user.shopId 
         } }; 
 
         const chartData = await Sale.aggregate([
-            // 1. Filter by Date Range AND Shop ID
             matchStage,
-            
-            // 2. Group and Aggregate
             {
                 $group: {
-                    _id: aggregationId, 
+                    // Use dateToString to get an actual date string as the ID
+                    _id: { 
+                        $dateToString: { format: dateFormat, date: "$timestamp" } 
+                    }, 
                     revenue: { $sum: "$totalAmount" },
                     bills: { $sum: 1 }
                 }
             },
-            
-            // 3. Project for final output (rename _id and include label)
             {
                 $project: {
                     _id: 0,
-                    [labelName]: "$_id", // e.g., 'Day': 278, 'Month': 10
+                    [labelName]: "$_id", 
                     revenue: 1,
                     bills: 1
                 }
             },
-            
-            // 4. Sort the data chronologically (by the aggregated key)
-            {
-                $sort: { [labelName]: 1 }
-            }
+            // Sorting by date string works alphabetically/chronologically for ISO formats
+            { $sort: { [labelName]: 1 } }
         ]);
 
         res.json(chartData);
-
     } catch (error) {
         console.error('Reports Chart Data API Error:', error);
         res.status(500).json({ error: 'Failed to generate chart data.' });

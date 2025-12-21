@@ -5,6 +5,7 @@ import InventoryContent from './InventoryContent';
 // --- Configuration and Constants (Remains the same) ---
 const USER_ROLES = {
   OWNER: 'owner', 
+  MANAGER: 'manager',
   CASHIER: 'cashier', 
 };
 const initialItemState = {
@@ -17,6 +18,7 @@ const initialItemState = {
 
 // CRITICAL: Updated props to remove centralized data and use API client
 const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
+    const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     const isOwner = userRole === USER_ROLES.OWNER;
     
     // --- New Data States ---
@@ -53,13 +55,13 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     }, [apiClient, API.inventory, showToast]);
 
     useEffect(() => {
-        if (isOwner) {
+        if (hasAccess) {
             fetchInventory();
         } else {
              setIsLoadingInitial(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOwner]); 
+    }, [hasAccess, fetchInventory]); 
 
     
     // --- Sticky Search Scroll Effect (remains the same) ---
@@ -239,7 +241,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     
     // --- Access Denied / Loading Component (Remains the same) ---
     
-    if (!isOwner) {
+    if (!hasAccess) {
         return (
             <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300">
                 <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />

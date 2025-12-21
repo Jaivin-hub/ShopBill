@@ -383,6 +383,7 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
                     {currentUser?.role?.toLowerCase() === 'owner' && (
+                        <>
                         <SettingItem 
                             icon={Crown} 
                             title="Manage Plan" 
@@ -390,8 +391,9 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                             onClick={handlePlanUpgradeClick} 
                             accentColor="text-yellow-600 dark:text-yellow-400"
                         />
-                    )}
                     <SettingItem icon={Users} title="Staff & Permissions" description="Add, edit, or remove staff members and define their access roles." onClick={handleStaffPermissionsClick} accentColor="text-indigo-600 dark:text-indigo-400" />
+                    </>
+                    )}
                     <SettingItem icon={Lock} title="Change Password" description="Update your owner/admin login credentials securely." onClick={handleChangePasswordClick} accentColor="text-red-600 dark:text-red-400"/>
                     <SettingItem icon={LogOut} title="Log Out" description="Securely log out of your current session." onClick={handleLogout} accentColor="text-red-600 dark:text-red-500" />
                 </div>

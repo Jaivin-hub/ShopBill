@@ -4,11 +4,13 @@ import { IndianRupee, CreditCard, Users, Package, AlertTriangle, List, Loader, A
 
 const USER_ROLES = {
   OWNER: 'owner',
+  MANAGER: 'manager',
   CASHIER: 'cashier',
 };
 
 // UPDATED: Added onViewSaleDetails prop for viewing a single bill
 const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, onViewSaleDetails }) => {
+  const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
   const isOwner = userRole === USER_ROLES.OWNER;
 
   // 1. Data States
@@ -42,11 +44,11 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   // 3. Initial Data Loading Effect
   useEffect(() => {
-    if (isOwner) {
+    if (hasAccess) {
       fetchDashboardData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwner]);
+  }, [hasAccess,fetchDashboardData]);
 
 
   // --- DATA CALCULATIONS ---
@@ -120,7 +122,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   // --- RENDER LOGIC ---
 
-  if (!isOwner) {
+  if (!hasAccess) {
     return (
       // Access Denied
       <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-white dark:bg-gray-950 transition-colors duration-300">

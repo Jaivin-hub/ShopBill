@@ -85,7 +85,7 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  // --- NOTIFICATION LOGIC (FROM CURRENT) ---
+  // --- NOTIFICATION LOGIC ---
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser) return;
     try {
@@ -125,7 +125,7 @@ const App = () => {
     return () => { if (socket) socket.disconnect(); };
   }, [currentUser?.shopId, showToast, fetchNotificationHistory]);
 
-  // --- NAVIGATION HANDLERS (FROM PREVIOUS) ---
+  // --- NAVIGATION HANDLERS ---
   const handleSelectPlan = useCallback((plan) => {
     setSelectedPlan(plan);
     setCurrentPage('checkout');
@@ -151,7 +151,14 @@ const App = () => {
     localStorage.setItem('currentUser', JSON.stringify(userWithNormalizedRole));
     setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
-    setCurrentPage('dashboard');
+    
+    // Role based landing page
+    if (userWithNormalizedRole.role === USER_ROLES.CASHIER) {
+        setCurrentPage('billing');
+    } else {
+        setCurrentPage('dashboard');
+    }
+
     if (planToCheckout) {
         showToast('Account created successfully!', 'success');
         setSelectedPlan(null);
@@ -168,8 +175,14 @@ const App = () => {
     if (token && userJson && token !== 'undefined') {
       try {
         let user = JSON.parse(userJson);
-        setCurrentUser({ ...user, role: user.role.toLowerCase() });
-        if (deepLink) setCurrentPage('dashboard');
+        const normalizedUser = { ...user, role: user.role.toLowerCase() };
+        setCurrentUser(normalizedUser);
+        
+        if (deepLink) {
+            setCurrentPage('dashboard');
+        } else if (normalizedUser.role === USER_ROLES.CASHIER && currentPage === 'dashboard') {
+            setCurrentPage('billing');
+        }
       } catch (e) { logout(); }
     } else if (deepLink) {
         setCurrentPage(deepLink);
@@ -179,13 +192,17 @@ const App = () => {
 
   const navItems = useMemo(() => {
     const standardNav = [
-        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        // Manager can see Dashboard
+        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
         { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        // Manager removed from Reports
+        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
     ];
-    return userRole === USER_ROLES.SUPERADMIN ? SUPERADMIN_NAV_ITEMS : standardNav.filter(item => item.roles.includes(userRole));
+    
+    if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
+    return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
   const utilityNavItems = useMemo(() => {
@@ -202,11 +219,9 @@ const App = () => {
       </div>
     );
 
-    // RESTORED DEEP LINK VIEWS
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
 
-    // RESTORED CHECKOUT FLOW
     if (currentPage === 'checkout') {
         if (!selectedPlan) {
             setCurrentPage('dashboard');
@@ -267,7 +282,7 @@ const App = () => {
           {showAppUI && (
               <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-10 shadow-2xl transition-colors duration-300">
                   <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                      <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage('dashboard')}><Smartphone className="mr-2 w-6 h-6" /> Pocket POS</h2>
+                      <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')}><Smartphone className="mr-2 w-6 h-6" /> Pocket POS</h2>
                       <p className="text-xs text-gray-500 mt-1">User: {displayRole}</p>
                   </div>
                   <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -289,6 +304,7 @@ const App = () => {
               {renderContent()}
           </main>
         </div>
+        {/* Mobile Footer Navigation */}
         {showAppUI && (
             <nav className="fixed bottom-0 inset-x-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:hidden flex justify-around items-center px-1 z-30 shadow-2xl">
                 {navItems.map(item => (
@@ -296,7 +312,7 @@ const App = () => {
                 ))}
             </nav>
         )}
-        {/* <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} /> */}
+        <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       </div>
     </ApiProvider>
   );

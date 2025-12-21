@@ -141,7 +141,7 @@ const MetricCard = ({ title, value, icon: Icon, colorClass, valueSuffix = '' }) 
     </div>
 );
 
-const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
+const SalesActivityPage = ({ salesData, apiClient, showToast, userRole }) => {
     const activeApiClient = apiClient;
     const [sales, setSales] = useState(salesData || []);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
@@ -234,7 +234,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
         <div className="p-4 md:p-8 h-full flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
             <div className="pb-4 mb-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center mb-4">
-                    Sales Activity <TrendingUp className='w-7 h-7 ml-3 text-indigo-600 dark:text-indigo-400' />
+                    Sales Activity
                 </h1>
                 <div className="p-4 bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800">
                     <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
@@ -242,6 +242,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
             </div>
 
             {/* --- FIXED METRICS: 3 Columns on Mobile --- */}
+            {userRole === 'owner' && (
             <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4 px-1">
                 <MetricCard
                     title="Sales"
@@ -264,6 +265,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast }) => {
                     valueSuffix="₹"
                 />
             </div>
+            )}
 
             <div className="flex-grow overflow-y-auto bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800">
                 <div className="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-gray-900 z-10 py-2 border-b dark:border-gray-800">
