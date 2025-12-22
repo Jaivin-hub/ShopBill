@@ -51,7 +51,8 @@ router.get('/:id', protect, async (req, res) => {
 
 // POST a new sale
 router.post('/', protect, async (req, res) => {
-    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid } = req.body; 
+    // Added forceProceed from req.body
+    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed } = req.body; 
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
     const shopId = req.user.shopId;
@@ -62,9 +63,9 @@ router.post('/', protect, async (req, res) => {
              for (const item of items) {
                 const inventoryItem = await Inventory.findOne({ _id: item.itemId, shopId }); 
                 if (!inventoryItem) throw new Error(`Inventory item not found.`);
-                if (item.quantity < inventoryItem.quantity) { // Check if deduction is possible
-                     // Stock is okay for now
-                } else if (inventoryItem.quantity < item.quantity) {
+                
+                // Only block if not forced
+                if (inventoryItem.quantity < item.quantity && !forceProceed) {
                     throw new Error(`Not enough stock for ${inventoryItem.name}.`);
                 }
             }
@@ -78,7 +79,9 @@ router.post('/', protect, async (req, res) => {
                 const khataDue = targetCustomer.outstandingCredit || 0;
                 const creditLimit = targetCustomer.creditLimit || Infinity;
 
-                if (khataDue + saleAmountCredited > creditLimit) {
+                // Only throw error if forceProceed is false
+                if (khataDue + saleAmountCredited > creditLimit && !forceProceed) {
+                    // We throw a specific string that the catch block will handle
                     throw new Error(`Credit limit of ₹${creditLimit} exceeded!`);
                 }
             }
@@ -116,7 +119,6 @@ router.post('/', protect, async (req, res) => {
                 { new: true }
             );
 
-            // Trigger real-time alert if they are now at/near limit
             if (updatedCustomer.outstandingCredit >= updatedCustomer.creditLimit) {
                 await emitAlert(req, shopId, 'credit_exceeded', {
                     _id: updatedCustomer._id,
@@ -132,23 +134,34 @@ router.post('/', protect, async (req, res) => {
             const reorderLevel = Number(item.reorderLevel) || 5;
 
             if (currentQty <= reorderLevel) {
-                // Trigger Low Stock Alert
                 await emitAlert(req, shopId, 'inventory_low', {
                     _id: item._id,
                     name: item.name,
                     quantity: currentQty
                 });
             } else {
-                // AUTO-RESOLVE: If stock is still healthy, ensure no old alerts remain
                 await resolveLowStockAlert(req, shopId, item._id);
             }
         }
 
-        res.json({ message: 'Sale recorded and inventory updated.', newSale });
+        res.status(200).json({ message: 'Sale recorded successfully.', newSale });
 
     } catch (error) {
         console.error('Sale POST Error:', error.message);
-        const status = error.message.includes('limit') || error.message.includes('stock') ? 400 : 500;
+        
+        // --- KEY CHANGE HERE ---
+        // If it's a credit limit error, return 200 with the error object 
+        // so the frontend modal can catch it and show the bypass button.
+        if (error.message.includes('limit') || error.message.includes('exceeded')) {
+            return res.status(200).json({ 
+                error: error.message,
+                isWarning: true,
+                type: 'CREDIT_LIMIT'
+            });
+        }
+
+        // For actual server crashes or other errors, keep 400/500
+        const status = error.message.includes('stock') ? 400 : 500;
         res.status(status).json({ error: error.message || 'Failed to record sale.' });
     }
 });

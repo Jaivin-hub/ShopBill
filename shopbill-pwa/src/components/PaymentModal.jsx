@@ -237,13 +237,16 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         try {
              // Pass force flag to parent payment processor
              await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
+             setCreditError(null);
         } catch (error) {
-            // Check for specific Credit Limit error
-            if (error.response?.data?.error === "CREDIT_LIMIT_EXCEEDED") {
-                setCreditError(error.response.data);
-                showToast({ message: error.response.data.message, type: 'warning' });
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || '';
+            
+            // Specifically checking for "limit" and "exceeded" in the string response
+            if (errorMessage.toLowerCase().includes('limit') && errorMessage.toLowerCase().includes('exceeded')) {
+                setCreditError({ message: errorMessage });
+                showToast({ message: 'Credit limit reached!', type: 'warning' });
             } else {
-                showToast({ message: error.response?.data?.error || 'Payment processing failed. Please try again.', type: 'error' });
+                showToast({ message: errorMessage || 'Payment processing failed.', type: 'error' });
             }
             setIsSubmitting(false); 
         }
@@ -337,7 +340,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     }
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-indigo-700">
+            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-md transform transition-all duration-300 scale-100 border border-indigo-700">
                 <div className="p-5 border-b border-gray-700 flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-white flex items-center">
                         <IndianRupee className="w-6 h-6 text-teal-400 mr-2" />
@@ -355,10 +358,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <div className="text-sm">
                                 <p className="font-bold text-red-400 mb-1">CREDIT LIMIT EXCEEDED</p>
                                 <p className="text-gray-200">{creditError.message}</p>
-                                <div className="mt-2 flex space-x-4 text-xs font-mono">
-                                    <span className="text-gray-400">Limit: ₹{creditError.limit}</span>
-                                    <span className="text-red-300">New Total: ₹{newKhataBalance.toFixed(2)}</span>
-                                </div>
+                                <p className="mt-1 text-red-300 text-xs font-bold underline">Click below to bypass this limit.</p>
                             </div>
                         </div>
                     )}
