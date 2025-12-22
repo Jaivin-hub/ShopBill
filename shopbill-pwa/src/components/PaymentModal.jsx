@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle } from 'lucide-react'; 
+import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle, AlertCircle } from 'lucide-react'; 
 import API from '../config/api'; 
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" option
@@ -10,7 +10,7 @@ export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" op
  * @param {function} props.onClose
  * @param {number} props.totalAmount
  * @param {object[]} props.allCustomers - Full list of customers including WALK_IN_CUSTOMER
- * @param {function} props.processPayment - (amountPaid, amountCredited, paymentMethod, finalCustomer) => void.
+ * @param {function} props.processPayment - (amountPaid, amountCredited, paymentMethod, finalCustomer, forceProceed) => void.
  * @param {function} props.showToast
  * @param {function} props.onAddNewCustomer - Function to call when "Add New Credit Customer" is selected.
  * @param {object} props.apiClient - The initialized API client for making requests.
@@ -27,6 +27,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // --- NEW STATE: For handling Credit Limit Error ---
+    const [creditError, setCreditError] = useState(null);
 
     // --- EFFECT: Reset state on modal open and set initial payment type ---
     useEffect(() => {
@@ -45,6 +48,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             setNewCustomerName('');
             setNewCustomerPhone('');
             setIsSubmitting(false); // Reset submitting state on open
+            setCreditError(null); // Clear previous errors
         }
     }, [isOpen, totalAmount, localSelectedCustomer.id]); // Added localSelectedCustomer.id to dependencies
 
@@ -158,6 +162,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const handleCustomerSelect = (customer) => {
         setIsDropdownOpen(false); 
         setSearchTerm(''); 
+        setCreditError(null); // Clear error if customer changes
         
         if (customer.id === ADD_NEW_CUSTOMER_ID) {
             setIsNewCustomerFormOpen(true); 
@@ -215,7 +220,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
     };
 
-    const handleConfirmPayment = async () => {
+    const handleConfirmPayment = async (force = false) => {
         if (totalAmount <= 0) {
             showToast({ message: 'Cart is empty. Cannot process payment.', type: 'error' });
             return;
@@ -230,9 +235,16 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
         setIsSubmitting(true);
         try {
-             await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer);
-        } catch (e) {
-            showToast({ message: 'Payment processing failed. Please try again.', type: 'error' });
+             // Pass force flag to parent payment processor
+             await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
+        } catch (error) {
+            // Check for specific Credit Limit error
+            if (error.response?.data?.error === "CREDIT_LIMIT_EXCEEDED") {
+                setCreditError(error.response.data);
+                showToast({ message: error.response.data.message, type: 'warning' });
+            } else {
+                showToast({ message: error.response?.data?.error || 'Payment processing failed. Please try again.', type: 'error' });
+            }
             setIsSubmitting(false); 
         }
     };
@@ -336,6 +348,21 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     </button>
                 </div>
                 <div className="p-5 space-y-5">
+                    {/* --- ERROR MESSAGE BOX --- */}
+                    {creditError && (
+                        <div className="p-4 bg-red-900/40 border border-red-500 rounded-xl flex items-start space-x-3 animate-pulse">
+                            <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-bold text-red-400 mb-1">CREDIT LIMIT EXCEEDED</p>
+                                <p className="text-gray-200">{creditError.message}</p>
+                                <div className="mt-2 flex space-x-4 text-xs font-mono">
+                                    <span className="text-gray-400">Limit: ₹{creditError.limit}</span>
+                                    <span className="text-red-300">New Total: ₹{newKhataBalance.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="relative" ref={dropdownRef}>
                         <h3 className="text-sm font-semibold flex items-center text-gray-300 mb-2">
                             <User className="w-4 h-4 mr-1 text-teal-400" /> Bill To Customer:
@@ -424,7 +451,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     )}
                     <div className="flex rounded-xl overflow-hidden shadow-2xl">
                         <button
-                            onClick={() => setPaymentType('UPI')}
+                            onClick={() => {setPaymentType('UPI'); setCreditError(null);}}
                             className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
                                 paymentType === 'UPI' 
                                     ? 'bg-teal-600 text-white shadow-inner shadow-teal-900' 
@@ -435,7 +462,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <IndianRupee className="w-5 h-5 inline-block mr-1" /> Cash / Mixed
                         </button>
                         <button
-                            onClick={() => setPaymentType('Credit')}
+                            onClick={() => {setPaymentType('Credit'); setCreditError(null);}}
                             disabled={!isCreditCustomerSelected || isSubmitting}
                             className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
                                 paymentType === 'Credit' 
@@ -455,7 +482,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 type="number"
                                 step="0.01"
                                 value={amountPaidInput}
-                                onChange={(e) => setAmountPaidInput(e.target.value)}
+                                onChange={(e) => {setAmountPaidInput(e.target.value); setCreditError(null);}}
                                 className="w-full p-4 border-2 border-teal-600 bg-gray-700 text-teal-400 rounded-xl text-3xl font-extrabold focus:ring-teal-500 focus:border-teal-500 shadow-xl transition-colors"
                                 placeholder={totalAmount.toFixed(2)}
                                 disabled={isSubmitting}
@@ -494,8 +521,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                 </div>
                 <div className="p-5 border-t border-gray-700">
                     <button 
-                        onClick={handleConfirmPayment} 
-                        className="cursor-pointer w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
+                        onClick={() => handleConfirmPayment(!!creditError)} 
+                        className={`cursor-pointer w-full py-4 text-white rounded-xl font-extrabold text-xl shadow-2xl transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center
+                            ${creditError ? 'bg-red-600 shadow-red-900/50 hover:bg-red-700' : 'bg-teal-600 shadow-teal-900/50 hover:bg-teal-700'}
+                        `}
                         disabled={totalAmount <= 0 || isSubmitting} 
                     >
                         {isSubmitting ? (
@@ -506,8 +535,21 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         ) : (
                             <CheckCircle className="w-6 h-6 mr-2" />
                         )}
-                        {isSubmitting ? 'Processing Transaction...' : paymentMethod == 'Credit' ? `Confirm ${paymentMethod} Transaction` : `Confirm Transaction`}
+                        {isSubmitting 
+                          ? 'Processing Transaction...' 
+                          : creditError 
+                            ? 'Bypass Limit & Confirm' 
+                            : paymentMethod === 'Credit' ? `Confirm ${paymentMethod} Transaction` : `Confirm Transaction`
+                        }
                     </button>
+                    {creditError && (
+                        <button 
+                            onClick={() => setCreditError(null)}
+                            className="w-full mt-3 text-gray-400 text-sm hover:text-white transition"
+                        >
+                            Cancel and Adjust Amount
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

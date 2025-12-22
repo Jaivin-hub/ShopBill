@@ -51,8 +51,7 @@ router.get('/:id', protect, async (req, res) => {
 
 // POST a new sale
 router.post('/', protect, async (req, res) => {
-    // Added 'forceProceed' to destructuring
-    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed } = req.body; 
+    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid } = req.body; 
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
     const shopId = req.user.shopId;
@@ -63,9 +62,10 @@ router.post('/', protect, async (req, res) => {
              for (const item of items) {
                 const inventoryItem = await Inventory.findOne({ _id: item.itemId, shopId }); 
                 if (!inventoryItem) throw new Error(`Inventory item not found.`);
-                
-                if (inventoryItem.quantity < item.quantity) {
-                    throw new Error(`Not enough stock for ${inventoryItem.name}. Current stock: ${inventoryItem.quantity}`);
+                if (item.quantity < inventoryItem.quantity) { // Check if deduction is possible
+                     // Stock is okay for now
+                } else if (inventoryItem.quantity < item.quantity) {
+                    throw new Error(`Not enough stock for ${inventoryItem.name}.`);
                 }
             }
         }
@@ -74,20 +74,12 @@ router.post('/', protect, async (req, res) => {
         let targetCustomer = null;
         if (saleCustomerId) {
             targetCustomer = await Customer.findOne({ _id: saleCustomerId, shopId });
-            
             if (saleAmountCredited > 0 && targetCustomer) {
-                const currentDue = targetCustomer.outstandingCredit || 0;
-                const limit = targetCustomer.creditLimit || 0;
+                const khataDue = targetCustomer.outstandingCredit || 0;
+                const creditLimit = targetCustomer.creditLimit || Infinity;
 
-                // Only block if forceProceed is NOT true
-                if (!forceProceed && (currentDue + saleAmountCredited > limit)) {
-                    // Send a specific error code so frontend can show a "Confirm Bypass" dialog
-                    return res.status(409).json({ 
-                        error: 'CREDIT_LIMIT_EXCEEDED', 
-                        message: `Customer credit limit of ₹${limit} exceeded. Current balance: ₹${currentDue}. Proceed anyway?`,
-                        currentBalance: currentDue,
-                        limit: limit
-                    });
+                if (khataDue + saleAmountCredited > creditLimit) {
+                    throw new Error(`Credit limit of ₹${creditLimit} exceeded!`);
                 }
             }
         }
@@ -129,8 +121,7 @@ router.post('/', protect, async (req, res) => {
                 await emitAlert(req, shopId, 'credit_exceeded', {
                     _id: updatedCustomer._id,
                     name: updatedCustomer.name,
-                    creditLimit: updatedCustomer.creditLimit,
-                    currentBalance: updatedCustomer.outstandingCredit
+                    creditLimit: updatedCustomer.creditLimit
                 });
             }
         }
@@ -141,21 +132,24 @@ router.post('/', protect, async (req, res) => {
             const reorderLevel = Number(item.reorderLevel) || 5;
 
             if (currentQty <= reorderLevel) {
+                // Trigger Low Stock Alert
                 await emitAlert(req, shopId, 'inventory_low', {
                     _id: item._id,
                     name: item.name,
                     quantity: currentQty
                 });
             } else {
+                // AUTO-RESOLVE: If stock is still healthy, ensure no old alerts remain
                 await resolveLowStockAlert(req, shopId, item._id);
             }
         }
 
-        res.json({ message: 'Sale recorded successfully.', newSale });
+        res.json({ message: 'Sale recorded and inventory updated.', newSale });
 
     } catch (error) {
         console.error('Sale POST Error:', error.message);
-        res.status(500).json({ error: error.message || 'Failed to record sale.' });
+        const status = error.message.includes('limit') || error.message.includes('stock') ? 400 : 500;
+        res.status(status).json({ error: error.message || 'Failed to record sale.' });
     }
 });
 
