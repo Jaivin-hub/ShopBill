@@ -10,6 +10,28 @@ const { emitAlert } = require('./notificationRoutes');
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
+const resolveLowStockAlert = async (req, shopId, itemId) => {
+    const io = req.app.get('socketio');
+    const shopIdStr = shopId.toString();
+
+    try {
+        // 1. Remove the "inventory_low" alerts for this specific item from DB
+        await Notification.deleteMany({
+            shopId: shopIdStr,
+            type: 'inventory_low',
+            'metadata.itemId': itemId
+        });
+
+        // 2. Tell the frontend to remove this item from the notification list
+        if (io) {
+            io.to(shopIdStr).emit('resolve_notification', { itemId });
+            console.log(`🧹 Resolved alerts for item: ${itemId}`);
+        }
+    } catch (error) {
+        console.error("❌ Failed to resolve alerts:", error.message);
+    }
+};
+
 // GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
     const { startDate, endDate } = req.query;

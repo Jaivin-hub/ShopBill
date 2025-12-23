@@ -44,7 +44,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }, [cart]);
 
   const filteredInventory = useMemo(() => {
-    // We prioritize the scannedBarcode for filtering/search functionality
     const term = (scannedBarcode || searchTerm).toLowerCase().trim(); 
     const inStockItems = inventory.filter(item =>
       item.quantity > 0
@@ -52,9 +51,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     if (!term) {
       return inStockItems.sort((a, b) => a.name.localeCompare(b.name));
     }
-    // Note: Inventory lookup should ideally use 'hsn' for scanner, 
-    // but we use 'barcode' here to match the current search/filter logic. 
-    // The ScannerModal uses 'hsn' internally.
     return inStockItems.filter(item =>
       item.name.toLowerCase().includes(term) || (item.barcode && item.barcode.includes(term))
     ).sort((a, b) => a.name.localeCompare(b.name));
@@ -113,7 +109,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }, [showToast]);
 
   const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
-    // ... (Process payment logic remains the same) ...
     if (totalAmount <= 0) {
       showToast('Cart is empty. Cannot process sale.', 'error');
       return;
@@ -152,13 +147,11 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   // --- Barcode Scanner Logic (Physical Scanner) ---
   useEffect(() => {
     if (scannedBarcode) {
-      // Find item by HSN (what the scanner returns)
       const item = inventory.find(i => i.hsn === scannedBarcode); 
       if (item) {
         addItemToCart(item);
         setScannedBarcode('');
       } else {
-        // If not found by HSN, set it as the search term to let the user see and manually add
         setSearchTerm(scannedBarcode);
         showToast(`Item with HSN/Code "${scannedBarcode}" not found.`, 'error');
         setScannedBarcode('');
@@ -168,52 +161,43 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
 
   const handlePhysicalScannerInput = (e) => {
     if (e.key === 'Enter' && searchTerm) {
-      // Assuming physical scanner input ends up in searchTerm and is confirmed by Enter
       setScannedBarcode(searchTerm);
       setSearchTerm('');
       e.preventDefault(); 
     }
   }
 
-  // --- CAMERA SCANNER CALLBACKS (UPDATED) ---
-
-  // 1. Item was found in inventory by the ScannerModal (scanner performs the lookup)
+  // --- CAMERA SCANNER CALLBACKS ---
   const handleScanItemFound = useCallback((itemData) => {
-      // itemData is the full item object returned from the ScannerModal's internal lookup
-      setIsCameraScannerOpen(false); // Close the scanner modal
-      addItemToCart(itemData);      // Add the found item to the cart
-      setSearchTerm('');            // Clear search term
+      setIsCameraScannerOpen(false); 
+      addItemToCart(itemData);      
+      setSearchTerm('');            
   }, [addItemToCart]);
 
-  // 2. Code was scanned, but the item was NOT found in inventory
   const handleScanItemNotFound = useCallback((rawCode) => {
-      // rawCode is the HSN/barcode text
-      setIsCameraScannerOpen(false); // Close the scanner modal
-      setSearchTerm(rawCode);        // Put the code in the search bar for manual inspection
+      setIsCameraScannerOpen(false); 
+      setSearchTerm(rawCode);        
       showToast(`Item with code ${rawCode} not found. Please add manually.`, 'error');
   }, [showToast]);
   
-  // 3. Scanner error (e.g., camera access denied)
   const handleScanError = useCallback((errorMessage) => {
-       // This is for camera/lib errors, not item not found errors
        setIsCameraScannerOpen(false); 
        showToast(errorMessage, 'error');
   }, [showToast]);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
+      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
         <Loader className="w-10 h-10 animate-spin text-teal-400" />
         <p className='mt-3'>Loading inventory and customer data...</p>
       </div>
     );
   }
 
-  // --- Component Render ---
   return (
-    <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300">
-      <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Point of Sale</h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
+    <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
+      <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
+      <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
       <div className="space-y-6">
         <div className="relative flex items-center">
           <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
@@ -223,13 +207,13 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handlePhysicalScannerInput}
-            className="w-full pl-10 pr-24 py-3 border border-gray-300 dark:border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white shadow-xl"
+            className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
             autoFocus
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-14 top-1/2 transform -translate-y-1/2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-full bg-gray-200 dark:bg-gray-700/50 transition-colors z-10"
+              className="absolute right-14 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white p-1 rounded-full bg-gray-700/50 transition-colors z-10"
               title="Clear Search"
             >
               <X className="w-4 h-4" />
@@ -243,7 +227,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             <ScanLine className="w-5 h-5" />
           </button>
         </div>
-        <div className="max-h-96 overflow-y-auto p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 shadow-inner">
+        <div className="max-h-96 overflow-y-auto p-3 border border-gray-700 rounded-xl bg-gray-900 shadow-inner">
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
             {filteredInventory.map(item => (
               <button
@@ -257,8 +241,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
               </button>
             ))}
             {filteredInventory.length === 0 && (
-              <div className="col-span-4 sm:col-span-5 md:col-span-6 lg:col-span-8 text-center py-4 text-gray-600 dark:text-gray-500">
-                <Search className="w-5 h-5 mx-auto mb-1 text-gray-600 dark:text-gray-400" />
+              <div className="col-span-4 sm:col-span-5 md:col-span-6 lg:col-span-8 text-center py-4 text-gray-500">
+                <Search className="w-5 h-5 mx-auto mb-1 text-gray-400" />
                 {searchTerm || scannedBarcode
                   ? `No items match the search/scan term: "${searchTerm || scannedBarcode}" or they are out of stock.`
                   : 'No items are currently in stock.'}
@@ -266,14 +250,14 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             )}
           </div>
         </div>
-        <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-xl shadow-2xl dark:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 transition duration-300">
-          <h3 className="text-lg font-bold flex items-center text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition duration-300">
+          <h3 className="text-lg font-bold flex items-center text-white mb-3 pb-2 border-b border-gray-700">
             <ShoppingCart className="w-5 h-5 mr-2 text-teal-400" /> Cart Items ({cart.length})
           </h3>
           <div className="max-h-80 overflow-y-auto space-y-3 p-1">
             {cart.map(item => (
-              <div key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner">
-                <span className="font-medium text-gray-900 dark:text-white w-2/5 truncate">{item.name}</span>
+              <div key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-gray-800 rounded-xl border border-gray-700 shadow-inner">
+                <span className="font-medium text-white w-2/5 truncate">{item.name}</span>
                 <div className="flex items-center space-x-2 w-1/5 justify-center">
                   <button
                     onClick={() => updateCartQuantity(item._id || item.id, -1)}
@@ -282,7 +266,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="font-extrabold w-4 text-center text-base text-gray-900 dark:text-white">{item.quantity}</span>
+                  <span className="font-extrabold w-4 text-center text-base text-white">{item.quantity}</span>
                   <button
                     onClick={() => updateCartQuantity(item._id || item.id, 1)}
                     className="cursor-pointer p-1 rounded-lg bg-green-900/40 text-green-300 active:bg-green-900/60 transition hover:bg-green-900/60"
@@ -312,7 +296,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           </div>
         </div>
         {cart.length > 0 && (
-          <div className="hidden md:block p-3 bg-gray-100 dark:bg-gray-900 rounded-xl mb-3 border border-indigo-300 dark:border-indigo-700 shadow-2xl dark:shadow-indigo-900/10">
+          <div className="hidden md:block p-3 bg-gray-900 rounded-xl mb-3 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
             <div className="flex justify-between items-stretch space-x-4">
               <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
                 <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
@@ -335,7 +319,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         )}
       </div>
       {cart.length > 0 && (
-        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-white dark:bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
+        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
           <div className="flex items-stretch space-x-3">
             <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
               <span className="text-lg font-bold text-white">TOTAL</span>
@@ -357,7 +341,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         </div>
       )}
 
-      {/* Payment Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -369,14 +352,13 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         apiClient={apiClient}
       />
       
-      {/* Scanner Modal (UPDATED PROPS) */}
       <ScannerModal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
-        inventory={inventory} // <<< CRITICAL: Pass inventory data for lookup
-        onScanSuccess={handleScanItemFound} // <<< NEW PROP: Item found
-        onScanNotFound={handleScanItemNotFound} // <<< NEW PROP: Code scanned, but item not found
-        onScanError={handleScanError} // <<< NEW PROP: Camera/Library error
+        inventory={inventory}
+        onScanSuccess={handleScanItemFound}
+        onScanNotFound={handleScanItemNotFound}
+        onScanError={handleScanError}
         showToast={showToast}
       />
 
