@@ -56,32 +56,15 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode(prev => {
-      const newValue = !prev;
-      localStorage.setItem('darkMode', JSON.stringify(newValue));
-      return newValue;
-    });
-  }, []);
-  
+  // Force HTML to always have 'dark' class for underlying tailwind support if needed
   useEffect(() => {
-    const html = document.documentElement;
-    if (isDarkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+    document.documentElement.classList.add('dark');
+  }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
@@ -152,7 +135,6 @@ const App = () => {
     setCurrentUser(userWithNormalizedRole);
     setIsViewingLogin(false);
     
-    // Role based landing page
     if (userWithNormalizedRole.role === USER_ROLES.CASHIER) {
         setCurrentPage('billing');
     } else {
@@ -192,12 +174,10 @@ const App = () => {
 
   const navItems = useMemo(() => {
     const standardNav = [
-        // Manager can see Dashboard
         { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
         { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'khata', name: 'Khata/Credit', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        // Manager removed from Reports
         { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
     ];
     
@@ -213,9 +193,9 @@ const App = () => {
 
   const renderContent = () => {
     if (isLoadingAuth) return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-gray-950">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950">
         <Loader className="w-10 h-10 animate-spin text-teal-400" />
-        <p className='mt-3 dark:text-gray-400'>Checking authentication...</p>
+        <p className='mt-3 text-gray-400'>Checking authentication...</p>
       </div>
     );
 
@@ -249,7 +229,7 @@ const App = () => {
             <LandingPage onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} onSelectPlan={handleSelectPlan} />;
     }
     
-    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, isDarkMode, toggleDarkMode, notifications, setNotifications, setCurrentPage };
+    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
     
     switch (currentPage) {
       case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? 
@@ -274,29 +254,29 @@ const App = () => {
 
   return (
     <ApiProvider>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+      <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
         {showAppUI && (
           <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
         )}
         <div className="flex flex-1">
           {showAppUI && (
-              <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-10 shadow-2xl transition-colors duration-300">
-                  <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-10 shadow-2xl transition-colors duration-300">
+                  <div className="p-6 border-b border-gray-800">
                       <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')}><Smartphone className="mr-2 w-6 h-6" /> Pocket POS</h2>
                       <p className="text-xs text-gray-500 mt-1">User: {displayRole}</p>
                   </div>
                   <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                       {navItems.map(item => (
-                          <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                          <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                       ))}
-                      <div className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                      <div className="pt-4 border-t border-gray-800 space-y-2">
                           {utilityNavItems.map(item => (
-                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
                           ))}
                       </div>
                   </nav>
-                  <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                      <button onClick={logout} className="w-full flex items-center p-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 font-medium"><LogOut className="w-5 h-5 mr-3" />Logout</button>
+                  <div className="p-4 border-t border-gray-800">
+                      <button onClick={logout} className="w-full flex items-center p-3 rounded-xl text-red-400 hover:bg-red-900/20 font-medium"><LogOut className="w-5 h-5 mr-3" />Logout</button>
                   </div>
               </aside>
           )}
@@ -306,9 +286,9 @@ const App = () => {
         </div>
         {/* Mobile Footer Navigation */}
         {showAppUI && (
-            <nav className="fixed bottom-0 inset-x-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:hidden flex justify-around items-center px-1 z-30 shadow-2xl">
+            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-30 shadow-2xl">
                 {navItems.map(item => (
-                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-600 font-bold' : 'text-gray-600 dark:text-gray-400'}`}><item.icon className="w-5 h-5" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
+                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-400 font-bold' : 'text-gray-400'}`}><item.icon className="w-5 h-5" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
                 ))}
             </nav>
         )}
