@@ -15,7 +15,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
   // Modal Visibility States
   const [activeModal, setActiveModal] = useState(null); // 'payment', 'add', 'history', 'remind'
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  
+
   // Form States
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
@@ -46,7 +46,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
   const handleRecordPayment = async () => {
     const amount = parseFloat(paymentAmount);
     if (amount <= 0 || isNaN(amount)) return showToast('Enter valid amount', 'error');
-    
+
     setIsProcessing(true);
     try {
       await apiClient.put(`${API.customers}/${selectedCustomer._id}/credit`, {
@@ -92,22 +92,50 @@ const Ledger = ({ apiClient, API, showToast }) => {
         <p className="text-gray-600 dark:text-gray-400">Manage all outstanding customer credit accounts.</p>
       </div>
 
-      <div className="p-6 bg-gray-100 dark:bg-gray-900 rounded-xl mb-6 border dark:border-indigo-700 shadow-2xl">
-        <div className="flex flex-col xl:flex-row justify-between items-center space-y-4 xl:space-y-0">
-          <div className="flex-1 w-full p-4 bg-red-900/40 rounded-xl border border-red-700 flex justify-between items-center">
-            <span className="text-xl font-bold dark:text-white flex items-center"><TrendingUp className='w-5 h-5 mr-2' /> Total Outstanding:</span>
-            <span className="text-red-400 text-3xl font-extrabold">₹{totalOutstanding.toFixed(0)}</span>
+      <div className="p-6 bg-gray-100 dark:bg-gray-900 rounded-2xl mb-6 border dark:border-indigo-900/50 shadow-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+
+          {/* Left Side: Stats Card */}
+          <div className="flex-1 w-full lg:max-w-md p-5 bg-white dark:bg-red-950/20 rounded-2xl border border-gray-200 dark:border-red-900/30 flex justify-between items-center shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg flex-shrink-0">
+                <TrendingUp className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <span className="text-sm uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+                Total Outstanding
+              </span>
+            </div>
+            <span className="text-2xl lg:text-3xl font-black text-red-600 dark:text-red-400">
+              ₹{totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
           </div>
-          <div className="flex space-x-3 w-full xl:w-auto xl:ml-4">
-            <button onClick={() => {setNewCustomerData(initialNewCustomerState); setActiveModal('add')}} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center"><UserPlus className="w-5 h-5 mr-2" /> Add Customer</button>
-            <button onClick={() => setActiveModal('remind')} className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold flex items-center justify-center"><MessageSquare className="w-5 h-5 mr-2" /> Remind ({hasDues})</button>
+
+          {/* Right Side: Action Buttons */}
+          <div className="grid grid-cols-2 lg:flex lg:space-x-4 w-full lg:w-auto gap-3">
+            <button
+              onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
+              className="flex items-center justify-center px-4 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-indigo-500/20"
+            >
+              {/* Added flex-shrink-0 and ensured size matches Remind icon */}
+              <UserPlus className="w-6 h-6 flex-shrink-0 mr-2" />
+              <span className="text-sm md:text-base whitespace-nowrap">Add Customer</span>
+            </button>
+
+            <button
+              onClick={() => setActiveModal('remind')}
+              className="flex items-center justify-center px-4 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-teal-500/20"
+            >
+              <MessageSquare className="w-6 h-6 flex-shrink-0 mr-2" />
+              <span className="text-sm md:text-base whitespace-nowrap">Remind ({hasDues})</span>
+            </button>
           </div>
+
         </div>
       </div>
 
-      <CustomerList 
-        sortedCustomers={sortedCustomers} 
-        openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }} 
+      <CustomerList
+        sortedCustomers={sortedCustomers}
+        openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
         openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
         isSearchVisible={isSearchVisible}
       />
@@ -117,7 +145,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
         <PaymentModal customer={selectedCustomer} amount={paymentAmount} setAmount={setPaymentAmount} onClose={() => setActiveModal(null)} onConfirm={handleRecordPayment} isProcessing={isProcessing} />
       )}
       {activeModal === 'add' && (
-        <AddCustomerModal data={newCustomerData} onChange={(e) => setNewCustomerData({...newCustomerData, [e.target.name]: e.target.value})} onClose={() => setActiveModal(null)} onConfirm={handleAddCustomer} errors={validationErrors} isProcessing={isProcessing} isValid={!!newCustomerData.name} />
+        <AddCustomerModal data={newCustomerData} onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })} onClose={() => setActiveModal(null)} onConfirm={handleAddCustomer} errors={validationErrors} isProcessing={isProcessing} isValid={!!newCustomerData.name} />
       )}
       {activeModal === 'history' && (
         <HistoryModal customer={selectedCustomer} onClose={() => setActiveModal(null)} fetchCustomerHistory={fetchCustomerHistory} />

@@ -144,7 +144,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     }
   }, [totalAmount, cart, showToast, apiClient, API.sales, fetchData]);
 
-  // --- Barcode Scanner Logic (Physical Scanner) ---
+  // --- Barcode Scanner Logic ---
   useEffect(() => {
     if (scannedBarcode) {
       const item = inventory.find(i => i.hsn === scannedBarcode); 
@@ -167,7 +167,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     }
   }
 
-  // --- CAMERA SCANNER CALLBACKS ---
   const handleScanItemFound = useCallback((itemData) => {
       setIsCameraScannerOpen(false); 
       addItemToCart(itemData);      
@@ -195,10 +194,17 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }
 
   return (
-    <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300">
-      <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
-      <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
-      <div className="space-y-6">
+    <div className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
+      {/* Header - Fixed */}
+      <div className="p-4 md:p-8 pb-0">
+        <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
+        <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
+      </div>
+
+      {/* Main Scrollable Area - This is what fixes the overlap */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-6 pb-40 md:pb-8">
+        
+        {/* Search Bar */}
         <div className="relative flex items-center">
           <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
           <input
@@ -208,7 +214,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handlePhysicalScannerInput}
             className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
-            autoFocus
           />
           {searchTerm && (
             <button
@@ -227,6 +232,8 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             <ScanLine className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Inventory Quick Access Grid */}
         <div className="max-h-96 overflow-y-auto p-3 border border-gray-700 rounded-xl bg-gray-900 shadow-inner">
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
             {filteredInventory.map(item => (
@@ -243,97 +250,50 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             {filteredInventory.length === 0 && (
               <div className="col-span-4 sm:col-span-5 md:col-span-6 lg:col-span-8 text-center py-4 text-gray-500">
                 <Search className="w-5 h-5 mx-auto mb-1 text-gray-400" />
-                {searchTerm || scannedBarcode
-                  ? `No items match the search/scan term: "${searchTerm || scannedBarcode}" or they are out of stock.`
-                  : 'No items are currently in stock.'}
+                No items found.
               </div>
             )}
           </div>
         </div>
+
+        {/* Cart Card */}
         <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition duration-300">
           <h3 className="text-lg font-bold flex items-center text-white mb-3 pb-2 border-b border-gray-700">
             <ShoppingCart className="w-5 h-5 mr-2 text-teal-400" /> Cart Items ({cart.length})
           </h3>
-          <div className="max-h-80 overflow-y-auto space-y-3 p-1">
+          <div className="space-y-3">
             {cart.map(item => (
               <div key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-gray-800 rounded-xl border border-gray-700 shadow-inner">
                 <span className="font-medium text-white w-2/5 truncate">{item.name}</span>
                 <div className="flex items-center space-x-2 w-1/5 justify-center">
-                  <button
-                    onClick={() => updateCartQuantity(item._id || item.id, -1)}
-                    className="cursor-pointer p-1 rounded-lg bg-red-900/40 text-red-300 active:bg-red-900/60 transition hover:bg-red-900/60"
-                    title="Decrease Quantity"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="font-extrabold w-4 text-center text-base text-white">{item.quantity}</span>
-                  <button
-                    onClick={() => updateCartQuantity(item._id || item.id, 1)}
-                    className="cursor-pointer p-1 rounded-lg bg-green-900/40 text-green-300 active:bg-green-900/60 transition hover:bg-green-900/60"
-                    title="Increase Quantity"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  <button onClick={() => updateCartQuantity(item._id || item.id, -1)} className="p-1 rounded-lg bg-red-900/40 text-red-300"><Minus className="w-4 h-4" /></button>
+                  <span className="font-extrabold w-4 text-center text-white">{item.quantity}</span>
+                  <button onClick={() => updateCartQuantity(item._id || item.id, 1)} className="p-1 rounded-lg bg-green-900/40 text-green-300"><Plus className="w-4 h-4" /></button>
                 </div>
                 <div className="flex items-center w-2/5 justify-end">
                   <span className="font-extrabold text-lg text-teal-400">₹{(item.quantity * item.price).toFixed(2)}</span>
-                  <button
-                    onClick={() => removeItemFromCart(item._id || item.id)}
-                    className="cursor-pointer text-red-400 hover:text-red-300 ml-3 p-1 transition"
-                    title="Remove Item"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <button onClick={() => removeItemFromCart(item._id || item.id)} className="text-red-400 ml-3"><Trash2 className="w-5 h-5" /></button>
                 </div>
               </div>
             ))}
             {cart.length === 0 && (
-              <p className="text-gray-500 text-center py-6 border-dashed border-2 border-gray-700 rounded-xl mx-auto">
-                <ShoppingCart className="w-6 h-6 mx-auto mb-2 text-gray-700" />
-                Cart is empty. Use the search bar or quick buttons to add items.
-              </p>
+              <p className="text-gray-500 text-center py-6 border-dashed border-2 border-gray-700 rounded-xl">Cart is empty.</p>
             )}
           </div>
         </div>
-        {cart.length > 0 && (
-          <div className="hidden md:block p-3 bg-gray-900 rounded-xl mb-3 border border-indigo-700 shadow-2xl shadow-indigo-900/10">
-            <div className="flex justify-between items-stretch space-x-4">
-              <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
-                <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
-                <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
-              </div>
-              <button
-                className="cursor-pointer w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
-                onClick={() => {
-                  if (totalAmount > 0) {
-                    setIsPaymentModalOpen(true);
-                  } else {
-                    showToast('Cart is empty. Please add items.', 'error');
-                  }
-                }}
-              >
-                <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Desktop Payment Bar (Above bottom of screen) */}
       {cart.length > 0 && (
-        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20 transition-colors duration-300">
-          <div className="flex items-stretch space-x-3">
-            <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
-              <span className="text-lg font-bold text-white">TOTAL</span>
-              <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
+        <div className="hidden md:block p-3 px-8 bg-gray-950 border-t border-gray-800">
+          <div className="flex justify-between items-stretch space-x-4">
+            <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+              <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
+              <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
             </div>
             <button
-              className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-lg shadow-xl shadow-teal-900/50 hover:bg-teal-700 transition flex items-center justify-center active:scale-[0.99] transform"
-              onClick={() => {
-                if (totalAmount > 0) {
-                  setIsPaymentModalOpen(true);
-                } else {
-                  showToast('Cart is empty. Please add items.', 'error');
-                }
-              }}
+              className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl hover:bg-teal-700 transition"
+              onClick={() => setIsPaymentModalOpen(true)}
             >
               <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
             </button>
@@ -341,6 +301,25 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         </div>
       )}
 
+      {/* Mobile Payment Bar (Fixed at Bottom-16 to avoid menu) */}
+      {cart.length > 0 && (
+        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20">
+          <div className="flex items-stretch space-x-3">
+            <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+              <span className="text-lg font-bold text-white">TOTAL</span>
+              <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
+            </div>
+            <button
+              className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-lg shadow-xl"
+              onClick={() => setIsPaymentModalOpen(true)}
+            >
+              <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -348,7 +327,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         allCustomers={allCustomers}
         processPayment={processPayment}
         showToast={showToast}
-        onAddNewCustomer={() => showToast('Redirecting to Add Customer screen...', 'info')}
+        onAddNewCustomer={() => showToast('Redirecting...', 'info')}
         apiClient={apiClient}
       />
       
@@ -361,7 +340,6 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         onScanError={handleScanError}
         showToast={showToast}
       />
-
     </div>
   );
 };
