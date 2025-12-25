@@ -1,19 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle, AlertCircle } from 'lucide-react'; 
+import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react'; 
 import API from '../config/api'; 
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" option
+
 /**
  * Sub-component for Payment Modal: Handles Cash, Full Credit, or Partial/Mixed Payments
- * @param {object} props
- * @param {boolean} props.isOpen
- * @param {function} props.onClose
- * @param {number} props.totalAmount
- * @param {object[]} props.allCustomers - Full list of customers including WALK_IN_CUSTOMER
- * @param {function} props.processPayment - (amountPaid, amountCredited, paymentMethod, finalCustomer, forceProceed) => void.
- * @param {function} props.showToast
- * @param {function} props.onAddNewCustomer - Function to call when "Add New Credit Customer" is selected.
- * @param {object} props.apiClient - The initialized API client for making requests.
  */
 const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, onAddNewCustomer, apiClient }) => {
     const dropdownRef = useRef(null);
@@ -26,6 +18,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const [isNewCustomerFormOpen, setIsNewCustomerFormOpen] = useState(false);
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
+    const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState('');
+    const [formErrors, setFormErrors] = useState({}); // To show validation errors under fields
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // --- NEW STATE: For handling Credit Limit Error ---
@@ -35,22 +29,19 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     useEffect(() => {
         if (isOpen) {
             setAmountPaidInput(totalAmount.toFixed(2));
-            // Determine initial payment type
             const initialPaymentType = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI';
             setPaymentType(initialPaymentType);
             
-            // Note: localSelectedCustomer state is maintained between opens unless explicitly reset
-            // If you want to reset customer to WALK_IN on every open, uncomment the line below:
-            // setLocalSelectedCustomer(WALK_IN_CUSTOMER); 
-
             setSearchTerm(''); 
             setIsNewCustomerFormOpen(false); 
             setNewCustomerName('');
             setNewCustomerPhone('');
-            setIsSubmitting(false); // Reset submitting state on open
-            setCreditError(null); // Clear previous errors
+            setNewCustomerCreditLimit('');
+            setFormErrors({});
+            setIsSubmitting(false); 
+            setCreditError(null); 
         }
-    }, [isOpen, totalAmount, localSelectedCustomer.id]); // Added localSelectedCustomer.id to dependencies
+    }, [isOpen, totalAmount, localSelectedCustomer.id]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -70,7 +61,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const isCreditCustomerSelected = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id;
     const amountPaid = parseFloat(amountPaidInput) || 0;
 
-    // --- EFFECT: Logic to prevent 'Credit' selection if Walk-in is selected ---
     useEffect(() => {
         if (paymentType === 'Credit' && !isCreditCustomerSelected) {
             setPaymentType('UPI');
@@ -83,12 +73,12 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         changeDue,      
         newKhataBalance, 
         paymentMethod,
-        effectiveAmountPaid // <--- The actual amount to record as paid
+        effectiveAmountPaid 
     } = useMemo(() => {
         const total = totalAmount;
-        let amountCredited = 0; // Amount of the CURRENT SALE to be added to Khata
+        let amountCredited = 0; 
         let changeDue = 0;
-        let effectiveAmountPaid = amountPaid; // Default: use the value from the input
+        let effectiveAmountPaid = amountPaid; 
         let method = paymentType;
 
         if (paymentType === 'Credit') {
@@ -96,7 +86,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             effectiveAmountPaid = 0; 
             method = 'Credit';
         }
-        else { // UPI / Mixed
+        else { 
             if (amountPaid >= total) {
                 changeDue = Math.max(0, amountPaid - total);
                 method = 'UPI'; 
@@ -112,13 +102,12 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             changeDue, 
             newKhataBalance, 
             paymentMethod: method,
-            effectiveAmountPaid // Return the corrected value
+            effectiveAmountPaid 
         };
     }, [amountPaid, totalAmount, paymentType, khataDue]);
 
     const filteredOptions = useMemo(() => {
         const options = [];
-        
         options.push({ 
             id: ADD_NEW_CUSTOMER_ID, 
             key: ADD_NEW_CUSTOMER_ID, 
@@ -141,9 +130,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             });
         });
 
-        if (!searchTerm) {
-            return options; 
-        }
+        if (!searchTerm) return options; 
 
         const lowerCaseSearch = searchTerm.toLowerCase();
         const specialOptions = options.slice(0, 2); 
@@ -158,11 +145,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         return [...specialOptions, ...filteredCustomers];
     }, [allCustomers, searchTerm]); 
     
-    // --- UPDATED: Automatically set to 'Credit' if a credit customer is selected ---
     const handleCustomerSelect = (customer) => {
         setIsDropdownOpen(false); 
         setSearchTerm(''); 
-        setCreditError(null); // Clear error if customer changes
+        setCreditError(null); 
         
         if (customer.id === ADD_NEW_CUSTOMER_ID) {
             setIsNewCustomerFormOpen(true); 
@@ -170,50 +156,58 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
         
         setLocalSelectedCustomer(customer);
-        
         if (customer.id !== WALK_IN_CUSTOMER.id) {
-            // New requirement: If any credit customer is selected, default to Full Khata
             setPaymentType('Credit');
         } else {
-            // If Walk-in is selected, default back to UPI (Cash/Mixed)
             setPaymentType('UPI');
         }
     };
-    // --- END UPDATED LOGIC ---
 
     const handleAddNewCustomerSubmit = async (e) => {
         e.preventDefault();
-        if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
-            showToast({ message: 'Name and Phone Number are required.', type: 'error' });
+        
+        // VALIDATION LOGIC
+        const errors = {};
+        if (!newCustomerName.trim()) errors.name = "Customer name is required";
+        if (!newCustomerPhone.trim()) {
+            errors.phone = "Phone number is required";
+        } else if (newCustomerPhone.length < 10) {
+            errors.phone = "Enter a valid 10-digit phone number";
+        }
+        if (!newCustomerCreditLimit || parseFloat(newCustomerCreditLimit) < 0) {
+            errors.limit = "Credit limit is required";
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
             return;
         }
+
+        setFormErrors({});
         setIsSubmitting(true);
         try {
             const dataToSend = {
                 name: newCustomerName.trim(),
                 phone: newCustomerPhone.trim().replace(/[^0-9]/g, ''), 
-                creditLimit: 0, 
+                creditLimit: parseFloat(newCustomerCreditLimit), 
                 initialDue: 0
             };
             const response = await apiClient.post(API.customers, dataToSend);
             if (response.data && response.data.customer) {
                 const newCustomer = response.data.customer;
                 showToast({ message: `Customer "${newCustomer.name}" added successfully!`, type: 'success' });
-                
-                // --- Set new customer and default payment to Credit ---
                 setLocalSelectedCustomer(newCustomer);
-                setPaymentType('Credit'); // Set to credit by default for new credit customer
-                // --- End Update ---
-                
+                setPaymentType('Credit'); 
                 onAddNewCustomer(newCustomer);
                 setNewCustomerName('');
                 setNewCustomerPhone('');
+                setNewCustomerCreditLimit('');
                 setIsNewCustomerFormOpen(false);
             } else {
                  showToast({ message: 'Customer created but response format was unexpected.', type: 'warning' });
             }
         } catch (error) {
-            const errorMessage = error.response?.data?.message || 'Failed to add new customer due to a network or server error.';
+            const errorMessage = error.response?.data?.message || 'Failed to add new customer.';
             showToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsSubmitting(false);
@@ -235,13 +229,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
         setIsSubmitting(true);
         try {
-             // Pass force flag to parent payment processor
              await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
              setCreditError(null);
         } catch (error) {
             const errorMessage = error.response?.data?.error || error.response?.data?.message || '';
-            
-            // Specifically checking for "limit" and "exceeded" in the string response
             if (errorMessage.toLowerCase().includes('limit') && errorMessage.toLowerCase().includes('exceeded')) {
                 setCreditError({ message: errorMessage });
                 showToast({ message: 'Credit limit reached!', type: 'warning' });
@@ -277,7 +268,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-                    <form onSubmit={handleAddNewCustomerSubmit} className="p-5 space-y-6">
+                    <form onSubmit={handleAddNewCustomerSubmit} className="p-5 space-y-4">
                         <div>
                             <label htmlFor="new-customer-name" className="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
                             <div className="relative">
@@ -286,33 +277,51 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                     id="new-customer-name"
                                     type="text"
                                     value={newCustomerName}
-                                    onChange={(e) => setNewCustomerName(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+                                    onChange={(e) => {setNewCustomerName(e.target.value); if(formErrors.name) setFormErrors({...formErrors, name:null});}}
+                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.name ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg`}
                                     placeholder="Enter full name"
                                     autoFocus
                                     disabled={isSubmitting}
                                 />
                             </div>
+                            {formErrors.name && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.name}</p>}
                         </div>
                         <div>
-                            <label htmlFor="new-customer-phone" className="block text-sm font-medium text-gray-300 mb-1">Phone Number (Required for Credit)</label>
+                            <label htmlFor="new-customer-phone" className="block text-sm font-medium text-gray-300 mb-1">Phone Number</label>
                             <div className="relative">
                                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
                                 <input
                                     id="new-customer-phone"
                                     type="tel"
                                     value={newCustomerPhone}
-                                    onChange={(e) => setNewCustomerPhone(e.target.value.replace(/[^0-9]/g, ''))} // Only allow digits
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+                                    onChange={(e) => {setNewCustomerPhone(e.target.value.replace(/[^0-9]/g, '')); if(formErrors.phone) setFormErrors({...formErrors, phone:null});}}
+                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg`}
                                     placeholder="e.g., 9876543210"
                                     maxLength="10"
                                     disabled={isSubmitting}
                                 />
                             </div>
+                            {formErrors.phone && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.phone}</p>}
+                        </div>
+                        <div>
+                            <label htmlFor="new-customer-limit" className="block text-sm font-medium text-gray-300 mb-1">Credit Limit (₹)</label>
+                            <div className="relative">
+                                <ShieldAlert className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                <input
+                                    id="new-customer-limit"
+                                    type="number"
+                                    value={newCustomerCreditLimit}
+                                    onChange={(e) => {setNewCustomerCreditLimit(e.target.value); if(formErrors.limit) setFormErrors({...formErrors, limit:null});}}
+                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.limit ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg font-bold`}
+                                    placeholder="e.g., 5000"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                            {formErrors.limit && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.limit}</p>}
                         </div>
                         <button 
                             type="submit"
-                            className="w-full py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
+                            className="w-full mt-2 py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -338,9 +347,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             </div>
         );
     }
+
     return (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-md transform transition-all duration-300 scale-100 border border-indigo-700">
+            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-indigo-700">
                 <div className="p-5 border-b border-gray-700 flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-white flex items-center">
                         <IndianRupee className="w-6 h-6 text-teal-400 mr-2" />
@@ -391,7 +401,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                             className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                                            onClick={(e) => e.stopPropagation()} // Prevent closing dropdown when clicking search
+                                            onClick={(e) => e.stopPropagation()} 
                                             disabled={isSubmitting}
                                         />
                                     </div>
@@ -404,15 +414,12 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                             className={`px-4 py-3 cursor-pointer text-sm font-medium transition-colors border-b border-gray-600 last:border-b-0 flex items-center justify-between
                                                 ${
                                                     customer.id === localSelectedCustomer.id 
-                                                        ? 'bg-indigo-600 text-white' // SELECTED Customer color
-                                                        
+                                                        ? 'bg-indigo-600 text-white' 
                                                     : customer.id === ADD_NEW_CUSTOMER_ID 
-                                                        ? 'bg-teal-800/70 text-teal-300 hover:bg-teal-700 font-bold' // Add New
-                                                        
+                                                        ? 'bg-teal-800/70 text-teal-300 hover:bg-teal-700 font-bold' 
                                                     : customer.id === WALK_IN_CUSTOMER.id
-                                                        ? 'bg-gray-600 text-white hover:bg-gray-500 font-bold' // Walk-in
-                                                        
-                                                    : 'text-gray-200 hover:bg-gray-600' // Default unselected
+                                                        ? 'bg-gray-600 text-white hover:bg-gray-500 font-bold' 
+                                                    : 'text-gray-200 hover:bg-gray-600' 
                                                 }
                                             `}
                                         >
@@ -510,11 +517,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <p className="flex justify-between text-sm text-gray-400 pt-3 border-t border-gray-700 mt-2">
                                 <span><strong>New</strong> Total Outstanding Khata Balance:</span>
                                 <span className="font-semibold text-white text-base">₹{newKhataBalance.toFixed(2)}</span>
-                            </p>
-                        )}
-                        {paymentType === 'UPI' && amountCredited > 0 && !isCreditCustomerSelected && (
-                             <p className="text-xs text-center text-yellow-400 p-2 bg-yellow-900/30 rounded-lg">
-                                <strong>WARNING:</strong> No customer selected. The remaining Khata amount cannot be saved to a specific account.
                             </p>
                         )}
                     </div>

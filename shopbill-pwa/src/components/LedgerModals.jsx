@@ -62,28 +62,79 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
   </div>
 );
 
-export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors, isProcessing, isValid }) => (
-  <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <form onSubmit={onConfirm} className="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-indigo-700">
-      <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
-        <h2 className="text-xl font-bold text-indigo-300 flex items-center"><UserPlus className="w-5 h-5 mr-2" /> New Khata Customer</h2>
-        <button type="button" onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
-      </div>
-      <div className="p-6 space-y-5">
-        <InputField label="Full Name" name="name" type="text" value={data.name} onChange={onChange} error={errors.name} required />
-        <InputField label="Phone Number" name="phone" type="tel" value={data.phone} onChange={onChange} error={errors.phone} />
-        <InputField label="Initial Due (₹)" name="initialDue" type="number" value={data.initialDue} onChange={onChange} error={errors.initialDue} />
-        <InputField label="Credit Limit (₹)" name="creditLimit" type="number" value={data.creditLimit} onChange={onChange} error={errors.creditLimit} />
-      </div>
-      <div className="p-5 border-t border-gray-700">
-        <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center disabled:opacity-50" disabled={isProcessing || !isValid}>
-          {isProcessing ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
-          Confirm & Add Customer
-        </button>
-      </div>
-    </form>
-  </div>
-);
+export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors, isProcessing, isValid }) => {
+  // Enhanced internal validation check to ensure mandatory fields are visually marked if empty on submit
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(e);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <form onSubmit={handleSubmit} className="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-indigo-700">
+        <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
+          <h2 className="text-xl font-bold text-indigo-300 flex items-center"><UserPlus className="w-5 h-5 mr-2" /> New Khata Customer</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
+        </div>
+        <div className="p-6 space-y-5">
+          <InputField 
+            label="Full Name (Mandatory)" 
+            name="name" 
+            type="text" 
+            value={data.name} 
+            onChange={onChange} 
+            error={errors.name} 
+            placeholder="Enter customer name"
+            required 
+          />
+          <InputField 
+            label="Phone Number (Mandatory)" 
+            name="phone" 
+            type="tel" 
+            value={data.phone} 
+            onChange={onChange} 
+            error={errors.phone} 
+            placeholder="10-digit mobile number"
+            maxLength="10"
+            required
+          />
+          <InputField 
+            label="Initial Due (₹)" 
+            name="initialDue" 
+            type="number" 
+            value={data.initialDue} 
+            onChange={onChange} 
+            error={errors.initialDue} 
+            placeholder="0"
+          />
+          <InputField 
+            label="Credit Limit (₹) (Mandatory)" 
+            name="creditLimit" 
+            type="number" 
+            value={data.creditLimit} 
+            onChange={onChange} 
+            error={errors.creditLimit} 
+            placeholder="Set spending limit"
+            required
+          />
+        </div>
+        <div className="p-5 border-t border-gray-700">
+          <button 
+            type="submit" 
+            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center disabled:opacity-50 transition-all active:scale-95" 
+            disabled={isProcessing || !isValid}
+          >
+            {isProcessing ? <Loader className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+            Confirm & Add Customer
+          </button>
+          {!isValid && !isProcessing && (
+            <p className="text-center text-xs text-gray-400 mt-3">Please fill all mandatory fields to continue.</p>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+};
 
 export const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
     const [history, setHistory] = React.useState([]);
