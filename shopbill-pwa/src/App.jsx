@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users } from 'lucide-react';
+import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X } from 'lucide-react';
 import { io } from 'socket.io-client';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
@@ -25,6 +25,52 @@ import SystemConfig from './components/SystemConfig';
 import GlobalReport from './components/GlobalReport';
 import Checkout from './components/Checkout';
 import NotificationToast from './components/NotificationToast';
+
+// --- NEW COMPONENT: PWA Update Popup ---
+const UpdatePrompt = () => {
+  const [show, setShow] = useState(false);
+  const [updateHandler, setUpdateHandler] = useState(null);
+
+  useEffect(() => {
+    const onUpdate = (e) => {
+      setUpdateHandler(() => e.detail.updateHandler);
+      setShow(true);
+    };
+    window.addEventListener('pwa-update-available', onUpdate);
+    return () => window.removeEventListener('pwa-update-available', onUpdate);
+  }, []);
+
+  if (!show) return null;
+
+  return (
+    // Backdrop to prevent user from clicking the app behind the modal
+    <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-md z-[9998] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+        <div className="flex flex-col items-center text-center">
+          <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
+            <RefreshCw className="w-8 h-8 animate-spin text-white" />
+          </div>
+          
+          <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
+          <p className="text-indigo-100 mt-2 text-sm">
+            A critical update is available for Pocket POS. Please update to continue using the app securely.
+          </p>
+          
+          <button 
+            onClick={() => updateHandler && updateHandler(true)}
+            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl flex items-center justify-center gap-2"
+          >
+            Update & Reload Now
+          </button>
+          
+          <p className="text-[10px] text-indigo-300 mt-4 uppercase tracking-widest font-semibold">
+            Pocket POS Version Sync
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const UTILITY_NAV_ITEMS_CONFIG = [
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
@@ -255,6 +301,7 @@ const App = () => {
   return (
     <ApiProvider>
       <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+        <UpdatePrompt />
         {showAppUI && (
           <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
         )}

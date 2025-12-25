@@ -17,7 +17,7 @@ export default defineConfig({
     // ----------------------------------------------------------------------
     
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       devOptions: {
         enabled: true,
         type: 'module', 
