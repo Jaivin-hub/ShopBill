@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, CheckCircle, AlertTriangle, ScanLine, Loader, QrCode } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, ScanLine, Loader, QrCode, Focus } from 'lucide-react';
 
 const ScannerModal = ({ 
     isOpen, 
@@ -24,6 +24,28 @@ const ScannerModal = ({
     const lastScannedCodeRef = useRef(null); 
     const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
+
+    // --- NEW: Focus Logic (Google Pay Style) ---
+    const triggerFocus = useCallback(async () => {
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track) return;
+
+        try {
+            // Attempting to force the camera to re-evaluate focus
+            const constraints = track.getConstraints();
+            // Toggling focusMode or applying advanced constraints triggers hardware autofocus
+            await track.applyConstraints({
+                advanced: [{ focusMode: "continuous" }, { focusMode: "manual" }]
+            });
+            // Reset back to continuous for ongoing scanning
+            await track.applyConstraints({
+                advanced: [{ focusMode: "continuous" }]
+            });
+            console.log("Scanner: Focus reset triggered.");
+        } catch (err) {
+            console.warn("Scanner: Manual focus control not supported on this device/browser.", err);
+        }
+    }, []);
 
     // --- Core Cleanup Logic (RE-OPTIMIZED TO FORCE CAMERA OFF) ---
     const resetScannerState = useCallback(() => {
@@ -149,7 +171,7 @@ const ScannerModal = ({
             null, 
             videoRef.current, 
             (result, err) => {
-                // Capture stream for manual cleanup
+                // Capture stream for manual cleanup and focus control
                 if (videoRef.current && videoRef.current.srcObject && !streamRef.current) {
                     streamRef.current = videoRef.current.srcObject;
                 }
@@ -253,8 +275,10 @@ const ScannerModal = ({
 
                 <div className="p-6 pb-4">
                     <div 
-                        className="aspect-video w-full bg-gray-900 rounded-xl overflow-hidden shadow-inner shadow-gray-950 relative border-4 border-cyan-900"
+                        className="aspect-video w-full bg-gray-900 rounded-xl overflow-hidden shadow-inner shadow-gray-950 relative border-4 border-cyan-900 cursor-crosshair"
                         style={{ minHeight: '320px' }}
+                        onClick={triggerFocus}
+                        title="Tap to focus"
                     >
                         <video ref={videoRef} id="scanner-video" className="w-full h-full object-cover" playsInline />
                         
@@ -264,10 +288,25 @@ const ScannerModal = ({
                             <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-cyan-400 opacity-80" />
                             <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-cyan-400 opacity-80" />
                             
+                            {/* Focus Target Square */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-cyan-400/20 rounded-lg flex items-center justify-center">
+                                 <div className="w-2 h-2 bg-cyan-400/20 rounded-full" />
+                            </div>
+
                             {lookupStatus === 'scanning' && (
                                 <div className="absolute top-1/2 left-1/2 w-4/5 h-px bg-cyan-400 shadow-[0_0_10px_2px_rgba(40,200,255,0.7)] -translate-x-1/2 animate-pulse-line" style={{ transform: 'translateY(-50%)' }} />
                             )}
                         </div>
+
+                        {/* Google Pay Style Focus Button */}
+                        {lookupStatus === 'scanning' && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); triggerFocus(); }}
+                                className="absolute bottom-4 right-4 bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-full shadow-lg transition-all active:scale-90 flex items-center gap-2 text-xs font-bold border border-indigo-400"
+                            >
+                                <Focus className="w-4 h-4" /> FOCUS
+                            </button>
+                        )}
                         
                         <style>{`
                             @keyframes pulse-line {
@@ -296,6 +335,7 @@ const ScannerModal = ({
                             </div>
                         ) : null}
                     </div>
+                    <p className="text-[10px] text-gray-500 mt-2 text-center uppercase tracking-widest font-semibold">Tip: Tap the camera screen to refocus</p>
                 </div>
                 
                 <div className={`p-6 pt-5 text-center transition-colors duration-300 ${statusBg} rounded-b-2xl`}>
