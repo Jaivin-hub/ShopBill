@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Info, X, BellOff, ShieldAlert } from 'lucide-react';
 import apiClient from '../lib/apiClient';
+import Api from '../config/api'
 
-/**
- * Helper to determine styling based on notification type
- */
 const getNotificationTypeDetails = (type) => {
     switch (type) {
         case 'inventory_low':
@@ -16,7 +14,7 @@ const getNotificationTypeDetails = (type) => {
             };
         case 'credit_exceeded':
             return { 
-                icon: ShieldAlert, // Changed to ShieldAlert for better distinction
+                icon: ShieldAlert, 
                 color: 'text-red-600 dark:text-red-400', 
                 bgColor: 'bg-red-50 dark:bg-red-900/10', 
                 borderColor: 'border-red-200 dark:border-red-700/50' 
@@ -40,14 +38,15 @@ const getNotificationTypeDetails = (type) => {
 
 const NotificationsPage = ({ notifications, setNotifications }) => {
     
-    // Auto-mark as read when the page is viewed to sync with Header badge
     useEffect(() => {
         const markAsReadOnMount = async () => {
-            const unreadIds = notifications.filter(n => !n.isRead).map(n => n._id);
-            if (unreadIds.length > 0) {
+            // Check if there are any notifications that are UNREAD for the current user
+            const hasUnread = notifications.some(n => n.isRead === false);
+            
+            if (hasUnread) {
                 try {
-                    await apiClient.put('/notifications/read-all');
-                    // Update local state so stripes disappear
+                    await apiClient.put(Api.notificationreadall);
+                    // Update local state to hide "New" stripes for this user only
                     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
                 } catch (err) {
                     console.error("Failed to sync read status:", err);
@@ -55,25 +54,19 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
             }
         };
         markAsReadOnMount();
-    }, [notifications.length]); // Re-run if a new notification arrives while on page
+    }, [notifications.length]); 
 
-    /**
-     * Mark all as read and clear list
-     */
     const handleClearAll = async () => {
         try {
-            await apiClient.put('/api/notifications/read-all');
+            await apiClient.put(Api.notificationreadall);
             setNotifications([]);
         } catch (error) {
             console.error("Failed to clear notifications:", error);
         }
     };
 
-    /**
-     * Remove a single notification
-     */
     const dismissNotification = (id) => {
-        setNotifications(prev => prev.filter(n => (n.id || n._id) !== id));
+        setNotifications(prev => prev.filter(n => (n._id || n.id) !== id));
     };
     
     const formatTime = (timestamp) => {
@@ -85,15 +78,10 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
 
     return (
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-            {/* Header Section */}
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1">
-                        Notifications
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm italic">
-                        Real-time system alerts & stock updates
-                    </p>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1">Notifications</h1>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm italic">Real-time system alerts & stock updates</p>
                 </div>
                 {notifications.length > 0 && (
                     <button 
@@ -105,28 +93,22 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                 )}
             </div>
 
-            {/* Notifications List */}
             <div className="space-y-3 pb-24 md:pb-12">
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
                         const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);
                         const uniqueId = notification._id || notification.id || `notif-${index}`;
-                        const isNew = notification.isRead === false || notification.isRead === undefined;
+                        const isNew = notification.isRead === false;
 
                         return (
                             <div 
                                 key={uniqueId} 
                                 className={`flex items-start p-4 rounded-xl shadow-sm border ${borderColor} ${bgColor} transition-all duration-500 hover:shadow-md animate-in fade-in slide-in-from-right-4 relative overflow-hidden`}
                             >
-                                {/* New Indicator Stripe */}
                                 {isNew && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 animate-pulse" />}
-
-                                {/* Icon Container */}
                                 <div className={`flex-shrink-0 mr-4 ${color} p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm`}>
                                     <Icon className="w-5 h-5" />
                                 </div>
-                                
-                                {/* Content */}
                                 <div className="flex-grow">
                                     <div className="flex justify-between items-start">
                                         <p className={`text-gray-900 dark:text-gray-100 leading-snug ${isNew ? 'font-bold' : 'font-medium'}`}>
@@ -142,12 +124,9 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                                         </p>
                                     </div>
                                 </div>
-
-                                {/* Dismiss Button */}
                                 <button
                                     onClick={() => dismissNotification(uniqueId)}
                                     className="ml-4 p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 transition-colors"
-                                    title="Dismiss"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -155,7 +134,6 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                         );
                     })
                 ) : (
-                    /* Empty State */
                     <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-gray-900/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800">
                         <div className="p-6 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
                             <BellOff className="w-12 h-12 text-gray-300 dark:text-gray-600" />

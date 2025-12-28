@@ -7,6 +7,7 @@ const router = express.Router();
 /**
  * UTILITY: emitAlert
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
+ * UPDATED: Ensures readBy is initialized as an empty array.
  */
 const emitAlert = async (req, shopId, type, data) => {
     const io = req.app.get('socketio');
@@ -49,12 +50,13 @@ const emitAlert = async (req, shopId, type, data) => {
             title,
             message,
             metadata,
-            isRead: false,
+            readBy: [], // Ensure this is initialized as empty
             createdAt: new Date()
         });
 
         if (io) {
-            io.to(shopIdStr).emit('new_notification', newNotification);
+            // For real-time, we tell the client it is NOT read (false)
+            io.to(shopIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
         }
         return newNotification;
     } catch (error) {
@@ -71,14 +73,12 @@ const resolveLowStockAlert = async (req, shopId, itemId) => {
     const shopIdStr = shopId.toString();
 
     try {
-        // 1. Remove the "inventory_low" alerts for this specific item from DB
         await Notification.deleteMany({
             shopId: shopIdStr,
             type: 'inventory_low',
             'metadata.itemId': itemId
         });
 
-        // 2. Tell the frontend to remove this item from the notification list
         if (io) {
             io.to(shopIdStr).emit('resolve_notification', { itemId });
             console.log(`🧹 Resolved alerts for item: ${itemId}`);
@@ -90,26 +90,48 @@ const resolveLowStockAlert = async (req, shopId, itemId) => {
 
 // --- API ROUTES ---
 
+/**
+ * GET /alerts
+ * Fetches notifications and calculates 'isRead' specifically for the logged-in user.
+ */
 router.get('/alerts', protect, async (req, res) => {
     try {
         const notifications = await Notification.find({ shopId: req.user.shopId })
             .sort({ createdAt: -1 })
             .limit(30);
+
+        // Map notifications to include an 'isRead' boolean specific to THIS user
+        const formattedAlerts = notifications.map(n => {
+            const doc = n.toObject();
+            return {
+                ...doc,
+                // Check if current logged-in user ID exists in the readBy array
+                isRead: n.readBy && n.readBy.some(userId => userId.toString() === req.user._id.toString())
+            };
+        });
+
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.json({
-            count: notifications.filter(n => !n.isRead).length,
-            alerts: notifications
+            count: formattedAlerts.filter(n => !n.isRead).length,
+            alerts: formattedAlerts
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch notifications.' });
     }
 });
 
+/**
+ * PUT /read-all
+ * Adds the current user's ID to the readBy array of all unread notifications for their shop.
+ */
 router.put('/read-all', protect, async (req, res) => {
     try {
         const result = await Notification.updateMany(
-            { shopId: req.user.shopId, isRead: false },
-            { $set: { isRead: true } }
+            { 
+                shopId: req.user.shopId, 
+                readBy: { $ne: req.user._id } // Filter notifications where this user ID is NOT present
+            },
+            { $addToSet: { readBy: req.user._id } } // Add the user ID to the array
         );
         res.json({ message: 'Success', updatedCount: result.modifiedCount });
     } catch (error) {
@@ -117,5 +139,4 @@ router.put('/read-all', protect, async (req, res) => {
     }
 });
 
-// EXPORT resolveLowStockAlert so inventoryRoutes can use it
 module.exports = { router, emitAlert, resolveLowStockAlert };

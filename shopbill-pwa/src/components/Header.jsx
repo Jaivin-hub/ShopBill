@@ -14,9 +14,11 @@ const Header = ({
     
     /**
      * LOGIC: Count unread notifications.
+     * UPDATED: Specifically checks for isRead === false. 
+     * With our new backend, this is now unique to the logged-in user.
      */
     const unreadCount = (notifications || []).filter(n => 
-        n && (n.isRead === false || n.isRead === undefined)
+        n && n.isRead === false
     ).length;
     
     const displayCount = unreadCount;
