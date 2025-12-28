@@ -129,7 +129,7 @@ const Reports = ({ apiClient, API, showToast }) => {
 
             {/* Header Block (Fixed) */}
             <div className="flex-shrink-0 p-4 md:p-8 pb-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white mb-1">
+                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
                     Business Reports
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Analyzing: <span className="font-semibold text-teal-500">{getCurrentFilterLabel()}</span></p>

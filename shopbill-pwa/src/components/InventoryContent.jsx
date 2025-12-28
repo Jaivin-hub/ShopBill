@@ -374,7 +374,7 @@ const InventoryContent = ({
     return (
         <div className="p-4 md:p-8 h-full overflow-y-auto bg-white dark:bg-gray-950 transition-colors duration-300">
             <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Inventory Management</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Detailed product configuration and stock levels.</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Detailed product configuration and stock levels.</p>
             {/* Sticky Search Bar (remains the same) */}
             <div className={`
                 fixed top-16 left-0 right-0 z-20 

@@ -7,6 +7,7 @@ import {
  * CustomerList Component: Renders the actual list of Khata customers.
  * * CHANGE: Removed max-width container to allow component to fill the parent's width.
  * CHANGE: Adjusted grid layout to support 3 columns on large screens (lg:grid-cols-3).
+ * CHANGE: Implemented Sticky Search and Header logic.
  */
 const CustomerList = ({ 
     sortedCustomers, 
@@ -136,40 +137,41 @@ const CustomerList = ({
     const displayCount = filteredCustomers.length;
 
     return (
-        // REMOVED: max-w-4xl mx-auto
         <div className="space-y-4 sm:space-y-6">
             
-            {/* --- 1. Search Bar --- */}
-            <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input
-                    type="text"
-                    placeholder="Search by name or phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full py-3 pl-10 pr-4 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                    disabled={isProcessing}
-                />
-            </div>
-            
-            {/* --- 2. Customer List Header --- */}
-            <div className="flex justify-between items-center text-gray-400 font-semibold pb-2 mt-2 border-b border-gray-700">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-300 flex items-center">
-                    <List className="w-5 h-5 mr-2 text-indigo-400" />
-                    {displayCount} Result{displayCount !== 1 ? 's' : ''} ({customersList.length} total)
-                </h2>
-                <span className="text-xs sm:text-sm hidden sm:block text-gray-500">Sorted by Highest Due</span>
+            {/* --- STICKY WRAPPER: Search Bar + Results Count --- */}
+            <div className="sticky top-0 z-30 bg-white dark:bg-gray-950 py-4 space-y-4">
+                {/* 1. Search Bar */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input
+                        type="text"
+                        placeholder="Search by name or phone..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full py-3 pl-10 pr-4 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
+                        disabled={isProcessing}
+                    />
+                </div>
+                
+                {/* 2. Customer List Header (Part of Sticky) */}
+                <div className="flex justify-between items-center text-gray-400 font-semibold pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300 flex items-center">
+                        <List className="w-5 h-5 mr-2 text-indigo-400" />
+                        {displayCount} Result{displayCount !== 1 ? 's' : ''} ({customersList.length} total)
+                    </h2>
+                    <span className="text-xs sm:text-sm hidden sm:block text-gray-500">Sorted by Highest Due</span>
+                </div>
             </div>
             
             {/* --- 3. Customer List (Grid Layout) --- */}
-            {/* ADDED: lg:grid-cols-3 for wider screens */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {filteredCustomers.length > 0 ? (
                     filteredCustomers.map(renderCustomerCard)
                 ) : (
-                    <div className="sm:col-span-2 lg:col-span-3 p-10 text-center bg-gray-800 rounded-xl border border-gray-700 text-gray-400">
+                    <div className="sm:col-span-2 lg:col-span-3 p-10 text-center bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-400">
                         <Search className="w-8 h-8 mx-auto mb-3" />
-                        <p className="font-semibold">
+                        <p className="font-semibold text-gray-600 dark:text-gray-400">
                             {searchTerm ? `No results found for "${searchTerm}".` : 'No customers found in the Khata ledger.'}
                         </p>
                         <p className="text-sm mt-1">Check your search term or add a new customer.</p>

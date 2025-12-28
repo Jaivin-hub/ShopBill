@@ -188,52 +188,54 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
         <Loader className="w-10 h-10 animate-spin text-teal-400" />
-        {/* <p className='mt-3'>Loading inventory and customer data...</p> */}
       </div>
     );
   }
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
-      {/* Header - Fixed */}
-      <div className="p-4 md:p-8 pb-0">
-        <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
-        <p className="text-gray-400 mb-6">Optimized for fast and accurate day-to-day billing.</p>
-      </div>
-
-      {/* Main Scrollable Area - This is what fixes the overlap */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-6 pb-40 md:pb-8">
+      
+      {/* SCROLLABLE CONTAINER FOR HEADER AND CONTENT */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-6 pb-60 scroll-smooth">
         
-        {/* Search Bar */}
-        <div className="relative flex items-center">
-          <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
-          <input
-            type="text"
-            placeholder="Search Item by Name or Scan Barcode..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={handlePhysicalScannerInput}
-            className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-14 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white p-1 rounded-full bg-gray-700/50 transition-colors z-10"
-              title="Clear Search"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={() => setIsCameraScannerOpen(true)}
-            className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
-            title="Scan Barcode with Camera"
-          >
-            <ScanLine className="w-5 h-5" />
-          </button>
+        {/* 1. Header Captions (Will scroll away) */}
+        <div className="pt-4 md:pt-8">
+          <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Optimized for fast and accurate day-to-day billing.</p>
         </div>
 
-        {/* Inventory Quick Access Grid */}
+        {/* 2. STICKY SEARCH BAR (Will stick to top when header scrolls up) */}
+        <div className="sticky top-0 z-40 bg-gray-950 py-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-gray-800 shadow-lg">
+          <div className="relative flex items-center">
+            <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
+            <input
+              type="text"
+              placeholder="Search Item by Name or Scan Barcode..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handlePhysicalScannerInput}
+              className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-14 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white p-1 rounded-full bg-gray-700/50 transition-colors z-10"
+                title="Clear Search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsCameraScannerOpen(true)}
+              className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 hover:text-white p-2 rounded-full bg-indigo-900/50 hover:bg-indigo-700/50 transition-colors z-10"
+              title="Scan Barcode with Camera"
+            >
+              <ScanLine className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* 3. Inventory Quick Access Grid */}
         <div className="max-h-96 overflow-y-auto p-3 border border-gray-700 rounded-xl bg-gray-900 shadow-inner">
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
             {filteredInventory.map(item => (
@@ -256,7 +258,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
           </div>
         </div>
 
-        {/* Cart Card */}
+        {/* 4. Cart Card */}
         <div className="bg-gray-900 p-4 rounded-xl shadow-2xl shadow-indigo-900/20 border border-gray-800 transition duration-300">
           <h3 className="text-lg font-bold flex items-center text-white mb-3 pb-2 border-b border-gray-700">
             <ShoppingCart className="w-5 h-5 mr-2 text-teal-400" /> Cart Items ({cart.length})
@@ -283,40 +285,41 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         </div>
       </div>
 
-      {/* Desktop Payment Bar (Above bottom of screen) */}
+      {/* FIXED PAYMENT BARS (Always at the bottom) */}
       {cart.length > 0 && (
-        <div className="hidden md:block p-3 px-8 bg-gray-950 border-t border-gray-800">
-          <div className="flex justify-between items-stretch space-x-4">
-            <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
-              <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
-              <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
+        <>
+          {/* Desktop Payment Bar */}
+          <div className="hidden md:block fixed bottom-0 left-0 right-0 p-4 px-8 bg-gray-950 border-t border-gray-800 z-50">
+            <div className="flex justify-between items-stretch space-x-4 max-w-7xl mx-auto">
+              <div className="flex-1 p-3 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+                <span className="text-xl font-bold text-white">FINAL TOTAL:</span>
+                <span className="text-teal-400 text-3xl font-extrabold">₹{totalAmount.toFixed(2)}</span>
+              </div>
+              <button
+                className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl hover:bg-teal-700 transition"
+                onClick={() => setIsPaymentModalOpen(true)}
+              >
+                <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
+              </button>
             </div>
-            <button
-              className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-xl hover:bg-teal-700 transition"
-              onClick={() => setIsPaymentModalOpen(true)}
-            >
-              <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
-            </button>
           </div>
-        </div>
-      )}
 
-      {/* Mobile Payment Bar (Fixed at Bottom-16 to avoid menu) */}
-      {cart.length > 0 && (
-        <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-20">
-          <div className="flex items-stretch space-x-3">
-            <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
-              <span className="text-lg font-bold text-white">TOTAL</span>
-              <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
+          {/* Mobile Payment Bar */}
+          <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gray-900 border-t-4 border-teal-600 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-3 z-50">
+            <div className="flex items-stretch space-x-3">
+              <div className="flex-1 p-2 py-3 bg-indigo-900/60 rounded-lg border border-indigo-800 flex items-center justify-between">
+                <span className="text-lg font-bold text-white">TOTAL</span>
+                <span className="text-2xl font-extrabold text-teal-400 truncate">₹{totalAmount.toFixed(2)}</span>
+              </div>
+              <button
+                className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-lg shadow-xl"
+                onClick={() => setIsPaymentModalOpen(true)}
+              >
+                <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
+              </button>
             </div>
-            <button
-              className="w-2/5 py-3 bg-teal-600 text-white rounded-lg font-extrabold text-lg shadow-xl"
-              onClick={() => setIsPaymentModalOpen(true)}
-            >
-              <IndianRupee className="w-5 h-5 inline-block mr-2" /> Pay
-            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* Modals */}

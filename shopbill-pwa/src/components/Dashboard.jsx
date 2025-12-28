@@ -136,7 +136,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
       
       <div className="p-4 md:p-8 flex-shrink-0"> 
         <h1 className="text-3xl font-extrabold text-white mb-2">Owner's Dashboard</h1>
-        <p className="text-gray-400">Quick overview of your shop's health.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Quick overview of your shop's health.</p>
       </div>
 
       <div className="flex-grow overflow-y-auto px-4 md:px-8 pb-8"> 
