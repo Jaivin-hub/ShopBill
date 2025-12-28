@@ -177,6 +177,113 @@ router.post('/signup', async (req, res) => {
     }
 });
 
+/**
+ * @route   GET /api/profile
+ * @desc    Get current user profile data
+ * @access  Private
+ */
+router.get('/profile', protect, async (req, res) => {
+    try {
+        // req.user is already populated by 'protect' middleware
+        const user = await User.findById(req.user.id).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // If the user is staff, we might want to return the owner's shop details
+        // so the frontend displays the correct business information.
+        let businessDetails = user;
+        if (user.role !== 'owner' && user.role !== 'superadmin') {
+            businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                // Business Details (either their own or their owner's)
+                shopName: businessDetails.shopName,
+                taxId: businessDetails.taxId,
+                address: businessDetails.address,
+                currency: businessDetails.currency,
+                profileImageUrl: businessDetails.profileImageUrl,
+                timezone: user.timezone,
+                plan: user.plan,
+                planEndDate: user.planEndDate
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching profile:', error);
+        res.status(500).json({ error: 'Server error fetching profile data.' });
+    }
+});
+
+/**
+ * @route   PUT /api/profile
+ * @desc    Update user profile and business settings
+ * @access  Private
+ */
+router.put('/profile', protect, async (req, res) => {
+    const { 
+        phone, 
+        shopName, 
+        taxId, 
+        address, 
+        profileImageUrl 
+    } = req.body;
+
+    try {
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // 1. Update Personal Fields (Allowed for everyone)
+        if (phone) user.phone = phone;
+        if (profileImageUrl) user.profileImageUrl = profileImageUrl;
+
+        // 2. Update Business Fields (Restricted to 'owner' or 'superadmin')
+        if (user.role === 'owner' || user.role === 'superadmin') {
+            if (shopName) user.shopName = shopName;
+            if (taxId) user.taxId = taxId;
+            if (address) user.address = address;
+            // Currency and Timezone remain read-only for safety as per your UI
+        }
+
+        const updatedUser = await user.save();
+
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            user: {
+                id: updatedUser._id,
+                email: updatedUser.email,
+                phone: updatedUser.phone,
+                shopName: updatedUser.shopName,
+                taxId: updatedUser.taxId,
+                address: updatedUser.address,
+                profileImageUrl: updatedUser.profileImageUrl,
+                role: updatedUser.role
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        
+        // Handle MongoDB Unique Error for ShopName
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'Shop name is already taken. Please choose another.' });
+        }
+        
+        res.status(500).json({ error: 'Server error updating profile.' });
+    }
+});
+
 // --- Forgot Password (Request Token) ---
 
 /**

@@ -1,28 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     User, Mail, Phone, MapPin, IndianRupee, Clock, Check, Building, 
-    UploadCloud, Edit, Shield, AlertTriangle
+    Edit, Shield, Loader
 } from 'lucide-react';
+import API from '../config/api';
 
-// --- Main App Component ---
-function Profile() {
-    // 1. Initialize data from localStorage
-    const currentUserJSON = localStorage.getItem('currentUser');
-    const currentUser = currentUserJSON ? JSON.parse(currentUserJSON) : {}; // Safe parsing
-    // 2. State Initialization: Removed 'name' and use actual 'email' and 'phone' from currentUser
-    console.log('currentUser',currentUser)
+/**
+ * Profile Component
+ * Handles fetching and updating user and business identity details.
+ */
+function Profile({ apiClient, showToast }) {
+    // 1. Initial local state
     const [profile, setProfile] = useState({
-        email: currentUser.email || '',
-        phone: currentUser.phone || '', 
+        email: '',
+        phone: '',
+        shopName: '',
+        taxId: '',
+        address: '',
+        currency: 'INR',
+        timezone: 'Asia/Kolkata'
     });
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
+    // --- Data Fetching ---
+    const fetchProfileData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await apiClient.get(API.profile);
+            // Assuming backend returns data in response.data or response.data.user
+            const data = response.data.user || response.data;
+            setProfile(data);
+        } catch (error) {
+            console.error("Failed to load profile:", error);
+            showToast('Error loading profile data.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [apiClient, showToast]);
 
-    const handleSave = () => {
-        setIsEditing(false); 
-        console.log("Local Save Simulated. Updated Profile:", profile);
-        // NOTE: In a real app, you would call apiClient.put('/api/profile', profile) here
+    useEffect(() => {
+        fetchProfileData();
+    }, [fetchProfileData]);
+
+    // --- Update Logic ---
+    const handleSave = async () => {
+        try {
+            showToast('Updating profile...', 'info');
+            const response = await apiClient.put(API.profile, profile);
+            
+            // Update local state with confirmed data from server
+            const updatedData = response.data.user || response.data;
+            setProfile(updatedData);
+            
+            // Sync localStorage if necessary (optional but helpful)
+            const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
+
+            setIsEditing(false);
+            showToast('Profile updated successfully!', 'success');
+        } catch (error) {
+            console.error("Profile update failed:", error);
+            const errMsg = error.response?.data?.error || 'Failed to update profile.';
+            showToast(errMsg, 'error');
+        }
     };
 
     const handleChange = (e) => {
@@ -39,93 +81,129 @@ function Profile() {
             <input 
                 type={name.includes('phone') ? 'tel' : name.includes('email') ? 'email' : 'text'} 
                 name={name}
-                value={value}
+                value={value || ''}
                 onChange={handleChange}
                 placeholder={placeholder}
                 readOnly={readOnly || !isEditing}
                 className={`w-full p-3 border rounded-lg transition-all text-sm
                     ${readOnly || !isEditing 
                         ? 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
-                        : 'border-indigo-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500'
+                        : 'border-indigo-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm'
                     }
                 `}
             />
         </div>
     );
 
-    // --- Main Layout ---
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-gray-950">
+                <Loader className="w-10 h-10 animate-spin text-teal-400" />
+                <p className="mt-4 text-gray-500">Loading profile...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-white dark:bg-gray-950 transition-colors duration-300 font-sans">
             
-            {/* ⭐️ MODIFIED: Changed max-w-xl to max-w-3xl to increase content width */}
             <header className="mb-8 pt-4 md:pt-0 max-w-8xl mx-auto">
                 <div className="flex justify-between items-center">
-                    {/* Header Text Block */}
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">My Profile</h1>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Refresh my core settings and identity.</p> {/* Refined caption */}
+                        <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Refresh my core settings and identity.</p>
                     </div>
-                    {/* Edit/Save Button: Now sits next to the title text on all screens */}
+
                     <button 
                         onClick={() => {
-                            if (isEditing) handleSave();
-                            setIsEditing(prev => !prev);
+                            if (isEditing) {
+                                handleSave();
+                            } else {
+                                setIsEditing(true);
+                            }
                         }}
-                        // Removed w-full and mt-4 to make it compact and inline
-                        className={`md:w-auto flex items-center justify-center px-4 py-2 rounded-full font-semibold transition duration-200 text-sm sm:text-base 
+                        className={`flex items-center justify-center px-6 py-2.5 rounded-full font-bold transition duration-200 text-sm sm:text-base shadow-lg
                             ${isEditing 
-                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40' // Save state
-                                : 'bg-transparent border border-indigo-600 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-700 hover:text-white hover:border-indigo-700' // Edit state
+                                ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-900/20' 
+                                : 'bg-transparent border-2 border-indigo-600 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white shadow-indigo-900/10' 
                             }`}
                     >
-                        {isEditing ? <Check className="w-5 h-5 mr-1" /> : <Edit className="w-5 h-5 mr-1" />}
-                        {isEditing ? 'Save' : 'Edit'}
+                        {isEditing ? <Check className="w-5 h-5 mr-1.5" /> : <Edit className="w-5 h-5 mr-1.5" />}
+                        {isEditing ? 'Save Changes' : 'Edit Profile'}
                     </button>
                 </div>
             </header>
             
-            {/* ⭐️ MODIFIED: Changed max-w-xl to max-w-3xl to increase content width */}
             <main className="space-y-6 max-w-8xl mx-auto">
                 
                 {/* 1. Personal Account Information */}
-                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-xl dark:shadow-indigo-900/5 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-6 pb-2 border-b border-gray-200 dark:border-gray-700">
                         <User className="w-5 h-5 mr-2 text-teal-400" /> Account Identity
                     </h2>
-                    
-                    <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-6">
-                        <div className="relative">
-                            <img src={profile.profileImageUrl || 'https://cdn.vectorstock.com/i/500p/23/78/shopping-bag-icon-vector-27812378.jpg'} alt="Profile" className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-600"/>
-                            {isEditing && (
-                                <button className="absolute bottom-0 right-0 p-1 bg-indigo-600 rounded-full text-white hover:bg-indigo-700 transition shadow-lg">
-                                    <UploadCloud className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                        <div className="text-center sm:text-left">
-                            {/* Displaying Email as primary identity now */}
-                            <p className="text-xl font-bold text-gray-900 dark:text-white break-all">{profile.shopName || 'Shop Name'}</p>
-                        </div>
-                    </div>
 
-                    <div className="space-y-4">
-                        {/* Removed Full Name Field */}
-                        <ProfileInputField label="Email Address (Login ID)" name="email" value={profile.email} icon={Mail} readOnly={true} />
-                        <ProfileInputField label="Phone Number" name="phone" value={profile.phone} icon={Phone} placeholder="e.g., +91 98765 43210"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ProfileInputField 
+                            label="Email Address (Login ID)" 
+                            name="email" 
+                            value={profile.email} 
+                            icon={Mail} 
+                            readOnly={true} 
+                        />
+                        <ProfileInputField 
+                            label="Phone Number" 
+                            name="phone" 
+                            value={profile.phone} 
+                            icon={Phone} 
+                            placeholder="e.g., +91 98765 43210"
+                        />
                     </div>
                 </section>
 
                 {/* 2. Essential Business Details */}
-                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-xl dark:shadow-indigo-900/5 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-6 pb-2 border-b border-gray-200 dark:border-gray-700">
                         <Building className="w-5 h-5 mr-2 text-amber-400" /> Essential Business Details
                     </h2>
-                    <div className="space-y-4">
-                        <ProfileInputField label="Shop / Business Name (Required for Invoices)" name="shopName" value={profile.shopName} icon={Shield} placeholder="e.g., ShopBill Retail"/>
-                        <ProfileInputField label="Tax/GST ID / EIN (Required for Invoices)" name="taxId" value={profile.taxId} icon={Check} placeholder="e.g., ABCDE1234F5G"/>
-                        <ProfileInputField label="Business Address (Required for Invoices)" name="address" value={profile.address} icon={MapPin} placeholder="e.g., 123 Main St, City, State, Zip"/>
-                        <ProfileInputField label="Default Currency (Core Setting - Read-Only)" name="currency" value={profile.currency} icon={IndianRupee} readOnly={true}/>
-                        <ProfileInputField label="Timezone (Core Setting - Read-Only)" name="timezone" value={profile.timezone} icon={Clock} readOnly={true}/>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2">
+                            <ProfileInputField 
+                                label="Shop / Business Name (Required for Invoices)" 
+                                name="shopName" 
+                                value={profile.shopName} 
+                                icon={Shield} 
+                                placeholder="e.g., ShopBill Retail"
+                            />
+                        </div>
+                        <ProfileInputField 
+                            label="Tax/GST ID / EIN (Required for Invoices)" 
+                            name="taxId" 
+                            value={profile.taxId} 
+                            icon={Check} 
+                            placeholder="e.g., ABCDE1234F5G"
+                        />
+                        <ProfileInputField 
+                            label="Business Address (Required for Invoices)" 
+                            name="address" 
+                            value={profile.address} 
+                            icon={MapPin} 
+                            placeholder="e.g., 123 Main St, City, State, Zip"
+                        />
+                        <ProfileInputField 
+                            label="Default Currency (Core Setting - Read-Only)" 
+                            name="currency" 
+                            value={profile.currency} 
+                            icon={IndianRupee} 
+                            readOnly={true}
+                        />
+                        <ProfileInputField 
+                            label="Timezone (Core Setting - Read-Only)" 
+                            name="timezone" 
+                            value={profile.timezone} 
+                            icon={Clock} 
+                            readOnly={true}
+                        />
                     </div>
                 </section>
                 
