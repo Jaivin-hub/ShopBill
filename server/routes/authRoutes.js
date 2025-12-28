@@ -268,7 +268,9 @@ router.put('/profile', protect, async (req, res) => {
                 taxId: updatedUser.taxId,
                 address: updatedUser.address,
                 profileImageUrl: updatedUser.profileImageUrl,
-                role: updatedUser.role
+                role: updatedUser.role,
+                currency: updatedUser.currency,
+                timezone: updatedUser.timezone,
             }
         });
 

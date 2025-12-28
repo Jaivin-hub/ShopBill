@@ -5,12 +5,31 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 
-/**
- * Profile Component
- * Handles fetching and updating user and business identity details.
- */
+// --- HELPER COMPONENT (Defined OUTSIDE to prevent focus loss) ---
+const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '', onChange, isEditing }) => (
+    <div className="flex flex-col space-y-1">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            <Icon className="w-4 h-4 mr-2 text-teal-400" /> {label}
+        </label>
+        <input 
+            type={name.includes('phone') ? 'tel' : name.includes('email') ? 'email' : 'text'} 
+            name={name}
+            value={value || ''}
+            onChange={onChange}
+            placeholder={placeholder}
+            readOnly={readOnly || !isEditing}
+            className={`w-full p-3 border rounded-lg transition-all text-sm
+                ${readOnly || !isEditing 
+                    ? 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
+                    : 'border-indigo-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm'
+                }
+            `}
+        />
+    </div>
+);
+
+// --- MAIN APP COMPONENT ---
 function Profile({ apiClient, showToast }) {
-    // 1. Initial local state
     const [profile, setProfile] = useState({
         email: '',
         phone: '',
@@ -29,7 +48,6 @@ function Profile({ apiClient, showToast }) {
         setIsLoading(true);
         try {
             const response = await apiClient.get(API.profile);
-            // Assuming backend returns data in response.data or response.data.user
             const data = response.data.user || response.data;
             setProfile(data);
         } catch (error) {
@@ -50,11 +68,11 @@ function Profile({ apiClient, showToast }) {
             showToast('Updating profile...', 'info');
             const response = await apiClient.put(API.profile, profile);
             
-            // Update local state with confirmed data from server
             const updatedData = response.data.user || response.data;
             setProfile(updatedData);
+            console.log('updatedData',updatedData)
             
-            // Sync localStorage if necessary (optional but helpful)
+            // Sync localStorage
             const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
             localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
 
@@ -71,29 +89,6 @@ function Profile({ apiClient, showToast }) {
         const { name, value } = e.target;
         setProfile(prev => ({ ...prev, [name]: value }));
     };
-    
-    // Helper Component: Editable Input Field
-    const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '' }) => (
-        <div className="flex flex-col space-y-1">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                <Icon className="w-4 h-4 mr-2 text-teal-400" /> {label}
-            </label>
-            <input 
-                type={name.includes('phone') ? 'tel' : name.includes('email') ? 'email' : 'text'} 
-                name={name}
-                value={value || ''}
-                onChange={handleChange}
-                placeholder={placeholder}
-                readOnly={readOnly || !isEditing}
-                className={`w-full p-3 border rounded-lg transition-all text-sm
-                    ${readOnly || !isEditing 
-                        ? 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
-                        : 'border-indigo-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm'
-                    }
-                `}
-            />
-        </div>
-    );
 
     if (isLoading) {
         return (
@@ -129,7 +124,7 @@ function Profile({ apiClient, showToast }) {
                             }`}
                     >
                         {isEditing ? <Check className="w-5 h-5 mr-1.5" /> : <Edit className="w-5 h-5 mr-1.5" />}
-                        {isEditing ? 'Save Changes' : 'Edit Profile'}
+                        {isEditing ? 'Save' : 'Edit Profile'}
                     </button>
                 </div>
             </header>
@@ -148,7 +143,9 @@ function Profile({ apiClient, showToast }) {
                             name="email" 
                             value={profile.email} 
                             icon={Mail} 
-                            readOnly={true} 
+                            readOnly={true}
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                         <ProfileInputField 
                             label="Phone Number" 
@@ -156,6 +153,8 @@ function Profile({ apiClient, showToast }) {
                             value={profile.phone} 
                             icon={Phone} 
                             placeholder="e.g., +91 98765 43210"
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                     </div>
                 </section>
@@ -174,6 +173,8 @@ function Profile({ apiClient, showToast }) {
                                 value={profile.shopName} 
                                 icon={Shield} 
                                 placeholder="e.g., ShopBill Retail"
+                                onChange={handleChange}
+                                isEditing={isEditing}
                             />
                         </div>
                         <ProfileInputField 
@@ -182,6 +183,8 @@ function Profile({ apiClient, showToast }) {
                             value={profile.taxId} 
                             icon={Check} 
                             placeholder="e.g., ABCDE1234F5G"
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                         <ProfileInputField 
                             label="Business Address (Required for Invoices)" 
@@ -189,6 +192,8 @@ function Profile({ apiClient, showToast }) {
                             value={profile.address} 
                             icon={MapPin} 
                             placeholder="e.g., 123 Main St, City, State, Zip"
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                         <ProfileInputField 
                             label="Default Currency (Core Setting - Read-Only)" 
@@ -196,6 +201,8 @@ function Profile({ apiClient, showToast }) {
                             value={profile.currency} 
                             icon={IndianRupee} 
                             readOnly={true}
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                         <ProfileInputField 
                             label="Timezone (Core Setting - Read-Only)" 
@@ -203,6 +210,8 @@ function Profile({ apiClient, showToast }) {
                             value={profile.timezone} 
                             icon={Clock} 
                             readOnly={true}
+                            onChange={handleChange}
+                            isEditing={isEditing}
                         />
                     </div>
                 </section>
