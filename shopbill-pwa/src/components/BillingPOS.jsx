@@ -262,7 +262,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
             <ShoppingCart className="w-5 h-5 mr-2 text-teal-400" /> Cart Items ({cart.length})
           </h3>
           <div className="space-y-3">
-            {cart.map(item => (
+            {[...cart].reverse().map(item => (
               <div key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-gray-800 rounded-xl border border-gray-700 shadow-inner">
                 <span className="font-medium text-white w-2/5 truncate">{item.name}</span>
                 <div className="flex items-center space-x-2 w-1/5 justify-center">

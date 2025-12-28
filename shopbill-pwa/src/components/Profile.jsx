@@ -9,10 +9,6 @@ function Profile() {
     // 1. Initialize data from localStorage
     const currentUserJSON = localStorage.getItem('currentUser');
     const currentUser = currentUserJSON ? JSON.parse(currentUserJSON) : {}; // Safe parsing
-
-    // Mock constants (User ID is still mocked as it typically comes from the server)
-    const mockUserId = 'mock-user-1234567890';
-    
     // 2. State Initialization: Removed 'name' and use actual 'email' and 'phone' from currentUser
     console.log('currentUser',currentUser)
     const [profile, setProfile] = useState({

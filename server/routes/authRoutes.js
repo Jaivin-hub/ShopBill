@@ -24,56 +24,63 @@ const generateToken = (id, shopId, role) => {
  * @access Public
  */
 router.post('/login', async (req, res) => {
-    const { identifier, password } = req.body; // Use 'identifier' to accept email or phone
+    const { identifier, password } = req.body; 
     
-    // Basic validation
     if (!identifier || !password) {
         return res.status(400).json({ error: 'Email/Phone and password are required.' });
     }
 
     try {
-        // --- NEW NORMALIZATION LOGIC ---
         let searchIdentifiers = [];
         const isEmail = identifier.includes('@');
         
-        // 1. If it looks like an email, search only by email
         if (isEmail) {
             searchIdentifiers.push(identifier.toLowerCase());
-        } 
-        // 2. If it looks like a phone number (no '@'), generate potential matches
-        else {
-            // Clean up the identifier: remove spaces, dashes, parentheses
+        } else {
             const cleanedIdentifier = identifier.replace(/[\s\-\(\)]/g, '');
-            
-            // A. Full identifier (Assumes user provided country code, e.g., "+91...")
             searchIdentifiers.push(cleanedIdentifier);
-
-            // B. Check against common/default country codes if it's a number without '+'
             const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91'; 
-
-            // If the cleaned identifier does not start with a '+' (i.e., local number only)
             if (!cleanedIdentifier.startsWith('+')) {
-                // Add the default country code prefix for search
                 searchIdentifiers.push(defaultCountryCode + cleanedIdentifier);
             }
         }
 
-        // 3. Construct the Mongoose $or query using the generated identifiers
         const orQuery = searchIdentifiers.flatMap(id => [
             { email: id },
-            // Phone numbers are typically stored with the '+' and country code
             { phone: id } 
         ]);
-        // --- END NORMALIZATION LOGIC ---
 
         const user = await User.findOne({ $or: orQuery });
 
         if (user && (await user.matchPassword(password))) {
-            // Check if the user is active (especially important for staff)
+            
+            // 1. Basic Active Check
             if (user.isActive === false) { 
                  return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
             }
-            
+
+            // --- NEW SUBSCRIPTION VALIDATION DURING LOGIN ---
+            if (user.role !== 'superadmin') {
+                const now = new Date();
+                
+                // Identify the owner account to check the plan status
+                let ownerAccount = user;
+                if (user.role !== 'owner') {
+                    // If staff is logging in, fetch their owner's data
+                    ownerAccount = await User.findById(user.shopId);
+                }
+
+                // Check if planEndDate exists and if it has already passed
+                if (!ownerAccount || !ownerAccount.planEndDate || new Date(ownerAccount.planEndDate) < now) {
+                    return res.status(403).json({ 
+                        error: 'Access Expired', 
+                        message: 'Your subscription period has ended. Please renew the plan to log in.',
+                        expiredAt: ownerAccount?.planEndDate
+                    });
+                }
+            }
+            // --- END SUBSCRIPTION VALIDATION ---
+
             const token = generateToken(user._id, user.shopId, user.role);
             res.json({
                 token,
@@ -83,7 +90,7 @@ router.post('/login', async (req, res) => {
                     role: user.role,
                     shopId: user.shopId,
                     phone: user.phone,
-                    plan: user.plan // Include plan in login response
+                    plan: user.plan
                 }
             });
         } else {

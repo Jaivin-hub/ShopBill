@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User'); // Assuming path to User model
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev'; // Get from env
 
-// --- NEW AUTHENTICATION MIDDLEWARE ---
+// --- UPDATED AUTHENTICATION MIDDLEWARE ---
 const protect = async (req, res, next) => {
     let token;
 
@@ -19,14 +19,44 @@ const protect = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // We fetch the user AND their shop owner's status to ensure staff are blocked if the owner's plan expires
         const user = await User.findById(decoded.id).select('-password');
         
-         if (!user) {
+        if (!user) {
             return res.status(401).json({ error: 'Not authorized, user not found' });
         }
-        
-        // **CRITICAL FIX/UPDATE:** // Ensure req.user has an 'id' property by explicitly setting it from Mongoose's _id
-        // (This makes it compatible with your router logic: const userId = req.user?.id;)
+
+        // ---------------------------------------------------------------------
+        // SUBSCRIPTION & PLAN EXPIRY CHECK
+        // ---------------------------------------------------------------------
+        // 1. Superadmins always have access
+        // 2. For Owners/Managers/Cashiers, we check the planEndDate
+        if (user.role !== 'superadmin') {
+            const now = new Date();
+            
+            // If the user is an owner, check their own planEndDate
+            // If the user is staff, we check the owner's planEndDate (stored in shopId)
+            let ownerAccount = user;
+            if (user.role !== 'owner') {
+                ownerAccount = await User.findById(user.shopId);
+            }
+
+            if (!ownerAccount || !ownerAccount.planEndDate || new Date(ownerAccount.planEndDate) < now) {
+                return res.status(403).json({ 
+                    error: 'Subscription expired', 
+                    message: 'Your access period has ended. Please renew your subscription to continue using the app.',
+                    expiredAt: ownerAccount?.planEndDate
+                });
+            }
+
+            // Optional: Block if the account is manually deactivated
+            if (!ownerAccount.isActive) {
+                return res.status(403).json({ error: 'Account deactivated. Please contact support.' });
+            }
+        }
+        // ---------------------------------------------------------------------
+
         req.user = user;
         req.user.id = user._id; // Attach the ID as 'id' for consistency
 
