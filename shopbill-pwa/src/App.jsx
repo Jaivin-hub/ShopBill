@@ -43,9 +43,8 @@ const UpdatePrompt = () => {
   if (!show) return null;
 
   return (
-    // Backdrop to prevent user from clicking the app behind the modal
     <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-md z-[9998] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+      <div className="w-full max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
@@ -107,14 +106,19 @@ const App = () => {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // Force HTML to always have 'dark' class for underlying tailwind support if needed
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  // --- NOTIFICATION LOGIC ---
+  // Calculate unread count for display in Header and Sidebar
+  const unreadCount = useMemo(() => {
+    return (notifications || []).filter(n => 
+        n && (n.isRead === false || n.isRead === undefined)
+    ).length;
+  }, [notifications]);
+
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser) return;
     try {
@@ -154,7 +158,6 @@ const App = () => {
     return () => { if (socket) socket.disconnect(); };
   }, [currentUser?.shopId, showToast, fetchNotificationHistory]);
 
-  // --- NAVIGATION HANDLERS ---
   const handleSelectPlan = useCallback((plan) => {
     setSelectedPlan(plan);
     setCurrentPage('checkout');
@@ -300,14 +303,20 @@ const App = () => {
 
   return (
     <ApiProvider>
-      <div className="min-h-screen bg-gray-950 flex flex-col font-sans transition-colors duration-300">
+      <div className="h-screen w-full bg-gray-950 flex flex-col font-sans transition-colors duration-300 overflow-hidden">
         <UpdatePrompt />
+        
+        {/* Fixed Header */}
         {showAppUI && (
-          <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
+          <div className="fixed top-0 left-0 right-0 z-[40]">
+            <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
+          </div>
         )}
-        <div className="flex flex-1">
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Fixed Sidebar */}
           {showAppUI && (
-              <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-10 shadow-2xl transition-colors duration-300">
+              <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl transition-colors duration-300">
                   <div className="p-6 border-b border-gray-800">
                       <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')}><Smartphone className="mr-2 w-6 h-6" /> Pocket POS</h2>
                       <p className="text-xs text-gray-500 mt-1">User: {displayRole}</p>
@@ -318,7 +327,15 @@ const App = () => {
                       ))}
                       <div className="pt-4 border-t border-gray-800 space-y-2">
                           {utilityNavItems.map(item => (
-                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium relative ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}>
+                                <item.icon className="w-5 h-5 mr-3" />
+                                {item.name}
+                                {item.id === 'notifications' && unreadCount > 0 && (
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full ring-2 ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
+                              </button>
                           ))}
                       </div>
                   </nav>
@@ -327,18 +344,22 @@ const App = () => {
                   </div>
               </aside>
           )}
-          <main className={`flex-1 ${showAppUI ? 'md:ml-64 pt-16 md:pt-4 pb-16 md:pb-0' : 'w-full'}`}>
+
+          {/* Main Content Area: Adjusted for fixed Header/Footer */}
+          <main className={`flex-1 overflow-y-auto ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
               {renderContent()}
           </main>
         </div>
-        {/* Mobile Footer Navigation */}
+
+        {/* Fixed Mobile Footer Navigation */}
         {showAppUI && (
-            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-30 shadow-2xl">
+            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-[40] shadow-2xl">
                 {navItems.map(item => (
                     <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-400 font-bold' : 'text-gray-400'}`}><item.icon className="w-5 h-5" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
                 ))}
             </nav>
         )}
+        
         <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       </div>
     </ApiProvider>

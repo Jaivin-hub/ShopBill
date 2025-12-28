@@ -94,7 +94,7 @@ function Profile({ apiClient, showToast }) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-gray-950">
                 <Loader className="w-10 h-10 animate-spin text-teal-400" />
-                <p className="mt-4 text-gray-500">Loading profile...</p>
+                {/* <p className="mt-4 text-gray-500">Loading profile...</p> */}
             </div>
         );
     }
@@ -124,7 +124,7 @@ function Profile({ apiClient, showToast }) {
                             }`}
                     >
                         {isEditing ? <Check className="w-5 h-5 mr-1.5" /> : <Edit className="w-5 h-5 mr-1.5" />}
-                        {isEditing ? 'Save' : 'Edit Profile'}
+                        {isEditing ? 'Save' : 'Edit'}
                     </button>
                 </div>
             </header>

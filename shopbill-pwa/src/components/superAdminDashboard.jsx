@@ -160,7 +160,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
         return (
             <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
                 <Loader className="w-10 h-10 animate-spin text-indigo-400" />
-                <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading dashboard data...</p>
+                {/* <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading dashboard data...</p> */}
             </div>
         );
     }
@@ -300,7 +300,6 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                             <span className="text-sm text-gray-600 dark:text-gray-400">{data.count || 0} shops</span>
                                         </div>
                                         {/* Display revenue in clean format here */}
-                                        {console.log('data', data)}
                                         <span className="text-sm font-semibold text-gray-900 dark:text-white">₹{formatNumber(data.revenue || 0)}/mo</span>
                                     </div>
                                     <div className="w-full bg-gray-200 dark:bg-gray-700/30 rounded-full h-2">

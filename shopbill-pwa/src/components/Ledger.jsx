@@ -81,7 +81,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-teal-400">
       <Loader className="w-10 h-10 animate-spin" />
-      <p className='mt-3 font-semibold'>Loading Khata Ledger...</p>
+      {/* <p className='mt-3 font-semibold'>Loading Khata Ledger...</p> */}
     </div>
   );
 

@@ -126,7 +126,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950">
         <Loader className="w-10 h-10 animate-spin text-teal-400" />
-        <p className='mt-3'>Loading dashboard summary data...</p>
+        {/* <p className='mt-3'>Loading dashboard summary data...</p> */}
       </div>
     );
   }
