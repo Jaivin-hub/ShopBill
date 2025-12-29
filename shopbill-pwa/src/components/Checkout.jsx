@@ -337,9 +337,9 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
             <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
                 <div className="text-center mb-6">
                     <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
-                        Complete Registration & Start Free Trial
+                        Registration
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Secure your subscription mandate to begin your 30-day free trial.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Start your 30-day free trial in minutes.</p>
                 </div>
                 {paymentError && (
                     <div className="p-3 mb-5 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
@@ -583,10 +583,11 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 </>
                             )}
                         </button>
-                        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-3 flex items-center justify-center">
-                            <Lock className="w-3 h-3 mr-1" />
-                            By clicking 'Setup Mandate', you agree to our Terms and Conditions.
-                        </p>
+                        <p className="text-center text-[10px] text-gray-500 mt-4 px-4 leading-relaxed">
+
+                                By proceeding, you authorize a one-time verification of ₹1 and agree to the 30-day trial terms. Future payments will be automated.
+
+                            </p>
                         <div className="text-center pt-3">
                             <button
                                 type="button"
@@ -594,7 +595,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                 className="cursor-pointer text-xs text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
                                 disabled={isProcessing}
                             >
-                                <ArrowLeft className="w-3 h-3 mr-1 cursor-pointer" /> Cancel and go back to plans
+                                <ArrowLeft className="w-3 h-3 mr-1 cursor-pointer" /> Cancel and go back
                             </button>
                         </div>
                     </div>
