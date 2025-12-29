@@ -1,17 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader, ScanLine, Upload } from 'lucide-react'; 
 import ScannerModal from './ScannerModal'; 
-
-// =========================================================================
-// BulkUploadModal Component (UNMODIFIED)
-// =========================================================================
 const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
     const [csvData, setCsvData] = useState('');
     const [file, setFile] = useState(null);
     const [error, setError] = useState(null);
-
-    // ONLY name, price, and quantity are REQUIRED. 
-    // reorderLevel and hsn are OPTIONAL in the parsing logic.
     const requiredHeaders = ["name", "price", "quantity"];
     const allExpectedHeaders = ["name", "price", "quantity", "reorderLevel", "hsn"];
 
@@ -22,7 +15,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             setError(null);
         }
     }, [isOpen]);
-
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile && selectedFile.name.endsWith('.csv')) {
@@ -39,17 +31,13 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             setError('Please select a valid CSV file.');
         }
     };
-
     const parseCSV = (text) => {
         const lines = text.trim().split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) {
             setError('CSV must contain a header row and at least one data row.');
             return null;
         }
-
         const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-        
-        // --- UPDATED VALIDATION LOGIC ---
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
         if (missingHeaders.length > 0) {
             setError(`Missing required CSV columns: ${missingHeaders.join(', ')}. Please ensure the first row contains: ${requiredHeaders.join(', ')}`);

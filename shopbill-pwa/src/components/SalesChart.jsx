@@ -1,9 +1,7 @@
 import React, { useMemo } from 'react';
-// Import LineChart and Line components instead of BarChart and Bar
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp } from 'lucide-react'; 
 
-// Define the configurations for the two potential charts
 const CHART_CONFIG = {
     revenue: {
         yAxisId: 'left',
@@ -27,19 +25,11 @@ const CHART_CONFIG = {
     }
 };
 
-/**
- * --- UPDATED HELPER FUNCTION ---
- * Converts IDs or Date strings into user-friendly labels.
- * @param {string} viewType - 'Day', 'Week', or 'Month'
- * @param {number|string} id - The value from the data
- * @returns {string} The formatted label for the X-axis.
- */
 const getChartLabel = (viewType, id) => {
     if (!id) return '';
 
     if (viewType === 'Month') {
         const numericId = parseInt(id, 10);
-        // Returns "Jan", "Feb", etc.
         const date = new Date(2000, numericId - 1, 1);
         return date.toLocaleString('en-US', { month: 'short' });
     } 
@@ -48,11 +38,9 @@ const getChartLabel = (viewType, id) => {
         return `Wk ${id}`;
     }
 
-    // UPDATED: Handle 'Day' to show readable dates like "Oct 12"
     if (viewType === 'Day') {
         try {
             const date = new Date(id);
-            // If the date is invalid, fallback to raw ID
             if (isNaN(date.getTime())) return id;
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         } catch (e) {
@@ -63,18 +51,12 @@ const getChartLabel = (viewType, id) => {
     return id; 
 };
 
-/**
- * Renders a dual-axis Line Chart for Sales (Revenue and Transactions).
- */
 const SalesChart = ({ data, viewType, yAxisKey }) => {
     const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
     
-    // Map the raw data to include a formatted label for the X-Axis
     const processedData = useMemo(() => {
         return data.map(d => {
-            // Get the value using the viewType as a key (handles 'Day', 'Week', 'Month')
             const rawValue = d[viewType];
-            
             return {
                 ...d,
                 label: getChartLabel(viewType, rawValue),
@@ -82,7 +64,6 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
         });
     }, [data, viewType]);
 
-    // Determine primary (left axis) and secondary (right axis) configurations
     const primaryConfig = CHART_CONFIG[yAxisKey] || CHART_CONFIG.revenue;
     const secondaryConfig = yAxisKey === 'revenue' ? { 
         dataKey: primaryConfig.transactionDataKey, 
@@ -110,11 +91,13 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
     
     if (filteredData.length === 0) {
         return (
-            <div className="h-[400px] flex items-center justify-center">
-                <p className="text-center text-gray-500 py-12">
-                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    No sales data available for the selected period.
-                </p>
+            <div className="h-[400px] flex items-center justify-center bg-gray-950 rounded-xl">
+                <div className="text-center">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-700" />
+                    <p className="text-gray-500 py-4 font-medium">
+                        No sales data available for the selected period.
+                    </p>
+                </div>
             </div>
         );
     }
@@ -123,15 +106,14 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
         <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
             <RechartsLineChart
                 data={filteredData} 
-                margin={{ top: 10, right: 20, left: 10, bottom: 20 }} // Bottom margin for date labels
+                margin={{ top: 10, right: 20, left: 10, bottom: 20 }}
             >
-                <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" className="dark:stroke-gray-700" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 
-                {/* Updated X-Axis for Dates */}
                 <XAxis 
                     dataKey="label" 
-                    stroke="#6b7280" 
-                    className="dark:text-gray-400 text-[10px] sm:text-xs" 
+                    stroke="#9ca3af" 
+                    className="text-gray-400 text-[10px] sm:text-xs" 
                     tick={{ dy: 10 }}
                     interval={isMobile ? "preserveStartEnd" : 0} 
                 />
@@ -139,7 +121,7 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                 <YAxis 
                     yAxisId="left" 
                     stroke={primaryConfig.color} 
-                    className="dark:text-gray-400 text-xs"
+                    className="text-gray-400 text-xs"
                     tickFormatter={primaryConfig.formatter}
                 />
                 
@@ -147,24 +129,24 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                     yAxisId="right" 
                     orientation="right" 
                     stroke={secondaryConfig.color} 
-                    className="dark:text-gray-400 text-xs"
+                    className="text-gray-400 text-xs"
                     tickFormatter={(value) => value.toLocaleString('en-IN', { notation: 'compact' })}
                 />
                 
                 <Tooltip
                     contentStyle={{ 
-                        backgroundColor: 'rgba(31, 41, 55, 0.9)', 
-                        border: '1px solid #4b5563', 
+                        backgroundColor: '#111827', 
+                        border: '1px solid #374151', 
                         borderRadius: '8px',
-                        padding: '8px',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)' ,
+                        padding: '12px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)' ,
                         color: '#f9fafb' 
                     }}
-                    labelStyle={{ fontWeight: 'bold', color: '#f9fafb' }} 
+                    labelStyle={{ fontWeight: 'bold', color: '#f9fafb', marginBottom: '4px' }} 
                     formatter={tooltipFormatter}
                 />
                 
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', color: '#9ca3af' }} />
                 
                 <Line 
                     yAxisId="left" 
@@ -173,7 +155,7 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                     stroke={primaryConfig.color} 
                     type="monotone" 
                     strokeWidth={2}
-                    dot={{ r: 4 }} 
+                    dot={{ r: 4, fill: primaryConfig.color, strokeWidth: 0 }} 
                     activeDot={{ r: 8, strokeWidth: 2 }} 
                 />
                 
@@ -184,7 +166,7 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
                     stroke={secondaryConfig.color} 
                     type="monotone" 
                     strokeWidth={2}
-                    dot={{ r: 4 }} 
+                    dot={{ r: 4, fill: secondaryConfig.color, strokeWidth: 0 }} 
                     activeDot={{ r: 8, strokeWidth: 2 }} 
                     opacity={0.8} 
                 />

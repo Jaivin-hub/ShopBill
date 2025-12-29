@@ -5,10 +5,10 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 
-// --- HELPER COMPONENT (Defined OUTSIDE to prevent focus loss) ---
+// --- HELPER COMPONENT ---
 const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '', onChange, isEditing }) => (
-    <div className="flex flex-col space-y-1">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+    <div className="flex flex-col space-y-1.5">
+        <label className="text-sm font-bold text-gray-400 flex items-center">
             <Icon className="w-4 h-4 mr-2 text-teal-400" /> {label}
         </label>
         <input 
@@ -18,10 +18,10 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
             onChange={onChange}
             placeholder={placeholder}
             readOnly={readOnly || !isEditing}
-            className={`w-full p-3 border rounded-lg transition-all text-sm
+            className={`w-full p-3.5 border rounded-xl transition-all text-sm outline-none
                 ${readOnly || !isEditing 
-                    ? 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
-                    : 'border-indigo-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 shadow-sm'
+                    ? 'border-gray-800 bg-gray-800/50 text-gray-500 cursor-default'
+                    : 'border-indigo-500/50 bg-gray-950 text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-inner'
                 }
             `}
         />
@@ -43,7 +43,6 @@ function Profile({ apiClient, showToast }) {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // --- Data Fetching ---
     const fetchProfileData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -62,7 +61,6 @@ function Profile({ apiClient, showToast }) {
         fetchProfileData();
     }, [fetchProfileData]);
 
-    // --- Update Logic ---
     const handleSave = async () => {
         try {
             showToast('Updating profile...', 'info');
@@ -70,9 +68,7 @@ function Profile({ apiClient, showToast }) {
             
             const updatedData = response.data.user || response.data;
             setProfile(updatedData);
-            console.log('updatedData',updatedData)
             
-            // Sync localStorage
             const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
             localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
 
@@ -92,21 +88,20 @@ function Profile({ apiClient, showToast }) {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-gray-950">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950">
                 <Loader className="w-10 h-10 animate-spin text-teal-400" />
-                {/* <p className="mt-4 text-gray-500">Loading profile...</p> */}
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-white dark:bg-gray-950 transition-colors duration-300 font-sans">
+        <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-gray-950 transition-colors duration-300 font-sans text-gray-100">
             
             <header className="mb-8 pt-4 md:pt-0 max-w-8xl mx-auto">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-end border-b border-gray-800 pb-6">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">My Profile</h1>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Refresh my core settings and identity.</p>
+                        <h1 className="text-3xl font-black text-white tracking-tight">My Profile</h1>
+                        <p className="text-gray-500 mt-1 text-sm font-medium">Shop & Account Settings</p>
                     </div>
 
                     <button 
@@ -117,10 +112,10 @@ function Profile({ apiClient, showToast }) {
                                 setIsEditing(true);
                             }
                         }}
-                        className={`flex items-center justify-center px-6 py-2.5 rounded-full font-bold transition duration-200 text-sm sm:text-base shadow-lg
+                        className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold transition-all duration-200 text-sm sm:text-base active:scale-95 shadow-lg
                             ${isEditing 
-                                ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-900/20' 
-                                : 'bg-transparent border-2 border-indigo-600 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white shadow-indigo-900/10' 
+                                ? 'bg-teal-600 hover:bg-teal-500 text-white shadow-teal-900/40' 
+                                : 'bg-gray-900 border border-indigo-500/30 text-indigo-400 hover:bg-gray-800 hover:border-indigo-400' 
                             }`}
                     >
                         {isEditing ? <Check className="w-5 h-5 mr-1.5" /> : <Edit className="w-5 h-5 mr-1.5" />}
@@ -132,12 +127,12 @@ function Profile({ apiClient, showToast }) {
             <main className="space-y-6 max-w-8xl mx-auto">
                 
                 {/* 1. Personal Account Information */}
-                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-xl dark:shadow-indigo-900/5 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-6 pb-2 border-b border-gray-200 dark:border-gray-700">
-                        <User className="w-5 h-5 mr-2 text-teal-400" /> Account Identity
+                <section className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 p-5 sm:p-8">
+                    <h2 className="text-lg font-black text-white flex items-center mb-8 uppercase tracking-widest text-xs opacity-70">
+                        <User className="w-4 h-4 mr-2 text-teal-400" /> Account Identity
                     </h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <ProfileInputField 
                             label="Email Address (Login ID)" 
                             name="email" 
@@ -160,12 +155,12 @@ function Profile({ apiClient, showToast }) {
                 </section>
 
                 {/* 2. Essential Business Details */}
-                <section className="bg-gray-100 dark:bg-gray-900 rounded-xl shadow-xl dark:shadow-indigo-900/5 overflow-hidden border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-6 pb-2 border-b border-gray-200 dark:border-gray-700">
-                        <Building className="w-5 h-5 mr-2 text-amber-400" /> Essential Business Details
+                <section className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 p-5 sm:p-8">
+                    <h2 className="text-lg font-black text-white flex items-center mb-8 uppercase tracking-widest text-xs opacity-70">
+                        <Building className="w-4 h-4 mr-2 text-amber-400" /> Essential Business Details
                     </h2>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="md:col-span-2">
                             <ProfileInputField 
                                 label="Shop / Business Name (Required for Invoices)" 
@@ -178,7 +173,7 @@ function Profile({ apiClient, showToast }) {
                             />
                         </div>
                         <ProfileInputField 
-                            label="Tax/GST ID / EIN (Required for Invoices)" 
+                            label="Tax/GST ID / EIN" 
                             name="taxId" 
                             value={profile.taxId} 
                             icon={Check} 
@@ -187,16 +182,16 @@ function Profile({ apiClient, showToast }) {
                             isEditing={isEditing}
                         />
                         <ProfileInputField 
-                            label="Business Address (Required for Invoices)" 
+                            label="Business Address" 
                             name="address" 
                             value={profile.address} 
                             icon={MapPin} 
-                            placeholder="e.g., 123 Main St, City, State, Zip"
+                            placeholder="e.g., 123 Main St, City, State"
                             onChange={handleChange}
                             isEditing={isEditing}
                         />
                         <ProfileInputField 
-                            label="Default Currency (Core Setting - Read-Only)" 
+                            label="Default Currency (Read-Only)" 
                             name="currency" 
                             value={profile.currency} 
                             icon={IndianRupee} 
@@ -205,7 +200,7 @@ function Profile({ apiClient, showToast }) {
                             isEditing={isEditing}
                         />
                         <ProfileInputField 
-                            label="Timezone (Core Setting - Read-Only)" 
+                            label="System Timezone (Read-Only)" 
                             name="timezone" 
                             value={profile.timezone} 
                             icon={Clock} 
