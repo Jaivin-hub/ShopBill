@@ -74,16 +74,31 @@ const BillModal = ({ sale, onClose, isLoading }) => {
             {/* Print Specific Styles */}
             <style>{`
                 @media print {
+                    @page { margin: 10mm; }
                     body * { visibility: hidden; }
                     #printable-receipt, #printable-receipt * { visibility: visible; }
                     #printable-receipt { 
                         position: absolute; 
-                        left: 0; 
-                        top: 0; 
-                        width: 100%; 
-                        padding: 20px;
+                        left: 0;
+                        right: 0;
+                        top: 0;
+                        margin: 0 auto;
+                        width: 100%;
+                        max-width: 100%;
+                        display: block !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
                         background: white !important;
                         color: black !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                    }
+                    /* Ensure scrollable area expands for print */
+                    .flex-grow.overflow-y-auto {
+                        overflow: visible !important;
+                        height: auto !important;
+                        display: block !important;
                     }
                     .no-print { display: none !important; }
                 }
