@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, X, User, ArrowDownWideNarrow, Clock, CheckCircle, Printer } from 'lucide-react';
+import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, ArrowLeft, X, User, ArrowDownWideNarrow, Clock, CheckCircle, Printer } from 'lucide-react';
 import API from '../config/api';
 
 const getLocalDateString = (date) => {
@@ -105,7 +105,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
             `}</style>
 
             <div id="printable-receipt" className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col transform transition-all border border-gray-100 dark:border-gray-700">
-                
+
                 {/* Header (Fixed) */}
                 <div className="p-4 sm:p-6 bg-indigo-500/10 dark:bg-indigo-900/20 text-center border-b border-indigo-500/30 dark:border-indigo-700/50 relative">
                     <button onClick={onClose} className="no-print absolute top-3 right-3 text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white transition-colors p-1 rounded-full">
@@ -177,14 +177,14 @@ const BillModal = ({ sale, onClose, isLoading }) => {
 
                 {/* Actions (Fixed) */}
                 <div className="no-print p-4 bg-gray-50 dark:bg-gray-800 flex gap-3 border-t dark:border-gray-700">
-                    <button 
-                        onClick={handlePrint} 
+                    <button
+                        onClick={handlePrint}
                         className="flex-1 flex items-center justify-center px-4 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold rounded-lg hover:opacity-90 transition-all"
                     >
                         <Printer className="w-5 h-5 mr-2" /> Print
                     </button>
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-all"
                     >
                         Close
@@ -208,7 +208,7 @@ const MetricCard = ({ title, value, icon: Icon, colorClass, valueSuffix = '' }) 
     </div>
 );
 
-const SalesActivityPage = ({ salesData, apiClient, showToast, userRole }) => {
+const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }) => {
     const activeApiClient = apiClient;
     const [sales, setSales] = useState(salesData || []);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
@@ -299,63 +299,72 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole }) => {
 
     return (
         <div className="p-4 md:p-8 h-full flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-            <div className="pb-4 mb-6">
-                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center mb-4">
-                    Sales Activity
-                </h1>
+            <div className="pb-4 mb-2 no-print">
+                <button
+                    onClick={onBack}
+                    className="flex items-center text-indigo-400 hover:underline mb-2 disabled:opacity-50"
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+                </button>
+                <div className="flex items-center space-x-4 mb-4">
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                        Sales Activity
+                    </h1>
+                </div>
                 <div className="p-4 bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800">
                     <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
                 </div>
             </div>
 
             {userRole === 'owner' && (
-            <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4 px-1">
-                <MetricCard
-                    title="Sales"
-                    value={summaryMetrics.totalSalesValue}
-                    icon={IndianRupee}
-                    colorClass="text-indigo-600 dark:text-indigo-400"
-                    valueSuffix="₹"
-                />
-                <MetricCard
-                    title="Bills"
-                    value={summaryMetrics.totalSalesCount}
-                    icon={CheckCircle}
-                    colorClass="text-teal-600 dark:text-teal-400"
-                />
-                <MetricCard
-                    title="Credit"
-                    value={summaryMetrics.totalCreditGiven}
-                    icon={AlertTriangle}
-                    colorClass="text-red-600 dark:text-red-400"
-                    valueSuffix="₹"
-                />
-            </div>
+                <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4 px-1 no-print">
+                    <MetricCard
+                        title="Sales"
+                        value={summaryMetrics.totalSalesValue}
+                        icon={IndianRupee}
+                        colorClass="text-indigo-600 dark:text-indigo-400"
+                        valueSuffix="₹"
+                    />
+                    <MetricCard
+                        title="Bills"
+                        value={summaryMetrics.totalSalesCount}
+                        icon={CheckCircle}
+                        colorClass="text-teal-600 dark:text-teal-400"
+                    />
+                    <MetricCard
+                        title="Credit"
+                        value={summaryMetrics.totalCreditGiven}
+                        icon={AlertTriangle}
+                        colorClass="text-red-600 dark:text-red-400"
+                        valueSuffix="₹"
+                    />
+                </div>
             )}
 
-            <div className="flex-grow overflow-y-auto bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800">
-                <div className="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-gray-900 z-10 py-2 border-b dark:border-gray-800">
+            <div className="flex-grow overflow-hidden bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 flex flex-col no-print">
+                {/* Fixed Header Container */}
+                <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b dark:border-gray-800">
                     <h2 className={`text-xl font-semibold text-gray-900 dark:text-white transition-opacity duration-200 ${activeControl !== 'none' ? 'hidden sm:block sm:opacity-50 sm:flex-shrink' : 'flex-shrink-0'}`}>
-                        Sales History ({filteredSales.length})
+                        History ({filteredSales.length})
                     </h2>
                     <div className={`flex items-center space-x-3 transition-all duration-300 ${activeControl !== 'none' ? 'w-full sm:w-auto ml-0 sm:ml-auto' : 'ml-auto flex-shrink-0'}`}>
                         {activeControl === 'none' && (
                             <div className="flex space-x-3">
-                                <button onClick={() => setActiveControl('search')} className="p-2 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-gray-700 shadow-md"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></button>
-                                <button onClick={() => setActiveControl('sort')} className="p-2 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-gray-700 shadow-md"><ArrowDownWideNarrow className="w-5 h-5" /></button>
+                                <button onClick={() => setActiveControl('search')} className="p-2 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-gray-700 shadow-sm"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></button>
+                                <button onClick={() => setActiveControl('sort')} className="p-2 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-gray-700 shadow-sm"><ArrowDownWideNarrow className="w-5 h-5" /></button>
                             </div>
                         )}
                         {activeControl === 'search' && (
                             <div className="relative flex items-center flex-grow max-w-lg w-full">
-                                <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-10 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-indigo-500 w-full" />
+                                <input type="text" placeholder="Search customer..." autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-10 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-indigo-500 w-full" />
                                 <button onClick={() => { setActiveControl('none'); setSearchQuery(''); }} className="absolute right-2 p-1 text-gray-400"><X className="w-4 h-4" /></button>
                             </div>
                         )}
                         {activeControl === 'sort' && (
                             <div className="flex items-center space-x-2 flex-grow max-w-lg w-full justify-end">
                                 <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="p-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-indigo-500 min-w-[150px]">
-                                    <option value="timeDesc">Newest</option>
-                                    <option value="creditDesc">Credit Due</option>
+                                    <option value="timeDesc">Newest First</option>
+                                    <option value="creditDesc">Highest Credit</option>
                                     <option value="customerAsc">Customer (A-Z)</option>
                                 </select>
                                 <button onClick={() => setActiveControl('none')} className="p-1 text-gray-400"><X className="w-4 h-4" /></button>
@@ -364,29 +373,35 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole }) => {
                     </div>
                 </div>
 
-                {isLoadingSales ? (
-                    <div className="py-12 text-center text-indigo-400"><svg className="animate-spin h-8 w-8 mx-auto mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Loading...</div>
-                ) : filteredSales.length === 0 ? (
-                    <div className="py-12 text-center text-gray-500">No records found.</div>
-                ) : (
-                    <div className="space-y-3">
-                        {filteredSales.map((sale) => (
-                            <div key={sale._id} className="p-4 flex justify-between items-center rounded-xl shadow-md border border-gray-200 dark:border-gray-800 hover:border-indigo-600 transition-all cursor-pointer text-sm" onClick={() => fetchSaleDetail(sale._id)}>
-                                <div className="flex flex-col flex-grow truncate mr-4">
-                                    <span className={`font-bold truncate text-base ${sale.amountCredited > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>{sale.customerName || sale.customerId?.name || 'Walk-in'}</span>
-                                    <div className="flex items-center text-xs text-gray-500 mt-0.5"><Clock className="w-3 h-3 mr-1" />{formatTimeAgo(sale.timestamp)}</div>
-                                </div>
-                                <div className="flex items-center space-x-4">
-                                    <div className="text-right">
-                                        <div className={`font-extrabold text-xl ${sale.amountCredited > 0 ? 'text-red-500' : 'text-indigo-600'}`}>₹{sale.totalAmount.toFixed(0)}</div>
-                                        <div className={`text-[10px] font-medium ${sale.amountCredited > 0 ? 'text-red-500' : 'text-green-600'}`}>{sale.amountCredited > 0 ? `Credit: ₹${sale.amountCredited.toFixed(0)}` : 'Paid'}</div>
+                {/* Scrollable List Container */}
+                <div className="flex-grow overflow-y-auto p-4 sm:p-6">
+                    {isLoadingSales ? (
+                        <div className="py-12 text-center text-indigo-400">
+                            <svg className="animate-spin h-8 w-8 mx-auto mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Loading history...
+                        </div>
+                    ) : filteredSales.length === 0 ? (
+                        <div className="py-12 text-center text-gray-500">No records found.</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {filteredSales.map((sale) => (
+                                <div key={sale._id} className="p-4 flex justify-between items-center rounded-xl shadow-md border border-gray-200 dark:border-gray-800 hover:border-indigo-600 transition-all cursor-pointer text-sm" onClick={() => fetchSaleDetail(sale._id)}>
+                                    <div className="flex flex-col flex-grow truncate mr-4">
+                                        <span className={`font-bold truncate text-base ${sale.amountCredited > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>{sale.customerName || sale.customerId?.name || 'Walk-in'}</span>
+                                        <div className="flex items-center text-xs text-gray-500 mt-0.5"><Clock className="w-3 h-3 mr-1" />{formatTimeAgo(sale.timestamp)}</div>
                                     </div>
-                                    <ArrowRight className="w-5 h-5 text-indigo-400" />
+                                    <div className="flex items-center space-x-4">
+                                        <div className="text-right">
+                                            <div className={`font-extrabold text-xl ${sale.amountCredited > 0 ? 'text-red-500' : 'text-indigo-600'}`}>₹{sale.totalAmount.toFixed(0)}</div>
+                                            <div className={`text-[10px] font-medium ${sale.amountCredited > 0 ? 'text-red-500' : 'text-green-600'}`}>{sale.amountCredited > 0 ? `Credit: ₹${sale.amountCredited.toFixed(0)}` : 'Paid'}</div>
+                                        </div>
+                                        <ArrowRight className="w-5 h-5 text-indigo-400" />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
             {isModalOpen && <BillModal sale={selectedSaleDetail} onClose={() => setIsModalOpen(false)} isLoading={isFetchingDetail} />}
         </div>

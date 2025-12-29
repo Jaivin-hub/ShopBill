@@ -291,7 +291,7 @@ const App = () => {
       case 'notifications': return <NotificationsPage {...commonProps} />;
       case 'settings': return <SettingsPage {...commonProps} />; 
       case 'profile': return <Profile {...commonProps} />;
-      case 'salesActivity': return <SalesActivityPage {...commonProps} />;
+      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
       default: return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
