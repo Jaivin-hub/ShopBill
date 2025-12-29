@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X } from 'lucide-react';
+import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText } from 'lucide-react';
 import { io } from 'socket.io-client';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
@@ -25,6 +25,9 @@ import SystemConfig from './components/SystemConfig';
 import GlobalReport from './components/GlobalReport';
 import Checkout from './components/Checkout';
 import NotificationToast from './components/NotificationToast';
+import TermsAndConditions from './components/TermsAndConditions';
+import PrivacyPolicy from './components/PrivacyPolicy';
+
 
 // --- NEW COMPONENT: PWA Update Popup ---
 const UpdatePrompt = () => {
@@ -250,6 +253,11 @@ const App = () => {
 
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
+    
+    // Terms and Conditions view (accessible via Landing Page footer)
+    if (currentPage === 'terms') return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
+    if (currentPage === 'policy') return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
+
 
     if (currentPage === 'checkout') {
         if (!selectedPlan) {
@@ -275,7 +283,12 @@ const App = () => {
                 setCurrentPage('dashboard');
                 setTimeout(() => { window.location.href = '#pricing'; }, 100);
             }} /> : 
-            <LandingPage onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} onSelectPlan={handleSelectPlan} />;
+            <LandingPage 
+                onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} 
+                onSelectPlan={handleSelectPlan} 
+                onViewTerms={() => setCurrentPage('terms')} 
+                onViewPolicy={()=> setCurrentPage('policy')}
+            />;
     }
     
     const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
@@ -294,11 +307,13 @@ const App = () => {
       case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
+      case 'terms': return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
+      case 'policy': return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
       default: return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
     }
   };
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout'].includes(currentPage);
+  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms'].includes(currentPage);
   const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
 
   return (

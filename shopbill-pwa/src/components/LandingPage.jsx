@@ -136,7 +136,7 @@ const renderTitle = (fullTitle, gradientWord) => {
         );
     });
 };
-const LandingPage = ({ onStartApp, onSelectPlan }) => {
+const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy }) => {
     const [language, setLanguage] = useState('en');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -475,8 +475,18 @@ const LandingPage = ({ onStartApp, onSelectPlan }) => {
             <footer className="bg-gray-900 border-t border-gray-800 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
                     <div className="mb-4">
-                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">{t.privacy}</a>
-                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">{t.terms}</a>
+                        <button 
+                        onClick={(e) => { e.preventDefault(); onViewPolicy(); }} 
+                        className="text-indigo-400 hover:text-indigo-300 mx-3"
+                        >
+                            {t.privacy}
+                            </button>
+                        <button
+                            onClick={(e) => { e.preventDefault(); onViewTerms(); }}
+                            className="text-indigo-400 hover:text-indigo-300 mx-3 cursor-pointer"
+                        >
+                            {t.terms}
+                        </button>
                         <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">{t.support}</a>
                     </div>
                     <p>&copy; {t.copyright}</p>
