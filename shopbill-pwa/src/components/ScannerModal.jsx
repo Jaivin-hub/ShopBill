@@ -10,7 +10,6 @@ const ScannerModal = ({
     onScanNotFound 
 }) => {
     
-    // CRITICAL: Ensure the ZXing object is safely accessed
     const ZXing = window.ZXing; 
     
     const videoRef = useRef(null); 
@@ -25,85 +24,61 @@ const ScannerModal = ({
     const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
 
-    // --- ENHANCED: Tap-to-Focus Logic ---
+    // --- OPTIMIZED: Ultra-Fast Focus Toggle ---
     const triggerFocus = useCallback(async () => {
         const track = streamRef.current?.getVideoTracks()[0];
         if (!track) return;
 
         const capabilities = track.getCapabilities();
-        const settings = track.getSettings();
 
         try {
-            // If the device supports focusMode control
             if (capabilities.focusMode) {
-                // To force a refocus, we switch to manual/single-shot and then back to continuous
-                await track.applyConstraints({
-                    advanced: [{ focusMode: "none" }] // Break current lock
-                });
-                
-                await track.applyConstraints({
+                // Force hardware to "wake up" by cycling modes rapidly
+                // This is faster than just waiting for continuous autofocus
+                await track.applyConstraints({ advanced: [{ focusMode: "manual" }] });
+                await track.applyConstraints({ 
                     advanced: [{ 
                         focusMode: "continuous",
-                        // If supported, we slightly nudge the focus distance to trigger hardware movement
-                        ...(capabilities.focusDistance ? { focusDistance: settings.focusDistance > 0.5 ? 0.1 : 0.9 } : {})
-                    }]
+                        // Points the laser/sensor to center if supported
+                        ...(capabilities.whiteBalanceMode ? { whiteBalanceMode: "continuous" } : {})
+                    }] 
                 });
             }
-            console.log("Scanner: Hardware refocus triggered via tap.");
+            console.log("Scanner: Snap-focus triggered.");
         } catch (err) {
-            console.warn("Scanner: Tap-to-focus not hardware supported, using software reset.", err);
+            console.warn("Scanner: Hardware focus jump failed.", err);
         }
     }, []);
 
-    // --- Core Cleanup Logic ---
     const resetScannerState = useCallback(() => {
         if (codeReaderRef.current) {
-            try {
-                codeReaderRef.current.reset(); 
-            } catch (e) {
-                console.warn("Scanner: Failed to reset stream via ZXing.", e);
-            }
+            try { codeReaderRef.current.reset(); } catch (e) {}
         }
-        
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-
         if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject;
-            if (stream && typeof stream.getTracks === 'function') {
-                 stream.getTracks().forEach(track => track.stop());
-            }
             videoRef.current.srcObject = null; 
         }
-        
         codeReaderRef.current = null;
         isProcessingRef.current = false;
         lastScannedCodeRef.current = null;
         setIsScannerInitialized(false);
         setResult(null);
         setLookupStatus('idle'); 
-        setLookupError(null);
     }, []); 
 
     const handleScanResult = useCallback((decodedText) => {
-        if (isProcessingRef.current || decodedText === lastScannedCodeRef.current) {
-            return;
-        }
+        if (isProcessingRef.current || decodedText === lastScannedCodeRef.current) return;
 
         isProcessingRef.current = true; 
         lastScannedCodeRef.current = decodedText; 
-        
         setResult(decodedText);
         setLookupStatus('lookingUp');
         
         if (codeReaderRef.current) {
-             try {
-                codeReaderRef.current.reset();
-             } catch (e) {
-                 console.warn("Scanner: Failed to reset stream after scan.", e);
-             }
+             try { codeReaderRef.current.reset(); } catch (e) {}
         }
         
         const normalizedCode = decodedText.toLowerCase().trim();
@@ -113,230 +88,122 @@ const ScannerModal = ({
 
         setTimeout(() => {
             isProcessingRef.current = false; 
-
             if (existingItem) {
                 setLookupStatus('found');
                 onScanSuccess(existingItem);
             } else {
                 setLookupStatus('notFound'); 
-                setLookupError(`Item with HSN/Code "${decodedText}" not found in inventory.`);
+                setLookupError(`Item "${decodedText}" not found.`);
                 onScanNotFound(decodedText); 
             }
         }, 500); 
         
     }, [inventory, onScanSuccess, onScanNotFound]);
 
-
     useEffect(() => {
-        if (!isOpen) {
-             resetScannerState(); 
-             return; 
-        }
-        
-        if (lookupStatus !== 'idle' || isProcessingRef.current) {
-            return;
-        }
-        
-        if (!ZXing) {
-            setLookupStatus('loadingLib');
-            setLookupError("ZXing library not found.");
-            return; 
-        }
-
-        if (!videoRef.current) {
-            return; 
-        }
+        if (!isOpen) { resetScannerState(); return; }
+        if (lookupStatus !== 'idle' || isProcessingRef.current || !ZXing || !videoRef.current) return;
         
         setLookupStatus('initializing');
-        setLookupError(null);
-
         codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
 
         const hints = new Map();
-        const decodeFormats = [
-            ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.EAN_13, 
-                ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.UPC_A,
-                ZXing.BarcodeFormat.CODE_39
-            ]
-        ];
-        
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.EAN_13, 
+            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.UPC_A
+        ]);
         hints.set(ZXing.DecodeHintType.TRY_HARDER, true); 
 
-        codeReaderRef.current.decodeFromVideoDevice(
-            null, 
-            videoRef.current, 
-            (result, err) => {
-                if (videoRef.current && videoRef.current.srcObject && !streamRef.current) {
-                    streamRef.current = videoRef.current.srcObject;
-                    // Trigger an initial focus attempt once the stream is ready
-                    setTimeout(triggerFocus, 1000);
-                }
-
-                if (result) {
-                    handleScanResult(result.getText()); 
-                }
-            }, 
-            hints
-        ) 
+        codeReaderRef.current.decodeFromVideoDevice(null, videoRef.current, (result) => {
+            if (videoRef.current?.srcObject && !streamRef.current) {
+                streamRef.current = videoRef.current.srcObject;
+                // Kickstart focus immediately
+                setTimeout(triggerFocus, 500);
+            }
+            if (result) handleScanResult(result.getText());
+        }, hints) 
         .then(() => {
             setIsScannerInitialized(true);
             setLookupStatus('scanning');
         })
         .catch(err => {
-            console.error("ZXing Initialization Failed:", err);
             setLookupStatus('notFound'); 
-            setLookupError("Camera access failed. Please check permissions.");
             onScanError("Camera access failed."); 
         });
         
-        return () => {
-             resetScannerState(); 
-        };
+        return () => resetScannerState();
     }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus]); 
 
     if (!isOpen) return null;
 
-    let statusIcon, statusText, statusColor, statusBg;
-
-    if (lookupStatus === 'loadingLib') {
-        statusIcon = <Loader className="w-8 h-8 text-yellow-400 animate-spin" />;
-        statusText = "Awaiting ZXing library load...";
-        statusColor = "text-yellow-300";
-        statusBg = "bg-yellow-900/40";
-    }
-    else if (lookupStatus === 'initializing') {
-        statusIcon = <Loader className="w-8 h-8 text-cyan-400 animate-spin" />;
-        statusText = "Requesting camera access...";
-        statusColor = "text-cyan-300";
-        statusBg = "bg-cyan-900/40";
-    } else if (lookupStatus === 'scanning') {
-        statusIcon = <ScanLine className="w-8 h-8 text-cyan-400" />;
-        statusText = "Tap to focus & Point at code...";
-        statusColor = "text-gray-300";
-        statusBg = "bg-gray-700/40";
-    } else if (lookupStatus === 'lookingUp') {
-        statusIcon = <Loader className="w-8 h-8 text-indigo-400 animate-spin" />;
-        statusText = "Code scanned! Looking up item...";
-        statusColor = "text-indigo-300";
-        statusBg = "bg-indigo-900/40";
-    } else if (lookupStatus === 'found') {
-        statusIcon = <CheckCircle className="w-8 h-8 text-teal-400" />;
-        statusText = `Success! Item found.`;
-        statusColor = "text-teal-300";
-        statusBg = "bg-teal-900/40";
-    } else if (lookupStatus === 'notFound' && lastScannedCodeRef.current) { 
-        statusIcon = <CheckCircle className="w-8 h-8 text-teal-400" />;
-        statusText = "New item detected! Opening form..."; 
-        statusColor = "text-teal-300";
-        statusBg = "bg-teal-900/40";
-    } else if (lookupStatus === 'notFound') { 
-        statusIcon = <AlertTriangle className="w-8 h-8 text-red-400" />;
-        statusText = lookupError || `Scanner Failed.`; 
-        statusColor = "text-red-300";
-        statusBg = "bg-red-900/40";
-    } else { 
-        statusIcon = <Loader className="w-8 h-8 text-gray-400 animate-spin" />;
-        statusText = "Initializing...";
-        statusColor = "text-gray-300";
-        statusBg = "bg-gray-700/40";
-    }
-
-    const isBusy = lookupStatus === 'lookingUp' || lookupStatus === 'initializing' || lookupStatus === 'loadingLib';
-    const isAutoClosing = lookupStatus === 'found' || (lookupStatus === 'notFound' && lastScannedCodeRef.current); 
-
     return (
-        <div 
-            ref={containerRef} 
-            className="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-[60] p-4 font-inter"
-            onClick={isAutoClosing ? null : onClose} 
-        >
-            <div 
-                className="bg-gray-800 w-full max-w-xl rounded-2xl shadow-2xl border border-gray-700 transition-all transform"
-                onClick={(e) => e.stopPropagation()} 
-            >
-                <div className="p-5 flex justify-between items-center rounded-t-2xl border-b border-gray-700/50">
+        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-md flex items-center justify-center z-[60] p-4 font-inter" onClick={isAutoClosing ? null : onClose}>
+            <div className="bg-gray-800 w-full max-w-xl rounded-2xl shadow-2xl border border-gray-700 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                
+                <div className="p-5 flex justify-between items-center border-b border-gray-700/50">
                     <h2 className="text-2xl font-extrabold text-white flex items-center">
                         <QrCode className="w-6 h-6 mr-3 text-cyan-500" /> Fast Scanner
                     </h2>
-                    <button 
-                        type="button" 
-                        onClick={onClose} 
-                        className="text-gray-400 hover:text-white p-2 rounded-full transition hover:bg-gray-700"
-                        disabled={isBusy || isAutoClosing}
-                    >
+                    <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-full transition hover:bg-gray-700">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <div className="p-6 pb-4">
+                <div className="p-6">
                     <div 
-                        className="aspect-video w-full bg-gray-900 rounded-xl overflow-hidden shadow-inner shadow-gray-950 relative border-4 border-cyan-900 cursor-crosshair active:border-white transition-colors duration-150"
-                        style={{ minHeight: '320px' }}
+                        className="aspect-video w-full bg-black rounded-xl overflow-hidden relative border-4 border-cyan-900 cursor-crosshair active:border-cyan-400 transition-colors"
                         onClick={triggerFocus}
                     >
-                        <video ref={videoRef} id="scanner-video" className="w-full h-full object-cover" playsInline />
+                        <video ref={videoRef} className="w-full h-full object-cover" playsInline />
                         
-                        <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-cyan-400 opacity-80" />
-                            <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-cyan-400 opacity-80" />
-                            <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-cyan-400 opacity-80" />
-                            <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-cyan-400 opacity-80" />
-                            
-                            {/* Target UI */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-cyan-400/20 rounded-lg flex items-center justify-center">
-                                 <div className="w-2 h-2 bg-cyan-400/20 rounded-full" />
+                        {/* Centered Scanning UI */}
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                            <div className="relative w-48 h-48">
+                                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-cyan-400" />
+                                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-400" />
+                                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-400" />
+                                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-400" />
+                                
+                                {lookupStatus === 'scanning' && (
+                                    <div className="absolute left-0 right-0 h-[2px] bg-cyan-400 shadow-[0_0_15px_cyan] animate-scan-line" />
+                                )}
                             </div>
-
-                            {lookupStatus === 'scanning' && (
-                                <div className="absolute top-1/2 left-1/2 w-4/5 h-px bg-cyan-400 shadow-[0_0_10px_2px_rgba(40,200,255,0.7)] -translate-x-1/2 animate-scan-line" style={{ transform: 'translateY(-50%)' }} />
-                            )}
                         </div>
 
-                        <style>{`
-                            @keyframes scan-move {
-                                0% { transform: translate(-50%, -100px); opacity: 0; }
-                                50% { opacity: 1; }
-                                100% { transform: translate(-50%, 100px); opacity: 0; }
-                            }
-                            .animate-scan-line { animation: scan-move 2s infinite ease-in-out; }
-                        `}</style>
-                        
-                        {(lookupStatus === 'initializing' || lookupStatus === 'loadingLib' || (lookupStatus === 'notFound' && !lastScannedCodeRef.current)) && (
-                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-4 text-center">
-                                {lookupStatus === 'initializing' || lookupStatus === 'loadingLib' ? (
-                                    <Loader className="w-10 h-10 text-cyan-400 animate-spin mb-4" />
-                                ) : (
-                                    <AlertTriangle className="w-10 h-10 text-red-400 mb-4" />
-                                )}
-                                <span className="text-xl text-gray-300 font-bold mb-2">
-                                    {lookupStatus === 'initializing' ? "Starting..." : lookupStatus === 'loadingLib' ? "Loading..." : "Failed"}
-                                </span>
+                        {/* Status Overlays */}
+                        {(lookupStatus === 'initializing' || lookupStatus === 'loadingLib') && (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80">
+                                <Loader className="w-10 h-10 text-cyan-400 animate-spin mb-2" />
+                                <span className="text-white font-bold tracking-tight">Waking Camera...</span>
                             </div>
                         )}
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-2 text-center uppercase tracking-widest font-semibold">TAP SCREEN TO QUICK-FOCUS</p>
+                    <p className="text-[10px] text-gray-500 mt-3 text-center uppercase tracking-[0.2em] font-bold">Tap screen to force focus</p>
                 </div>
                 
-                <div className={`p-6 pt-5 text-center transition-colors duration-300 ${statusBg} rounded-b-2xl`}>
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                        <div className="p-3 rounded-full bg-gray-900/50 shadow-inner">
-                            {statusIcon}
-                        </div>
-                        <p className={`text-lg font-bold ${statusColor}`}>
-                            {statusText}
+                <div className={`p-6 text-center ${lookupStatus === 'found' ? 'bg-teal-900/20' : 'bg-gray-900/40'}`}>
+                    <div className="flex flex-col items-center space-y-2">
+                        <p className="text-lg font-bold text-white italic">
+                            {lookupStatus === 'scanning' ? "Searching for barcode..." : lookupStatus === 'lookingUp' ? "Verifying..." : "Ready"}
                         </p>
                     </div>
-
-                    <button 
-                        onClick={onClose}
-                        className="mt-6 w-full py-3 bg-cyan-600 text-white font-semibold rounded-xl hover:bg-cyan-700 transition shadow-lg shadow-cyan-900/50 disabled:opacity-50"
-                        disabled={isBusy || isAutoClosing}
-                    >
-                        {isAutoClosing ? 'Opening Form...' : 'Close'}
+                    <button onClick={onClose} className="mt-4 w-full py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-500 transition shadow-lg">
+                        Close Scanner
                     </button>
                 </div>
             </div>
+
+            <style>{`
+                @keyframes scan-line {
+                    0% { top: 0%; opacity: 0; }
+                    20% { opacity: 1; }
+                    80% { opacity: 1; }
+                    100% { top: 100%; opacity: 0; }
+                }
+                .animate-scan-line {
+                    animation: scan-line 2s infinite linear;
+                }
+            `}</style>
         </div>
     );
 };
