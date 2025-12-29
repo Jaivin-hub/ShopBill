@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, X, User, ArrowDownWideNarrow, Clock, CheckCircle } from 'lucide-react';
+import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, X, User, ArrowDownWideNarrow, Clock, CheckCircle, Printer } from 'lucide-react';
 import API from '../config/api';
 
 const getLocalDateString = (date) => {
@@ -45,10 +45,15 @@ const formatTimeAgo = (timestamp) => {
 };
 
 const BillModal = ({ sale, onClose, isLoading }) => {
+    // Standard Print Function
+    const handlePrint = () => {
+        window.print();
+    };
+
     if (!sale && isLoading) {
         return (
             <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full transform transition-all overflow-hidden p-8 text-center">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-8 text-center">
                     <p className="text-lg text-indigo-600 dark:text-indigo-400">Loading bill details...</p>
                 </div>
             </div>
@@ -65,69 +70,116 @@ const BillModal = ({ sale, onClose, isLoading }) => {
     const billId = sale._id ? sale._id.substring(0, 8).toUpperCase() : 'N/A';
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full transform transition-all overflow-hidden border border-gray-100 dark:border-gray-700">
-                <div className="p-6 bg-indigo-500/10 dark:bg-indigo-900/20 text-center border-b border-indigo-500/30 dark:border-indigo-700/50 relative">
-                    <button onClick={onClose} className="absolute top-3 right-3 text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white transition-colors p-1 rounded-full bg-transparent hover:bg-indigo-100/50 dark:hover:bg-indigo-800/50">
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-2 sm:p-4 z-50">
+            {/* Print Specific Styles */}
+            <style>{`
+                @media print {
+                    body * { visibility: hidden; }
+                    #printable-receipt, #printable-receipt * { visibility: visible; }
+                    #printable-receipt { 
+                        position: absolute; 
+                        left: 0; 
+                        top: 0; 
+                        width: 100%; 
+                        padding: 20px;
+                        background: white !important;
+                        color: black !important;
+                    }
+                    .no-print { display: none !important; }
+                }
+            `}</style>
+
+            <div id="printable-receipt" className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col transform transition-all border border-gray-100 dark:border-gray-700">
+                
+                {/* Header (Fixed) */}
+                <div className="p-4 sm:p-6 bg-indigo-500/10 dark:bg-indigo-900/20 text-center border-b border-indigo-500/30 dark:border-indigo-700/50 relative">
+                    <button onClick={onClose} className="no-print absolute top-3 right-3 text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-white transition-colors p-1 rounded-full">
                         <X className="w-5 h-5" />
                     </button>
-                    <div className="flex items-center justify-center mb-2">
-                        <IndianRupee className="w-8 h-4 text-indigo-600 dark:text-indigo-400 mr-1" />
-                        <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white">SALE RECEIPT</h3>
+                    <div className="flex items-center justify-center mb-1">
+                        <IndianRupee className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mr-1" />
+                        <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">SALE RECEIPT</h3>
                     </div>
-                    <p className="text-xs font-mono text-gray-600 dark:text-gray-400 mt-1">
-                        Transaction ID: <span className="font-semibold">{billId}</span>
+                    <p className="text-[10px] font-mono text-gray-600 dark:text-gray-400 uppercase tracking-widest">
+                        ID: {billId}
                     </p>
                 </div>
-                <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                    <div className="flex justify-between items-center text-sm mb-2">
-                        <span className="flex items-center text-gray-500 dark:text-gray-400"><Clock className="w-4 h-4 mr-2" />Date & Time</span>
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">{saleDate} at {saleTime}</span>
+
+                {/* Info Bar (Fixed) */}
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800 grid grid-cols-2 gap-2">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase text-gray-500 font-bold">Date & Time</span>
+                        <span className="text-xs font-semibold dark:text-gray-200">{saleDate} | {saleTime}</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="flex items-center text-gray-500 dark:text-gray-400"><User className="w-4 h-4 mr-2" />Customer</span>
-                        <span className={`font-bold ${isCredit ? 'text-red-500 dark:text-red-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{customerName}</span>
+                    <div className="flex flex-col text-right">
+                        <span className="text-[10px] uppercase text-gray-500 font-bold">Customer</span>
+                        <span className={`text-xs font-bold truncate ${isCredit ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400'}`}>{customerName}</span>
                     </div>
                 </div>
-                <div className="p-6 max-h-[60vh] overflow-y-auto border-b border-dashed border-gray-300 dark:border-gray-700">
-                    <h4 className="font-bold text-lg text-gray-700 dark:text-gray-300 mb-3">Order Summary</h4>
-                    <ul className="space-y-3">
+
+                {/* SCROLLABLE ITEMS AREA */}
+                <div className="flex-grow overflow-y-auto p-4 sm:p-6 bg-gray-50/50 dark:bg-gray-800/20">
+                    <h4 className="font-bold text-xs text-gray-500 uppercase tracking-widest mb-3">Items Summary</h4>
+                    <ul className="space-y-4">
                         {sale.items && sale.items.length > 0 ? (
                             sale.items.map((item, index) => (
-                                <li key={index} className="flex justify-between items-start text-sm border-b border-gray-100 dark:border-gray-800 pb-2 last:border-b-0">
-                                    <div className='flex flex-col'>
-                                        <span className="font-medium text-gray-800 dark:text-gray-200">{(item.itemId?.name || item.name || 'Unknown Product')}</span>
-                                        <span className='text-xs text-gray-500 dark:text-gray-400 mt-0.5'>{item.quantity} units @ ₹{item.price.toFixed(2)}</span>
+                                <li key={index} className="flex justify-between items-start text-sm pb-2 border-b border-gray-200/50 dark:border-gray-700/50 last:border-0">
+                                    <div className='flex flex-col pr-4'>
+                                        <span className="font-bold text-gray-800 dark:text-gray-200">{(item.itemId?.name || item.name || 'Product')}</span>
+                                        <span className='text-[11px] text-gray-500 dark:text-gray-400'>{item.quantity} x ₹{item.price.toFixed(2)}</span>
                                     </div>
-                                    <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">₹{(item.quantity * item.price).toFixed(2)}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">₹{(item.quantity * item.price).toFixed(2)}</span>
                                 </li>
                             ))
                         ) : (
-                            <li className="text-gray-500 italic text-center">No item details available.</li>
+                            <li className="text-gray-500 italic text-center">No items listed.</li>
                         )}
                     </ul>
                 </div>
-                <div className="p-6 space-y-3">
-                    <div className="flex justify-between font-medium text-lg text-gray-700 dark:text-gray-300"><span>SUBTOTAL</span><span>₹{sale.totalAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between font-extrabold text-2xl text-indigo-700 dark:text-indigo-400 border-t border-dashed border-gray-400 dark:border-gray-600 pt-3"><span>TOTAL AMOUNT</span><span>₹{sale.totalAmount.toFixed(2)}</span></div>
+
+                {/* TOTALS (Fixed Bottom) */}
+                <div className="p-4 sm:p-6 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+                    <div className="flex justify-between text-sm text-gray-500 font-bold">
+                        <span>SUBTOTAL</span>
+                        <span>₹{sale.totalAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-2 border-t-2 border-double border-gray-300 dark:border-gray-700">
+                        <span className="text-sm font-black text-gray-900 dark:text-white uppercase">Grand Total</span>
+                        <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">₹{sale.totalAmount.toFixed(2)}</span>
+                    </div>
+
                     {isCredit ? (
-                        <div className="space-y-1 pt-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
-                            <div className="flex justify-between text-base font-semibold text-green-700 dark:text-green-400"><span>Amount Paid</span><span>₹{paidAmount.toFixed(2)}</span></div>
-                            <div className="flex justify-between font-extrabold text-xl text-red-700 dark:text-red-400"><span className='flex items-center'><AlertTriangle className='w-5 h-5 mr-2' />CREDIT DUE</span><span>₹{sale.amountCredited.toFixed(2)}</span></div>
+                        <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
+                            <div className="flex justify-between text-xs font-bold text-green-600"><span>Amount Paid</span><span>₹{paidAmount.toFixed(2)}</span></div>
+                            <div className="flex justify-between text-sm font-black text-red-600"><span>CREDIT DUE</span><span>₹{sale.amountCredited.toFixed(2)}</span></div>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center pt-3 text-lg font-bold text-green-700 dark:text-green-400"><CheckCircle className='w-6 h-6 mr-2' />Payment Completed</div>
+                        <div className="text-center pt-2 text-xs font-black text-green-600 uppercase tracking-widest flex items-center justify-center">
+                            <CheckCircle className="w-4 h-4 mr-1" /> Full Paid
+                        </div>
                     )}
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 text-center border-t border-gray-200 dark:border-gray-700">
-                    <button onClick={onClose} className="w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-[1.01]">Close Receipt</button>
+
+                {/* Actions (Fixed) */}
+                <div className="no-print p-4 bg-gray-50 dark:bg-gray-800 flex gap-3 border-t dark:border-gray-700">
+                    <button 
+                        onClick={handlePrint} 
+                        className="flex-1 flex items-center justify-center px-4 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold rounded-lg hover:opacity-90 transition-all"
+                    >
+                        <Printer className="w-5 h-5 mr-2" /> Print
+                    </button>
+                    <button 
+                        onClick={onClose} 
+                        className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-all"
+                    >
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- UPDATED Metric Card for single row mobile support ---
 const MetricCard = ({ title, value, icon: Icon, colorClass, valueSuffix = '' }) => (
     <div className="flex flex-col items-center justify-center p-2 sm:p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700/50 text-center">
         <div className="flex flex-col items-center mb-1">
@@ -241,7 +293,6 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole }) => {
                 </div>
             </div>
 
-            {/* --- FIXED METRICS: 3 Columns on Mobile --- */}
             {userRole === 'owner' && (
             <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4 px-1">
                 <MetricCard
