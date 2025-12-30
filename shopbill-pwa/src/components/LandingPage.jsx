@@ -501,9 +501,6 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         </button>
                     </div>
                     <p>&copy; {t.copyright}</p>
-                    {/* <p className="text-gray-700 text-[10px] mt-2 uppercase tracking-widest">
-                Developed by Jaivin JV &bull; Kerala, India
-            </p> */}
                 </div>
             </footer>
         </div>

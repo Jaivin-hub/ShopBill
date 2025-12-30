@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     User, Lock, Moon, Sun, Cloud, Globe, Check, Server, Bell, 
     RefreshCw, Trash2, Users, LogOut, ArrowLeft, UploadCloud, 
-    CheckCircle, XCircle, Link, Slash, Mail, Crown
+    CheckCircle, XCircle, Link, Slash, Mail, Crown, LifeBuoy, Gift
 } from 'lucide-react'; 
 // Assuming these are imported from sibling components/files
 import SettingItem from './SettingItem';
@@ -161,7 +161,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
 );
 
 
-function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }) { 
+function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast, setCurrentPage, setPageOrigin }) { 
     const [currentView, setCurrentView] = useState('main'); 
     const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
     const [confirmModal, setConfirmModal] = useState(null); 
@@ -177,7 +177,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     const [isCloudConnected, setIsCloudConnected] = useState(true); 
     const currentUserJSON = localStorage.getItem('currentUser')
     const currentUser = JSON.parse(currentUserJSON);
-    console.log('currentUser',currentUser.email)
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
     // Placeholder handlers (Log out, Password, etc. - Unchanged)
@@ -241,16 +240,13 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     
     // 🌟 REAL-WORLD CODE IMPROVEMENT: Cloud Upload Handler (Reverting to original API.post for safety)
     const handleUploadToCloud = async (driveType) => {
-    console.log('driveType',driveType)
     setCloudSelectionModal(null); 
     if (cloudUploadStatus === 'loading') return; 
 
     setCloudUploadStatus('loading');
     
     try {
-        // NOTE: Using API.uploadcloud as in the original file snippet, 
-        // as API.uploadcloud was not defined in the provided backend route list.
-        const response = await apiClient.post(API.uploadcloud || '/api/data/upload-to-cloud', { // Added fallback to original path
+        const response = await apiClient.post(API.uploadcloud || '/api/data/upload-to-cloud', { 
             driveType 
         });
 
@@ -293,12 +289,10 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         if (showToast) { showToast({ message: 'Initiating synchronization with server...', type: 'info' }); }
 
         try {
-            // Use the API.sync endpoint you added to the backend router
             const response = await apiClient.post(API.sync, { 
-                userId: currentUser.id // Sending user ID for targeted sync might be necessary
+                userId: currentUser.id 
             });
             
-            // Assuming the backend returns a success message and maybe new data count/status
             if (response.data.success) {
                 setSyncStatus('success');
                 console.log("Data successfully synced from server.");
@@ -309,7 +303,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 
                 setTimeout(() => setSyncStatus('idle'), 4000); 
             } else {
-                // Handle success response but with a server-side failure flag
                 throw new Error(response.data.message || 'Sync process reported an issue on the server.');
             }
 
@@ -325,7 +318,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         }
     };
 
-    // NEW HANDLER: Triggers the initial confirmation modal (Unchanged)
     const handleUploadToCloudClick = () => {
         if (cloudUploadStatus !== 'idle') return;
         
@@ -338,11 +330,8 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
             onCancel: () => setCloudSelectionModal(null)
         });
     };
-    // -------------------------
     
-    // --- Helper function to determine the action component for Cloud Upload ---
     const getCloudUploadActionComponent = () => {
-        // ... (Existing cloud status logic - kept for completeness) ...
         switch (cloudUploadStatus) {
             case 'loading':
                 return (
@@ -373,10 +362,9 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
     
     // --- Render Logic ---
     const renderSettingsList = () => (
-        // 💥 UPDATED: Removed max-w-xl mx-auto from main settings list
         <main className="space-y-6">
             
-            {/* 1. Account & User Management Section (Unchanged) */}
+            {/* 1. Account & User Management Section */}
             <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
                     <User className="w-5 h-5 mr-2 text-teal-600 dark:text-teal-400" /> Account & User Management
@@ -405,13 +393,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                     <Globe className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> App Preferences
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {/* <SettingItem 
-                        icon={isDarkMode ? Moon : Sun} 
-                        title="Dark Mode" 
-                        description={isDarkMode ? "Switch to light mode for a brighter interface." : "Switch to dark mode for a comfortable viewing experience."} 
-                        actionComponent={<ToggleSwitch checked={isDarkMode} onChange={handleToggleDarkMode} />} 
-                        accentColor={isDarkMode ? "text-indigo-600 dark:text-indigo-400" : "text-yellow-600 dark:text-yellow-400"} 
-                    /> */}
                     <SettingItem 
                         icon={Bell} 
                         title="Notifications" 
@@ -422,55 +403,40 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 </div>
             </section>
 
-            {/* 3. Data Management Section - NEWLY ADDED */}
-            {/* <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
+            {/* 3. NEW: Help & Growth Section */}
+            <section className="bg-white dark:bg-gray-900 rounded-xl shadow-lg dark:shadow-2xl dark:shadow-indigo-900/10 overflow-hidden border border-gray-200 dark:border-gray-800">
                 <h2 className="p-4 text-lg font-bold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 flex items-center border-b border-gray-200 dark:border-gray-700">
-                    <Server className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" /> Data & Sync
+                    <LifeBuoy className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" /> Help & Growth
                 </h2>
                 <div className="divide-y divide-gray-200 dark:divide-gray-800">
                     <SettingItem 
-                        icon={RefreshCw} 
-                        title="Force Sync Data" 
-                        description="Manually trigger an immediate synchronization of all local data with the server." 
-                        onClick={handleForceSync} 
-                        actionComponent={
-                            syncStatus === 'loading' ? (
-                                <div className="flex items-center text-indigo-600 dark:text-indigo-400">
-                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                    Syncing...
-                                </div>
-                            ) : syncStatus === 'success' ? (
-                                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                            ) : (
-                                <RefreshCw className="w-5 h-5 text-indigo-500 hover:text-indigo-700" />
-                            )
-                        }
+                        icon={LifeBuoy} 
+                        title="Help & Support" 
+                        description="Contact our support team for technical issues or queries." 
+                        onClick={() => {
+                            setPageOrigin('settings');
+                            setCurrentPage('support');
+                        }} 
                         accentColor="text-indigo-600 dark:text-indigo-400" 
                     />
                     <SettingItem 
-                        icon={UploadCloud} 
-                        title="Cloud Backup" 
-                        description={`Backup all current data to your linked cloud account: ${connectedAccountEmail || 'None Linked'}`}
-                        onClick={handleUploadToCloudClick} 
-                        actionComponent={getCloudUploadActionComponent() || <Cloud className="w-5 h-5 text-teal-500 hover:text-teal-700" />} 
-                        accentColor="text-teal-600 dark:text-teal-400"
-                    />
-                    <SettingItem 
-                        icon={Trash2} 
-                        title="Wipe Local Cache" 
-                        description="Clear all application data stored locally on this device (requires re-sync)." 
-                        onClick={handleWipeLocalData} 
-                        accentColor="text-red-600 dark:text-red-400"
+                        icon={Gift} 
+                        title="Affiliate Program" 
+                        description="Refer other businesses and earn commissions for every successful sign-up." 
+                        onClick={() => {
+                            setPageOrigin('settings');
+                            setCurrentPage('affiliate');
+                        }} 
+                        accentColor="text-amber-600 dark:text-amber-400" 
                     />
                 </div>
-            </section> */}
+            </section>
         </main>
     );
 
     const renderHeader = () => {
         if (currentView === 'main') {
             return (
-                // 💥 UPDATED: Applied max-w-4xl mx-auto to Header
                 <header className="mb-8 pt-1 md:pt-0 max-w-8xl mx-auto">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center">
                         Settings
@@ -479,14 +445,12 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 </header>
             );
         }
-        // For sub-views, the back button/header is usually handled within the sub-component itself
         return null;
     }
 
     const renderContent = () => {
         switch (currentView) {
             case 'password':
-                // Sub-components usually handle their own width/layout
                 return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} />;
             case 'staff':
                 return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} setConfirmModal={setConfirmModal} />;
@@ -494,7 +458,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={() => setCurrentView('main')} />;
             case 'main':
             default:
-                // 💥 WRAPPER: Applied max-w-4xl mx-auto here to contain the settings list
                 return (
                     <div className="max-w-8xl mx-auto"> 
                         {renderSettingsList()}
@@ -503,7 +466,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
         }
     };
 
-    // --- Main Layout ---
     return (
         <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-gray-100 dark:bg-gray-950 transition-colors duration-300 font-sans">
             
@@ -511,7 +473,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
 
             {renderContent()}
             
-            {/* Custom Confirmation Modal (Log out / Wipe Cache) */}
             {confirmModal && (
                 <ConfirmationModal 
                     message={confirmModal.message}
@@ -520,7 +481,6 @@ function Settings({ apiClient, onLogout, isDarkMode, toggleDarkMode, showToast }
                 />
             )}
 
-            {/* 💥 Cloud Upload Confirmation Modal */}
             {cloudSelectionModal && (
                 <CloudUploadConfirmationModal 
                     isConnected={cloudSelectionModal.isConnected}

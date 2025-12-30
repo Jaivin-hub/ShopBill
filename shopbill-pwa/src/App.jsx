@@ -30,9 +30,6 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import SupportPage from './components/SupportPage';
 import AffiliatePage from './components/AffiliatePage';
 
-
-
-
 // --- NEW COMPONENT: PWA Update Popup ---
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -100,6 +97,7 @@ const checkDeepLinkPath = () => {
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
+  const [pageOrigin, setPageOrigin] = useState(null); // Tracks where user came from ('landing' or 'settings')
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
@@ -119,7 +117,6 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  // Calculate unread count for display in Header and Sidebar
   const unreadCount = useMemo(() => {
     return (notifications || []).filter(n => 
         n && (n.isRead === false || n.isRead === undefined)
@@ -180,6 +177,7 @@ const App = () => {
     setCurrentUser(null);
     setNotifications([]);
     setCurrentPage('dashboard');
+    setPageOrigin(null);
     setIsViewingLogin(false);
     showToast('Logged out successfully.', 'info');
   }, [showToast]);
@@ -258,15 +256,20 @@ const App = () => {
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
     
-    // Terms and Conditions view (accessible via Landing Page footer)
-    if (currentPage === 'terms') return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
-    if (currentPage === 'policy') return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
-    if (currentPage === 'support') return <SupportPage onBack={() => setCurrentPage('dashboard')} />;
-    if (currentPage === 'affiliate') return <AffiliatePage onBack={() => setCurrentPage('dashboard')} />;
+    // Page redirection logic based on origin
+    const handleDynamicBack = (target) => {
+        // If the target passed by component is 'settings', go to settings. Otherwise go to dashboard.
+        if (target === 'settings') {
+            setCurrentPage('settings');
+        } else {
+            setCurrentPage('dashboard');
+        }
+    };
 
-
-    
-
+    if (currentPage === 'terms') return <TermsAndConditions onBack={() => handleDynamicBack(pageOrigin)} />;
+    if (currentPage === 'policy') return <PrivacyPolicy onBack={() => handleDynamicBack(pageOrigin)} />;
+    if (currentPage === 'support') return <SupportPage onBack={handleDynamicBack} origin={pageOrigin} />;
+    if (currentPage === 'affiliate') return <AffiliatePage onBack={handleDynamicBack} origin={pageOrigin} />;
 
     if (currentPage === 'checkout') {
         if (!selectedPlan) {
@@ -295,14 +298,14 @@ const App = () => {
             <LandingPage 
                 onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} 
                 onSelectPlan={handleSelectPlan} 
-                onViewTerms={() => setCurrentPage('terms')} 
-                onViewPolicy={()=> setCurrentPage('policy')}
-                onViewSupport={()=> setCurrentPage('support')}
-                onViewAffiliate={()=> setCurrentPage('affiliate')}
+                onViewTerms={() => { setPageOrigin('landing'); setCurrentPage('terms'); }} 
+                onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
+                onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
+                onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
             />;
     }
     
-    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
+    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, pageOrigin, setPageOrigin };
     
     switch (currentPage) {
       case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? 
@@ -318,15 +321,11 @@ const App = () => {
       case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-      case 'terms': return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
-      case 'policy': return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
-      case 'support': return <SupportPage onBack={() => setCurrentPage('dashboard')} />;
-      case 'affiliate': return <AffiliatePage onBack={() => setCurrentPage('dashboard')} />;
       default: return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
     }
   };
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms'].includes(currentPage);
+  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
   const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
 
   return (
@@ -334,7 +333,6 @@ const App = () => {
       <div className="h-screen w-full bg-gray-950 flex flex-col font-sans transition-colors duration-300 overflow-hidden">
         <UpdatePrompt />
         
-        {/* Fixed Header */}
         {showAppUI && (
           <div className="fixed top-0 left-0 right-0 z-[40]">
             <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
@@ -342,7 +340,6 @@ const App = () => {
         )}
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Fixed Sidebar */}
           {showAppUI && (
               <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl transition-colors duration-300">
                   <div className="p-6 border-b border-gray-800">
@@ -373,13 +370,11 @@ const App = () => {
               </aside>
           )}
 
-          {/* Main Content Area: Adjusted for fixed Header/Footer */}
           <main className={`flex-1 overflow-y-auto ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
               {renderContent()}
           </main>
         </div>
 
-        {/* Fixed Mobile Footer Navigation */}
         {showAppUI && (
             <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-[40] shadow-2xl">
                 {navItems.map(item => (
