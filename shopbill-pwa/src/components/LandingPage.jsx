@@ -136,7 +136,7 @@ const renderTitle = (fullTitle, gradientWord) => {
         );
     });
 };
-const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy }) => {
+const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onViewSupport, onViewAffiliate }) => {
     const [language, setLanguage] = useState('en');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -475,21 +475,35 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy }) =>
             <footer className="bg-gray-900 border-t border-gray-800 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
                     <div className="mb-4">
-                        <button 
-                        onClick={(e) => { e.preventDefault(); onViewPolicy(); }} 
-                        className="text-indigo-400 hover:text-indigo-300 mx-3"
+                        <button
+                            onClick={(e) => { e.preventDefault(); onViewPolicy(); }}
+                            className="text-indigo-400 hover:text-indigo-300 mx-3"
                         >
                             {t.privacy}
-                            </button>
+                        </button>
                         <button
                             onClick={(e) => { e.preventDefault(); onViewTerms(); }}
                             className="text-indigo-400 hover:text-indigo-300 mx-3 cursor-pointer"
                         >
                             {t.terms}
                         </button>
-                        <a href="#" className="text-indigo-400 hover:text-indigo-300 mx-3">{t.support}</a>
+                        <button
+                            onClick={(e) => { e.preventDefault(); onViewSupport(); }}
+                            className="text-indigo-400 hover:text-indigo-300 mx-3"
+                        >
+                            {t.support}
+                        </button>
+                        <button
+                            onClick={(e) => { e.preventDefault(); onViewAffiliate(); }}
+                            className="text-indigo-400 hover:text-indigo-300 mx-3"
+                        >
+                            {t.affiliate || 'Affiliate Program'}
+                        </button>
                     </div>
                     <p>&copy; {t.copyright}</p>
+                    {/* <p className="text-gray-700 text-[10px] mt-2 uppercase tracking-widest">
+                Developed by Jaivin JV &bull; Kerala, India
+            </p> */}
                 </div>
             </footer>
         </div>

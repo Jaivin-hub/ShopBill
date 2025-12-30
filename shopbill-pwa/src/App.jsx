@@ -27,6 +27,10 @@ import Checkout from './components/Checkout';
 import NotificationToast from './components/NotificationToast';
 import TermsAndConditions from './components/TermsAndConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import SupportPage from './components/SupportPage';
+import AffiliatePage from './components/AffiliatePage';
+
+
 
 
 // --- NEW COMPONENT: PWA Update Popup ---
@@ -257,6 +261,11 @@ const App = () => {
     // Terms and Conditions view (accessible via Landing Page footer)
     if (currentPage === 'terms') return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
     if (currentPage === 'policy') return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
+    if (currentPage === 'support') return <SupportPage onBack={() => setCurrentPage('dashboard')} />;
+    if (currentPage === 'affiliate') return <AffiliatePage onBack={() => setCurrentPage('dashboard')} />;
+
+
+    
 
 
     if (currentPage === 'checkout') {
@@ -288,6 +297,8 @@ const App = () => {
                 onSelectPlan={handleSelectPlan} 
                 onViewTerms={() => setCurrentPage('terms')} 
                 onViewPolicy={()=> setCurrentPage('policy')}
+                onViewSupport={()=> setCurrentPage('support')}
+                onViewAffiliate={()=> setCurrentPage('affiliate')}
             />;
     }
     
@@ -309,6 +320,8 @@ const App = () => {
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
       case 'terms': return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
       case 'policy': return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
+      case 'support': return <SupportPage onBack={() => setCurrentPage('dashboard')} />;
+      case 'affiliate': return <AffiliatePage onBack={() => setCurrentPage('dashboard')} />;
       default: return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
     }
   };
