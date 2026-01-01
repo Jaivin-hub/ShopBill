@@ -75,11 +75,11 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
     }
 
     return (
-        <div className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300">
-            <div className="flex justify-between items-center mb-6">
+        <main className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300" itemScope itemType="https://schema.org/ItemList">
+            <header className="flex justify-between items-center mb-6" itemProp="headline">
                 <div>
                     <h1 className="text-3xl font-extrabold text-white mb-1">Notifications</h1>
-                    <p className="text-gray-400 text-sm italic">Real-time system alerts & stock updates</p>
+                    <p className="text-gray-400 text-sm" itemProp="description">System alerts, stock updates, and notifications.</p>
                 </div>
                 {notifications.length > 0 && (
                     <button 
@@ -89,9 +89,9 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                         Clear All
                     </button>
                 )}
-            </div>
+            </header>
 
-            <div className="space-y-3 pb-24 md:pb-12">
+            <header className="space-y-3 pb-24 md:pb-12">
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
                         const { icon: Icon, color, bgColor, borderColor } = getNotificationTypeDetails(notification.type);
@@ -142,8 +142,8 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                         </p>
                     </div>
                 )}
-            </div>
-        </div>
+            </header>
+        </main>
     );
 };
 

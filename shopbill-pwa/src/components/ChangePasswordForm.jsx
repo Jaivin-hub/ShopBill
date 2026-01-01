@@ -194,7 +194,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
 
     return (
         // Added ref to attach swipe listeners
-        <div ref={containerRef} className="p-4 md:p-6 min-h-screen-safe bg-gray-900 rounded-xl">
+        <section ref={containerRef} className="p-4 md:p-6 min-h-screen-safe bg-gray-900 rounded-xl" itemScope itemType="https://schema.org/WebPage" aria-labelledby="change-password-title">
             <button 
                 onClick={onBack} 
                 className="flex items-center text-indigo-400 hover:underline mb-6 disabled:opacity-50"
@@ -202,7 +202,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
             >
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to Settings
             </button>
-            <h2 className="text-2xl font-bold text-white mb-6">Change Password</h2>
+            <h2 id="change-password-title" className="text-2xl font-bold text-white mb-6" itemProp="headline">Change Password</h2>
             
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -266,7 +266,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                     )}
                 </button>
             </form>
-        </div>
+        </section>
     );
 };
 

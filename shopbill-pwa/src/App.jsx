@@ -24,13 +24,12 @@ import SuperAdminDashboard from './components/superAdminDashboard';
 import SystemConfig from './components/SystemConfig';
 import GlobalReport from './components/GlobalReport';
 import Checkout from './components/Checkout';
-import NotificationToast from './components/NotificationToast';
 import TermsAndConditions from './components/TermsAndConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import SupportPage from './components/SupportPage';
 import AffiliatePage from './components/AffiliatePage';
+import SEO from './components/SEO';
 
-// --- NEW COMPONENT: PWA Update Popup ---
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -97,7 +96,7 @@ const checkDeepLinkPath = () => {
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
-  const [pageOrigin, setPageOrigin] = useState(null); // Tracks where user came from ('landing' or 'settings')
+  const [pageOrigin, setPageOrigin] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
@@ -105,6 +104,91 @@ const App = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
+
+  // SEO Configuration for different pages
+  const seoConfig = useMemo(() => {
+    if (!currentUser) {
+      if (isViewingLogin) {
+        return {
+          title: 'Login | Pocket POS - Retail Management Software',
+          description: 'Login to your Pocket POS account. Access your retail management dashboard, billing, inventory, and digital Khata ledger.',
+          keywords: 'Pocket POS login, retail management login, POS login, shop management login',
+          noindex: true
+        };
+      }
+      return {
+        title: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software for Indian Shops',
+        description: 'Pocket POS - The #1 retail management software for Indian shops. Lightning-fast billing, real-time inventory management, digital Khata ledger, GST billing, and business reports. Works offline, syncs to cloud. Start your free trial today!',
+        keywords: 'Pocket POS, retail management software, billing app, inventory tracker, digital khata, GST billing, point of sale India, POS software, retail POS, shop management software, billing software India'
+      };
+    }
+
+    const pageSEO = {
+      'dashboard': {
+        title: 'Dashboard | Pocket POS - Business Overview & Analytics',
+        description: 'View your business dashboard with real-time sales, inventory alerts, and key performance metrics. Manage your retail business efficiently with Pocket POS.',
+        keywords: 'business dashboard, retail dashboard, sales analytics, business metrics, Pocket POS dashboard'
+      },
+      'billing': {
+        title: 'Billing & POS | Pocket POS - Lightning-Fast Point of Sale',
+        description: 'Complete sales transactions in seconds with Pocket POS billing system. Intuitive touch interface for high-volume retail environments. Print receipts or share via SMS.',
+        keywords: 'POS billing, point of sale, retail billing, shop billing, invoice generation, GST billing'
+      },
+      'inventory': {
+        title: 'Inventory Management | Pocket POS - Real-Time Stock Control',
+        description: 'Add, edit, and track products effortlessly with Pocket POS inventory management. Get instant low-stock alerts and set smart reorder levels to never miss a sale.',
+        keywords: 'inventory management, stock control, product management, inventory tracking, stock alerts'
+      },
+      'khata': {
+        title: 'Digital Ledger | Pocket POS - Credit & Payment Management',
+        description: 'Manage customer credit and outstanding payments easily with Pocket POS digital Khata ledger. Send gentle reminders and record payments, keeping your ledger always balanced.',
+        keywords: 'digital khata, credit ledger, payment management, customer credit, outstanding payments'
+      },
+      'reports': {
+        title: 'Business Reports | Pocket POS - Sales Analytics & Insights',
+        description: 'View daily, weekly, and custom sales trends with Pocket POS reports. Identify top-selling items and busy hours to optimize purchasing and staffing.',
+        keywords: 'business reports, sales reports, retail analytics, sales trends, business insights'
+      },
+      'settings': {
+        title: 'Settings | Pocket POS - Configure Your Retail Management',
+        description: 'Configure your Pocket POS settings. Manage staff permissions, system preferences, and business settings.',
+        keywords: 'Pocket POS settings, retail management settings, system configuration',
+        noindex: true
+      },
+      'checkout': {
+        title: 'Secure Checkout | Pocket POS - Choose Your Plan',
+        description: 'Select your Pocket POS plan and complete secure payment. Choose from Basic, Pro, or Premium plans with flexible pricing.',
+        keywords: 'Pocket POS pricing, POS software pricing, retail management plans',
+        noindex: true
+      },
+      'terms': {
+        title: 'Terms and Conditions | Pocket POS',
+        description: 'Read the terms and conditions for using Pocket POS retail management software.',
+        keywords: 'Pocket POS terms, terms of service, legal terms'
+      },
+      'policy': {
+        title: 'Privacy Policy | Pocket POS',
+        description: 'Learn how Pocket POS protects your privacy and handles your business data securely.',
+        keywords: 'Pocket POS privacy, privacy policy, data protection'
+      },
+      'support': {
+        title: 'Support | Pocket POS - Get Help & Contact Us',
+        description: 'Get help with Pocket POS. Contact our support team, access documentation, and find answers to common questions.',
+        keywords: 'Pocket POS support, customer support, help center, contact support'
+      },
+      'affiliate': {
+        title: 'Affiliate Program | Pocket POS - Earn by Referring',
+        description: 'Join the Pocket POS affiliate program and earn commissions by referring retail businesses to our platform.',
+        keywords: 'Pocket POS affiliate, affiliate program, referral program, earn commissions'
+      }
+    };
+
+    return pageSEO[currentPage] || {
+      title: 'Pocket POS - #1 Retail Management Tool',
+      description: 'Pocket POS - The #1 retail management software for Indian shops.',
+      keywords: 'Pocket POS, retail management software'
+    };
+  }, [currentPage, currentUser, isViewingLogin]);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -256,9 +340,7 @@ const App = () => {
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
     
-    // Page redirection logic based on origin
     const handleDynamicBack = (target) => {
-        // If the target passed by component is 'settings', go to settings. Otherwise go to dashboard.
         if (target === 'settings') {
             setCurrentPage('settings');
         } else {
@@ -330,30 +412,31 @@ const App = () => {
 
   return (
     <ApiProvider>
+      <SEO {...seoConfig} />
       <div className="h-screen w-full bg-gray-950 flex flex-col font-sans transition-colors duration-300 overflow-hidden">
         <UpdatePrompt />
         
         {showAppUI && (
-          <div className="fixed top-0 left-0 right-0 z-[40]">
+          <header className="fixed top-0 left-0 right-0 z-[40]">
             <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
-          </div>
+          </header>
         )}
 
         <div className="flex flex-1 overflow-hidden">
           {showAppUI && (
               <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl transition-colors duration-300">
                   <div className="p-6 border-b border-gray-800">
-                      <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')}><Smartphone className="mr-2 w-6 h-6" /> Pocket POS</h2>
+                      <div className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')} aria-label="Pocket POS Logo"><Smartphone className="mr-2 w-6 h-6" aria-hidden="true" /> Pocket POS</div>
                       <p className="text-xs text-gray-500 mt-1">User: {displayRole}</p>
                   </div>
-                  <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                  <nav className="flex-1 p-4 space-y-2 overflow-y-auto" aria-label="Desktop Sidebar Navigation">
                       {navItems.map(item => (
-                          <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" />{item.name}</button>
+                          <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" aria-hidden="true" />{item.name}</button>
                       ))}
                       <div className="pt-4 border-t border-gray-800 space-y-2">
                           {utilityNavItems.map(item => (
-                              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition font-medium relative ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}>
-                                <item.icon className="w-5 h-5 mr-3" />
+                              <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`w-full flex items-center p-3 rounded-xl transition font-medium relative ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}>
+                                <item.icon className="w-5 h-5 mr-3" aria-hidden="true" />
                                 {item.name}
                                 {item.id === 'notifications' && unreadCount > 0 && (
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full ring-2 ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
@@ -365,7 +448,7 @@ const App = () => {
                       </div>
                   </nav>
                   <div className="p-4 border-t border-gray-800">
-                      <button onClick={logout} className="w-full flex items-center p-3 rounded-xl text-red-400 hover:bg-red-900/20 font-medium"><LogOut className="w-5 h-5 mr-3" />Logout</button>
+                      <button onClick={logout} className="w-full flex items-center p-3 rounded-xl text-red-400 hover:bg-red-900/20 font-medium"><LogOut className="w-5 h-5 mr-3" aria-hidden="true" />Logout</button>
                   </div>
               </aside>
           )}
@@ -376,14 +459,13 @@ const App = () => {
         </div>
 
         {showAppUI && (
-            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-[40] shadow-2xl">
+            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-[40] shadow-2xl" aria-label="Mobile Bottom Navigation">
                 {navItems.map(item => (
-                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-400 font-bold' : 'text-gray-400'}`}><item.icon className="w-5 h-5" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
+                    <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-400 font-bold' : 'text-gray-400'}`}><item.icon className="w-5 h-5" aria-hidden="true" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
                 ))}
             </nav>
         )}
         
-        <NotificationToast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       </div>
     </ApiProvider>
   );

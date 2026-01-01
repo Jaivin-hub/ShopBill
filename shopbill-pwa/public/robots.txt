@@ -1,0 +1,34 @@
+# robots.txt for Pocket POS
+# Allow all search engines to crawl the site
+
+User-agent: *
+Allow: /
+
+# Disallow admin and API routes
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /billing/
+Disallow: /inventory/
+Disallow: /khata/
+Disallow: /reports/
+Disallow: /settings/
+Disallow: /profile/
+Disallow: /notifications/
+Disallow: /checkout/
+Disallow: /reset-password/
+Disallow: /staff-setup/
+
+# Allow important public pages
+Allow: /
+Allow: /terms
+Allow: /policy
+Allow: /support
+Allow: /affiliate
+
+# Sitemap location
+Sitemap: https://yourdomain.com/sitemap.xml
+
+# Crawl delay (optional, helps prevent server overload)
+Crawl-delay: 1
+

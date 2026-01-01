@@ -23,28 +23,39 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
     const [showPassword, setShowPassword] = useState(false);
 
     return (
-        <>
-            <h2 className="text-3xl font-extrabold text-white text-center mb-6">
+        <section aria-labelledby="login-heading">
+            <h2 id="login-heading" className="text-3xl font-extrabold text-white text-center mb-6">
                 Welcome Back
             </h2>
             {authError && (
-                <div className="p-3 mb-4 text-sm text-red-100 bg-red-800/80 border border-red-600 rounded-lg text-center" role="alert">
+                <div 
+                    className="p-3 mb-4 text-sm text-red-100 bg-red-800/80 border border-red-600 rounded-lg text-center" 
+                    role="alert" 
+                    aria-live="assertive"
+                >
                     {authError}
                 </div>
             )}
-            <form className="space-y-4" onSubmit={handleAuth}>
-                <input
-                    type="text"
-                    placeholder="Email Address or Phone Number"
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150"
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    value={identifier}
-                    required
-                    autoComplete="username" 
-                />
-                
-                <div className="relative">
+            <form className="space-y-4" onSubmit={handleAuth} aria-label="Login form">
+                <div className="space-y-1">
+                    <label htmlFor="identifier" className="sr-only">Email or Phone Number</label>
                     <input
+                        id="identifier"
+                        type="text"
+                        placeholder="Email Address or Phone Number"
+                        className="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150"
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        value={identifier}
+                        required
+                        autoComplete="username"
+                        aria-required="true"
+                    />
+                </div>
+                
+                <div className="relative space-y-1">
+                    <label htmlFor="password" className="sr-only">Password</label>
+                    <input
+                        id="password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Password"
                         className="w-full pr-12 px-4 py-3 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150"
@@ -52,6 +63,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         value={password}
                         required
                         autoComplete="current-password"
+                        aria-required="true"
                     />
                     <button
                         type="button"
@@ -59,7 +71,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-indigo-400 transition duration-150"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        {showPassword ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
                     </button>
                 </div>
 
@@ -88,24 +100,25 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                     onClick={onBackToLanding} 
                     className="ml-2 cursor-pointer text-teal-400 hover:text-teal-300 font-bold transition duration-150"
                     disabled={loading}
+                    aria-label="Create a new account"
                 >
                     Create Account
                 </button>
             </p>
-        </>
+        </section>
     );
 };
 
 // --- Sub-Component: Forgot Password Form ---
 const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailChange, handleEmailBlur, loading, setView, resetMessage, emailError }) => {
     return (
-        <>
-            <h2 className="text-3xl font-extrabold text-white text-center mb-6">
+        <section aria-labelledby="reset-heading">
+            <h2 id="reset-heading" className="text-3xl font-extrabold text-white text-center mb-6">
                 Reset Password
             </h2>
 
             {resetMessage && resetMessage.success && (
-                <div className="p-3 mb-4 text-sm text-green-100 bg-green-900/80 border border-green-700 rounded-lg text-center" role="alert">
+                <div className="p-3 mb-4 text-sm text-green-100 bg-green-900/80 border border-green-700 rounded-lg text-center" role="status">
                     <p>{resetMessage.success}</p>
                     {resetMessage.devToken && (
                         <p className="mt-2 text-xs font-mono break-all text-green-300">
@@ -121,23 +134,29 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                 </div>
             )}
 
-            <form className="space-y-4" onSubmit={handleForgotPasswordRequest}>
+            <form className="space-y-4" onSubmit={handleForgotPasswordRequest} aria-label="Password reset form">
                 <p className="text-gray-400 text-sm text-center pt-2">
                     Enter your email address to receive a password reset link.
                 </p>
-                <input
-                    type="email"
-                    placeholder="Email Address"
-                    className={`w-full px-4 py-3 bg-gray-900 border text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-700'}`}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    onBlur={handleEmailBlur}
-                    value={email}
-                    required
-                    autoComplete="email"
-                />
-                {emailError && (
-                    <p className="text-red-400 text-sm mt-1">{emailError}</p>
-                )}
+                <div className="space-y-1">
+                    <label htmlFor="reset-email" className="sr-only">Email Address</label>
+                    <input
+                        id="reset-email"
+                        type="email"
+                        inputMode="email"
+                        placeholder="Email Address"
+                        className={`w-full px-4 py-3 bg-gray-900 border text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-700'}`}
+                        onChange={(e) => handleEmailChange(e.target.value)}
+                        onBlur={handleEmailBlur}
+                        value={email}
+                        required
+                        autoComplete="email"
+                        aria-invalid={!!emailError}
+                    />
+                    {emailError && (
+                        <p className="text-red-400 text-sm mt-1" role="alert">{emailError}</p>
+                    )}
+                </div>
 
                 <button
                     type="submit"
@@ -157,7 +176,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                     ← Back to Log In
                 </button>
             </p>
-        </>
+        </section>
     );
 };
 
@@ -288,25 +307,27 @@ const Login = ({ onLogin, onBackToLanding }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
-            <div className="w-full max-w-md bg-gray-900 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/20 border border-gray-800">
-                <div className="text-center mb-4">
-                    <DollarSign className="w-12 h-12 text-indigo-500 mx-auto" />
+        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter" itemScope itemType="https://schema.org/WebPage">
+            <section className="w-full max-w-md bg-gray-900 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/20 border border-gray-800">
+                <header className="text-center mb-4" itemProp="headline">
+                    <DollarSign className="w-12 h-12 text-indigo-500 mx-auto" aria-hidden="true" />
                     <h1 className="text-3xl font-extrabold text-white">Pocket POS</h1>
-                </div>
+                    <p className="text-sm text-gray-400 mt-2" itemProp="description">Login to your Pocket POS account to access your retail management dashboard, billing, inventory, and digital Khata ledger.</p>
+                </header>
                 {renderForm()}
                 <div className="text-center text-sm mt-8">
                     <button
                         onClick={onBackToLanding}
                         className="cursor-pointer text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
                         disabled={loading}
+                        aria-label="Return to landing page"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M19 12H5" /><polyline points="12 19 5 12 12 5" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1" aria-hidden="true"><path d="M19 12H5" /><polyline points="12 19 5 12 12 5" /></svg>
                         Back to Landing Page
                     </button>
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
     );
 };
 

@@ -33,11 +33,13 @@ const PlanCard = ({
     const buttonDisabled = (isCurrent && !alreadyInTerminalState) || isUpgrading || isCancelling;
 
     return (
-        <div
+        <article
             className={`relative bg-gray-800/50 rounded-xl p-6 border-2 transition-all duration-300 flex flex-col ${isCurrent
                 ? 'border-indigo-500 shadow-xl shadow-indigo-500/20 transform scale-[1.02]'
                 : 'border-gray-700/50 hover:border-gray-600 hover:shadow-lg'
                 } mobile:p-4`}
+            itemScope
+            itemType="https://schema.org/Offer"
         >
             {/* Display 'Current Plan' badge */}
             {isCurrent && (
@@ -56,7 +58,7 @@ const PlanCard = ({
                         <div className={`p-3 rounded-lg ${getPlanColor(plan.id)}`}>
                             <IconComponent className={`w-6 h-6 ${getPlanTextColor(plan.id)}`} />
                         </div>
-                        <h3 className="text-xl font-bold text-white">{plan.name}</h3> {/* Plan Name moved here */}
+                        <h3 className="text-xl font-bold text-white" itemProp="name">{plan.name}</h3> {/* Plan Name moved here */}
                     </div>
                     
                     {/* Show Recommended badge */}
@@ -106,10 +108,11 @@ const PlanCard = ({
                         ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/30'
                         : 'bg-indigo-600 text-white'
                     }`}
+                aria-label={`${buttonText} for ${plan.name} plan`}
             >
                 {buttonText}
             </button>
-        </div>
+        </article>
     );
 };
 

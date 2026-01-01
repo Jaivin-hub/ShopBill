@@ -30,7 +30,7 @@ const Ledger = ({ apiClient, API, showToast }) => {
     finally { setLoading(false); }
   }, [apiClient, API.customers]);
 
-  useEffect(() => { fetchCustomers(); }, []);
+  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
   const fetchCustomerHistory = useCallback(async (id) => {
     const response = await apiClient.get(`${API.customers}/${id}/history`);
@@ -79,87 +79,111 @@ const Ledger = ({ apiClient, API, showToast }) => {
   };
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-teal-400">
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-teal-400" role="status" aria-label="Loading Ledger">
       <Loader className="w-10 h-10 animate-spin" />
+      <span className="sr-only">Loading Khata data...</span>
     </div>
   );
 
   return (
-    <div className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
-
+    <main className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden" itemScope itemType="https://schema.org/FinancialProduct">
+      
       {/* Main Scrollable Area */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-6 pb-20 scroll-smooth">
 
-        {/* 1. Header Section (Will scroll away) */}
-        <div className="pt-4 md:pt-8">
+        {/* 1. Header Section */}
+        <header className="pt-4 md:pt-8" itemProp="headline">
           <h1 className="text-3xl font-extrabold text-white">Khata Ledger</h1>
-          <p className="text-sm text-gray-400 mb-4">Manage all outstanding customer credit accounts.</p>
-        </div>
+          <p className="text-sm text-gray-400 mb-4" itemProp="description">Track customer credit, payments, and digital ledgers.</p>
+        </header>
 
-        {/* 2. Stats and Actions Section (Will scroll away) */}
-        <div className="p-6 bg-gray-900 rounded-2xl border border-indigo-900/50 shadow-xl">
+        {/* 2. Stats and Actions Section */}
+        <section aria-label="Financial Overview" className="p-6 bg-gray-900 rounded-2xl border border-indigo-900/50 shadow-xl">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
 
             {/* Left Side: Stats Card */}
-            <div className="flex-1 w-full lg:max-w-md p-5 bg-red-950/20 rounded-2xl border border-red-900/30 flex justify-between items-center shadow-sm">
+            <article className="flex-1 w-full lg:max-w-md p-5 bg-red-950/20 rounded-2xl border border-red-900/30 flex justify-between items-center shadow-sm">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-red-900/40 rounded-lg flex-shrink-0">
+                <div className="p-2 bg-red-900/40 rounded-lg flex-shrink-0" aria-hidden="true">
                   <TrendingUp className="w-6 h-6 text-red-400" />
                 </div>
-                <span className="text-sm uppercase tracking-wider font-semibold text-gray-400">
+                <h2 className="text-sm uppercase tracking-wider font-semibold text-gray-400">
                   Total Outstanding
-                </span>
+                </h2>
               </div>
-              <span className="text-2xl lg:text-3xl font-black text-red-400">
+              <data value={totalOutstanding} className="text-2xl lg:text-3xl font-black text-red-400">
                 ₹{totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-            </div>
+              </data>
+            </article>
 
             {/* Right Side: Action Buttons */}
-            <div className="grid grid-cols-2 lg:flex lg:space-x-4 w-full lg:w-auto gap-3">
+            <nav className="grid grid-cols-2 lg:flex lg:space-x-4 w-full lg:w-auto gap-3" aria-label="Ledger actions">
               <button
                 onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
+                aria-haspopup="dialog"
+                aria-expanded={activeModal === 'add'}
                 className="flex items-center justify-center px-4 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-indigo-500/20"
               >
-                <UserPlus className="w-6 h-6 flex-shrink-0 mr-2" />
+                <UserPlus className="w-6 h-6 flex-shrink-0 mr-2" aria-hidden="true" />
                 <span className="text-sm md:text-base whitespace-nowrap">Add Customer</span>
               </button>
 
               <button
                 onClick={() => setActiveModal('remind')}
+                aria-label={`Send payment reminders to ${hasDues} customers`}
                 className="flex items-center justify-center px-4 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-teal-500/20"
               >
-                <MessageSquare className="w-6 h-6 flex-shrink-0 mr-2" />
+                <MessageSquare className="w-6 h-6 flex-shrink-0 mr-2" aria-hidden="true" />
                 <span className="text-sm md:text-base whitespace-nowrap">Remind ({hasDues})</span>
               </button>
-            </div>
+            </nav>
           </div>
-        </div>
+        </section>
 
-        {/* 3. Customer List */}
-        <div className="relative">
+        {/* 3. Customer List Section */}
+        <section aria-label="Customer Accounts List" className="relative">
           <CustomerList
             sortedCustomers={sortedCustomers}
             openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
             openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
             isSearchVisible={isSearchVisible}
           />
-        </div>
+        </section>
 
       </div>
 
       {/* Render Modals Conditionally */}
+      {/* Note: Ensure these sub-components use role="dialog" and aria-modal="true" internally */}
       {activeModal === 'payment' && (
-        <PaymentModal customer={selectedCustomer} amount={paymentAmount} setAmount={setPaymentAmount} onClose={() => setActiveModal(null)} onConfirm={handleRecordPayment} isProcessing={isProcessing} />
+        <PaymentModal 
+          customer={selectedCustomer} 
+          amount={paymentAmount} 
+          setAmount={setPaymentAmount} 
+          onClose={() => setActiveModal(null)} 
+          onConfirm={handleRecordPayment} 
+          isProcessing={isProcessing} 
+        />
       )}
       {activeModal === 'add' && (
-        <AddCustomerModal data={newCustomerData} onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })} onClose={() => setActiveModal(null)} onConfirm={handleAddCustomer} errors={validationErrors} isProcessing={isProcessing} isValid={!!newCustomerData.name} />
+        <AddCustomerModal 
+          data={newCustomerData} 
+          onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })} 
+          onClose={() => setActiveModal(null)} 
+          onConfirm={handleAddCustomer} 
+          errors={validationErrors} 
+          isProcessing={isProcessing} 
+          isValid={!!newCustomerData.name} 
+        />
       )}
       {activeModal === 'history' && (
-        <HistoryModal customer={selectedCustomer} onClose={() => setActiveModal(null)} fetchCustomerHistory={fetchCustomerHistory} />
+        <HistoryModal 
+          customer={selectedCustomer} 
+          onClose={() => setActiveModal(null)} 
+          fetchCustomerHistory={fetchCustomerHistory} 
+        />
       )}
       {activeModal === 'remind' && <RemindInfoModal onClose={() => setActiveModal(null)} />}
-    </div>
+    </main>
   );
 };
 

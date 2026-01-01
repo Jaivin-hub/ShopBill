@@ -16,8 +16,19 @@ const PrivacyPolicy = ({ onBack, origin }) => {
         onBack(origin === 'settings' ? 'settings' : 'dashboard');
     };
 
+    // Structured Data for Privacy Policy
+    const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Privacy Policy - Pocket POS",
+        "description": "Privacy Policy for Pocket POS retail management software. Learn how we collect, protect, and handle your business data securely.",
+        "url": "https://yourdomain.com/policy"
+    };
+
     return (
-        <div className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans">
+        <>
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+            <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans" itemScope itemType="https://schema.org/WebPage">
             {/* Styles for print and layout */}
             <style dangerouslySetInnerHTML={{
                 __html: `
@@ -55,8 +66,8 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                     <Lock className="w-8 h-8 text-teal-300" />
                                 </div>
                             </div>
-                            <h1 className="text-3xl font-extrabold tracking-tight">Privacy Policy</h1>
-                            <p className="mt-2 text-teal-100 font-medium">Your Data Security is Our Top Priority</p>
+                            <h1 className="text-3xl font-extrabold tracking-tight" itemProp="headline">Privacy Policy</h1>
+                            <p className="mt-2 text-teal-100 font-medium" itemProp="description">Your Data Security is Our Top Priority</p>
                             <p className="mt-2 text-teal-200/60 text-[10px] uppercase tracking-widest font-bold">Effective Date: 29/12/2025</p>
                         </div>
                     </div>
@@ -178,7 +189,8 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                     &copy; {new Date().getFullYear()} Pocket POS &bull; Secure & Reliable Billing
                 </div>
             </div>
-        </div>
+        </article>
+        </>
     );
 };
 

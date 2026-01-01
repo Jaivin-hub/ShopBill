@@ -41,8 +41,19 @@ const SupportPage = ({ onBack, origin }) => {
     }
   ];
 
+  // Structured Data for Support Page
+  const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "ContactPage",
+      "name": "Support - Pocket POS",
+      "description": "Get help with Pocket POS. Contact our support team, access documentation, and find answers to common questions.",
+      "url": "https://yourdomain.com/support"
+  };
+
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center text-white">
+      <>
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+          <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white" itemScope itemType="https://schema.org/ContactPage">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           .print-hidden { display: none !important; }
@@ -86,8 +97,8 @@ const SupportPage = ({ onBack, origin }) => {
                   <LifeBuoy className="w-10 h-10 text-white animate-pulse" />
                 </div>
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">How can we help?</h1>
-              <p className="mt-2 text-indigo-100 font-medium">Pocket POS Support Team is here for you</p>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white" itemProp="headline">How can we help?</h1>
+              <p className="mt-2 text-indigo-100 font-medium" itemProp="description">Pocket POS Support Team is here for you</p>
             </div>
           </div>
 
@@ -155,7 +166,8 @@ const SupportPage = ({ onBack, origin }) => {
           &copy; {new Date().getFullYear()} Pocket POS &bull; Helping your business grow
         </div>
       </div>
-    </div>
+    </article>
+    </>
   );
 };
 

@@ -8,7 +8,6 @@ const USER_ROLES = {
   CASHIER: 'cashier',
 };
 
-// UPDATED: Fixed to Permanent Dark Theme
 const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, onViewSaleDetails }) => {
   const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
   const isOwner = userRole === USER_ROLES.OWNER;
@@ -21,7 +20,6 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
   // 2. Data Fetching Function
   const fetchDashboardData = useCallback(async () => {
-    console.log('this fetchDashboardData function is invoking')
     setIsLoading(true);
     try {
       const [invResponse, custResponse, salesResponse] = await Promise.all([
@@ -46,23 +44,17 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
     if (hasAccess) {
       fetchDashboardData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAccess,fetchDashboardData]);
-
+  }, [hasAccess, fetchDashboardData]);
 
   // --- DATA CALCULATIONS ---
-
   const today = useMemo(() => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-
     const todaySales = sales.filter(s => new Date(s.timestamp) > startOfDay);
-
     const totalSales = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
     const totalCreditGiven = todaySales
       .filter(s => s.paymentMethod === 'Credit' || s.paymentMethod === 'Mixed')
       .reduce((sum, sale) => sum + sale.amountCredited, 0);
-
     return { totalSales, totalCreditGiven };
   }, [sales]);
 
@@ -109,40 +101,43 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
     return Math.floor(seconds) + " seconds ago";
   };
 
-
-  // --- RENDER LOGIC ---
+  const dashboardTitle = {
+    [USER_ROLES.OWNER]: "Owner's Dashboard",
+    [USER_ROLES.MANAGER]: "Manager's Dashboard",
+    [USER_ROLES.CASHIER]: "Cashier's Dashboard",
+  }[userRole] || "Dashboard";
 
   if (!hasAccess) {
     return (
-      <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950">
-        <AlertTriangle className="w-12 h-12 text-indigo-400 mb-4" />
-        <h2 className="text-xl font-semibold text-white">Access Denied</h2>
+      <main className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950" aria-labelledby="access-denied-title">
+        <AlertTriangle className="w-12 h-12 text-indigo-400 mb-4" aria-hidden="true" />
+        <h2 id="access-denied-title" className="text-xl font-semibold text-white">Access Denied</h2>
         <p className="text-gray-400">You do not have permission to view the main dashboard. Please proceed to the Billing screen.</p>
-      </div>
+      </main>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950">
-        <Loader className="w-10 h-10 animate-spin text-teal-400" />
-        {/* <p className='mt-3'>Loading dashboard summary data...</p> */}
+      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950" aria-busy="true" aria-live="polite">
+        <Loader className="w-10 h-10 animate-spin text-teal-400" aria-hidden="true" />
+        <span className="sr-only">Loading dashboard data...</span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-950 text-white transition-colors duration-300"> 
+    <main className="flex flex-col h-full bg-gray-950 text-white transition-colors duration-300" itemScope itemType="https://schema.org/Dashboard"> 
       
-      <div className="p-4 md:p-8 flex-shrink-0"> 
-        <h1 className="text-3xl font-extrabold text-white mb-2">Owner's Dashboard</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Quick overview of your shop's health.</p>
-      </div>
+      <header className="p-4 md:p-8 flex-shrink-0" itemProp="headline"> 
+        <h1 className="text-3xl font-extrabold text-white">{dashboardTitle}</h1>
+        <p className="text-sm text-gray-600 text-gray-400 mb-4" itemProp="description">Track sales, inventory, and credit in real-time.</p>
+      </header>
 
       <div className="flex-grow overflow-y-auto px-4 md:px-8 pb-8"> 
 
-        {/* Today's Report - Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Financial Summary Cards */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" aria-label="Today's Financial Summary">
           <StatCard
             title="Today's Total Sales"
             value={today.totalSales.toFixed(2)}
@@ -167,24 +162,25 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
             colorClass="text-red-400"
             bgColor="bg-gray-900"
           />
-        </div>
+        </section>
 
-        {/* Main Content */}
+        {/* Detailed Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          {/* Inventory Health Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col">
+          {/* Inventory Health */}
+          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="inventory-heading">
             <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
-                <Package className="w-5 h-5 mr-2 text-teal-400" /> Inventory Alerts
+              <h2 id="inventory-heading" className="text-xl font-semibold text-white flex items-center">
+                <Package className="w-5 h-5 mr-2 text-teal-400" aria-hidden="true" /> Inventory Alerts
               </h2>
               {allLowStockAlerts.length > 0 && (
                 <button
                   onClick={onViewAllInventory}
+                  aria-label={`View all ${allLowStockAlerts.length} low stock alerts`}
                   className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                 >
                   {allLowStockAlerts.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -203,21 +199,22 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                 <p className="text-gray-400 text-sm p-4 bg-green-900/20 rounded-lg border border-green-700 text-center font-medium">All inventory levels look great!</p>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Khata (Credit) Status Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col">
+          {/* Khata Status */}
+          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="khata-heading">
             <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
-                <Users className="w-5 h-5 mr-2 text-indigo-400" /> Top Credit Holders
+              <h2 id="khata-heading" className="text-xl font-semibold text-white flex items-center">
+                <Users className="w-5 h-5 mr-2 text-indigo-400" aria-hidden="true" /> Top Credit Holders
               </h2>
               {customersWithCredit.length > 0 && (
                 <button
                   onClick={onViewAllCredit}
+                  aria-label={`View all ${customersWithCredit.length} customers with outstanding credit`}
                   className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                 >
                   {customersWithCredit.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -238,21 +235,22 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                 )}
               </ul>
             </div>
-          </div>
+          </section>
 
-          {/* Recent Sales Activity Card */}
-          <div className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col">
+          {/* Recent Sales Activity */}
+          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="sales-heading">
             <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 className="text-xl font-semibold text-white flex items-center">
-                <List className="w-5 h-5 mr-2 text-teal-400" /> Recent Sales Activity
+              <h2 id="sales-heading" className="text-xl font-semibold text-white flex items-center">
+                <List className="w-5 h-5 mr-2 text-teal-400" aria-hidden="true" /> Recent Sales Activity
               </h2>
               {sales.length > 0 && (
                 <button
                   onClick={onViewAllSales}
+                  aria-label="View all historical sales activity"
                   className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
                 >
                   {sales.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -274,7 +272,7 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
 
                     return (
                       <li key={sale._id || sale.id} className="py-3 flex justify-between items-center text-sm">
-                        <div className="flex flex-grow justify-between items-center">
+                        <article className="flex flex-grow justify-between items-center">
                           <div className="flex items-center space-x-3">
                             <span className="font-bold text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
                             {sale.paymentMethod === 'Mixed' ? (
@@ -293,19 +291,20 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                             )}
                           </div>
                           <div className="flex items-center space-x-3">
-                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                            <time className="text-xs text-gray-500 whitespace-nowrap">
                               {formatTimeAgo(sale.timestamp)}
-                            </span>
+                            </time>
                             {onViewSaleDetails && (
                               <button
                                 onClick={() => onViewSaleDetails(sale)}
+                                aria-label="View transaction details"
                                 className="p-1 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-600 transition-colors duration-200"
                               >
-                                <ArrowRight className="w-4 h-4" />
+                                <ArrowRight className="w-4 h-4" aria-hidden="true" />
                               </button>
                             )}
                           </div>
-                        </div>
+                        </article>
                       </li>
                     );
                   })
@@ -314,10 +313,10 @@ const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onView
                 )}
               </ul>
             </div>
-          </div>
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

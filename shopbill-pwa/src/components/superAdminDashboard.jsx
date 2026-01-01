@@ -22,7 +22,7 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
     const colorClass = colorClasses[color] || colorClasses.indigo;
     
     return (
-        <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600/50 transition-all duration-200">
+        <article className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200" itemScope itemType="https://schema.org/QuantitativeValue">
             <div className="flex items-center justify-between mb-3">
                 <div className={`w-12 h-12 rounded-lg ${colorClass} flex items-center justify-center border`}>
                     <Icon className="w-6 h-6" />
@@ -37,14 +37,14 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
                 )}
             </div>
             <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
+                <p className="text-sm font-medium text-gray-400 mb-1" itemProp="name">{title}</p>
                 <div className="flex items-baseline gap-1">
                     {unit && <span className="text-lg text-gray-500">{unit}</span>}
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
+                    <h3 className="text-2xl font-bold text-white" itemProp="value">{value}</h3>
                 </div>
-                {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+                {subtitle && <p className="text-xs text-gray-500 mt-1" itemProp="description">{subtitle}</p>}
             </div>
-        </div>
+        </article>
     );
 };
 
@@ -158,38 +158,38 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-indigo-400" />
-                {/* <p className='mt-3 text-gray-700 dark:text-gray-300'>Loading dashboard data...</p> */}
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300" aria-busy="true" aria-live="polite">
+                <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
+                <span className="sr-only">Loading dashboard data...</span>
             </div>
         );
     }
     
     if (!dashboardData) {
         return (
-            <div className="p-8 text-center text-gray-400">
-                <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+            <div className="p-8 text-center text-gray-400" aria-label="No data available">
+                <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-600" aria-hidden="true" />
                 <p>No data available</p>
             </div>
         );
     }
     
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300 overflow-y-auto">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/Dashboard">
             {/* Header */}
-            <div className="mb-6">
+            <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
-                        <Shield className="w-8 h-8 text-indigo-400" />
+                    <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                        <Shield className="w-8 h-8 text-indigo-400" aria-hidden="true" />
                         Super Admin
                     </h1>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Calendar className="w-4 h-4" aria-hidden="true" />
+                        <time>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</time>
                     </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400">Overview of all shops, revenue, and system metrics</p>
-            </div>
+                <p className="text-gray-400" itemProp="description">Overview of all shops, revenue, and system metrics across the entire Pocket POS platform.</p>
+            </header>
             
             {/* Key Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -270,10 +270,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 
                 {/* Plan Distribution */}
-                <div className="lg:col-span-2 bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
+                <section className="lg:col-span-2 bg-gray-800/50 rounded-xl p-6 border border-gray-700/50" aria-labelledby="plan-distribution-heading">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                            <PieChart className="w-5 h-5 text-indigo-400" />
+                        <h2 id="plan-distribution-heading" className="text-lg font-semibold text-white flex items-center gap-2">
+                            <PieChart className="w-5 h-5 text-indigo-400" aria-hidden="true" />
                             Plan Distribution
                         </h2>
                     </div>
@@ -316,11 +316,11 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                             );
                         })}
                     </div>
-                </div>
+                </section>
                 
                 {/* Payment Status Overview */}
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                <section className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50" aria-labelledby="payment-status-heading">
+                    <h2 id="payment-status-heading" className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                         <CreditCard className="w-5 h-5 text-indigo-400" />
                         Payment Status
                     </h2>
@@ -330,7 +330,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                                 <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
                                     <div className="flex items-center gap-2">
                                         <CheckCircle className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm text-gray-700 dark:text-gray-300">Paid</span>
+                                        <span className="text-sm text-gray-300">Paid</span>
                                     </div>
                                     <span className="text-sm font-semibold text-green-400">{dashboardData.paymentStatus.paid || 0}</span>
                                 </div>
@@ -358,7 +358,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                             </>
                         )}
                     </div>
-                </div>
+                </section>
             </div>
             
             {/* Monthly Revenue Trend and Recent Activity */}
@@ -382,8 +382,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 
                     return (
                         <div key={index} className="flex items-center gap-3">
-                            <span className="text-xs text-gray-600 dark:text-gray-400 w-12">{item.month}</span>
-                            <div className="flex-1 bg-gray-200 dark:bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
+                            <span className="text-xs text-gray-400 w-12">{item.month}</span>
+                            <div className="flex-1 bg-gray-700/30 rounded-full h-6 relative overflow-hidden">
                                 <div
                                     className="h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                                     style={{ width: `${percentage}%` }}
@@ -471,7 +471,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
 </div>
             
             {/* System Health & Quick Stats (Static/Mocked Data) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <header className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center justify-center">
@@ -519,8 +519,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         <span>Avg: 120ms</span>
                     </div>
                 </div>
-            </div>
-        </div>
+            </header>
+        </main>
     );
 };
 

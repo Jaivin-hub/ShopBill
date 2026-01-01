@@ -227,8 +227,8 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-indigo-400" />
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300" aria-busy="true" aria-live="polite">
+                <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
                 <p className='mt-3 text-gray-300'>Loading global reports...</p>
             </div>
         );
@@ -247,12 +247,12 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     const maxRevenue = Math.max(...chartData.map(d => d.revenue));
     
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300 overflow-y-auto">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/Report">
             {/* Header */}
-            <div className="mb-6">
+            <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
                     <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
-                        <BarChart3 className="w-8 h-8 text-indigo-400" />
+                        <BarChart3 className="w-8 h-8 text-indigo-400" aria-hidden="true" />
                         Global Reports
                     </h1>
                     <div className="flex items-center gap-2">
@@ -272,7 +272,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
                     </div>
                 </div>
                 <p className="text-gray-400">Comprehensive analytics across all shops</p>
-            </div>
+            </header>
             
             {/* Date Filters */}
             <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -449,7 +449,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
             </div>
             
             {/* Plan Performance and Geographic Distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <header className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Plan Performance */}
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
                     <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
@@ -542,8 +542,8 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
                         })}
                     </div>
                 </div>
-            </div>
-        </div>
+            </header>
+        </main>
     );
 };
 

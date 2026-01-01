@@ -9,7 +9,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   // State for the camera scanner modal
-  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false); 
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +44,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }, [cart]);
 
   const filteredInventory = useMemo(() => {
-    const term = (scannedBarcode || searchTerm).toLowerCase().trim(); 
+    const term = (scannedBarcode || searchTerm).toLowerCase().trim();
     const inStockItems = inventory.filter(item =>
       item.quantity > 0
     );
@@ -147,7 +147,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   // --- Barcode Scanner Logic ---
   useEffect(() => {
     if (scannedBarcode) {
-      const item = inventory.find(i => i.hsn === scannedBarcode); 
+      const item = inventory.find(i => i.hsn === scannedBarcode);
       if (item) {
         addItemToCart(item);
         setScannedBarcode('');
@@ -163,25 +163,25 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
     if (e.key === 'Enter' && searchTerm) {
       setScannedBarcode(searchTerm);
       setSearchTerm('');
-      e.preventDefault(); 
+      e.preventDefault();
     }
   }
 
   const handleScanItemFound = useCallback((itemData) => {
-      setIsCameraScannerOpen(false); 
-      addItemToCart(itemData);      
-      setSearchTerm('');            
+    setIsCameraScannerOpen(false);
+    addItemToCart(itemData);
+    setSearchTerm('');
   }, [addItemToCart]);
 
   const handleScanItemNotFound = useCallback((rawCode) => {
-      setIsCameraScannerOpen(false); 
-      setSearchTerm(rawCode);        
-      showToast(`Item with code ${rawCode} not found. Please add manually.`, 'error');
+    setIsCameraScannerOpen(false);
+    setSearchTerm(rawCode);
+    showToast(`Item with code ${rawCode} not found. Please add manually.`, 'error');
   }, [showToast]);
-  
+
   const handleScanError = useCallback((errorMessage) => {
-       setIsCameraScannerOpen(false); 
-       showToast(errorMessage, 'error');
+    setIsCameraScannerOpen(false);
+    showToast(errorMessage, 'error');
   }, [showToast]);
 
   if (isLoading) {
@@ -193,28 +193,30 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
-      
-      {/* SCROLLABLE CONTAINER FOR HEADER AND CONTENT */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-6 pb-60 scroll-smooth">
-        
-        {/* 1. Header Captions (Will scroll away) */}
-        <div className="pt-4 md:pt-8">
-          <h1 className="text-3xl font-extrabold text-white mb-2">Point of Sale</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Optimized for fast and accurate day-to-day billing.</p>
-        </div>
+    <main className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden" itemScope itemType="https://schema.org/SoftwareApplication">
 
-        {/* 2. STICKY SEARCH BAR (Will stick to top when header scrolls up) */}
-        <div className="sticky top-0 z-40 bg-gray-950 py-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-gray-800 shadow-lg">
+      {/* SCROLLABLE CONTAINER FOR HEADER AND CONTENT */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-3 pb-60 scroll-smooth">
+
+        {/* 1. Header Captions - Tightened vertical padding and margins */}
+        <header className="pt-4 md:pt-8" itemProp="headline">
+          <h1 className="text-3xl font-extrabold text-white">Point of Sale</h1>
+          <p className="text-sm text-gray-600 text-gray-400 mb-4" itemProp="description">
+            Fast, accurate billing for high-volume retail.
+          </p>
+        </header>
+
+        {/* 2. STICKY SEARCH BAR - Reduced py-4 to py-1.5 to bring it closer to text */}
+        <div className="sticky top-0 z-40 bg-gray-950 py-1.5 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-gray-800 shadow-lg">
           <div className="relative flex items-center">
             <Search className="w-5 h-5 text-gray-500 absolute left-3 z-10" />
             <input
               type="text"
-              placeholder="Search Item by Name or Scan Barcode..."
+              placeholder="Search Item or Scan Barcode..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handlePhysicalScannerInput}
-              className="w-full pl-10 pr-24 py-3 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
+              className="w-full pl-10 pr-24 py-2 border border-gray-700 rounded-xl text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-800 text-white shadow-xl"
             />
             {searchTerm && (
               <button
@@ -333,7 +335,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         onAddNewCustomer={() => showToast('Redirecting...', 'info')}
         apiClient={apiClient}
       />
-      
+
       <ScannerModal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
@@ -343,7 +345,7 @@ const BillingPOS = ({ apiClient, API, showToast }) => {
         onScanError={handleScanError}
         showToast={showToast}
       />
-    </div>
+    </main>
   );
 };
 

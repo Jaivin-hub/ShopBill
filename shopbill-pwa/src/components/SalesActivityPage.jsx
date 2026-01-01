@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { IndianRupee, AlertTriangle, Calendar, TrendingUp, ArrowRight, ArrowLeft, X, User, ArrowDownWideNarrow, Clock, CheckCircle, Printer } from 'lucide-react';
+import { IndianRupee, AlertTriangle, Calendar, ArrowRight, ArrowLeft, X, ArrowDownWideNarrow, Clock, CheckCircle, Printer } from 'lucide-react';
 import API from '../config/api';
 
 const getLocalDateString = (date) => {
@@ -49,7 +49,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
         window.print();
     };
 
-    if (!sale && isLoading) {
+    if (isLoading && !sale) {
         return (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                 <div className="bg-gray-900 border border-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-8 text-center">
@@ -159,19 +159,7 @@ const BillModal = ({ sale, onClose, isLoading }) => {
     );
 };
 
-const MetricCard = ({ title, value, icon: Icon, colorClass, valueSuffix = '' }) => (
-    <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-gray-900 rounded-xl shadow-lg border border-gray-800 text-center">
-        <Icon className={`w-5 h-5 mb-2 ${colorClass}`} />
-        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{title}</span>
-        <p className="text-lg sm:text-2xl font-black text-white truncate w-full">
-            {value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            <span className="text-xs font-normal text-gray-400 ml-0.5">{valueSuffix}</span>
-        </p>
-    </div>
-);
-
 const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }) => {
-    const activeApiClient = apiClient;
     const [sales, setSales] = useState(salesData || []);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -187,7 +175,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
     });
 
     useEffect(() => {
-        if (!activeApiClient || !API.sales || (salesData?.length > 0 && !activeApiClient)) return;
+        if (!apiClient || !API.sales) return;
 
         const fetchSales = async () => {
             setIsLoadingSales(true);
@@ -199,7 +187,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
                     end.setHours(23, 59, 59, 999);
                     params.append('endDate', end.toISOString());
                 }
-                const response = await activeApiClient.get(`${API.sales}?${params.toString()}`);
+                const response = await apiClient.get(`${API.sales}?${params.toString()}`);
                 setSales(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 showToast?.('Failed to load sales activity.', 'error');
@@ -209,15 +197,15 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
             }
         };
         fetchSales();
-    }, [dateRange, activeApiClient, showToast]);
+    }, [dateRange, apiClient, showToast]);
 
     const fetchSaleDetail = async (saleId) => {
-        if (!activeApiClient) return;
+        if (!apiClient) return;
         setIsFetchingDetail(true);
         setSelectedSaleDetail(null);
         setIsModalOpen(true);
         try {
-            const response = await activeApiClient.get(`${API.sales}/${saleId}`);
+            const response = await apiClient.get(`${API.sales}/${saleId}`);
             setSelectedSaleDetail(response.data);
         } catch (error) {
             showToast?.('Failed to load bill details.', 'error');
@@ -244,16 +232,10 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
         return currentSales;
     }, [sales, sortOption, searchQuery]);
 
-    const metrics = useMemo(() => ({
-        val: filteredSales.reduce((s, x) => s + (x.totalAmount || 0), 0),
-        count: filteredSales.length,
-        credit: filteredSales.reduce((s, x) => s + (x.amountCredited || 0), 0)
-    }), [filteredSales]);
-
     return (
-        <div className="p-4 md:p-6 h-full flex flex-col bg-gray-950 text-gray-100 transition-colors duration-300">
+        <main className="p-4 md:p-6 h-full flex flex-col bg-gray-950 text-gray-100 transition-colors duration-300">
             {/* Header Section */}
-            <div className="mb-6 no-print">
+            <header className="mb-6 no-print">
                 <div className="flex items-center mb-4">
                     <button onClick={onBack} className="p-2 mr-2 text-indigo-400 hover:bg-gray-900 rounded-lg transition-colors">
                         <ArrowLeft className="w-6 h-6" />
@@ -263,17 +245,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
                 <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 shadow-xl">
                     <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
                 </div>
-            </div>
+            </header>
 
-            {/* {userRole === 'owner' && (
-                <div className="mb-6 grid grid-cols-3 gap-3 no-print">
-                    <MetricCard title="Sales" value={metrics.val} icon={IndianRupee} colorClass="text-indigo-400" valueSuffix="₹" />
-                    <MetricCard title="Bills" value={metrics.count} icon={CheckCircle} colorClass="text-emerald-400" />
-                    <MetricCard title="Credit" value={metrics.credit} icon={AlertTriangle} colorClass="text-red-400" valueSuffix="₹" />
-                </div>
-            )} */}
-
-            {/* Content Table */}
+            {/* Content Table Area */}
             <div className="flex-grow overflow-hidden bg-gray-900 rounded-xl border border-gray-800 shadow-2xl flex flex-col no-print">
                 <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-800 bg-gray-900/50">
                     <h2 className="text-lg font-bold text-white uppercase tracking-wider">
@@ -282,8 +256,12 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
                     <div className="flex items-center space-x-2">
                         {activeControl === 'none' ? (
                             <div className="flex space-x-1">
-                                <button onClick={() => setActiveControl('search')} className="p-2 text-indigo-400 hover:bg-gray-800 rounded-lg"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></button>
-                                <button onClick={() => setActiveControl('sort')} className="p-2 text-indigo-400 hover:bg-gray-800 rounded-lg"><ArrowDownWideNarrow className="w-5 h-5" /></button>
+                                <button onClick={() => setActiveControl('search')} className="p-2 text-indigo-400 hover:bg-gray-800 rounded-lg">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </button>
+                                <button onClick={() => setActiveControl('sort')} className="p-2 text-indigo-400 hover:bg-gray-800 rounded-lg">
+                                    <ArrowDownWideNarrow className="w-5 h-5" />
+                                </button>
                             </div>
                         ) : activeControl === 'search' ? (
                             <div className="relative flex items-center">
@@ -303,7 +281,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
                     </div>
                 </div>
 
-                <div className="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                <div className="flex-grow overflow-y-auto p-4 space-y-3">
                     {isLoadingSales ? (
                         <div className="py-20 text-center text-indigo-400">
                             <div className="animate-spin h-8 w-8 mx-auto border-2 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
@@ -339,7 +317,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, userRole, onBack }
                 </div>
             </div>
             {isModalOpen && <BillModal sale={selectedSaleDetail} onClose={() => setIsModalOpen(false)} isLoading={isFetchingDetail} />}
-        </div>
+        </main>
     );
 };
 

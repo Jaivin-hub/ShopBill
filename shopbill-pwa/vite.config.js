@@ -24,9 +24,9 @@ export default defineConfig({
       },
       // ... (rest of PWA configuration remains the same)
       manifest: {
-        name: 'Pocket POS',
+        name: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software',
         short_name: 'Pocket POS',
-        description: 'Your Progressive Web App for Pocket POS',
+        description: 'Pocket POS - The #1 retail management software for Indian shops. Lightning-fast billing, real-time inventory management, digital Khata ledger, GST billing, and business reports. Works offline, syncs to cloud.',
         theme_color: '#34495e',
         background_color: '#1a1a1a',
         icons: [

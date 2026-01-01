@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Loader } from 'lucide-react'; 
 import InventoryContent from './InventoryContent'; 
 
-// --- Configuration and Constants (Remains the same) ---
+// --- Configuration and Constants ---
 const USER_ROLES = {
   OWNER: 'owner', 
   MANAGER: 'manager',
   CASHIER: 'cashier', 
 };
+
 const initialItemState = {
     name: '',
     price: '',
@@ -16,19 +17,18 @@ const initialItemState = {
     hsn: ''
 };
 
-// CRITICAL: Updated props to remove centralized data and use API client
 const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     const isOwner = userRole === USER_ROLES.OWNER;
     
-    // --- New Data States ---
+    // --- Data States ---
     const [inventory, setInventory] = useState([]);
     const [isLoadingInitial, setIsLoadingInitial] = useState(true); 
     
     // --- UI/Form States ---
     const [isFormModalOpen, setIsFormModalOpen] = useState(false); 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false); // NEW STATE FOR BULK UPLOAD
+    const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false); 
     const [formData, setFormData] = useState(initialItemState); 
@@ -37,8 +37,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     const [sortOption, setSortOption] = useState('default'); 
     const [showStickySearch, setShowStickySearch] = useState(false);
     
-    
-    // --- Data Fetching Logic (Remains the same) ---
+    // --- Data Fetching Logic ---
     const fetchInventory = useCallback(async () => {
         setIsProcessing(true); 
         try {
@@ -60,11 +59,9 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         } else {
              setIsLoadingInitial(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hasAccess, fetchInventory]); 
 
-    
-    // --- Sticky Search Scroll Effect (remains the same) ---
+    // --- Sticky Search Scroll Effect ---
     useEffect(() => {
         if (!isOwner) return;
         const scrollTarget = document.querySelector('.scrollable-content') || window;
@@ -76,14 +73,10 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         };
         
         scrollTarget.addEventListener('scroll', handleScroll);
-
-        return () => {
-            scrollTarget.removeEventListener('scroll', handleScroll);
-        };
+        return () => scrollTarget.removeEventListener('scroll', handleScroll);
     }, [isOwner]);
     
-    
-    // --- Modal & Form Handlers (remain the same, ensure openAddModal is passed) ---
+    // --- Modal & Form Handlers ---
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
         setFormData(prev => ({
@@ -91,11 +84,13 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             [name]: type === 'number' && name !== 'hsn' ? parseFloat(value) : value
         }));
     };
+
     const openAddModal = () => {
         setIsEditing(false);
         setFormData(initialItemState);
         setIsFormModalOpen(true);
-    }
+    };
+
     const handleEditClick = (item) => {
         setIsEditing(true);
         setFormData({ 
@@ -109,55 +104,45 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         });
         setIsFormModalOpen(true);
     };
+
     const closeFormModal = () => {
         setIsFormModalOpen(false);
         setFormData(initialItemState);
         setIsEditing(false);
-    }
+    };
+
     const handleDeleteClick = (itemId, itemName) => {
         setItemToDelete({ id: itemId, name: itemName });
         setIsConfirmModalOpen(true);
-    }
+    };
     
-    // --- NEW: Bulk Upload Handlers (remain the same) ---
     const openBulkUploadModal = () => setIsBulkUploadModalOpen(true);
     const closeBulkUploadModal = () => setIsBulkUploadModalOpen(false);
     
     const handleBulkUpload = async (items) => {
         closeBulkUploadModal();
         setIsProcessing(true);
-        
         try {
-            // New route for bulk upload: API.inventory + '/bulk'
             const response = await apiClient.post(`${API.inventory}/bulk`, items);
-            
             showToast(response.data.message || `${response.data.insertedCount} items uploaded successfully!`, 'success');
-            await fetchInventory(); // Refresh data
-            
+            await fetchInventory();
         } catch (error) {
             console.error('Bulk Upload Error:', error.response?.data || error.message);
-            const errorMessage = error.response?.data?.error || error.message || 'Unknown error during bulk upload.';
-            showToast(`Error uploading items: ${errorMessage}`, 'error');
+            showToast(`Error: ${error.response?.data?.error || 'Bulk upload failed.'}`, 'error');
             setIsProcessing(false); 
         } 
-    }
+    };
     
-    // --- CRUD Handlers (remain the same) ---
     const handleAddItem = async () => { 
         setIsProcessing(true);
         try {
             const dataToSend = { ...formData, _id: undefined, id: undefined }; 
-            
             await apiClient.post(API.inventory, dataToSend);
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-
             showToast(`New item added: ${formData.name}`, 'success');
             await fetchInventory(); 
             closeFormModal();
         } catch (error) {
-            console.error('Add Item Error:', error.response?.data || error.message);
-            const errorMessage = error.response?.data?.error || error.message || 'Unknown error adding item.';
-            showToast(`Error adding item: ${errorMessage}`, 'error');
+            showToast(`Error adding item: ${error.response?.data?.error || error.message}`, 'error');
             setIsProcessing(false); 
         } 
     };
@@ -165,60 +150,44 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     const handleUpdateItem = async () => { 
         setIsProcessing(true);
         const itemId = formData._id || formData.id; 
-
         if (!itemId) {
             setIsProcessing(false);
-            return showToast('Error: Cannot update item without an ID.', 'error');
+            return showToast('Error: Missing item ID.', 'error');
         }
         try {
             const { _id, id, ...dataToSend } = formData; 
-            
             await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-
             showToast(`${formData.name} updated successfully!`, 'success');
             await fetchInventory(); 
             closeFormModal();
         } catch (error) {
-            console.error('Update Item Error:', error.response?.data || error.message);
-            const errorMessage = error.response?.data?.error || error.message || 'Unknown error updating item.';
-            showToast(`Error updating item: ${errorMessage}`, 'error');
+            showToast(`Error updating item: ${error.response?.data?.error || error.message}`, 'error');
             setIsProcessing(false); 
         } 
-    }
+    };
 
     const handleFormSubmit = (e) => {
         e.preventDefault();
-        if (isEditing) {
-            handleUpdateItem();
-        } else {
-            handleAddItem();
-        }
-    }
+        isEditing ? handleUpdateItem() : handleAddItem();
+    };
     
     const confirmDeleteItem = async () => {
         if (!itemToDelete) return;
-
         const { id: itemId, name: itemName } = itemToDelete;
         setIsConfirmModalOpen(false);
         setItemToDelete(null);
         setIsProcessing(true);
         try {
-            
             await apiClient.delete(`${API.inventory}/${itemId}`);
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-
             showToast(`${itemName} deleted successfully.`, 'success');
             await fetchInventory(); 
         } catch (error) {
-            console.error('Delete Item Error:', error.response?.data || error.message);
-            const errorMessage = error.response?.data?.error || error.message || 'Unknown error deleting item.';
-            showToast(`Error deleting item: ${errorMessage}`, 'error');
+            showToast(`Error deleting item: ${error.response?.data?.error || error.message}`, 'error');
             setIsProcessing(false); 
         }
     };
     
-    // --- Sorting and Filtering Logic (Remains the same) ---
+    // --- Sorting and Filtering Logic ---
     const sortedAndFilteredInventory = useMemo(() => {
         return [...inventory]
             .filter(item => 
@@ -231,36 +200,33 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
                     const bIsLow = b.quantity <= b.reorderLevel;
                     if (aIsLow && !bIsLow) return -1;
                     if (!aIsLow && bIsLow) return 1;
-                    if (a.quantity !== b.quantity) {
-                        return a.quantity - b.quantity;
-                    }
+                    if (a.quantity !== b.quantity) return a.quantity - b.quantity;
                 }
                 return a.name.localeCompare(b.name);
             });
     }, [inventory, searchTerm, sortOption]);
     
-    // --- Access Denied / Loading Component (Remains the same) ---
+    // --- Semantic Render Transitions ---
     
     if (!hasAccess) {
         return (
-            <div className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300">
-                <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-                <h2 className="text-xl font-semibold text-gray-200">Access Denied</h2>
-                <p className="text-gray-400">Only the Owner role has permission to manage the full inventory.</p>
-            </div>
+            <main className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300" aria-labelledby="access-denied-title">
+                <AlertTriangle className="w-12 h-12 text-red-500 mb-4" aria-hidden="true" />
+                <h1 id="access-denied-title" className="text-xl font-semibold text-gray-200">Access Denied</h1>
+                <p className="text-gray-400">Only authorized users can manage the full inventory.</p>
+            </main>
         );
     }
 
     if (isLoadingInitial) {
          return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-teal-400" />
-                {/* <p className='mt-3'>Loading Inventory data...</p> */}
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 bg-gray-950" aria-busy="true" aria-live="polite">
+                <Loader className="w-10 h-10 animate-spin text-teal-400" aria-hidden="true" />
+                <span className="sr-only">Loading Inventory data...</span>
             </div>
         );
     }
 
-    // --- RENDER InventoryContent (The Child) ---
     return (
         <InventoryContent
             // Data
@@ -269,7 +235,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             loading={isProcessing} 
             isFormModalOpen={isFormModalOpen}
             isConfirmModalOpen={isConfirmModalOpen}
-            isBulkUploadModalOpen={isBulkUploadModalOpen} // NEW PROP
+            isBulkUploadModalOpen={isBulkUploadModalOpen} 
             formData={formData}
             isEditing={isEditing}
             itemToDelete={itemToDelete}
@@ -279,11 +245,11 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             // Handlers
             setSearchTerm={setSearchTerm}
             setSortOption={setSortOption}
-            setFormData={setFormData} // Required for prefilling scan data
+            setFormData={setFormData}
             openAddModal={openAddModal}
-            openBulkUploadModal={openBulkUploadModal} // NEW PROP
-            closeBulkUploadModal={closeBulkUploadModal} // NEW PROP
-            handleBulkUpload={handleBulkUpload} // NEW PROP
+            openBulkUploadModal={openBulkUploadModal}
+            closeBulkUploadModal={closeBulkUploadModal}
+            handleBulkUpload={handleBulkUpload}
             handleEditClick={handleEditClick}
             handleDeleteClick={handleDeleteClick}
             closeFormModal={closeFormModal}

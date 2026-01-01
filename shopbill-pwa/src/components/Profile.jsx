@@ -47,7 +47,8 @@ function Profile({ apiClient, showToast }) {
         setIsLoading(true);
         try {
             const response = await apiClient.get(API.profile);
-            const data = response.data.user || response.data;
+            // Handling common API response structures
+            const data = response.data.user || response.data.data || response.data;
             setProfile(data);
         } catch (error) {
             console.error("Failed to load profile:", error);
@@ -66,9 +67,10 @@ function Profile({ apiClient, showToast }) {
             showToast('Updating profile...', 'info');
             const response = await apiClient.put(API.profile, profile);
             
-            const updatedData = response.data.user || response.data;
+            const updatedData = response.data.user || response.data.data || response.data;
             setProfile(updatedData);
             
+            // Sync local storage so the sidebar/header updates name immediately
             const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
             localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
 
@@ -95,9 +97,9 @@ function Profile({ apiClient, showToast }) {
     }
 
     return (
-        <div className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-gray-950 transition-colors duration-300 font-sans text-gray-100">
+        <main className="min-h-screen p-4 pb-20 md:p-8 md:pt-4 bg-gray-950 transition-colors duration-300 font-sans text-gray-100">
             
-            <header className="mb-8 pt-4 md:pt-0 max-w-8xl mx-auto">
+            <header className="mb-8 pt-4 md:pt-0 max-w-7xl mx-auto">
                 <div className="flex justify-between items-end border-b border-gray-800 pb-6">
                     <div>
                         <h1 className="text-3xl font-black text-white tracking-tight">My Profile</h1>
@@ -119,16 +121,15 @@ function Profile({ apiClient, showToast }) {
                             }`}
                     >
                         {isEditing ? <Check className="w-5 h-5 mr-1.5" /> : <Edit className="w-5 h-5 mr-1.5" />}
-                        {isEditing ? 'Save' : 'Edit'}
+                        {isEditing ? 'Save' : 'Edit Profile'}
                     </button>
                 </div>
             </header>
             
-            <main className="space-y-6 max-w-8xl mx-auto">
-                
+            <div className="space-y-6 max-w-7xl mx-auto">
                 {/* 1. Personal Account Information */}
                 <section className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 p-5 sm:p-8">
-                    <h2 className="text-lg font-black text-white flex items-center mb-8 uppercase tracking-widest text-xs opacity-70">
+                    <h2 className="text-xs font-black text-white flex items-center mb-8 uppercase tracking-widest opacity-70">
                         <User className="w-4 h-4 mr-2 text-teal-400" /> Account Identity
                     </h2>
 
@@ -156,7 +157,7 @@ function Profile({ apiClient, showToast }) {
 
                 {/* 2. Essential Business Details */}
                 <section className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 p-5 sm:p-8">
-                    <h2 className="text-lg font-black text-white flex items-center mb-8 uppercase tracking-widest text-xs opacity-70">
+                    <h2 className="text-xs font-black text-white flex items-center mb-8 uppercase tracking-widest opacity-70">
                         <Building className="w-4 h-4 mr-2 text-amber-400" /> Essential Business Details
                     </h2>
                     
@@ -210,9 +211,8 @@ function Profile({ apiClient, showToast }) {
                         />
                     </div>
                 </section>
-                
-            </main>
-        </div>
+            </div>
+        </main>
     );
 }
 

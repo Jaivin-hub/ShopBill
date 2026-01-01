@@ -44,15 +44,15 @@ const BarcodeScannerModal = ({ isOpen, onClose, onScan, showToast }) => {
         <Modal
             isOpen={isOpen}
             onRequestClose={onClose}
-            contentLabel="Barcode Scanner"
+            contentLabel="Barcode Scanner - Scan product barcodes using your device camera"
             className="fixed inset-0 bg-gray-900/95 flex items-center justify-center p-4 z-50"
             overlayClassName="fixed inset-0 bg-black/75 z-40"
+            aria-labelledby="barcode-scanner-title"
         >
-            {/* ... (Header remains the same) ... */}
-            <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
-                <div className="flex justify-between items-center border-b pb-3 border-gray-700">
-                    <h2 className="text-xl font-bold text-white flex items-center">
-                        <Camera className="w-6 h-6 mr-2 text-teal-400" /> Mobile Camera Scan
+            <section className="bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-2xl" role="dialog" aria-modal="true">
+                <header className="flex justify-between items-center border-b pb-3 border-gray-700">
+                    <h2 id="barcode-scanner-title" className="text-xl font-bold text-white flex items-center">
+                        <Camera className="w-6 h-6 mr-2 text-teal-400" aria-hidden="true" /> Mobile Camera Scan
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition">
                         <X className="w-6 h-6" />
@@ -74,8 +74,8 @@ const BarcodeScannerModal = ({ isOpen, onClose, onScan, showToast }) => {
                     {/* Note: The Mock Scan Button is no longer needed with real scanning */}
                 </div>
                 
-                <p className='text-sm text-gray-500 mt-4'>Ensure camera access is granted for scanning.</p>
-            </div>
+                <p className='text-sm text-gray-500 mt-4' aria-label="Camera permission notice">Ensure camera access is granted for scanning.</p>
+            </section>
         </Modal>
     );
 };

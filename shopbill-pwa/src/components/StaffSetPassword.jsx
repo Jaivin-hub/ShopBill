@@ -145,8 +145,8 @@ const StaffSetPassword = () => {
     const showFinalMessage = (!token && !loading && status?.type !== 'info') || status?.type === 'success';
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
-            <div className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
+        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
+            <section className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
 
                 {/* Header */}
                 <div className="text-center mb-8">
@@ -223,8 +223,8 @@ const StaffSetPassword = () => {
                         Go to Log In Page
                     </a>
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
     );
 };
 

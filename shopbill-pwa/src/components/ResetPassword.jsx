@@ -146,14 +146,14 @@ const ResetPassword = () => {
     const showFinalMessage = (!token && !loading && status?.type !== 'info') || status?.type === 'success';
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter">
-            <div className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
+        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter" itemScope itemType="https://schema.org/WebPage">
+            <section className="w-full max-w-md bg-gray-800 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/50">
 
                 {/* Header */}
-                <div className="text-center mb-8">
+                <header className="text-center mb-8" itemProp="headline">
                     <h1 className="text-3xl font-extrabold text-white">New Password</h1>
-                    <p className="text-gray-400 mt-2">Set a strong password for your account.</p>
-                </div>
+                    <p className="text-gray-400 mt-2" itemProp="description">Set a strong password for your Pocket POS account. Minimum 8 characters required.</p>
+                </header>
                 
                 {/* Status Message (for API/Token errors) */}
                 {status && status.message && (
@@ -224,8 +224,8 @@ const ResetPassword = () => {
                         Go to Log In Page
                     </a>
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
     );
 };
 

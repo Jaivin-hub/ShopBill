@@ -49,8 +49,8 @@ const Header = ({
                 className="flex items-center cursor-pointer" 
                 onClick={() => setCurrentPage('dashboard')}
             >
-                <h1 className="text-xl font-extrabold text-indigo-400 truncate flex items-center">
-                    <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" />
+                <h1 className="text-xl font-extrabold text-indigo-400 truncate flex items-center" itemProp="name">
+                    <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" aria-hidden="true" />
                     {companyName || 'Pocket POS'}
                 </h1>
             </div>

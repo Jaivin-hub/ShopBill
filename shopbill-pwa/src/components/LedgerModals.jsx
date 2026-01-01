@@ -26,23 +26,23 @@ const formatDate = (dateString) => {
 
 const InputField = ({ label, name, type, value, onChange, error, disabled, ...props }) => (
   <div>
-    <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+    <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
     <input
       {...props}
       id={name} name={name} type={type} value={value} onChange={onChange} disabled={disabled}
-      className={`w-full p-3 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200 ${error ? 'border-2 border-red-500' : 'border border-gray-300 dark:border-gray-600'} ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
+      className={`w-full p-3 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-gray-700 text-gray-200 ${error ? 'border-2 border-red-500' : 'border border-gray-600'} ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
     />
     {error && <p className="mt-1 text-xs text-red-400 flex items-center"><XCircle className="w-3 h-3 mr-1" />{error}</p>}
   </div>
 );
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing }) => (
-  <div className="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-indigo-700/50">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
-        <h2 className="text-lg font-semibold text-indigo-300 flex items-center"><CreditCard className="w-5 h-5 mr-2" /> Record Payment</h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700"><X className="w-5 h-5" /></button>
-      </div>
+  <div className="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+    <section className="bg-gray-800 w-full max-w-sm rounded-xl shadow-2xl border border-indigo-700/50">
+      <header className="p-4 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
+        <h2 id="payment-modal-title" className="text-lg font-semibold text-indigo-300 flex items-center"><CreditCard className="w-5 h-5 mr-2" aria-hidden="true" /> Record Payment</h2>
+        <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700" aria-label="Close payment modal"><X className="w-5 h-5" aria-hidden="true" /></button>
+      </header>
       <div className="p-4 space-y-4">
         <p className="text-lg font-semibold text-white truncate">{customer.name}</p>
         <div className="bg-red-900/30 p-3 rounded-lg flex items-center justify-between border border-red-700/50">
@@ -58,7 +58,7 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
           Confirm Payment
         </button>
       </div>
-    </div>
+    </section>
   </div>
 );
 
@@ -164,14 +164,14 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                         <p className="text-lg font-bold dark:text-white truncate">{customer.name}</p>
                         <span className="text-red-400 text-2xl font-extrabold">₹{customer.outstandingCredit?.toFixed(0)} <span className="text-sm text-gray-400">Due</span></span>
                     </div>
-                    <div className="h-96 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="h-96 overflow-y-auto p-2 bg-gray-900 rounded-lg">
                         {isLoading ? <Loader className="w-6 h-6 animate-spin mx-auto mt-10" /> : history.map(t => {
                             const styles = getTypeStyles(t.type);
                             const isCredit = t.type === 'credit_sale' || t.type === 'initial_due';
                             return (
                                 <div key={t._id} className={`flex items-center p-3 mb-2 rounded-lg border ${styles.color}`}>
                                     <div className="flex-grow">
-                                        <p className="font-medium text-sm dark:text-white">{styles.label}</p>
+                                        <p className="font-medium text-sm text-white">{styles.label}</p>
                                         <p className="text-xs text-gray-500">{formatDate(t.timestamp)}</p>
                                     </div>
                                     <div className={`font-bold text-lg ${isCredit ? 'text-red-400' : 'text-teal-400'}`}>
@@ -182,7 +182,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory }) => {
                         })}
                     </div>
                 </div>
-                <div className="p-4 border-t dark:border-gray-700">
+                <div className="p-4 border-t border-gray-700">
                     <button onClick={onClose} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">Close Ledger</button>
                 </div>
             </div>

@@ -450,8 +450,8 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300">
-                <Loader className="w-10 h-10 animate-spin text-indigo-400" />
+            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300" aria-busy="true" aria-live="polite">
+                <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
                 <p className='mt-3 text-gray-300'>Loading system configuration...</p>
             </div>
         );
@@ -467,34 +467,35 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
     ];
 
     return (
-        <div className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/WebPage">
             {/* Header */}
-            <div className="mb-6">
+            <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
                     <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
-                        <Settings className="w-8 h-8 text-indigo-400" />
+                        <Settings className="w-8 h-8 text-indigo-400" aria-hidden="true" />
                         System Configuration
                     </h1>
                     <button
                         onClick={handleSaveConfig}
                         disabled={isSaving}
                         className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        aria-label="Save all configuration changes"
                     >
                         {isSaving ? (
                             <>
-                                <Loader className="w-4 h-4 animate-spin" />
+                                <Loader className="w-4 h-4 animate-spin" aria-hidden="true" />
                                 Saving...
                             </>
                         ) : (
                             <>
-                                <Save className="w-4 h-4" />
+                                <Save className="w-4 h-4" aria-hidden="true" />
                                 Save All Changes
                             </>
                         )}
                     </button>
                 </div>
-                <p className="text-gray-400">Manage system-wide settings and configurations</p>
-            </div>
+                <p className="text-gray-400" itemProp="description">Manage system-wide settings, subscription plans, feature flags, security, email/SMS, and maintenance mode configurations for the entire Pocket POS platform.</p>
+            </header>
 
             {/* Tabs */}
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -805,7 +806,7 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </main>
     );
 };
 

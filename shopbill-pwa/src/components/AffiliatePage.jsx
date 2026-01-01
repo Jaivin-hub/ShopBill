@@ -32,8 +32,19 @@ const AffiliatePage = ({ onBack, origin }) => {
         }
     ];
 
+    // Structured Data for Affiliate Page
+    const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Affiliate Program - Pocket POS",
+        "description": "Join the Pocket POS affiliate program and earn commissions by referring retail businesses to our platform.",
+        "url": "https://yourdomain.com/affiliate"
+    };
+
     return (
-        <div className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans">
+        <>
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+            <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans" itemScope itemType="https://schema.org/WebPage">
             <style dangerouslySetInnerHTML={{
                 __html: `
         @media print {
@@ -68,8 +79,8 @@ const AffiliatePage = ({ onBack, origin }) => {
                                     <Award className="w-8 h-8 text-yellow-400" />
                                 </div>
                             </div>
-                            <h1 className="text-3xl font-extrabold tracking-tight">Pocket POS Partners</h1>
-                            <p className="mt-2 text-indigo-100 font-medium">Earn while you help other businesses grow.</p>
+                            <h1 className="text-3xl font-extrabold tracking-tight" itemProp="headline">Pocket POS Partners</h1>
+                            <p className="mt-2 text-indigo-100 font-medium" itemProp="description">Earn while you help other businesses grow.</p>
                         </div>
                     </div>
 
@@ -136,7 +147,8 @@ const AffiliatePage = ({ onBack, origin }) => {
                     &copy; {new Date().getFullYear()} Pocket POS &bull; Growing Together
                 </div>
             </div>
-        </div>
+        </article>
+        </>
     );
 };
 

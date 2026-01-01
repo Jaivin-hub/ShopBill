@@ -163,7 +163,7 @@ const CustomerList = ({
             </div>
             
             {/* --- 3. Customer List (Grid Layout) --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4" aria-label="Customer credit ledger list" itemScope itemType="https://schema.org/ItemList">
                 {filteredCustomers.length > 0 ? (
                     filteredCustomers.map(renderCustomerCard)
                 ) : (
@@ -175,7 +175,7 @@ const CustomerList = ({
                         <p className="text-sm mt-2 text-gray-600">Try a different name or phone number.</p>
                     </div>
                 )}
-            </div>
+            </section>
             
             {/* Loader overlay for processing actions */}
             {isProcessing && (

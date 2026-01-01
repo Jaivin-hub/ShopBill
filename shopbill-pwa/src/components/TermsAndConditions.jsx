@@ -16,8 +16,19 @@ const TermsAndConditions = ({ onBack, origin }) => {
         onBack(origin === 'settings' ? 'settings' : 'dashboard');
     };
 
+    // Structured Data for Terms and Conditions
+    const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Terms and Conditions - Pocket POS",
+        "description": "Terms and Conditions for Pocket POS retail management software. Service agreement and legal terms for using Pocket POS.",
+        "url": "https://yourdomain.com/terms"
+    };
+
     return (
-        <div className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans">
+        <>
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+            <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans" itemScope itemType="https://schema.org/WebPage">
             {/* Styles for print and layout */}
             <style dangerouslySetInnerHTML={{
                 __html: `
@@ -55,8 +66,8 @@ const TermsAndConditions = ({ onBack, origin }) => {
                                     <ShieldCheck className="w-8 h-8 text-indigo-300" />
                                 </div>
                             </div>
-                            <h1 className="text-3xl font-extrabold tracking-tight text-white">Terms and Conditions</h1>
-                            <p className="mt-2 text-indigo-100 font-medium">Pocket POS Service Agreement</p>
+                            <h1 className="text-3xl font-extrabold tracking-tight text-white" itemProp="headline">Terms and Conditions</h1>
+                            <p className="mt-2 text-indigo-100 font-medium" itemProp="description">Pocket POS Service Agreement</p>
                             <p className="mt-2 text-indigo-200/60 text-[10px] uppercase tracking-widest font-bold">Effective Date: 29/12/2025</p>
                         </div>
                     </div>
@@ -166,7 +177,8 @@ const TermsAndConditions = ({ onBack, origin }) => {
                     &copy; {new Date().getFullYear()} Pocket POS &bull; Built for Small Businesses
                 </div>
             </div>
-        </div>
+        </article>
+        </>
     );
 };
 

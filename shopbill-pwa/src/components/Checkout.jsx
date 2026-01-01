@@ -333,14 +333,14 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
         );
     }
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans">
-            <div className="w-full max-w-5xl bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
-                <div className="text-center mb-6">
-                    <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
+        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans" itemScope itemType="https://schema.org/CheckoutPage">
+            <section className="w-full max-w-5xl bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-700">
+                <header className="text-center mb-6" itemProp="headline">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
                         Registration
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Start your 30-day free trial in minutes.</p>
-                </div>
+                    </h1>
+                    <p className="text-sm text-gray-400" itemProp="description">Start your 30-day free trial in minutes. Complete your registration and secure checkout for Pocket POS subscription.</p>
+                </header>
                 {paymentError && (
                     <div className="p-3 mb-5 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
                         {paymentError}
@@ -360,7 +360,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     
                                     {/* Shop Name Input */}
                                     <div className="mb-5">
-                                        <label htmlFor="shopName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Shop/Business Name</label>
+                                        <label htmlFor="shopName" className="block text-xs font-medium text-gray-300 mb-1">Shop/Business Name</label>
                                         <div className='relative'>
                                             <Building className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' />
                                             <input
@@ -372,7 +372,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     setShopNameError(null);
                                                 }}
                                                 placeholder="Ex: Sharma General Store"
-                                                className={`w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                                className={`w-full pl-9 pr-3 py-2.5 bg-gray-800 border rounded-lg text-sm text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-600'}`}
                                                 required
                                                 disabled={isProcessing}
                                             />
@@ -382,7 +382,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
 
                                     {/* Email Input */}
                                     <div className="mb-5">
-                                        <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address (for Login)</label>
+                                        <label htmlFor="email" className="block text-xs font-medium text-gray-300 mb-1">Email Address (for Login)</label>
                                         <input
                                             type="email"
                                             id="email"
@@ -392,7 +392,7 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                 setEmailError(null);
                                             }}
                                             placeholder="your@email.com"
-                                            className={`w-full px-3 py-2.5 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                            className={`w-full px-3 py-2.5 bg-gray-800 border rounded-lg text-sm text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${emailError ? 'border-red-500' : 'border-gray-600'}`}
                                             required
                                             disabled={isProcessing}
                                         />
@@ -401,10 +401,10 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                     
                                     {/* Phone Number Input (Complex) */}
                                     <div className="mb-5">
-                                        <label htmlFor="phone" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
+                                        <label htmlFor="phone" className="block text-xs font-medium text-gray-300 mb-1">Phone Number</label>
                                         <div className={`
-                                            w-full flex rounded-lg transition duration-150 bg-white dark:bg-gray-800
-                                            ${phoneError ? 'border border-red-500' : 'border border-gray-300 dark:border-gray-600'}
+                                            w-full flex rounded-lg transition duration-150 bg-gray-800
+                                            ${phoneError ? 'border border-red-500' : 'border border-gray-600'}
                                             focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500
                                         `} ref={dropdownRef}>
                                             {/* Country Code Selector */}
@@ -413,16 +413,16 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     type="button"
                                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                                     className={`
-                                                        bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-3 pl-3 pr-2 border-r border-gray-300 dark:border-gray-600 
+                                                        bg-gray-700 text-gray-200 py-3 pl-3 pr-2 border-r border-gray-600 
                                                         focus:outline-none rounded-l-lg cursor-pointer flex items-center justify-between
                                                         w-auto min-w-[70px] max-w-[100px]
-                                                        text-xs sm:text-sm truncate hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-150
-                                                        ${isDropdownOpen ? 'bg-gray-200 dark:bg-gray-600' : ''}
+                                                        text-xs sm:text-sm truncate hover:bg-gray-600 transition duration-150
+                                                        ${isDropdownOpen ? 'bg-gray-600' : ''}
                                                     `}
                                                     disabled={countryCodes.length === 0 || isProcessing}
                                                 >
                                                     {countryCodes.length === 0 ? (
-                                                        <span className="text-gray-500 dark:text-gray-400">...</span>
+                                                        <span className="text-gray-400">...</span>
                                                     ) : (
                                                         <>
                                                             <span>{selectedCountry?.flag}</span>
@@ -432,12 +432,12 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                     )}
                                                 </button>
                                                 {isDropdownOpen && countryCodes.length > 0 && (
-                                                    <div className="absolute z-10 top-full left-0 mt-1 w-64 sm:w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-indigo-500/50">
-                                                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 z-20">
+                                                    <div className="absolute z-10 top-full left-0 mt-1 w-64 sm:w-72 max-h-80 overflow-y-auto bg-gray-700 rounded-lg shadow-xl border border-indigo-500/50">
+                                                        <div className="p-2 sticky top-0 bg-gray-700 border-b border-gray-600 z-20">
                                                             <input
                                                                 type="text"
                                                                 placeholder="Search country or code..."
-                                                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
+                                                                className="w-full px-3 py-2 bg-gray-800 text-gray-200 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
                                                                 value={searchQuery}
                                                                 onChange={(e) => setSearchQuery(e.target.value)}
                                                                 autoFocus
@@ -451,16 +451,16 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                                                                         key={code}
                                                                         className={`
                                                                             p-2 text-sm rounded-md cursor-pointer flex justify-between items-center
-                                                                            ${code === dialCode ? 'bg-indigo-600 text-white' : 'text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600'}
+                                                                            ${code === dialCode ? 'bg-indigo-600 text-white' : 'text-gray-200 hover:bg-gray-600'}
                                                                         `}
                                                                         onClick={() => handleSelectCountry(code)}
                                                                     >
                                                                         <span className="font-medium truncate">{flag} {name}</span>
-                                                                        <span className={`${code === dialCode ? 'font-bold' : 'text-gray-600 dark:text-gray-400'}`}>{code}</span>
+                                                                        <span className={`${code === dialCode ? 'font-bold' : 'text-gray-400'}`}>{code}</span>
                                                                     </li>
                                                                 ))
                                                             ) : (
-                                                                <li className="p-2 text-sm text-gray-600 dark:text-gray-400 text-center">No countries found.</li>
+                                                                <li className="p-2 text-sm text-gray-400 text-center">No countries found.</li>
                                                             )}
                                                         </ul>
                                                     </div>
@@ -600,8 +600,8 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
                         </div>
                     </div>
                 </form>
-            </div>
-        </div>
+            </section>
+        </main>
     );
 };
 export default Checkout;
