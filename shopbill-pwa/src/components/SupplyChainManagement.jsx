@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Truck, Plus, History, Users, PackageCheck, IndianRupee, 
-  ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail
+  Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
+  ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
+  Calculator, Calendar
 } from 'lucide-react';
+import ScannerModal from './ScannerModal'; 
+
+const DATE_FILTERS = [
+    { id: '24h', label: '24 Hrs', days: 1 },
+    { id: '7d', label: '7 Days', days: 7 },
+    { id: '30d', label: '30 Days', days: 30 },
+    { id: 'all', label: 'All Time', days: Infinity },
+    { id: 'custom', label: 'Custom Range', days: 0 },
+];
 
 const SupplyChainManagement = ({ apiClient, API, showToast }) => {
   // --- States ---
@@ -12,11 +22,18 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [inventory, setInventory] = useState([]);
   
+  // Date Filtering States
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
   // Selection States
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isSupplierPickerOpen, setIsSupplierPickerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   
   // Form Data
   const [purchaseForm, setPurchaseForm] = useState({
@@ -29,7 +46,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
   });
 
   const [supplierForm, setSupplierForm] = useState({
-    name: '', contactPerson: '', phone: '', email: '', gstin: ''
+    name: '', phone: '', email: '', gstin: ''
+  });
+
+  const [productForm, setProductForm] = useState({
+    name: '', price: '', quantity: 0, reorderLevel: 5, hsn: ''
   });
 
   const fetchSCMData = useCallback(async () => {
@@ -52,13 +73,47 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
 
   useEffect(() => { fetchSCMData(); }, [fetchSCMData]);
 
+  // --- Filter Logic ---
+  const filteredHistory = useMemo(() => {
+    return purchaseHistory.filter(item => {
+      const itemDate = new Date(item.date);
+      const now = new Date();
+
+      if (selectedFilter === 'custom') {
+        if (!customStartDate || !customEndDate) return true;
+        const start = new Date(customStartDate);
+        const end = new Date(customEndDate);
+        end.setHours(23, 59, 59, 999);
+        return itemDate >= start && itemDate <= end;
+      }
+
+      const filter = DATE_FILTERS.find(f => f.id === selectedFilter);
+      if (!filter || filter.id === 'all') return true;
+
+      const diffInDays = (now - itemDate) / (1000 * 60 * 60 * 24);
+      return diffInDays <= filter.days;
+    });
+  }, [purchaseHistory, selectedFilter, customStartDate, customEndDate]);
+
+  // --- Calculations ---
+  const historyTotals = useMemo(() => {
+    return filteredHistory.reduce((acc, curr) => {
+      const qty = Number(curr.quantity) || 0;
+      const price = Number(curr.purchasePrice) || 0;
+      return {
+        totalQty: acc.totalQty + qty,
+        totalValue: acc.totalValue + (qty * price)
+      };
+    }, { totalQty: 0, totalValue: 0 });
+  }, [filteredHistory]);
+
+  // --- Handlers ---
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
     if (!purchaseForm.productId || !purchaseForm.supplierId) return showToast("Select product & supplier", "info");
     
     setIsLoading(true);
     try {
-      // Logic: One API call handles both record creation and stock increment on backend
       await apiClient.post(API.scmPurchases, {
         ...purchaseForm,
         quantity: Number(purchaseForm.quantity),
@@ -78,16 +133,49 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
 
   const handleAddSupplier = async (e) => {
     e.preventDefault();
+    if (supplierForm.name.length < 2) return showToast("Enter a valid supplier name", "info");
+    
     setIsLoading(true);
     try {
       await apiClient.post(API.scmSuppliers, supplierForm);
       showToast("Supplier added successfully", "success");
-      setSupplierForm({ name: '', contactPerson: '', phone: '', email: '', gstin: '' });
+      setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
       setIsSupplierModalOpen(false);
       fetchSCMData();
     } catch (error) {
       showToast("Failed to add supplier", "error");
     } finally { setIsLoading(false); }
+  };
+
+  const handleQuickAddProduct = async (e) => {
+    e.preventDefault();
+    if (!productForm.name) return showToast("Product name is required", "info");
+    setIsLoading(true);
+    try {
+      const res = await apiClient.post(API.inventory, productForm);
+      showToast("New product registered", "success");
+      setPurchaseForm(prev => ({ ...prev, productId: res.data._id || res.data.id }));
+      setProductForm({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
+      setIsProductModalOpen(false);
+      fetchSCMData();
+    } catch (error) {
+      showToast("Failed to add product", "error");
+    } finally { setIsLoading(false); }
+  };
+
+  const handleScanSuccess = (scannedItem) => {
+    const code = (scannedItem.hsn || scannedItem.barcode || "").toLowerCase().trim();
+    const existing = inventory.find(p => p.hsn && p.hsn.toLowerCase().trim() === code);
+    
+    setIsScannerModalOpen(false);
+    if (existing) {
+      setPurchaseForm(prev => ({ ...prev, productId: existing._id || existing.id }));
+      showToast(`Selected: ${existing.name}`, "success");
+    } else {
+      setProductForm(prev => ({ ...prev, hsn: code }));
+      setIsProductModalOpen(true);
+      showToast("Item not found. Register as new product?", "info");
+    }
   };
 
   const filteredProducts = useMemo(() => 
@@ -105,19 +193,25 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
 
   return (
     <div className="p-4 md:p-8 bg-gray-950 min-h-full text-gray-200">
-      <header className="mb-6">
-        <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight">
-          <Truck className="text-indigo-500 w-7 h-7" /> SUPPLY CHAIN
+      <header className="mb-6 flex justify-between items-center">
+        <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight uppercase">
+          <Truck className="text-indigo-500 w-7 h-7" /> Supply Chain
         </h1>
+        <button 
+          onClick={() => setIsScannerModalOpen(true)}
+          className="bg-indigo-600/20 text-indigo-400 px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center gap-2 text-xs font-bold active:scale-95 transition-all"
+        >
+          <ScanLine className="w-4 h-4" /> SCAN PRODUCT
+        </button>
       </header>
 
-      {/* Tabs */}
+      {/* Main Tabs */}
       <div className="flex bg-gray-900/50 p-1 rounded-2xl mb-8 border border-gray-800">
         {['purchase', 'history', 'suppliers'].map((id) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+            className={`flex-1 py-3 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all ${
               activeTab === id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -128,48 +222,42 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
 
       {activeTab === 'purchase' && (
         <form onSubmit={handlePurchaseSubmit} className="space-y-4 max-w-2xl mx-auto pb-20">
-          
-          {/* Custom Product Picker */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Select Product</label>
-            <button
-              type="button"
-              onClick={() => { setIsProductPickerOpen(true); setSearchTerm(''); }}
-              className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between group active:scale-[0.98] transition-all"
-            >
-              <div className="flex flex-col items-start">
-                <span className={selectedProduct ? 'text-white font-semibold' : 'text-gray-500'}>
-                  {selectedProduct ? selectedProduct.name : 'Choose a product...'}
-                </span>
-                {selectedProduct && (
-                  <span className="text-[10px] text-indigo-400 font-bold uppercase">
-                    Current Stock: {selectedProduct.quantity}
+            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Product Name</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsProductPickerOpen(true); setSearchTerm(''); }}
+                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all"
+              >
+                <div className="flex flex-col items-start truncate mr-2">
+                  <span className={selectedProduct ? 'text-white font-semibold' : 'text-gray-500'}>
+                    {selectedProduct ? selectedProduct.name : 'Choose a product...'}
                   </span>
-                )}
-              </div>
-              <ChevronDown className="w-5 h-5 text-gray-500 group-hover:text-indigo-400" />
-            </button>
+                  {selectedProduct && <span className={`text-[10px] font-bold uppercase ${selectedProduct.quantity <= (selectedProduct.reorderLevel || 5) ? 'text-red-500' : 'text-indigo-400'}`}>Available: {selectedProduct.quantity}</span>}
+                </div>
+                <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+              </button>
+              <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-emerald-600/10 text-emerald-400 p-4 rounded-2xl border border-emerald-500/20 active:scale-90 transition-all">
+                <Plus className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
-          {/* Custom Supplier Picker */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Select Supplier</label>
+            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Supplier / Vendor</label>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => { setIsSupplierPickerOpen(true); setSearchTerm(''); }}
-                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.98] transition-all"
+                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all truncate"
               >
-                <span className={selectedSupplier ? 'text-white font-semibold' : 'text-gray-500'}>
+                <span className={selectedSupplier ? 'text-white font-semibold' : 'text-gray-500 truncate'}>
                   {selectedSupplier ? selectedSupplier.name : 'Choose a supplier...'}
                 </span>
-                <ChevronDown className="w-5 h-5 text-gray-500" />
+                <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
               </button>
-              <button 
-                type="button" 
-                onClick={() => setIsSupplierModalOpen(true)}
-                className="bg-indigo-600/10 text-indigo-400 p-4 rounded-2xl border border-indigo-500/20 active:scale-90 transition-all"
-              >
+              <button type="button" onClick={() => setIsSupplierModalOpen(true)} className="bg-indigo-600/10 text-indigo-400 p-4 rounded-2xl border border-indigo-500/20 active:scale-90 transition-all">
                 <Plus className="w-6 h-6" />
               </button>
             </div>
@@ -177,187 +265,251 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Quantity to Add</label>
-              <input 
-                type="number" required
-                value={purchaseForm.quantity}
-                onChange={(e) => setPurchaseForm({...purchaseForm, quantity: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none focus:border-indigo-500"
-                placeholder="0"
-              />
+              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Quantity Received</label>
+              <input type="number" required min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({...purchaseForm, quantity: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none focus:border-indigo-500" placeholder="0" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Unit Cost (Buying Price)</label>
+              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Unit Purchase Cost</label>
               <div className="relative">
                 <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-                <input 
-                  type="number" required step="0.01"
-                  value={purchaseForm.purchasePrice}
-                  onChange={(e) => setPurchaseForm({...purchaseForm, purchasePrice: e.target.value})}
-                  className="w-full bg-gray-900 border border-gray-800 p-4 pl-10 rounded-2xl outline-none focus:border-indigo-500"
-                  placeholder="0.00"
-                />
+                <input type="number" required step="0.01" min="0" value={purchaseForm.purchasePrice} onChange={(e) => setPurchaseForm({...purchaseForm, purchasePrice: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 pl-10 rounded-2xl outline-none focus:border-indigo-500" placeholder="0.00" />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Invoice Number</label>
-              <input 
-                type="text"
-                value={purchaseForm.invoiceNumber}
-                onChange={(e) => setPurchaseForm({...purchaseForm, invoiceNumber: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none"
-                placeholder="Bill #"
-              />
+              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Invoice / Bill Number</label>
+              <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({...purchaseForm, invoiceNumber: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none" placeholder="Optional" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Date</label>
-              <input 
-                type="date"
-                value={purchaseForm.date}
-                onChange={(e) => setPurchaseForm({...purchaseForm, date: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none text-xs"
-              />
+              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Entry Date</label>
+              <input type="date" value={purchaseForm.date} onChange={(e) => setPurchaseForm({...purchaseForm, date: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none text-sm text-white" />
             </div>
           </div>
 
-          <button 
-            disabled={isLoading}
-            className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isLoading ? <Loader className="animate-spin" /> : <>RECORD STOCK ENTRY <ArrowRight className="w-5 h-5" /></>}
+          <button disabled={isLoading} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+            {isLoading ? <Loader className="animate-spin" /> : <>UPDATE STOCK <ArrowRight className="w-5 h-5" /></>}
           </button>
         </form>
       )}
 
-      {/* Drawer Modals */}
-      {(isProductPickerOpen || isSupplierPickerOpen) && (
+      {/* History Tab with Filters and Detailed Table */}
+      {activeTab === 'history' && (
+        <div className="max-w-5xl mx-auto space-y-6 pb-20">
+            
+            {/* Filter Navigation */}
+            <nav aria-label="Report date filters" className="space-y-4">
+                <div className="overflow-x-auto no-scrollbar py-1">
+                    <div className="inline-flex space-x-2 p-1 bg-gray-900 rounded-xl border border-gray-800" role="group">
+                        {DATE_FILTERS.map(filter => (
+                            <button
+                                key={filter.id}
+                                onClick={() => setSelectedFilter(filter.id)}
+                                aria-pressed={selectedFilter === filter.id}
+                                className={`px-4 py-2 text-xs md:text-sm font-bold rounded-lg transition-all ${selectedFilter === filter.id
+                                    ? 'bg-indigo-600 text-white shadow-lg'
+                                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                                    }`}
+                                disabled={isLoading}
+                            >
+                                {filter.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {selectedFilter === 'custom' && (
+                    <div className="flex gap-3 p-3 bg-gray-900 rounded-xl border border-gray-800 animate-in fade-in zoom-in duration-200">
+                        <div className="flex-1">
+                            <label htmlFor="start-date" className="sr-only">Start Date</label>
+                            <input
+                                id="start-date"
+                                type="date"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                className="w-full p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                disabled={isLoading}
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label htmlFor="end-date" className="sr-only">End Date</label>
+                            <input
+                                id="end-date"
+                                type="date"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                                className="w-full p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                disabled={isLoading}
+                            />
+                        </div>
+                    </div>
+                )}
+            </nav>
+
+            {filteredHistory.length === 0 ? (
+                <div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-dashed border-gray-800">
+                   <History className="w-12 h-12 text-gray-800 mx-auto mb-4" />
+                   <p className="text-gray-500 font-medium">No records found for this period</p>
+                </div>
+            ) : (
+                <>
+                    {/* Totals Banner */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Quantity</p>
+                        <p className="text-2xl font-black text-white">{historyTotals.totalQty}</p>
+                        </div>
+                        <div className="bg-indigo-600 border border-indigo-500 p-6 rounded-3xl shadow-lg shadow-indigo-600/20">
+                        <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Total Investment</p>
+                        <p className="text-2xl font-black text-white flex items-center gap-1">
+                            <IndianRupee className="w-5 h-5" /> {historyTotals.totalValue.toLocaleString()}
+                        </p>
+                        </div>
+                    </div>
+
+                    {/* Enhanced Table with Spent Column */}
+                    <div className="overflow-x-auto rounded-3xl border border-gray-800 bg-gray-900/20">
+                        <table className="w-full text-left min-w-[650px]">
+                        <thead className="bg-gray-900 text-[10px] uppercase tracking-widest text-gray-500 font-black border-b border-gray-800">
+                            <tr>
+                            <th className="p-4">Date / Inv</th>
+                            <th className="p-4">Item</th>
+                            <th className="p-4">Supplier</th>
+                            <th className="p-4 text-center">Unit Cost</th>
+                            <th className="p-4 text-center">Qty</th>
+                            <th className="p-4 text-right">Total Spent</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800">
+                            {filteredHistory.map(record => {
+                                const totalRowSpent = (record.quantity || 0) * (record.purchasePrice || 0);
+                                return (
+                                    <tr key={record._id} className="hover:bg-gray-900/50 transition-colors">
+                                        <td className="p-4">
+                                            <p className="text-xs font-bold text-white">{new Date(record.date).toLocaleDateString()}</p>
+                                            <p className="text-[10px] text-gray-500 font-mono uppercase">{record.invoiceNumber || 'No Invoice'}</p>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-xs font-semibold text-white">{record.productId?.name || '---'}</p>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{record.supplierId?.name || 'Vendor'}</p>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <p className="text-[10px] text-gray-400 font-mono">₹{record.purchasePrice}</p>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <p className="text-xs font-black text-indigo-400">+{record.quantity}</p>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <p className="text-xs font-black text-emerald-400">₹{totalRowSpent.toLocaleString()}</p>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
+        </div>
+      )}
+
+      {/* Product List Drawer */}
+      {isProductPickerOpen && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} />
-          
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsProductPickerOpen(false)} />
           <div className="relative w-full max-w-lg bg-gray-900 rounded-t-[2.5rem] sm:rounded-3xl border-t border-gray-800 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6 pb-2">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-black uppercase tracking-tighter">
-                  {isProductPickerOpen ? 'Choose Product' : 'Choose Supplier'}
-                </h3>
-                <button onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} className="p-2 bg-gray-800 rounded-full text-gray-400">
-                  <X className="w-5 h-5" />
-                </button>
+                <h3 className="text-xl font-black uppercase tracking-tighter">Select Product</h3>
+                <button onClick={() => setIsProductPickerOpen(false)} className="p-2 bg-gray-800 rounded-full text-gray-400"><X className="w-5 h-5" /></button>
               </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input 
-                  autoFocus
-                  placeholder="Quick search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-gray-800 border-none p-4 pl-12 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                <input placeholder="Search item..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 border-none p-4 pl-12 rounded-2xl outline-none focus:ring-1 focus:ring-indigo-500" />
               </div>
             </div>
-
             <div className="flex-1 overflow-y-auto p-4 pt-2">
-              {isProductPickerOpen ? (
-                filteredProducts.map(item => (
-                  <button
-                    key={item._id}
-                    onClick={() => { setPurchaseForm({...purchaseForm, productId: item._id}); setIsProductPickerOpen(false); }}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-800 rounded-2xl transition-all border-b border-gray-800/30 last:border-none"
-                  >
+              {filteredProducts.map(item => {
+                const isLowStock = item.quantity <= (item.reorderLevel || 5);
+                return (
+                  <button key={item._id} onClick={() => { setPurchaseForm({...purchaseForm, productId: item._id}); setIsProductPickerOpen(false); }} className={`w-full flex items-center justify-between p-4 hover:bg-gray-800 rounded-2xl transition-all border-b border-gray-800/30 last:border-none ${isLowStock ? 'bg-red-500/5' : ''}`}>
                     <div className="text-left">
-                      <p className="font-bold text-white">{item.name}</p>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        In Stock: <span className={item.quantity <= (item.reorderLevel || 5) ? 'text-red-400' : 'text-indigo-400'}>{item.quantity} {item.unit || 'units'}</span>
-                      </p>
+                      <p className={`font-bold ${isLowStock ? 'text-red-400' : 'text-white'}`}>{item.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded ${isLowStock ? 'bg-red-500/20 text-red-500' : 'bg-indigo-500/10 text-indigo-400'}`}>Stock: {item.quantity}</p>
+                        {isLowStock && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                      </div>
                     </div>
                     {purchaseForm.productId === item._id && <Check className="w-5 h-5 text-indigo-500" />}
                   </button>
-                ))
-              ) : (
-                filteredSuppliers.map(s => (
-                  <button
-                    key={s._id}
-                    onClick={() => { setPurchaseForm({...purchaseForm, supplierId: s._id}); setIsSupplierPickerOpen(false); }}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-800 rounded-2xl transition-all border-b border-gray-800/30 last:border-none"
-                  >
-                    <div className="text-left">
-                      <p className="font-bold text-white">{s.name}</p>
-                      <p className="text-xs text-gray-500">{s.phone || 'No phone recorded'}</p>
-                    </div>
-                    {purchaseForm.supplierId === s._id && <Check className="w-5 h-5 text-indigo-500" />}
-                  </button>
-                ))
-              )}
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* Purchase History Tab */}
-      {activeTab === 'history' && (
-        <div className="max-w-4xl mx-auto space-y-4">
-          {purchaseHistory.length === 0 ? (
-            <div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-dashed border-gray-800">
-               <History className="w-12 h-12 text-gray-800 mx-auto mb-4" />
-               <p className="text-gray-500 font-medium">No purchase records found</p>
+      {/* Supplier List Drawer */}
+      {isSupplierPickerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsSupplierPickerOpen(false)} />
+          <div className="relative w-full max-w-lg bg-gray-900 rounded-t-[2.5rem] sm:rounded-3xl border-t border-gray-800 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="p-6 pb-2">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-black uppercase tracking-tighter">Select Supplier</h3>
+                <button onClick={() => setIsSupplierPickerOpen(false)} className="p-2 bg-gray-800 rounded-full text-gray-400"><X className="w-5 h-5" /></button>
+              </div>
+              <input placeholder="Search vendor..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
             </div>
-          ) : (
-            <div className="overflow-x-auto rounded-3xl border border-gray-800">
-              <table className="w-full text-left">
-                <thead className="bg-gray-900 text-[10px] uppercase tracking-widest text-gray-500 font-black border-b border-gray-800">
-                  <tr>
-                    <th className="p-4">Date/Invoice</th>
-                    <th className="p-4">Product</th>
-                    <th className="p-4">Supplier</th>
-                    <th className="p-4 text-right">Qty</th>
-                    <th className="p-4 text-right">Cost</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {purchaseHistory.map(record => (
-                    <tr key={record._id} className="hover:bg-gray-900/50 transition-colors">
-                      <td className="p-4">
-                        <p className="text-xs font-bold">{new Date(record.date).toLocaleDateString()}</p>
-                        <p className="text-[10px] text-gray-500 font-mono">{record.invoiceNumber || 'NO INV'}</p>
-                      </td>
-                      <td className="p-4 text-sm font-semibold">{record.productId?.name || 'Deleted Product'}</td>
-                      <td className="p-4 text-xs text-gray-400">{record.supplierId?.name || 'Direct'}</td>
-                      <td className="p-4 text-right font-bold text-indigo-400">+{record.quantity}</td>
-                      <td className="p-4 text-right text-xs font-mono">₹{(record.purchasePrice * record.quantity).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex-1 overflow-y-auto p-4">
+              {filteredSuppliers.map(s => (
+                <button key={s._id} onClick={() => { setPurchaseForm({...purchaseForm, supplierId: s._id}); setIsSupplierPickerOpen(false); }} className="w-full flex items-center justify-between p-4 hover:bg-gray-800 rounded-2xl transition-all border-b border-gray-800/30 last:border-none">
+                  <div className="text-left">
+                    <p className="font-bold text-white">{s.name}</p>
+                    <p className="text-xs text-gray-500 font-mono">{s.phone || 'No phone'}</p>
+                  </div>
+                  {purchaseForm.supplierId === s._id && <Check className="w-5 h-5 text-indigo-500" />}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Supplier List Tab */}
-      {activeTab === 'suppliers' && (
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button 
-            onClick={() => setIsSupplierModalOpen(true)}
-            className="h-40 border-2 border-dashed border-gray-800 rounded-3xl flex flex-col items-center justify-center gap-3 text-gray-500 hover:border-indigo-500 hover:text-indigo-400 transition-all active:scale-95 bg-gray-900/20"
-          >
-            <Plus className="w-8 h-8" />
-            <span className="font-bold uppercase tracking-widest text-[10px]">New Supplier</span>
-          </button>
-          
-          {suppliers.map(s => (
-            <div key={s._id} className="p-6 bg-gray-900 border border-gray-800 rounded-3xl hover:border-gray-700 transition-all group">
-              <h4 className="text-lg font-black text-white group-hover:text-indigo-400 transition-colors">{s.name}</h4>
-              <p className="text-xs text-gray-500 font-medium mb-4">{s.contactPerson || 'Vendor'}</p>
-              <div className="space-y-2 border-t border-gray-800 pt-4">
-                {s.phone && <p className="text-xs text-gray-400 flex items-center gap-2 font-mono"><Phone className="w-3 h-3"/> {s.phone}</p>}
-                {s.email && <p className="text-xs text-gray-400 flex items-center gap-2 font-mono"><Mail className="w-3 h-3"/> {s.email}</p>}
-                {s.gstin && <p className="text-[10px] text-indigo-500 font-bold bg-indigo-500/10 w-fit px-2 py-1 rounded">GST: {s.gstin}</p>}
-              </div>
-            </div>
-          ))}
+      {/* Quick Add Product Modal */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
+          <form onSubmit={handleQuickAddProduct} className="relative w-full max-w-md bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-2xl">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black tracking-tighter uppercase">Quick Register</h3>
+                <X className="w-6 h-6 text-gray-500 cursor-pointer" onClick={() => setIsProductModalOpen(false)} />
+             </div>
+             <div className="space-y-4">
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Product Name *</label>
+                 <input required placeholder="Enter item name" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-emerald-500" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Selling Price (₹) *</label>
+                 <input type="number" required placeholder="Set retail price" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">HSN / Barcode</label>
+                 <input placeholder="Enter or scan code" value={productForm.hsn} onChange={e => setProductForm({...productForm, hsn: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Reorder Alert Level</label>
+                 <input type="number" placeholder="Default: 5" value={productForm.reorderLevel} onChange={e => setProductForm({...productForm, reorderLevel: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+               </div>
+             </div>
+             <button disabled={isLoading} className="w-full mt-6 bg-emerald-600 p-5 rounded-2xl font-black uppercase tracking-widest text-white shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">
+               {isLoading ? <Loader className="animate-spin mx-auto" /> : 'Register & Select Item'}
+             </button>
+          </form>
         </div>
       )}
 
@@ -365,23 +517,57 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
       {isSupplierModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setIsSupplierModalOpen(false)} />
-          <form onSubmit={handleAddSupplier} className="relative w-full max-w-md bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-2xl animate-in zoom-in duration-200">
+          <form onSubmit={handleAddSupplier} className="relative w-full max-w-md bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-2xl">
              <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-black tracking-tighter uppercase">New Vendor</h3>
                 <X className="w-6 h-6 text-gray-500 cursor-pointer" onClick={() => setIsSupplierModalOpen(false)} />
              </div>
-             <div className="space-y-3">
-               <input placeholder="Supplier/Firm Name" required value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
-               <input placeholder="Contact Person" value={supplierForm.contactPerson} onChange={e => setSupplierForm({...supplierForm, contactPerson: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
-               <input placeholder="Phone" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
-               <input placeholder="GSTIN (Optional)" value={supplierForm.gstin} onChange={e => setSupplierForm({...supplierForm, gstin: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+             <div className="space-y-4">
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Supplier Name *</label>
+                 <input required placeholder="Business / Shop Name" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Contact Phone *</label>
+                 <input required type="tel" placeholder="10-digit mobile" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">GSTIN Number</label>
+                 <input placeholder="Enter GST if available" value={supplierForm.gstin} onChange={e => setSupplierForm({...supplierForm, gstin: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+               </div>
              </div>
              <button disabled={isLoading} className="w-full mt-6 bg-indigo-600 p-5 rounded-2xl font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
-               {isLoading ? <Loader className="animate-spin mx-auto" /> : 'Save Supplier'}
+               {isLoading ? <Loader className="animate-spin mx-auto" /> : 'Create Vendor Profile'}
              </button>
           </form>
         </div>
       )}
+
+      {/* Suppliers Grid */}
+      {activeTab === 'suppliers' && (
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+          <button onClick={() => setIsSupplierModalOpen(true)} className="h-40 border-2 border-dashed border-gray-800 rounded-3xl flex flex-col items-center justify-center gap-3 text-gray-500 hover:border-indigo-500 hover:text-indigo-400 transition-all bg-gray-900/10">
+            <Plus className="w-8 h-8" />
+            <span className="font-bold uppercase tracking-widest text-[10px]">Add Vendor</span>
+          </button>
+          {suppliers.map(s => (
+            <div key={s._id} className="p-6 bg-gray-900 border border-gray-800 rounded-3xl group">
+              <h4 className="text-lg font-black text-white truncate">{s.name}</h4>
+              <div className="mt-4 pt-4 border-t border-gray-800 space-y-2">
+                {s.phone && <p className="text-xs text-gray-400 flex items-center gap-2"><Phone className="w-3 h-3"/> {s.phone}</p>}
+                {s.gstin && <p className="text-[10px] text-indigo-500 font-bold bg-indigo-500/10 w-fit px-2 py-1 rounded">GST: {s.gstin}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ScannerModal 
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        onScanSuccess={handleScanSuccess}
+        inventory={inventory}
+      />
     </div>
   );
 };
