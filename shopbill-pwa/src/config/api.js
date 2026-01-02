@@ -15,15 +15,11 @@ const API = {
     currentPlan: API_BASE_URL + '/auth/current-plan',
     profile: API_BASE_URL + '/auth/profile',
 
-
-
-
     // Staff Management Endpoints
     staff: API_BASE_URL + '/staff', // GET, POST
     staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT (for active status)
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
-
 
     // Existing Business Endpoints
     inventory: API_BASE_URL + '/inventory',
@@ -34,7 +30,10 @@ const API = {
     notificationalert: API_BASE_URL + '/notifications/alerts',
     notificationreadall: API_BASE_URL + '/notifications/read-all',
 
-
+    // 🚛 NEW: SUPPLY CHAIN MANAGEMENT (SCM) ENDPOINTS 🚛
+    scmSuppliers: API_BASE_URL + '/scm/suppliers',    // GET (All Suppliers), POST (Add Supplier)
+    scmPurchases: API_BASE_URL + '/scm/purchases',    // GET (Purchase History), POST (Record Purchase & Update Stock)
+    // ------------------------------------------
 
     // 💥 NEW: SUPERADMIN MANAGEMENT ENDPOINTS 💥
     superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)
@@ -60,4 +59,4 @@ const API = {
     // ------------------------------------------
 }
 
-export default API
+export default API;

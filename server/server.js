@@ -20,6 +20,7 @@ const superadminRoutes = require('./routes/superadminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes'); 
 const webhookRouter = require('./routes/webhookRouter');
+const scmRoutes = require('./routes/scmRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +60,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRouter);
+app.use('/api/scm', scmRoutes);
 
 // --- SOCKET.IO LOGIC ---
 
