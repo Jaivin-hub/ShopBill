@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Package, Plus, AlertTriangle, Edit, Trash2, X, Search, ListOrdered, Loader, ScanLine, Upload } from 'lucide-react'; 
 import ScannerModal from './ScannerModal'; 
-
 const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
     const [csvData, setCsvData] = useState('');
     const [file, setFile] = useState(null);
     const [error, setError] = useState(null);
     const requiredHeaders = ["name", "price", "quantity"];
     const allExpectedHeaders = ["name", "price", "quantity", "reorderLevel", "hsn"];
-    
     useEffect(() => {
         if (!isOpen) {
             setCsvData('');
@@ -16,7 +14,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             setError(null);
         }
     }, [isOpen]);
-
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile && selectedFile.name.endsWith('.csv')) {
@@ -33,7 +30,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             setError('Please select a valid CSV file.');
         }
     };
-
     const parseCSV = (text) => {
         const lines = text.trim().split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) {
@@ -46,7 +42,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             setError(`Missing required CSV columns: ${missingHeaders.join(', ')}. Please ensure the first row contains: ${requiredHeaders.join(', ')}`);
             return null;
         }
-
         const result = [];
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',');
@@ -77,7 +72,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
         }
         return result;
     };
-
     const handleSubmit = (e) => {
         e.preventDefault();
         setError(null);
@@ -89,7 +83,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
             onSubmit(items);
         }
     };
-
     if (!isOpen) return null;
     return (
         <section className="fixed inset-0 bg-gray-900/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity" role="dialog" aria-modal="true" aria-labelledby="bulk-upload-title">
@@ -146,7 +139,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading }) => {
         </section>
     );
 }
-
 const InputField = ({ label, name, type, value, onChange, ...props }) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -163,7 +155,6 @@ const InputField = ({ label, name, type, value, onChange, ...props }) => (
         />
     </div>
 );
-
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }) => {
     const itemId = item._id || item.id;
     const isLowStock = item.quantity <= item.reorderLevel;
@@ -219,14 +210,12 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading }
         </article>
     );
 };
-
 const InventoryContent = ({
     inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, showStickySearch, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, 
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const openScannerModal = () => setIsScannerModalOpen(true);
     const closeScannerModal = () => setIsScannerModalOpen(false);
-    
     const handleScannedItemSuccess = (scannedItem) => {
         const uniqueCode = scannedItem.hsn || scannedItem.barcode; 
         if (!uniqueCode) {
@@ -244,7 +233,6 @@ const InventoryContent = ({
              handleScannedItemNotFound(uniqueCode, scannedItem); 
         }
     };
-
     const handleScannedItemNotFound = (uniqueCode, prefillData = {}) => {
         closeScannerModal();
         openAddModal(); 
@@ -257,12 +245,9 @@ const InventoryContent = ({
             reorderLevel: prefillData.reorderLevel || prev.reorderLevel || 5, 
         }));
     };
-
     const handleScannedItemError = () => {};
-
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const sortDropdownRef = useRef(null);
-    
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
@@ -272,25 +257,21 @@ const InventoryContent = ({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
     const handleSortSelect = (optionValue) => {
         setSortOption(optionValue);
         setIsSortDropdownOpen(false);
     };
-
     const sortOptions = [
         { value: 'default', label: 'Sort: Name (A-Z)' },
         { value: 'low-stock', label: 'Sort: Low Stock / Out of Stock' },
     ];
     const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
-
     return (
         <main className="p-4 md:p-8 h-full overflow-y-auto bg-gray-950 transition-colors duration-300" itemScope itemType="https://schema.org/ItemList">
             <header itemProp="headline">
                 <h1 className="text-3xl font-extrabold text-white">Inventory Management</h1>
                 <p className="text-sm text-gray-400 mb-4" itemProp="description">Detailed product configuration and stock levels.</p>
             </header>
-            
             <section className={`
                 fixed top-16 left-0 right-0 z-20 
                 md:ml-64 
@@ -353,9 +334,7 @@ const InventoryContent = ({
                     </div>
                 </div>
             </section>
-            
             <div className={`${showStickySearch ? 'mb-16' : ''}`}></div> 
-            
             <div className="hidden lg:block bg-gray-100 dark:bg-gray-900 rounded-xl shadow-2xl dark:shadow-indigo-900/10 border border-gray-200 dark:border-gray-800">  
                  <header className="p-4 md:p-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
                     <h2 className="text-xl font-bold flex items-center text-indigo-600 dark:text-indigo-400">
@@ -414,7 +393,6 @@ const InventoryContent = ({
                         </button>
                     </div>
                 </header>
-
                 <div className="max-h-[60vh] overflow-y-auto">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -475,7 +453,6 @@ const InventoryContent = ({
                     </div>
                 </div>
             </div>
-
             <section className="lg:hidden">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold flex items-center text-indigo-400">
@@ -571,7 +548,6 @@ const InventoryContent = ({
                     ))}
                 </div>
             </section>
-
             {isFormModalOpen && (
                 <section className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity" role="dialog" aria-modal="true" aria-labelledby="form-modal-title">
                     <form onSubmit={handleFormSubmit} 
@@ -611,7 +587,6 @@ const InventoryContent = ({
                     </form>
                 </section>
             )}
-
             {isConfirmModalOpen && itemToDelete && (
                 <section className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity" role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-title">
                     <div className="bg-gray-900 w-full max-w-sm rounded-xl shadow-2xl transform transition-transform duration-300 border border-red-700">
@@ -646,7 +621,6 @@ const InventoryContent = ({
                     </div>
                 </section>
             )}
-
             {loading && (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40" role="status" aria-live="polite">
                     <div className="bg-gray-900 p-6 rounded-xl shadow-2xl text-indigo-400 flex items-center border border-gray-700">
@@ -654,7 +628,6 @@ const InventoryContent = ({
                     </div>
                 </div>
             )}
-
             <ScannerModal 
                 isOpen={isScannerModalOpen}
                 inventory={inventory}

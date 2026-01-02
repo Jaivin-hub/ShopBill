@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText } from 'lucide-react';
+import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck } from 'lucide-react';
 import { io } from 'socket.io-client';
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
@@ -29,6 +29,7 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import SupportPage from './components/SupportPage';
 import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
+import SupplyChainManagement from './components/SupplyChainManagement';
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -46,28 +47,20 @@ const UpdatePrompt = () => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-md z-[9998] flex items-center justify-center p-4">
-      <div className="w-full max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+    <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
           </div>
-          
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
-          <p className="text-indigo-100 mt-2 text-sm">
-            A critical update is available for Pocket POS. Please update to continue using the app securely.
-          </p>
-          
+          <p className="text-indigo-100 mt-2 text-sm">A critical update is available. Please update to continue securely.</p>
           <button 
             onClick={() => updateHandler && updateHandler(true)}
-            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl flex items-center justify-center gap-2"
+            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-xl"
           >
             Update & Reload Now
           </button>
-          
-          <p className="text-[10px] text-indigo-300 mt-4 uppercase tracking-widest font-semibold">
-            Pocket POS Version Sync
-          </p>
         </div>
       </div>
     </div>
@@ -105,367 +98,142 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
-  // SEO Configuration for different pages
-  const seoConfig = useMemo(() => {
-    if (!currentUser) {
-      if (isViewingLogin) {
-        return {
-          title: 'Login | Pocket POS - Retail Management Software',
-          description: 'Login to your Pocket POS account. Access your retail management dashboard, billing, inventory, and digital Khata ledger.',
-          keywords: 'Pocket POS login, retail management login, POS login, shop management login',
-          noindex: true
-        };
-      }
-      return {
-        title: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software for Indian Shops',
-        description: 'Pocket POS - The #1 retail management software for Indian shops. Lightning-fast billing, real-time inventory management, digital Khata ledger, GST billing, and business reports. Works offline, syncs to cloud. Start your free trial today!',
-        keywords: 'Pocket POS, retail management software, billing app, inventory tracker, digital khata, GST billing, point of sale India, POS software, retail POS, shop management software, billing software India'
-      };
-    }
-
-    const pageSEO = {
-      'dashboard': {
-        title: 'Dashboard | Pocket POS - Business Overview & Analytics',
-        description: 'View your business dashboard with real-time sales, inventory alerts, and key performance metrics. Manage your retail business efficiently with Pocket POS.',
-        keywords: 'business dashboard, retail dashboard, sales analytics, business metrics, Pocket POS dashboard'
-      },
-      'billing': {
-        title: 'Billing & POS | Pocket POS - Lightning-Fast Point of Sale',
-        description: 'Complete sales transactions in seconds with Pocket POS billing system. Intuitive touch interface for high-volume retail environments. Print receipts or share via SMS.',
-        keywords: 'POS billing, point of sale, retail billing, shop billing, invoice generation, GST billing'
-      },
-      'inventory': {
-        title: 'Inventory Management | Pocket POS - Real-Time Stock Control',
-        description: 'Add, edit, and track products effortlessly with Pocket POS inventory management. Get instant low-stock alerts and set smart reorder levels to never miss a sale.',
-        keywords: 'inventory management, stock control, product management, inventory tracking, stock alerts'
-      },
-      'khata': {
-        title: 'Digital Ledger | Pocket POS - Credit & Payment Management',
-        description: 'Manage customer credit and outstanding payments easily with Pocket POS digital Khata ledger. Send gentle reminders and record payments, keeping your ledger always balanced.',
-        keywords: 'digital khata, credit ledger, payment management, customer credit, outstanding payments'
-      },
-      'reports': {
-        title: 'Business Reports | Pocket POS - Sales Analytics & Insights',
-        description: 'View daily, weekly, and custom sales trends with Pocket POS reports. Identify top-selling items and busy hours to optimize purchasing and staffing.',
-        keywords: 'business reports, sales reports, retail analytics, sales trends, business insights'
-      },
-      'settings': {
-        title: 'Settings | Pocket POS - Configure Your Retail Management',
-        description: 'Configure your Pocket POS settings. Manage staff permissions, system preferences, and business settings.',
-        keywords: 'Pocket POS settings, retail management settings, system configuration',
-        noindex: true
-      },
-      'checkout': {
-        title: 'Secure Checkout | Pocket POS - Choose Your Plan',
-        description: 'Select your Pocket POS plan and complete secure payment. Choose from Basic, Pro, or Premium plans with flexible pricing.',
-        keywords: 'Pocket POS pricing, POS software pricing, retail management plans',
-        noindex: true
-      },
-      'terms': {
-        title: 'Terms and Conditions | Pocket POS',
-        description: 'Read the terms and conditions for using Pocket POS retail management software.',
-        keywords: 'Pocket POS terms, terms of service, legal terms'
-      },
-      'policy': {
-        title: 'Privacy Policy | Pocket POS',
-        description: 'Learn how Pocket POS protects your privacy and handles your business data securely.',
-        keywords: 'Pocket POS privacy, privacy policy, data protection'
-      },
-      'support': {
-        title: 'Support | Pocket POS - Get Help & Contact Us',
-        description: 'Get help with Pocket POS. Contact our support team, access documentation, and find answers to common questions.',
-        keywords: 'Pocket POS support, customer support, help center, contact support'
-      },
-      'affiliate': {
-        title: 'Affiliate Program | Pocket POS - Earn by Referring',
-        description: 'Join the Pocket POS affiliate program and earn commissions by referring retail businesses to our platform.',
-        keywords: 'Pocket POS affiliate, affiliate program, referral program, earn commissions'
-      }
-    };
-
-    return pageSEO[currentPage] || {
-      title: 'Pocket POS - #1 Retail Management Tool',
-      description: 'Pocket POS - The #1 retail management software for Indian shops.',
-      keywords: 'Pocket POS, retail management software'
-    };
-  }, [currentPage, currentUser, isViewingLogin]);
-
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
+  const seoConfig = useMemo(() => {
+    if (!currentUser) return { title: 'Pocket POS - Retail Management' };
+    return { title: `${currentPage.toUpperCase()} | Pocket POS` };
+  }, [currentPage, currentUser]);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  const unreadCount = useMemo(() => {
-    return (notifications || []).filter(n => 
-        n && (n.isRead === false || n.isRead === undefined)
-    ).length;
-  }, [notifications]);
-
-  const fetchNotificationHistory = useCallback(async () => {
-    if (!currentUser) return;
-    try {
-        const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
-        if (response.data && response.data.alerts) {
-            setNotifications(response.data.alerts);
-        }
-    } catch (error) {
-        console.error("Error fetching notification history:", error);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!currentUser?.shopId) return;
-    fetchNotificationHistory();
-    socketRef.current = io("https://shopbill-3le1.onrender.com", {
-        auth: { token: localStorage.getItem('userToken') },
-        transports: ['polling', 'websocket'],
-        withCredentials: true,
-        reconnection: true
-    });
-    const socket = socketRef.current;
-    socket.on('connect', () => {
-        socket.emit('join_shop', String(currentUser.shopId));
-    });
-    socket.on('new_notification', (newAlert) => {
-        setNotifications(prev => {
-            const exists = prev.some(n => (n._id === newAlert._id));
-            if (exists) return prev;
-            return [newAlert, ...prev];
-        });
-        showToast(newAlert.message, 'info');
-    });
-    socket.on('resolve_notification', (data) => {
-        setNotifications(prev => prev.filter(n => n.metadata?.itemId !== data.itemId));
-    });
-    return () => { if (socket) socket.disconnect(); };
-  }, [currentUser?.shopId, showToast, fetchNotificationHistory]);
-
-  const handleSelectPlan = useCallback((plan) => {
-    setSelectedPlan(plan);
-    setCurrentPage('checkout');
-  }, []);
-
-  const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
-  const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
-  const handleViewAllInventory = useCallback(() => setCurrentPage('inventory'), []);
+  const unreadCount = useMemo(() => 
+    notifications.filter(n => n && (n.isRead === false)).length
+  , [notifications]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
-    setNotifications([]);
     setCurrentPage('dashboard');
-    setPageOrigin(null);
-    setIsViewingLogin(false);
-    showToast('Logged out successfully.', 'info');
+    showToast('Logged out.', 'info');
   }, [showToast]);
 
-  const handleLoginSuccess = useCallback((user, token, planToCheckout = null) => {
-    const userWithNormalizedRole = { ...user, role: user.role.toLowerCase() }; 
+  const handleLoginSuccess = useCallback((user, token) => {
+    const normalizedUser = { ...user, role: user.role.toLowerCase() };
     localStorage.setItem('userToken', token);
-    localStorage.setItem('currentUser', JSON.stringify(userWithNormalizedRole));
-    setCurrentUser(userWithNormalizedRole);
-    setIsViewingLogin(false);
-    
-    if (userWithNormalizedRole.role === USER_ROLES.CASHIER) {
-        setCurrentPage('billing');
-    } else {
-        setCurrentPage('dashboard');
-    }
-
-    if (planToCheckout) {
-        showToast('Account created successfully!', 'success');
-        setSelectedPlan(null);
-    } else {
-        showToast('Welcome back!', 'success');
-    }
-  }, [showToast]);
+    localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
+    setCurrentUser(normalizedUser);
+    setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
-    const deepLink = checkDeepLinkPath();
-
-    if (token && userJson && token !== 'undefined') {
-      try {
-        let user = JSON.parse(userJson);
-        const normalizedUser = { ...user, role: user.role.toLowerCase() };
-        setCurrentUser(normalizedUser);
-        
-        if (deepLink) {
-            setCurrentPage('dashboard');
-        } else if (normalizedUser.role === USER_ROLES.CASHIER && currentPage === 'dashboard') {
-            setCurrentPage('billing');
-        }
-      } catch (e) { logout(); }
-    } else if (deepLink) {
-        setCurrentPage(deepLink);
+    if (token && userJson) {
+      try { setCurrentUser(JSON.parse(userJson)); } catch (e) { logout(); }
     }
-    setIsLoadingAuth(false); 
+    setIsLoadingAuth(false);
   }, [logout]);
 
   const navItems = useMemo(() => {
+    if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const standardNav = [
         { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'billing', name: 'Billing/POS', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
         { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
         { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
     ];
-    
-    if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
-  const utilityNavItems = useMemo(() => {
-    return UTILITY_NAV_ITEMS_CONFIG.filter(item => 
-        userRole === USER_ROLES.SUPERADMIN ? (item.id === 'profile' || item.id === 'notifications') : item.roles.includes(userRole)
-    );
-  }, [userRole]);
+  const utilityNavItems = useMemo(() => 
+    UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
+  , [userRole]);
 
   const renderContent = () => {
-    if (isLoadingAuth) return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950">
-        <Loader className="w-10 h-10 animate-spin text-teal-400" />
-        <p className='mt-3 text-gray-400'>Checking authentication...</p>
-      </div>
-    );
+    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center"><Loader className="animate-spin text-indigo-500" /></div>;
+    if (!currentUser) return isViewingLogin ? <Login onLogin={handleLoginSuccess} /> : <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
 
-    if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
-    if (currentPage === 'resetPassword') return <ResetPassword />;
-    
-    const handleDynamicBack = (target) => {
-        if (target === 'settings') {
-            setCurrentPage('settings');
-        } else {
-            setCurrentPage('dashboard');
-        }
-    };
+    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
 
-    if (currentPage === 'terms') return <TermsAndConditions onBack={() => handleDynamicBack(pageOrigin)} />;
-    if (currentPage === 'policy') return <PrivacyPolicy onBack={() => handleDynamicBack(pageOrigin)} />;
-    if (currentPage === 'support') return <SupportPage onBack={handleDynamicBack} origin={pageOrigin} />;
-    if (currentPage === 'affiliate') return <AffiliatePage onBack={handleDynamicBack} origin={pageOrigin} />;
-
-    if (currentPage === 'checkout') {
-        if (!selectedPlan) {
-            setCurrentPage('dashboard');
-            return null;
-        }
-        return <Checkout plan={selectedPlan} onPaymentSuccess={(data) => {
-            showToast(data.message || 'Account created successfully!', 'success');
-            setCurrentPage('dashboard');
-            setSelectedPlan(null);
-            setIsViewingLogin(true);
-        }} onBackToDashboard={() => {
-            setCurrentPage('dashboard');
-            setSelectedPlan(null);
-        }} />;
-    }
-    
-    if (!currentUser) {
-        return isViewingLogin ? 
-            <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => {
-                setIsViewingLogin(false);
-                setSelectedPlan(null);
-                setCurrentPage('dashboard');
-                setTimeout(() => { window.location.href = '#pricing'; }, 100);
-            }} /> : 
-            <LandingPage 
-                onStartApp={() => { setIsViewingLogin(true); setCurrentPage('dashboard'); }} 
-                onSelectPlan={handleSelectPlan} 
-                onViewTerms={() => { setPageOrigin('landing'); setCurrentPage('terms'); }} 
-                onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
-                onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
-                onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
-            />;
-    }
-    
-    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, pageOrigin, setPageOrigin };
-    
     switch (currentPage) {
-      case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? 
-        <SuperAdminDashboard {...commonProps} /> : 
-        <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+      case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} />;
       case 'billing': return <BillingPOS {...commonProps} />;
       case 'khata': return <Ledger {...commonProps} />;
-      case 'inventory': return userRole !== USER_ROLES.SUPERADMIN ? <InventoryManager {...commonProps} /> : <div className="p-8 text-center text-gray-400">Superadmin Access via Tools</div>;
+      case 'inventory': return <InventoryManager {...commonProps} />;
+      case 'scm': return <SupplyChainManagement {...commonProps} />;
       case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
       case 'notifications': return <NotificationsPage {...commonProps} />;
-      case 'settings': return <SettingsPage {...commonProps} />; 
+      case 'settings': return <SettingsPage {...commonProps} />;
       case 'profile': return <Profile {...commonProps} />;
-      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-      default: return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+      default: return <Dashboard {...commonProps} />;
     }
   };
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
-  const displayRole = userRole?.charAt(0).toUpperCase() + userRole?.slice(1);
+  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout'].includes(currentPage);
 
   return (
     <ApiProvider>
       <SEO {...seoConfig} />
-      <div className="h-screen w-full bg-gray-950 flex flex-col font-sans transition-colors duration-300 overflow-hidden">
+      <div className="h-screen w-full bg-gray-950 flex flex-col overflow-hidden text-gray-200">
         <UpdatePrompt />
-        
-        {showAppUI && (
-          <header className="fixed top-0 left-0 right-0 z-[40]">
-            <Header companyName="Pocket POS" userRole={displayRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />
-          </header>
-        )}
+        {showAppUI && <Header companyName="Pocket POS" userRole={userRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* DESKTOP SIDEBAR */}
           {showAppUI && (
-              <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl transition-colors duration-300">
-                  <div className="p-6 border-b border-gray-800">
-                      <div className="text-2xl font-extrabold text-indigo-400 flex items-center cursor-pointer" onClick={() => setCurrentPage(userRole === USER_ROLES.CASHIER ? 'billing' : 'dashboard')} aria-label="Pocket POS Logo"><Smartphone className="mr-2 w-6 h-6" aria-hidden="true" /> Pocket POS</div>
-                      <p className="text-xs text-gray-500 mt-1">User: {displayRole}</p>
-                  </div>
-                  <nav className="flex-1 p-4 space-y-2 overflow-y-auto" aria-label="Desktop Sidebar Navigation">
-                      {navItems.map(item => (
-                          <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`w-full flex items-center p-3 rounded-xl transition font-medium ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}><item.icon className="w-5 h-5 mr-3" aria-hidden="true" />{item.name}</button>
-                      ))}
-                      <div className="pt-4 border-t border-gray-800 space-y-2">
-                          {utilityNavItems.map(item => (
-                              <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`w-full flex items-center p-3 rounded-xl transition font-medium relative ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-800'}`}>
-                                <item.icon className="w-5 h-5 mr-3" aria-hidden="true" />
-                                {item.name}
-                                {item.id === 'notifications' && unreadCount > 0 && (
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full ring-2 ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
-                                        {unreadCount > 9 ? '9+' : unreadCount}
-                                    </span>
-                                )}
-                              </button>
-                          ))}
-                      </div>
-                  </nav>
-                  <div className="p-4 border-t border-gray-800">
-                      <button onClick={logout} className="w-full flex items-center p-3 rounded-xl text-red-400 hover:bg-red-900/20 font-medium"><LogOut className="w-5 h-5 mr-3" aria-hidden="true" />Logout</button>
-                  </div>
-              </aside>
+            <aside className="hidden md:flex flex-col w-64 bg-gray-900 border-r border-gray-800 z-30">
+              <div className="p-6 font-black text-indigo-500 text-xl tracking-tighter">POCKET POS</div>
+              <nav className="flex-1 px-4 space-y-1">
+                {navItems.map(item => (
+                  <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'}`}>
+                    <item.icon className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
+                  </button>
+                ))}
+                <div className="pt-4 mt-4 border-t border-gray-800">
+                  {utilityNavItems.map(item => (
+                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}>
+                      <item.icon className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
+              <div className="p-4 border-t border-gray-800">
+                <button onClick={logout} className="w-full flex items-center p-3 text-red-400 hover:bg-red-950/20 rounded-xl"><LogOut className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">Logout</span></button>
+              </div>
+            </aside>
           )}
 
-          <main className={`flex-1 overflow-y-auto ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
+          {/* MAIN CONTENT AREA */}
+          <main className={`flex-1 overflow-y-auto bg-gray-950 ${showAppUI ? 'pt-16 pb-20 md:pb-0' : 'w-full'}`}>
+            <div className="max-w-7xl mx-auto min-h-full">
               {renderContent()}
+            </div>
           </main>
         </div>
 
+        {/* MOBILE BOTTOM NAV - Arranged for 6 items */}
         {showAppUI && (
-            <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex justify-around items-center px-1 z-[40] shadow-2xl" aria-label="Mobile Bottom Navigation">
-                {navItems.map(item => (
-                    <button key={item.id} onClick={() => setCurrentPage(item.id)} aria-current={currentPage === item.id ? 'page' : undefined} className={`flex flex-col items-center justify-center p-1 transition flex-1 min-w-0 ${currentPage === item.id ? 'text-indigo-400 font-bold' : 'text-gray-400'}`}><item.icon className="w-5 h-5" aria-hidden="true" /><span className="text-[10px] mt-0.5 truncate">{item.name.split('/')[0]}</span></button>
-                ))}
-            </nav>
+          <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex items-center justify-around z-50 px-1 shadow-2xl">
+            {navItems.map(item => (
+              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center flex-1 transition-all ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-500'}`}>
+                <item.icon className="w-5 h-5" />
+                <span className="text-[9px] mt-1 font-bold uppercase tracking-tighter truncate w-full text-center">
+                  {item.name.split(' ')[0]}
+                </span>
+              </button>
+            ))}
+          </nav>
         )}
-        
       </div>
     </ApiProvider>
   );
