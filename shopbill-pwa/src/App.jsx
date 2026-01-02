@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck } from 'lucide-react';
 import { io } from 'socket.io-client';
+
+// Component Imports
 import InventoryManager from './components/InventoryManager';
 import Dashboard from './components/Dashboard';
 import API from './config/api';
@@ -31,6 +33,7 @@ import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
 import SupplyChainManagement from './components/SupplyChainManagement';
 
+// Update Prompt Logic - Triggers when Service Worker detects new content
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -40,6 +43,7 @@ const UpdatePrompt = () => {
       setUpdateHandler(() => e.detail.updateHandler);
       setShow(true);
     };
+    // Standard PWA update event
     window.addEventListener('pwa-update-available', onUpdate);
     return () => window.removeEventListener('pwa-update-available', onUpdate);
   }, []);
@@ -47,17 +51,17 @@ const UpdatePrompt = () => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
           </div>
-          <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
-          <p className="text-indigo-100 mt-2 text-sm">A critical update is available. Please update to continue securely.</p>
+          <h4 className="font-extrabold text-2xl leading-tight">New Update Live</h4>
+          <p className="text-indigo-100 mt-2 text-sm">A new version of Pocket POS is available. Update now to access new features and security fixes.</p>
           <button 
             onClick={() => updateHandler && updateHandler(true)}
-            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-xl"
+            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
             Update & Reload Now
           </button>
@@ -89,7 +93,6 @@ const checkDeepLinkPath = () => {
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
-  const [pageOrigin, setPageOrigin] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
@@ -103,22 +106,20 @@ const App = () => {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
+
   const seoConfig = useMemo(() => {
     if (!currentUser) return { title: 'Pocket POS - Retail Management' };
     return { title: `${currentPage.toUpperCase()} | Pocket POS` };
   }, [currentPage, currentUser]);
 
-  const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
-
-  const unreadCount = useMemo(() => 
-    notifications.filter(n => n && (n.isRead === false)).length
-  , [notifications]);
-
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
+    setNotifications([]);
     setCurrentPage('dashboard');
+    setIsViewingLogin(false);
     showToast('Logged out.', 'info');
   }, [showToast]);
 
@@ -133,8 +134,11 @@ const App = () => {
   useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
-    if (token && userJson) {
-      try { setCurrentUser(JSON.parse(userJson)); } catch (e) { logout(); }
+    if (token && userJson && token !== 'undefined') {
+      try {
+        const user = JSON.parse(userJson);
+        setCurrentUser({ ...user, role: user.role.toLowerCase() });
+      } catch (e) { logout(); }
     }
     setIsLoadingAuth(false);
   }, [logout]);
@@ -157,8 +161,16 @@ const App = () => {
   , [userRole]);
 
   const renderContent = () => {
-    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center"><Loader className="animate-spin text-indigo-500" /></div>;
-    if (!currentUser) return isViewingLogin ? <Login onLogin={handleLoginSuccess} /> : <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
+    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
+    
+    if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
+    if (currentPage === 'resetPassword') return <ResetPassword />;
+
+    if (!currentUser) {
+        return isViewingLogin ? 
+            <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> : 
+            <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
+    }
 
     const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
 
@@ -175,25 +187,30 @@ const App = () => {
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
       case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+      case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
+      case 'terms': return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
+      case 'policy': return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
       default: return <Dashboard {...commonProps} />;
     }
   };
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout'].includes(currentPage);
+  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy'].includes(currentPage);
 
   return (
     <ApiProvider>
       <SEO {...seoConfig} />
       <div className="h-screen w-full bg-gray-950 flex flex-col overflow-hidden text-gray-200">
         <UpdatePrompt />
-        {showAppUI && <Header companyName="Pocket POS" userRole={userRole} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
+        {showAppUI && <Header companyName="Pocket POS" userRole={userRole.toUpperCase()} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
 
         <div className="flex flex-1 overflow-hidden relative">
           {/* DESKTOP SIDEBAR */}
           {showAppUI && (
-            <aside className="hidden md:flex flex-col w-64 bg-gray-900 border-r border-gray-800 z-30">
-              <div className="p-6 font-black text-indigo-500 text-xl tracking-tighter">POCKET POS</div>
-              <nav className="flex-1 px-4 space-y-1">
+            <aside className="hidden md:flex flex-col w-64 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl">
+              <div className="p-6 font-black text-indigo-500 text-xl tracking-tighter flex items-center gap-2">
+                <Smartphone className="w-6 h-6" /> POCKET POS
+              </div>
+              <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
                 {navItems.map(item => (
                   <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'}`}>
                     <item.icon className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
@@ -214,16 +231,16 @@ const App = () => {
           )}
 
           {/* MAIN CONTENT AREA */}
-          <main className={`flex-1 overflow-y-auto bg-gray-950 ${showAppUI ? 'pt-16 pb-20 md:pb-0' : 'w-full'}`}>
+          <main className={`flex-1 overflow-y-auto bg-gray-950 ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
             <div className="max-w-7xl mx-auto min-h-full">
               {renderContent()}
             </div>
           </main>
         </div>
 
-        {/* MOBILE BOTTOM NAV - Arranged for 6 items */}
+        {/* MOBILE BOTTOM NAV */}
         {showAppUI && (
-          <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex items-center justify-around z-50 px-1 shadow-2xl">
+          <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex items-center justify-around z-[40] px-1 shadow-2xl">
             {navItems.map(item => (
               <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center flex-1 transition-all ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-500'}`}>
                 <item.icon className="w-5 h-5" />
