@@ -221,24 +221,24 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
       </div>
 
       {activeTab === 'purchase' && (
-        <form onSubmit={handlePurchaseSubmit} className="space-y-4 max-w-2xl mx-auto pb-20">
+        <form onSubmit={handlePurchaseSubmit} className="space-y-4 max-w-2xl mx-auto pb-24">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase ml-1">Product Name</label>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => { setIsProductPickerOpen(true); setSearchTerm(''); }}
-                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all"
+                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all overflow-hidden"
               >
                 <div className="flex flex-col items-start truncate mr-2">
-                  <span className={selectedProduct ? 'text-white font-semibold' : 'text-gray-500'}>
+                  <span className={selectedProduct ? 'text-white font-semibold truncate w-full' : 'text-gray-500 truncate w-full'}>
                     {selectedProduct ? selectedProduct.name : 'Choose a product...'}
                   </span>
                   {selectedProduct && <span className={`text-[10px] font-bold uppercase ${selectedProduct.quantity <= (selectedProduct.reorderLevel || 5) ? 'text-red-500' : 'text-indigo-400'}`}>Available: {selectedProduct.quantity}</span>}
                 </div>
                 <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
               </button>
-              <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-emerald-600/10 text-emerald-400 p-4 rounded-2xl border border-emerald-500/20 active:scale-90 transition-all">
+              <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-emerald-600/10 text-emerald-400 p-4 rounded-2xl border border-emerald-500/20 active:scale-90 transition-all flex-shrink-0">
                 <Plus className="w-6 h-6" />
               </button>
             </div>
@@ -250,14 +250,14 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
               <button
                 type="button"
                 onClick={() => { setIsSupplierPickerOpen(true); setSearchTerm(''); }}
-                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all truncate"
+                className="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-2xl flex items-center justify-between active:scale-[0.99] transition-all overflow-hidden"
               >
-                <span className={selectedSupplier ? 'text-white font-semibold' : 'text-gray-500 truncate'}>
+                <span className={selectedSupplier ? 'text-white font-semibold truncate' : 'text-gray-500 truncate'}>
                   {selectedSupplier ? selectedSupplier.name : 'Choose a supplier...'}
                 </span>
                 <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
               </button>
-              <button type="button" onClick={() => setIsSupplierModalOpen(true)} className="bg-indigo-600/10 text-indigo-400 p-4 rounded-2xl border border-indigo-500/20 active:scale-90 transition-all">
+              <button type="button" onClick={() => setIsSupplierModalOpen(true)} className="bg-indigo-600/10 text-indigo-400 p-4 rounded-2xl border border-indigo-500/20 active:scale-90 transition-all flex-shrink-0">
                 <Plus className="w-6 h-6" />
               </button>
             </div>
@@ -266,29 +266,36 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase ml-1">Quantity Received</label>
-              <input type="number" required min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({...purchaseForm, quantity: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none focus:border-indigo-500" placeholder="0" />
+              <input type="number" required min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({...purchaseForm, quantity: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none focus:border-indigo-500 text-white" placeholder="0" />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase ml-1">Unit Purchase Cost</label>
               <div className="relative">
                 <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-                <input type="number" required step="0.01" min="0" value={purchaseForm.purchasePrice} onChange={(e) => setPurchaseForm({...purchaseForm, purchasePrice: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 pl-10 rounded-2xl outline-none focus:border-indigo-500" placeholder="0.00" />
+                <input type="number" required step="0.01" min="0" value={purchaseForm.purchasePrice} onChange={(e) => setPurchaseForm({...purchaseForm, purchasePrice: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 pl-10 rounded-2xl outline-none focus:border-indigo-500 text-white" placeholder="0.00" />
               </div>
             </div>
           </div>
 
+          {/* FIXED DATE GRID LAYOUT */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase ml-1">Invoice / Bill Number</label>
-              <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({...purchaseForm, invoiceNumber: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none" placeholder="Optional" />
+              <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({...purchaseForm, invoiceNumber: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none text-white" placeholder="Optional" />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-hidden">
               <label className="text-xs font-bold text-gray-500 uppercase ml-1">Entry Date</label>
-              <input type="date" value={purchaseForm.date} onChange={(e) => setPurchaseForm({...purchaseForm, date: e.target.value})} className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none text-sm text-white" />
+              <input 
+                type="date" 
+                value={purchaseForm.date} 
+                onChange={(e) => setPurchaseForm({...purchaseForm, date: e.target.value})} 
+                className="w-full bg-gray-900 border border-gray-800 p-4 rounded-2xl outline-none text-sm text-white appearance-none" 
+                style={{ minWidth: '0' }}
+              />
             </div>
           </div>
 
-          <button disabled={isLoading} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+          <button disabled={isLoading} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4">
             {isLoading ? <Loader className="animate-spin" /> : <>UPDATE STOCK <ArrowRight className="w-5 h-5" /></>}
           </button>
         </form>
@@ -297,7 +304,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
       {/* History Tab with Filters and Detailed Table */}
       {activeTab === 'history' && (
         <div className="max-w-5xl mx-auto space-y-6 pb-20">
-            
             {/* Filter Navigation */}
             <nav aria-label="Report date filters" className="space-y-4">
                 <div className="overflow-x-auto no-scrollbar py-1">
@@ -428,7 +434,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
               </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input placeholder="Search item..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 border-none p-4 pl-12 rounded-2xl outline-none focus:ring-1 focus:ring-indigo-500" />
+                <input placeholder="Search item..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 border-none p-4 pl-12 rounded-2xl outline-none focus:ring-1 focus:ring-indigo-500 text-white" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pt-2">
@@ -462,7 +468,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
                 <h3 className="text-xl font-black uppercase tracking-tighter">Select Supplier</h3>
                 <button onClick={() => setIsSupplierPickerOpen(false)} className="p-2 bg-gray-800 rounded-full text-gray-400"><X className="w-5 h-5" /></button>
               </div>
-              <input placeholder="Search vendor..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+              <input placeholder="Search vendor..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-800 p-4 rounded-2xl outline-none text-white" />
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {filteredSuppliers.map(s => (
@@ -485,25 +491,25 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
           <form onSubmit={handleQuickAddProduct} className="relative w-full max-w-md bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-2xl">
              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-black tracking-tighter uppercase">Quick Register</h3>
+                <h3 className="text-2xl font-black tracking-tighter uppercase text-white">Quick Register</h3>
                 <X className="w-6 h-6 text-gray-500 cursor-pointer" onClick={() => setIsProductModalOpen(false)} />
              </div>
              <div className="space-y-4">
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Product Name *</label>
-                 <input required placeholder="Enter item name" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-emerald-500" />
+                 <input required placeholder="Enter item name" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-emerald-500 text-white" />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Selling Price (₹) *</label>
-                 <input type="number" required placeholder="Set retail price" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+                 <input type="number" required placeholder="Set retail price" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none text-white" />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">HSN / Barcode</label>
-                 <input placeholder="Enter or scan code" value={productForm.hsn} onChange={e => setProductForm({...productForm, hsn: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+                 <input placeholder="Enter or scan code" value={productForm.hsn} onChange={e => setProductForm({...productForm, hsn: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none text-white" />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Reorder Alert Level</label>
-                 <input type="number" placeholder="Default: 5" value={productForm.reorderLevel} onChange={e => setProductForm({...productForm, reorderLevel: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+                 <input type="number" placeholder="Default: 5" value={productForm.reorderLevel} onChange={e => setProductForm({...productForm, reorderLevel: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none text-white" />
                </div>
              </div>
              <button disabled={isLoading} className="w-full mt-6 bg-emerald-600 p-5 rounded-2xl font-black uppercase tracking-widest text-white shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">
@@ -519,21 +525,21 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setIsSupplierModalOpen(false)} />
           <form onSubmit={handleAddSupplier} className="relative w-full max-w-md bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-2xl">
              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-black tracking-tighter uppercase">New Vendor</h3>
+                <h3 className="text-2xl font-black tracking-tighter uppercase text-white">New Vendor</h3>
                 <X className="w-6 h-6 text-gray-500 cursor-pointer" onClick={() => setIsSupplierModalOpen(false)} />
              </div>
              <div className="space-y-4">
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Supplier Name *</label>
-                 <input required placeholder="Business / Shop Name" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500" />
+                 <input required placeholder="Business / Shop Name" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500 text-white" />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Contact Phone *</label>
-                 <input required type="tel" placeholder="10-digit mobile" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500" />
+                 <input required type="tel" placeholder="10-digit mobile" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none border border-transparent focus:border-indigo-500 text-white" />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">GSTIN Number</label>
-                 <input placeholder="Enter GST if available" value={supplierForm.gstin} onChange={e => setSupplierForm({...supplierForm, gstin: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none" />
+                 <input placeholder="Enter GST if available" value={supplierForm.gstin} onChange={e => setSupplierForm({...supplierForm, gstin: e.target.value})} className="w-full bg-gray-800 p-4 rounded-2xl outline-none text-white" />
                </div>
              </div>
              <button disabled={isLoading} className="w-full mt-6 bg-indigo-600 p-5 rounded-2xl font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">

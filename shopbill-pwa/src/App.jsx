@@ -19,8 +19,8 @@ import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage';
 import ResetPassword from './components/ResetPassword';
-import StaffSetPassword from './components/StaffSetPassword';
-import SalesActivityPage from './components/SalesActivityPage';
+import StaffSetPassword from './components/StaffSetPassword'; 
+import SalesActivityPage from './components/SalesActivityPage'; 
 import UserManagement from './components/UserManagement';
 import SuperAdminDashboard from './components/superAdminDashboard';
 import SystemConfig from './components/SystemConfig';
@@ -33,7 +33,6 @@ import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
 import SupplyChainManagement from './components/SupplyChainManagement';
 
-// Update Prompt Logic - Triggers when Service Worker detects new content
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -43,7 +42,6 @@ const UpdatePrompt = () => {
       setUpdateHandler(() => e.detail.updateHandler);
       setShow(true);
     };
-    // Standard PWA update event
     window.addEventListener('pwa-update-available', onUpdate);
     return () => window.removeEventListener('pwa-update-available', onUpdate);
   }, []);
@@ -52,14 +50,14 @@ const UpdatePrompt = () => {
 
   return (
     <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+      <div className="w-full max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
           </div>
-          <h4 className="font-extrabold text-2xl leading-tight">New Update Live</h4>
-          <p className="text-indigo-100 mt-2 text-sm">A new version of Pocket POS is available. Update now to access new features and security fixes.</p>
-          <button
+          <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
+          <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
+          <button 
             onClick={() => updateHandler && updateHandler(true)}
             className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
@@ -72,27 +70,28 @@ const UpdatePrompt = () => {
 };
 
 const UTILITY_NAV_ITEMS_CONFIG = [
-  { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-  { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+    { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
 const SUPERADMIN_NAV_ITEMS = [
-  { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
 const checkDeepLinkPath = () => {
-  const path = window.location.pathname;
-  if (path.startsWith('/staff-setup/')) return 'staffSetPassword';
-  if (path.startsWith('/reset-password/')) return 'resetPassword';
-  return null;
+    const path = window.location.pathname;
+    if (path.startsWith('/staff-setup/')) return 'staffSetPassword'; 
+    if (path.startsWith('/reset-password/')) return 'resetPassword'; 
+    return null; 
 };
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
+  const [pageOrigin, setPageOrigin] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
@@ -108,10 +107,42 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  const seoConfig = useMemo(() => {
-    if (!currentUser) return { title: 'Pocket POS - Retail Management' };
-    return { title: `${currentPage.toUpperCase()} | Pocket POS` };
-  }, [currentPage, currentUser]);
+  const unreadCount = useMemo(() => 
+    (notifications || []).filter(n => n && (n.isRead === false || n.isRead === undefined)).length
+  , [notifications]);
+
+  const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
+  const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
+  const handleViewAllInventory = useCallback(() => setCurrentPage('inventory'), []);
+
+  const fetchNotificationHistory = useCallback(async () => {
+    if (!currentUser?.shopId) return;
+    try {
+        const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
+        if (response.data && response.data.alerts) setNotifications(response.data.alerts);
+    } catch (error) { console.error("Error fetching notifications:", error); }
+  }, [currentUser, API.notificationalert]);
+
+  useEffect(() => {
+    if (!currentUser?.shopId) return;
+    fetchNotificationHistory();
+    socketRef.current = io("https://shopbill-3le1.onrender.com", {
+        auth: { token: localStorage.getItem('userToken') },
+        transports: ['polling', 'websocket'],
+        withCredentials: true,
+        reconnection: true
+    });
+    const socket = socketRef.current;
+    socket.on('connect', () => socket.emit('join_shop', String(currentUser.shopId)));
+    socket.on('new_notification', (newAlert) => {
+        setNotifications(prev => {
+            if (prev.some(n => n._id === newAlert._id)) return prev;
+            return [newAlert, ...prev];
+        });
+        showToast(newAlert.message, 'info');
+    });
+    return () => { if (socket) socket.disconnect(); };
+  }, [currentUser?.shopId, fetchNotificationHistory, showToast]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
@@ -120,7 +151,7 @@ const App = () => {
     setNotifications([]);
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
-    showToast('Logged out.', 'info');
+    showToast('Logged out successfully.', 'info');
   }, [showToast]);
 
   const handleLoginSuccess = useCallback((user, token) => {
@@ -146,109 +177,102 @@ const App = () => {
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const standardNav = [
-      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
+        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+        { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
-  const utilityNavItems = useMemo(() =>
+  const utilityNavItems = useMemo(() => 
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
-    , [userRole]);
+  , [userRole]);
+
+  const handleBackToOrigin = () => {
+    setCurrentPage(pageOrigin || 'dashboard');
+    setPageOrigin('dashboard');
+  };
 
   const renderContent = () => {
-  if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
+    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
+    
+    if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
+    if (currentPage === 'resetPassword') return <ResetPassword />;
+    if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} />;
+    if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} />;
+    if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} />;
+    if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
 
-  // 1. PUBLIC PAGES (Accessible by everyone)
-  if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
-  if (currentPage === 'resetPassword') return <ResetPassword />;
-  if (currentPage === 'terms') return <TermsAndConditions onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
-  if (currentPage === 'policy') return <PrivacyPolicy onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
-  if (currentPage === 'support') return <SupportPage onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
-  if (currentPage === 'affiliate') return <AffiliatePage onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
-
-  // 2. AUTHENTICATION GATES
-  if (!currentUser) {
-    if (isViewingLogin) {
-      return <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} />;
+    if (!currentUser) {
+        return isViewingLogin ? 
+            <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> : 
+            <LandingPage 
+              onStartApp={() => setIsViewingLogin(true)} 
+              onSelectPlan={(p) => { setSelectedPlan(p); setIsViewingLogin(true); }}
+              onViewTerms={() => { setPageOrigin('landing'); setCurrentPage('terms'); }}
+              onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
+              onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
+              onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
+            />;
     }
-    return (
-      <LandingPage
-        onStartApp={() => setIsViewingLogin(true)}
-        onViewTerms={() => setCurrentPage('terms')}
-        onViewPolicy={() => setCurrentPage('policy')}
-        onViewSupport={() => setCurrentPage('support')}
-        onViewAffiliate={() => setCurrentPage('affiliate')}
-        onSelectPlan={(plan) => {
-          setSelectedPlan(plan);
-          setIsViewingLogin(true);
-        }}
-      />
-    );
-  }
 
-  // 3. PROTECTED APP PAGES
-  const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
+    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
 
-  switch (currentPage) {
-    case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} />;
-    case 'billing': return <BillingPOS {...commonProps} />;
-    case 'khata': return <Ledger {...commonProps} />;
-    case 'inventory': return <InventoryManager {...commonProps} />;
-    case 'scm': return <SupplyChainManagement {...commonProps} />;
-    case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
-    case 'notifications': return <NotificationsPage {...commonProps} />;
-    case 'settings': return <SettingsPage {...commonProps} />;
-    case 'profile': return <Profile {...commonProps} />;
-    case 'superadmin_users': return <UserManagement {...commonProps} />;
-    case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-    case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-    case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
-    default: return <Dashboard {...commonProps} />;
-  }
-};
+    switch (currentPage) {
+      case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+      case 'billing': return <BillingPOS {...commonProps} />;
+      case 'khata': return <Ledger {...commonProps} />;
+      case 'inventory': return <InventoryManager {...commonProps} />;
+      case 'scm': return <SupplyChainManagement {...commonProps} />;
+      case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
+      case 'notifications': return <NotificationsPage {...commonProps} />;
+      case 'settings': return <SettingsPage {...commonProps} />;
+      case 'profile': return <Profile {...commonProps} />;
+      case 'superadmin_users': return <UserManagement {...commonProps} />;
+      case 'superadmin_systems': return <SystemConfig {...commonProps} />;
+      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+      case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
+      default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+    }
+  };
 
   const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
 
   return (
     <ApiProvider>
-      <SEO {...seoConfig} />
+      <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className="h-screen w-full bg-gray-950 flex flex-col overflow-hidden text-gray-200">
         <UpdatePrompt />
-        {showAppUI && <Header companyName="Pocket POS" userRole={userRole.toUpperCase()} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
+        {showAppUI && <Header companyName="Pocket POS" userRole={userRole.toUpperCase()} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} unreadCount={unreadCount} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
 
         <div className="flex flex-1 overflow-hidden relative">
-          {/* DESKTOP SIDEBAR */}
           {showAppUI && (
             <aside className="hidden md:flex flex-col w-64 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl">
               <div className="p-6 font-black text-indigo-500 text-xl tracking-tighter flex items-center gap-2">
-                <Smartphone className="w-6 h-6" /> POCKET POS
+                <Smartphone className="w-7 h-7" /> POCKET POS
               </div>
-              <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
+              <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
                 {navItems.map(item => (
                   <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'}`}>
-                    <item.icon className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
+                    <item.icon className="w-6 h-6 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
                   </button>
                 ))}
-                <div className="pt-4 mt-4 border-t border-gray-800">
+                <div className="pt-4 mt-2 border-t border-gray-800 space-y-2">
                   {utilityNavItems.map(item => (
-                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}>
-                      <item.icon className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
+                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all relative ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}>
+                      <item.icon className="w-6 h-6 mr-3" /> 
+                      <span className="text-sm font-bold">{item.name}</span>
+                      {item.id === 'notifications' && unreadCount > 0 && <span className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{unreadCount}</span>}
                     </button>
                   ))}
                 </div>
               </nav>
-              <div className="p-4 border-t border-gray-800">
-                <button onClick={logout} className="w-full flex items-center p-3 text-red-400 hover:bg-red-950/20 rounded-xl"><LogOut className="w-5 h-5 mr-3" /> <span className="text-sm font-bold">Logout</span></button>
-              </div>
             </aside>
           )}
 
-          {/* MAIN CONTENT AREA */}
           <main className={`flex-1 overflow-y-auto bg-gray-950 ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
             <div className="max-w-7xl mx-auto min-h-full">
               {renderContent()}
@@ -256,15 +280,12 @@ const App = () => {
           </main>
         </div>
 
-        {/* MOBILE BOTTOM NAV */}
+        {/* MOBILE BOTTOM NAV - ICONS INCREASED TO W-6 H-6 */}
         {showAppUI && (
           <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex items-center justify-around z-[40] px-1 shadow-2xl">
             {navItems.map(item => (
               <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center flex-1 transition-all ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-500'}`}>
-                <item.icon className="w-5 h-5" />
-                <span className="text-[9px] mt-1 font-bold uppercase tracking-tighter truncate w-full text-center">
-                  {item.name.split(' ')[0]}
-                </span>
+                <item.icon className="w-6 h-6" />
               </button>
             ))}
           </nav>
