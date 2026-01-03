@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrendingUp, DollarSign, IndianRupee, List, BarChart, CreditCard, Package, Loader } from 'lucide-react';
+import { TrendingUp, DollarSign, IndianRupee, List, BarChart, CreditCard, Package, Loader, Truck, AlertTriangle, ShoppingCart, Users, Activity, Layers } from 'lucide-react';
 import SalesChart from './SalesChart';
 
 // --- Constants ---
@@ -52,6 +52,10 @@ const Reports = ({ apiClient, API, showToast }) => {
     const [chartData, setChartData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
+    // SCM Specific States
+    const [suppliers, setSuppliers] = useState([]);
+    const [purchases, setPurchases] = useState([]);
+
     const fetchReportData = useCallback(async () => {
         setIsLoading(true);
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
@@ -60,10 +64,19 @@ const Reports = ({ apiClient, API, showToast }) => {
         try {
             const summaryResponse = await apiClient.get(API.reportsSummary, { params: queryParams });
             setSummaryData(summaryResponse.data);
+            
             const chartResponse = await apiClient.get(API.reportsChartData, {
                 params: { ...queryParams, viewType: viewType }
             });
             setChartData(chartResponse.data);
+
+            const [suppliersRes, purchasesRes] = await Promise.all([
+                apiClient.get(API.scmSuppliers),
+                apiClient.get(API.scmPurchases)
+            ]);
+            setSuppliers(suppliersRes.data);
+            setPurchases(purchasesRes.data);
+
         } catch (error) {
             console.error("Failed to fetch report data:", error.response?.data || error.message);
             if (error.response?.status === 401 || error.message.includes('token')) {
@@ -71,12 +84,10 @@ const Reports = ({ apiClient, API, showToast }) => {
             } else {
                 showToast({ message: "Failed to load reports.", type: 'error' });
             }
-            setSummaryData(null);
-            setChartData(null);
         } finally {
             setIsLoading(false);
         }
-    }, [selectedFilter, customStartDate, customEndDate, viewType, showToast, apiClient, API.reportsSummary, API.reportsChartData]);
+    }, [selectedFilter, customStartDate, customEndDate, viewType, showToast, apiClient, API]);
 
     useEffect(() => {
         fetchReportData();
@@ -86,6 +97,31 @@ const Reports = ({ apiClient, API, showToast }) => {
         const numericAmount = typeof amount === 'number' ? amount : 0;
         return `₹${numericAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     };
+
+    const scmInsights = useMemo(() => {
+        const totalInvestment = purchases.reduce((acc, curr) => acc + (curr.purchasePrice * curr.quantity), 0);
+        
+        const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
+        const filteredPurchases = purchases.filter(p => {
+            if (!startDate) return true;
+            const pDate = new Date(p.date).toISOString().split('T')[0];
+            return pDate >= startDate && pDate <= endDate;
+        });
+
+        const supplierSpend = filteredPurchases.reduce((acc, curr) => {
+            const sName = curr.supplierId?.name || 'Unknown Vendor';
+            if (!acc[sName]) acc[sName] = { name: sName, totalSpent: 0, orders: 0 };
+            acc[sName].totalSpent += (curr.purchasePrice * curr.quantity);
+            acc[sName].orders += 1;
+            return acc;
+        }, {});
+
+        return {
+            totalStockValue: totalInvestment,
+            activeSuppliers: suppliers.length,
+            topSuppliers: Object.values(supplierSpend).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5)
+        };
+    }, [purchases, suppliers, selectedFilter, customStartDate, customEndDate]);
 
     const MetricCard = ({ title, value, icon: Icon, colorClass, description }) => (
         <article className={`p-4 rounded-xl shadow-lg border-b-4 ${colorClass} bg-gray-900 border border-gray-800`}>
@@ -119,37 +155,27 @@ const Reports = ({ apiClient, API, showToast }) => {
     const chartDataToRender = chartData || [];
 
     return (
-        <main className="h-screen w-full flex flex-col bg-gray-950 overflow-hidden font-sans antialiased text-gray-100" itemScope itemType="https://schema.org/Report">
+        <main className="h-screen w-full flex flex-col bg-gray-950 overflow-hidden font-sans antialiased text-gray-100">
             <style jsx global>{`
                 .font-sans { font-family: 'Inter', sans-serif; }
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            {/* Header Block */}
-            <header className="flex-shrink-0 p-4 md:p-8 pb-4 border-b border-gray-800 bg-gray-950" itemProp="headline">
-                <h1 className="text-3xl font-extrabold text-white">
-                    Business Reports
-                </h1>
-                <p className="text-sm text-gray-400 mb-4 tracking-wide" itemProp="description">
-                    {/* <span>Optimize stock and staffing with sales insights.</span> */}
-                    <span className="block mt-1">
-                        Analyzing: <span className="font-bold text-teal-400">{getCurrentFilterLabel()}</span>
-                    </span>
+            <header className="flex-shrink-0 p-4 md:p-8 pb-4 border-b border-gray-800 bg-gray-950">
+                <h1 className="text-3xl font-extrabold text-white">Business Reports</h1>
+                <p className="text-sm text-gray-400 mb-4 tracking-wide">
+                    Analyzing: <span className="font-bold text-teal-400">{getCurrentFilterLabel()}</span>
                 </p>
 
-                <nav aria-label="Report date filters" className="space-y-4">
+                <nav className="space-y-4">
                     <div className="overflow-x-auto no-scrollbar py-1">
-                        <div className="inline-flex space-x-2 p-1 bg-gray-900 rounded-xl border border-gray-800" role="group">
+                        <div className="inline-flex space-x-2 p-1 bg-gray-900 rounded-xl border border-gray-800">
                             {DATE_FILTERS.map(filter => (
                                 <button
                                     key={filter.id}
                                     onClick={() => setSelectedFilter(filter.id)}
-                                    aria-pressed={selectedFilter === filter.id}
-                                    className={`px-4 py-2 text-xs md:text-sm font-bold rounded-lg transition-all ${selectedFilter === filter.id
-                                        ? 'bg-indigo-600 text-white shadow-lg'
-                                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                                        }`}
+                                    className={`px-4 py-2 text-xs md:text-sm font-bold rounded-lg transition-all ${selectedFilter === filter.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                                     disabled={isLoading}
                                 >
                                     {filter.label}
@@ -157,167 +183,145 @@ const Reports = ({ apiClient, API, showToast }) => {
                             ))}
                         </div>
                     </div>
-
                     {selectedFilter === 'custom' && (
                         <div className="flex gap-3 p-3 bg-gray-900 rounded-xl border border-gray-800">
-                            <div className="flex-1">
-                                <label htmlFor="start-date" className="sr-only">Start Date</label>
-                                <input
-                                    id="start-date"
-                                    type="date"
-                                    value={customStartDate}
-                                    onChange={(e) => setCustomStartDate(e.target.value)}
-                                    className="w-full p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                                    disabled={isLoading}
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <label htmlFor="end-date" className="sr-only">End Date</label>
-                                <input
-                                    id="end-date"
-                                    type="date"
-                                    value={customEndDate}
-                                    onChange={(e) => setCustomEndDate(e.target.value)}
-                                    className="w-full p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                                    disabled={isLoading}
-                                />
-                            </div>
+                            <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="flex-1 p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white outline-none" />
+                            <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="flex-1 p-2 text-xs border border-gray-700 rounded-lg bg-gray-800 text-white outline-none" />
                         </div>
                     )}
                 </nav>
             </header>
 
-            {/* Main Scrollable Content Area */}
-            <div
-                className="flex-grow overflow-y-auto p-4 md:p-8 pt-6 pb-32 custom-scrollbar"
-                aria-busy={isLoading}
-            >
+            <div className="flex-grow overflow-y-auto p-4 md:p-8 pt-6 pb-32 custom-scrollbar">
                 <div className="max-w-7xl mx-auto">
-
-                    {/* Metrics Grid */}
-                    <section aria-label="Key Performance Indicators" className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
+                    {/* Primary Sales KPI Section */}
+                    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
                         <MetricCard title="Total Revenue" value={formatCurrency(data.revenue)} icon={IndianRupee} colorClass="border-b-indigo-500 text-indigo-400" description="Generated from bills" />
                         <MetricCard title="Bills Raised" value={data.billsRaised.toLocaleString()} icon={List} colorClass="border-b-emerald-500 text-emerald-400" description="Total sales bills" />
                         <MetricCard title="Avg. Bill Value" value={formatCurrency(data.averageBillValue)} icon={IndianRupee} colorClass="border-b-amber-500 text-amber-400" description="Revenue / Bills" />
                         <MetricCard title="Items Volume" value={data.volume.toLocaleString()} icon={Package} colorClass="border-b-sky-500 text-sky-400" description="Total units sold" />
                     </section>
 
-                    {/* Chart Visualization */}
-                    <section aria-label="Sales trend analysis chart" className="bg-gray-900 p-4 md:p-6 rounded-xl shadow-2xl border border-gray-800 mb-8">
+                    {/* Sales Trend Chart */}
+                    <section className="bg-gray-900 p-4 md:p-6 rounded-xl shadow-2xl border border-gray-800 mb-8">
                         <h3 className="text-xl font-bold flex items-center text-gray-100 mb-4 border-b border-gray-800 pb-3">
-                            <BarChart aria-hidden="true" className="w-5 h-5 mr-2 text-indigo-400" /> Trend Analysis
+                            <BarChart className="w-5 h-5 mr-2 text-indigo-400" /> Trend Analysis
                         </h3>
-
-                        {/* Chart Controls */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                            <nav aria-label="Chart data toggle" className="flex flex-col gap-2">
-                                <div className="inline-flex rounded-full shadow-inner bg-gray-800 p-1" role="tablist">
-                                    <button
-                                        role="tab"
-                                        aria-selected={chartYAxis === 'revenue'}
-                                        onClick={() => setChartYAxis('revenue')}
-                                        className={`flex-1 px-3 py-2 text-xs font-bold rounded-full transition ${chartYAxis === 'revenue' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        disabled={isLoading}
-                                    >
-                                        Revenue
-                                    </button>
-                                    <button
-                                        role="tab"
-                                        aria-selected={chartYAxis === 'bills'}
-                                        onClick={() => setChartYAxis('bills')}
-                                        className={`flex-1 px-3 py-2 text-xs font-bold rounded-full transition ${chartYAxis === 'bills' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        disabled={isLoading}
-                                    >
-                                        Bills
-                                    </button>
-                                </div>
-                            </nav>
-
-                            <nav aria-label="Chart view scale" className="flex flex-col gap-2">
-                                <div className="inline-flex rounded-full shadow-inner bg-gray-800 p-1" role="tablist">
-                                    {VIEW_TYPES.map(type => (
-                                        <button
-                                            key={type}
-                                            role="tab"
-                                            aria-selected={viewType === type}
-                                            onClick={() => setViewType(type)}
-                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-full transition ${viewType === type
-                                                    ? 'bg-emerald-600 text-white'
-                                                    : 'text-gray-400 hover:text-white'
-                                                }`}
-                                            disabled={isLoading}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
-                            </nav>
+                            <div className="inline-flex rounded-full shadow-inner bg-gray-800 p-1">
+                                {['revenue', 'bills'].map(key => (
+                                    <button key={key} onClick={() => setChartYAxis(key)} className={`flex-1 px-3 py-2 text-xs font-bold rounded-full transition uppercase ${chartYAxis === key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>{key}</button>
+                                ))}
+                            </div>
+                            <div className="inline-flex rounded-full shadow-inner bg-gray-800 p-1">
+                                {VIEW_TYPES.map(type => (
+                                    <button key={type} onClick={() => setViewType(type)} className={`flex-1 px-3 py-2 text-xs font-bold rounded-full transition ${viewType === type ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}>{type}</button>
+                                ))}
+                            </div>
                         </div>
-
-                        {isLoading ? (
-                            <div className="h-64 w-full bg-gray-950/50 rounded-xl flex items-center justify-center border border-gray-800" role="status">
-                                <Loader className="w-6 h-6 animate-spin mr-2 text-emerald-400" />
-                                <p className="text-center text-gray-500 font-medium tracking-wide">Loading chart data...</p>
-                            </div>
-                        ) : chartDataToRender.length > 0 ? (
-                            <div className="bg-gray-950/30 p-2 rounded-lg">
-                                <SalesChart
-                                    data={chartDataToRender}
-                                    viewType={viewType}
-                                    yAxisKey={chartYAxis}
-                                />
-                            </div>
-                        ) : (
-                            <p className="text-center text-gray-500 py-12 font-medium italic">No data available for the selected period.</p>
-                        )}
+                        {isLoading ? <div className="h-64 flex items-center justify-center"><Loader className="animate-spin text-emerald-400" /></div> : <div className="bg-gray-950/30 p-2 rounded-lg"><SalesChart data={chartDataToRender} viewType={viewType} yAxisKey={chartYAxis} /></div>}
                     </section>
 
-                    {/* Bottom Grid: Items and Financials */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <section aria-label="Top selling products" className="bg-gray-900 p-4 md:p-6 rounded-xl border border-gray-800">
-                            <h3 className="text-lg font-bold flex items-center text-gray-200 mb-4">
-                                <Package aria-hidden="true" className="w-5 h-5 mr-2 text-sky-400" /> Top Selling Items
-                            </h3>
-                            {isLoading ? (
-                                <div className="space-y-3">
-                                    <div className="h-12 bg-gray-800 rounded-lg animate-pulse"></div>
-                                    <div className="h-12 bg-gray-800 rounded-lg animate-pulse"></div>
+                    {/* Supply Chain Insights - UPDATED TO MATCH TREND ANALYSIS OUTER CARD */}
+                    <section className="bg-gray-900 p-4 md:p-6 rounded-xl shadow-2xl border border-gray-800 mb-8">
+                         <h3 className="text-xl font-bold flex items-center text-gray-100 mb-6 border-b border-gray-800 pb-3">
+                            <Truck className="w-5 h-5 mr-2 text-amber-500" /> Supply Chain Insights
+                         </h3>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="flex items-center gap-4 p-4 bg-gray-950/40 rounded-xl border border-gray-800/60">
+                                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                    <Layers className="w-6 h-6 text-amber-500" />
                                 </div>
-                            ) : data.topItems.length > 0 ? (
-                                <ul className="space-y-3">
-                                    {data.topItems.map((item, index) => (
-                                        <li key={item.name} className="flex items-center justify-between p-3 bg-gray-950/50 rounded-lg border border-gray-800 hover:border-sky-500/30 transition-colors">
-                                            <span className="text-xs md:text-sm font-bold text-gray-300 flex items-center">
-                                                <span aria-hidden="true" className="w-6 h-6 rounded-full bg-sky-900/50 text-sky-400 text-[10px] font-black mr-3 flex items-center justify-center border border-sky-500/20">{index + 1}</span>
-                                                {item.name}
-                                            </span>
-                                            <span className="font-black text-sm md:text-base text-sky-400">{item.quantity} units</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : <p className="text-center text-gray-600 py-4 text-sm font-medium">No sales recorded in this period.</p>}
-                        </section>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Procurement Cost</p>
+                                    <p className="text-xl font-black text-white">{formatCurrency(scmInsights.totalStockValue)}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4 p-4 bg-gray-950/40 rounded-xl border border-gray-800/60">
+                                <div className="p-3 bg-teal-500/10 rounded-lg border border-teal-500/20">
+                                    <Users className="w-6 h-6 text-teal-500" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Vendor List</p>
+                                    <p className="text-xl font-black text-white">{scmInsights.activeSuppliers} Partners</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4 p-4 bg-gray-950/40 rounded-xl border border-gray-800/60">
+                                <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                                    <Activity className="w-6 h-6 text-indigo-500" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Purchase Orders</p>
+                                    <p className="text-xl font-black text-white">{purchases.length} Total</p>
+                                </div>
+                            </div>
+                         </div>
+                    </section>
 
-                        <aside aria-label="Lifetime financial summary" className="bg-gray-900 p-4 md:p-6 rounded-xl border border-gray-800">
-                            <h3 className="text-lg font-bold flex items-center text-gray-200 mb-4">
-                                <CreditCard aria-hidden="true" className="w-5 h-5 mr-2 text-red-400" /> Financial Summary
+                    {/* Vendor Analysis & Financial Health Grid */}
+                    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <div className="bg-gray-900 p-5 md:p-6 rounded-2xl border border-gray-800 shadow-2xl">
+                            <h3 className="text-lg font-bold flex items-center text-gray-100 mb-6">
+                                <ShoppingCart className="w-5 h-5 mr-2 text-indigo-400" /> Vendor Spend Analysis
                             </h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                                    <span className="text-xs md:text-sm text-gray-500 font-bold uppercase tracking-tight">Total Khata Due</span>
-                                    <span className="font-black text-lg md:text-xl text-red-500">{formatCurrency(data.totalCreditOutstanding)}</span>
+                            <div className="space-y-3">
+                                {scmInsights.topSuppliers.length > 0 ? scmInsights.topSuppliers.map((sup, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-950/40 rounded-xl border border-gray-800/60 hover:bg-gray-950/80 transition-all duration-300">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center text-xs font-bold text-gray-500 border border-gray-800">{idx + 1}</div>
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-200">{sup.name}</p>
+                                                <p className="text-[10px] text-gray-500 font-medium">{sup.orders} Purchases</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm font-black text-indigo-400">{formatCurrency(sup.totalSpent)}</p>
+                                    </div>
+                                )) : <div className="text-center py-12 border-2 border-dashed border-gray-800 rounded-xl">
+                                        <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">No Vendor Activity</p>
+                                     </div>}
+                            </div>
+                        </div>
+
+                        <aside className="bg-gray-900 p-5 md:p-6 rounded-2xl border border-gray-800 shadow-2xl">
+                            <h3 className="text-lg font-bold flex items-center text-gray-200 mb-6">
+                                <CreditCard className="w-5 h-5 mr-2 text-red-400" /> Financial Health Summary
+                            </h3>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center p-4 bg-red-500/5 rounded-xl border border-red-500/10 mb-3">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Total Khata Due</span>
+                                    <span className="font-black text-xl text-red-500">{formatCurrency(data.totalCreditOutstanding)}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                                    <span className="text-xs md:text-sm text-gray-500 font-bold uppercase tracking-tight">All Time Revenue</span>
-                                    <span className="font-black text-emerald-400">{formatCurrency(data.totalAllTimeRevenue)}</span>
+                                <div className="flex justify-between items-center p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10 mb-3">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">All Time Revenue</span>
+                                    <span className="font-black text-xl text-emerald-400">{formatCurrency(data.totalAllTimeRevenue)}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-2">
-                                    <span className="text-xs md:text-sm text-gray-500 font-bold uppercase tracking-tight">All Time Bills</span>
-                                    <span className="font-black text-indigo-400">{data.totalAllTimeBills.toLocaleString()}</span>
+                                <div className="flex justify-between items-center p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">All Time Bills</span>
+                                    <span className="font-black text-xl text-indigo-400">{data.totalAllTimeBills.toLocaleString()}</span>
                                 </div>
                             </div>
                         </aside>
-                    </div>
+                    </section>
+
+                    {/* Top Selling Items (Matches Trend Analysis Card Style) */}
+                    <section className="bg-gray-900 p-5 md:p-6 rounded-2xl border border-gray-800 shadow-2xl">
+                        <h3 className="text-lg font-bold flex items-center text-gray-200 mb-6 border-b border-gray-800 pb-3">
+                            <Package className="w-5 h-5 mr-2 text-sky-400" /> Best Performing Products
+                        </h3>
+                        {isLoading ? <div className="h-24 animate-pulse bg-gray-800 rounded-xl"></div> : data.topItems.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {data.topItems.map((item, index) => (
+                                    <div key={item.name} className="flex items-center justify-between p-4 bg-gray-950/50 rounded-xl border border-gray-800 hover:border-sky-500/30 transition-all">
+                                        <div className="flex items-center">
+                                            <span className="w-7 h-7 rounded-lg bg-sky-900/50 text-sky-400 text-[10px] font-black mr-3 flex items-center justify-center border border-sky-500/20">{index + 1}</span>
+                                            <span className="text-sm font-bold text-gray-300">{item.name}</span>
+                                        </div>
+                                        <span className="font-black text-sm text-sky-400">{item.quantity} Units</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : <p className="text-center text-gray-600 py-10 text-xs font-bold uppercase">No sales data recorded.</p>}
+                    </section>
                 </div>
             </div>
         </main>

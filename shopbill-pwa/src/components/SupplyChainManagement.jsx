@@ -195,7 +195,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
     <div className="p-4 md:p-8 bg-gray-950 min-h-full text-gray-200">
       <header className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight uppercase">
-          <Truck className="text-indigo-500 w-7 h-7" /> Supply Chain
+           Supply Chain
         </h1>
         <button 
           onClick={() => setIsScannerModalOpen(true)}
