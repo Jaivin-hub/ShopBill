@@ -62,6 +62,7 @@ const Reports = ({ apiClient, API, showToast }) => {
         const queryParams = { ...(startDate && { startDate }), ...(endDate && { endDate }) };
 
         try {
+            // Fetch Sales Data
             const summaryResponse = await apiClient.get(API.reportsSummary, { params: queryParams });
             setSummaryData(summaryResponse.data);
             
@@ -70,6 +71,7 @@ const Reports = ({ apiClient, API, showToast }) => {
             });
             setChartData(chartResponse.data);
 
+            // Fetch SCM Data - Note: We fetch all and filter locally to ensure consistency with UI filters
             const [suppliersRes, purchasesRes] = await Promise.all([
                 apiClient.get(API.scmSuppliers),
                 apiClient.get(API.scmPurchases)
@@ -98,28 +100,34 @@ const Reports = ({ apiClient, API, showToast }) => {
         return `₹${numericAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     };
 
+    // --- Dynamic Filtering Logic for SCM ---
     const scmInsights = useMemo(() => {
-        const totalInvestment = purchases.reduce((acc, curr) => acc + (curr.purchasePrice * curr.quantity), 0);
-        
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
+        
+        // Filter purchases based on the active report date range
         const filteredPurchases = purchases.filter(p => {
-            if (!startDate) return true;
-            const pDate = new Date(p.date).toISOString().split('T')[0];
-            return pDate >= startDate && pDate <= endDate;
+            if (!startDate || !endDate) return true; // 'All Time'
+            const purchaseDate = new Date(p.date || p.createdAt).toISOString().split('T')[0];
+            return purchaseDate >= startDate && purchaseDate <= endDate;
         });
 
-        const supplierSpend = filteredPurchases.reduce((acc, curr) => {
+        const totalInvestment = filteredPurchases.reduce((acc, curr) => acc + (curr.purchasePrice * curr.quantity), 0);
+        
+        // Group spend by supplier within the filtered range
+        const supplierSpendMap = filteredPurchases.reduce((acc, curr) => {
+            const sId = curr.supplierId?._id || 'unknown';
             const sName = curr.supplierId?.name || 'Unknown Vendor';
-            if (!acc[sName]) acc[sName] = { name: sName, totalSpent: 0, orders: 0 };
-            acc[sName].totalSpent += (curr.purchasePrice * curr.quantity);
-            acc[sName].orders += 1;
+            if (!acc[sId]) acc[sId] = { name: sName, totalSpent: 0, orders: 0 };
+            acc[sId].totalSpent += (curr.purchasePrice * curr.quantity);
+            acc[sId].orders += 1;
             return acc;
         }, {});
 
         return {
             totalStockValue: totalInvestment,
             activeSuppliers: suppliers.length,
-            topSuppliers: Object.values(supplierSpend).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5)
+            filteredPurchaseCount: filteredPurchases.length,
+            topSuppliers: Object.values(supplierSpendMap).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5)
         };
     }, [purchases, suppliers, selectedFilter, customStartDate, customEndDate]);
 
@@ -222,7 +230,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                         {isLoading ? <div className="h-64 flex items-center justify-center"><Loader className="animate-spin text-emerald-400" /></div> : <div className="bg-gray-950/30 p-2 rounded-lg"><SalesChart data={chartDataToRender} viewType={viewType} yAxisKey={chartYAxis} /></div>}
                     </section>
 
-                    {/* Supply Chain Insights - UPDATED TO MATCH TREND ANALYSIS OUTER CARD */}
+                    {/* Supply Chain Insights - Filtered */}
                     <section className="bg-gray-900 p-4 md:p-6 rounded-xl shadow-2xl border border-gray-800 mb-8">
                          <h3 className="text-xl font-bold flex items-center text-gray-100 mb-6 border-b border-gray-800 pb-3">
                             <Truck className="w-5 h-5 mr-2 text-amber-500" /> Supply Chain Insights
@@ -233,7 +241,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                     <Layers className="w-6 h-6 text-amber-500" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Procurement Cost</p>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Procurement ({selectedFilter})</p>
                                     <p className="text-xl font-black text-white">{formatCurrency(scmInsights.totalStockValue)}</p>
                                 </div>
                             </div>
@@ -242,8 +250,8 @@ const Reports = ({ apiClient, API, showToast }) => {
                                     <Users className="w-6 h-6 text-teal-500" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Vendor List</p>
-                                    <p className="text-xl font-black text-white">{scmInsights.activeSuppliers} Partners</p>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Active Vendors</p>
+                                    <p className="text-xl font-black text-white">{scmInsights.activeSuppliers}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4 p-4 bg-gray-950/40 rounded-xl border border-gray-800/60">
@@ -251,8 +259,8 @@ const Reports = ({ apiClient, API, showToast }) => {
                                     <Activity className="w-6 h-6 text-indigo-500" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Purchase Orders</p>
-                                    <p className="text-xl font-black text-white">{purchases.length} Total</p>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Orders in Period</p>
+                                    <p className="text-xl font-black text-white">{scmInsights.filteredPurchaseCount}</p>
                                 </div>
                             </div>
                          </div>
@@ -277,7 +285,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                         <p className="text-sm font-black text-indigo-400">{formatCurrency(sup.totalSpent)}</p>
                                     </div>
                                 )) : <div className="text-center py-12 border-2 border-dashed border-gray-800 rounded-xl">
-                                        <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">No Vendor Activity</p>
+                                        <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">No Activity for this Period</p>
                                      </div>}
                             </div>
                         </div>
@@ -303,10 +311,10 @@ const Reports = ({ apiClient, API, showToast }) => {
                         </aside>
                     </section>
 
-                    {/* Top Selling Items (Matches Trend Analysis Card Style) */}
+                    {/* Best Performing Products */}
                     <section className="bg-gray-900 p-5 md:p-6 rounded-2xl border border-gray-800 shadow-2xl">
                         <h3 className="text-lg font-bold flex items-center text-gray-200 mb-6 border-b border-gray-800 pb-3">
-                            <Package className="w-5 h-5 mr-2 text-sky-400" /> Best Performing Products
+                            <Package className="w-5 h-5 mr-2 text-sky-400" /> Top Selling Products
                         </h3>
                         {isLoading ? <div className="h-24 animate-pulse bg-gray-800 rounded-xl"></div> : data.topItems.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -320,7 +328,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                     </div>
                                 ))}
                             </div>
-                        ) : <p className="text-center text-gray-600 py-10 text-xs font-bold uppercase">No sales data recorded.</p>}
+                        ) : <p className="text-center text-gray-600 py-10 text-xs font-bold uppercase">No data for this period.</p>}
                     </section>
                 </div>
             </div>
