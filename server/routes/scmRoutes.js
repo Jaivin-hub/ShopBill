@@ -6,40 +6,39 @@ const Inventory = require('../models/Inventory');
 // Import your notification helpers
 const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
 
-// Placeholder for Models (Ensure these paths match your project structure)
 const Supplier = require('../models/Supplier'); 
 const Purchase = require('../models/Purchase');
 
 const router = express.Router();
 
 /**
- * HELPER: checkAndNotifyLowStock (Shared logic with Inventory)
- * Resolves alerts if stock is added via purchase.
+ * HELPER: checkAndNotifyLowStock
+ * Logic: If stock is now healthy, clear old alerts. 
+ * Also sends a success notification for the replenishment.
  */
-const checkAndNotifyLowStock = async (req, item) => {
+const handlePurchaseNotifications = async (req, item, quantityPurchased) => {
     if (!item) return;
     const currentQty = Number(item.quantity);
     const reorderLevel = Number(item.reorderLevel) || 5;
     const shopIdString = item.shopId.toString();
 
-    if (currentQty <= reorderLevel) {
-        try {
-            await emitAlert(req, shopIdString, 'inventory_low', {
-                _id: item._id,
-                name: item.name,
-                quantity: currentQty
-            });
-        } catch (err) { console.error("❌ Alert Error:", err); }
-    } else {
+    // 1. Resolve any existing 'Low Stock' alert if quantity is now above threshold
+    if (currentQty > reorderLevel) {
         try {
             await resolveLowStockAlert(req, shopIdString, item._id);
         } catch (err) { console.error("❌ Resolution Error:", err); }
     }
+
+    // 2. Send a Success notification for the replenishment
+    try {
+        await emitAlert(req, shopIdString, 'success', {
+            message: `Purchased ${quantityPurchased} units of ${item.name}. (New Stock: ${currentQty})`,
+            _id: item._id
+        });
+    } catch (err) { console.error("❌ Success Notification Error:", err); }
 };
 
 // --- SUPPLIER ROUTES ---
-
-// 1. Get all suppliers for the shop
 router.get('/suppliers', protect, async (req, res) => {
     try {
         const suppliers = await Supplier.find({ shopId: req.user.shopId }).sort({ createdAt: -1 });
@@ -49,7 +48,6 @@ router.get('/suppliers', protect, async (req, res) => {
     }
 });
 
-// 2. Add a new supplier
 router.post('/suppliers', protect, async (req, res) => {
     try {
         const supplier = await Supplier.create({
@@ -63,8 +61,6 @@ router.post('/suppliers', protect, async (req, res) => {
 });
 
 // --- PURCHASE / PROCUREMENT ROUTES ---
-
-// 3. Get purchase history
 router.get('/purchases', protect, async (req, res) => {
     try {
         const history = await Purchase.find({ shopId: req.user.shopId })
@@ -77,8 +73,10 @@ router.get('/purchases', protect, async (req, res) => {
     }
 });
 
-// 4. Record a Purchase (CORE LOGIC)
-// This records the invoice AND updates the inventory stock in one flow.
+/**
+ * Record a Purchase
+ * Updates stock AND triggers notifications.
+ */
 router.post('/purchases', protect, async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -86,13 +84,14 @@ router.post('/purchases', protect, async (req, res) => {
     try {
         const { productId, supplierId, quantity, purchasePrice, invoiceNumber, date } = req.body;
         const shopId = req.user.shopId;
+        const numQty = Number(quantity);
 
         // 1. Create Purchase Record
         const purchase = await Purchase.create([{
             shopId,
             productId,
             supplierId,
-            quantity: Number(quantity),
+            quantity: numQty,
             purchasePrice: Number(purchasePrice),
             invoiceNumber,
             date: date || new Date()
@@ -101,7 +100,7 @@ router.post('/purchases', protect, async (req, res) => {
         // 2. Increment Inventory Stock
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: productId, shopId },
-            { $inc: { quantity: Number(quantity) } },
+            { $inc: { quantity: numQty } },
             { new: true, session }
         );
 
@@ -112,8 +111,9 @@ router.post('/purchases', protect, async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // 3. Check if this replenishment resolves a "Low Stock" alert
-        await checkAndNotifyLowStock(req, updatedItem);
+        // 3. TRIGGER NOTIFICATIONS
+        // We pass 'numQty' to let the user know exactly how much was added in the alert.
+        await handlePurchaseNotifications(req, updatedItem, numQty);
 
         res.status(201).json({
             message: 'Purchase recorded and stock updated.',

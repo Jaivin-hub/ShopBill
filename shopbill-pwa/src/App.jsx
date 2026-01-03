@@ -19,8 +19,8 @@ import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage';
 import ResetPassword from './components/ResetPassword';
-import StaffSetPassword from './components/StaffSetPassword'; 
-import SalesActivityPage from './components/SalesActivityPage'; 
+import StaffSetPassword from './components/StaffSetPassword';
+import SalesActivityPage from './components/SalesActivityPage';
 import UserManagement from './components/UserManagement';
 import SuperAdminDashboard from './components/superAdminDashboard';
 import SystemConfig from './components/SystemConfig';
@@ -59,7 +59,7 @@ const UpdatePrompt = () => {
           </div>
           <h4 className="font-extrabold text-2xl leading-tight">New Update Live</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version of Pocket POS is available. Update now to access new features and security fixes.</p>
-          <button 
+          <button
             onClick={() => updateHandler && updateHandler(true)}
             className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
@@ -72,23 +72,23 @@ const UpdatePrompt = () => {
 };
 
 const UTILITY_NAV_ITEMS_CONFIG = [
-    { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-    { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+  { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+  { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
 const SUPERADMIN_NAV_ITEMS = [
-    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
 const checkDeepLinkPath = () => {
-    const path = window.location.pathname;
-    if (path.startsWith('/staff-setup/')) return 'staffSetPassword'; 
-    if (path.startsWith('/reset-password/')) return 'resetPassword'; 
-    return null; 
+  const path = window.location.pathname;
+  if (path.startsWith('/staff-setup/')) return 'staffSetPassword';
+  if (path.startsWith('/reset-password/')) return 'resetPassword';
+  return null;
 };
 
 const App = () => {
@@ -146,55 +146,73 @@ const App = () => {
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const standardNav = [
-        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-        { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-        { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
+      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
-  const utilityNavItems = useMemo(() => 
+  const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
-  , [userRole]);
+    , [userRole]);
 
   const renderContent = () => {
-    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
-    
-    if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
-    if (currentPage === 'resetPassword') return <ResetPassword />;
+  if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
 
-    if (!currentUser) {
-        return isViewingLogin ? 
-            <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> : 
-            <LandingPage onStartApp={() => setIsViewingLogin(true)} />;
+  // 1. PUBLIC PAGES (Accessible by everyone)
+  if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
+  if (currentPage === 'resetPassword') return <ResetPassword />;
+  if (currentPage === 'terms') return <TermsAndConditions onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
+  if (currentPage === 'policy') return <PrivacyPolicy onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
+  if (currentPage === 'support') return <SupportPage onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
+  if (currentPage === 'affiliate') return <AffiliatePage onBack={() => currentUser ? setCurrentPage('dashboard') : setCurrentPage('landing')} />;
+
+  // 2. AUTHENTICATION GATES
+  if (!currentUser) {
+    if (isViewingLogin) {
+      return <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} />;
     }
+    return (
+      <LandingPage
+        onStartApp={() => setIsViewingLogin(true)}
+        onViewTerms={() => setCurrentPage('terms')}
+        onViewPolicy={() => setCurrentPage('policy')}
+        onViewSupport={() => setCurrentPage('support')}
+        onViewAffiliate={() => setCurrentPage('affiliate')}
+        onSelectPlan={(plan) => {
+          setSelectedPlan(plan);
+          setIsViewingLogin(true);
+        }}
+      />
+    );
+  }
 
-    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
+  // 3. PROTECTED APP PAGES
+  const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage };
 
-    switch (currentPage) {
-      case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} />;
-      case 'billing': return <BillingPOS {...commonProps} />;
-      case 'khata': return <Ledger {...commonProps} />;
-      case 'inventory': return <InventoryManager {...commonProps} />;
-      case 'scm': return <SupplyChainManagement {...commonProps} />;
-      case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
-      case 'notifications': return <NotificationsPage {...commonProps} />;
-      case 'settings': return <SettingsPage {...commonProps} />;
-      case 'profile': return <Profile {...commonProps} />;
-      case 'superadmin_users': return <UserManagement {...commonProps} />;
-      case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-      case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
-      case 'terms': return <TermsAndConditions onBack={() => setCurrentPage('dashboard')} />;
-      case 'policy': return <PrivacyPolicy onBack={() => setCurrentPage('dashboard')} />;
-      default: return <Dashboard {...commonProps} />;
-    }
-  };
+  switch (currentPage) {
+    case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} />;
+    case 'billing': return <BillingPOS {...commonProps} />;
+    case 'khata': return <Ledger {...commonProps} />;
+    case 'inventory': return <InventoryManager {...commonProps} />;
+    case 'scm': return <SupplyChainManagement {...commonProps} />;
+    case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
+    case 'notifications': return <NotificationsPage {...commonProps} />;
+    case 'settings': return <SettingsPage {...commonProps} />;
+    case 'profile': return <Profile {...commonProps} />;
+    case 'superadmin_users': return <UserManagement {...commonProps} />;
+    case 'superadmin_systems': return <SystemConfig {...commonProps} />;
+    case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+    case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
+    default: return <Dashboard {...commonProps} />;
+  }
+};
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy'].includes(currentPage);
+  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
 
   return (
     <ApiProvider>
