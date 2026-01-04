@@ -196,10 +196,10 @@ const SupplyChainManagement = ({ apiClient, API, showToast }) => {
     <div className="p-4 md:p-8 bg-gray-950 min-h-screen text-gray-200">
       {/* HEADER SECTION */}
       <header className="">
-        <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3 tracking-tight uppercase text-white">
+        <h1 className="text-3xl md:text-3xl font-black flex items-center gap-3 tracking-tight text-white">
             Supply Management
         </h1>
-        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1 md:ml-11">
+        <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1 md:ml-11">
             Logistics & Procurement Control
         </p>
       </header>

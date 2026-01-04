@@ -456,7 +456,7 @@ const InventoryContent = ({
             <section className="lg:hidden">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold flex items-center text-indigo-400">
-                        <Package className="w-4 h-4 mr-2" /> Inventory List ({inventory.length})
+                        Inventory List ({inventory.length})
                     </h3>
                     <div className="flex space-x-2">
                         <button 
