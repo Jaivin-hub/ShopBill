@@ -1,323 +1,281 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import StatCard from './StatCard';
-import { IndianRupee, CreditCard, Users, Package, AlertTriangle, List, Loader, ArrowRight } from 'lucide-react';
+import {
+    IndianRupee, CreditCard, Users, Package, AlertTriangle,
+    List, Loader, ArrowRight, TrendingUp, ShoppingBag, 
+    Clock, Activity, ArrowUpRight, ShieldCheck, BarChart3
+} from 'lucide-react';
 
 const USER_ROLES = {
-  OWNER: 'owner',
-  MANAGER: 'manager',
-  CASHIER: 'cashier',
+    OWNER: 'owner',
+    MANAGER: 'manager',
+    CASHIER: 'cashier',
 };
 
 const Dashboard = ({ userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, onViewSaleDetails }) => {
-  const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
-  const isOwner = userRole === USER_ROLES.OWNER;
+    const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
 
-  // 1. Data States
-  const [inventory, setInventory] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+    const [inventory, setInventory] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [sales, setSales] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-  // 2. Data Fetching Function
-  const fetchDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [invResponse, custResponse, salesResponse] = await Promise.all([
-        apiClient.get(API.inventory),
-        apiClient.get(API.customers),
-        apiClient.get(API.sales),
-      ]);
+    const fetchDashboardData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const [invResponse, custResponse, salesResponse] = await Promise.all([
+                apiClient.get(API.inventory),
+                apiClient.get(API.customers),
+                apiClient.get(API.sales),
+            ]);
 
-      setInventory(invResponse.data);
-      setCustomers(custResponse.data);
-      setSales(salesResponse.data);
-    } catch (error) {
-      console.error("Failed to load dashboard data:", error);
-      showToast('Error loading dashboard data. Please check server connection.', 'error');
-    } finally {
-      setIsLoading(false);
+            setInventory(invResponse.data || []);
+            setCustomers(custResponse.data || []);
+            setSales(salesResponse.data || []);
+        } catch (error) {
+            showToast('Error syncing dashboard data.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [apiClient, API.inventory, API.customers, API.sales, showToast]);
+
+    useEffect(() => {
+        if (hasAccess) fetchDashboardData();
+    }, [hasAccess, fetchDashboardData]);
+
+    // --- DATA CALCULATIONS ---
+    const today = useMemo(() => {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const todaySales = sales.filter(s => new Date(s.timestamp) > startOfDay);
+        const totalSales = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        const totalCreditGiven = todaySales
+            .filter(s => s.paymentMethod === 'Credit' || s.paymentMethod === 'Mixed')
+            .reduce((sum, sale) => sum + sale.amountCredited, 0);
+        return { totalSales, totalCreditGiven };
+    }, [sales]);
+
+    const customersWithCredit = useMemo(() => customers.filter(cust => cust.outstandingCredit > 0), [customers]);
+    const totalOutstandingCredit = useMemo(() => customers.reduce((sum, cust) => sum + (cust.outstandingCredit || 0), 0), [customers]);
+    const topCreditHolders = useMemo(() => [...customersWithCredit].sort((a, b) => b.outstandingCredit - a.outstandingCredit).slice(0, 5), [customersWithCredit]);
+    const allLowStockAlerts = useMemo(() => inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0)), [inventory]);
+    const lowStockAlerts = useMemo(() => allLowStockAlerts.slice(0, 5), [allLowStockAlerts]);
+    const recentSales = useMemo(() => [...sales].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5), [sales]);
+
+    const formatTimeAgo = (timestamp) => {
+        const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+        if (seconds < 60) return "Just now";
+        let interval = seconds / 3600;
+        if (interval > 1 && interval < 24) return Math.floor(interval) + "h ago";
+        if (interval >= 24) return Math.floor(interval / 24) + "d ago";
+        return Math.floor(seconds / 60) + "m ago";
+    };
+
+    const dashboardTitle = {
+        [USER_ROLES.OWNER]: "OWNER",
+        [USER_ROLES.MANAGER]: "MANAGER",
+        [USER_ROLES.CASHIER]: "CASHIER",
+    }[userRole] || "DASHBOARD";
+
+    if (!hasAccess) {
+        return (
+            <main className="h-screen flex flex-col items-center justify-center bg-gray-950 p-8 text-center">
+                <div className="p-5 bg-rose-500/5 rounded-2xl border border-rose-500/20 mb-6">
+                    <ShieldCheck className="w-10 h-10 text-rose-500/50" />
+                </div>
+                <h2 className="text-lg font-bold text-white uppercase tracking-tight">Access Restricted</h2>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-2">Administrative permissions required</p>
+            </main>
+        );
     }
-  }, [apiClient, API.inventory, API.customers, API.sales, showToast]);
 
-  // 3. Initial Data Loading Effect
-  useEffect(() => {
-    if (hasAccess) {
-      fetchDashboardData();
+    if (isLoading) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-gray-950">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader className="w-6 h-6 animate-spin text-indigo-500" />
+                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-[0.3em]">Synchronizing Analytics</span>
+                </div>
+            </div>
+        );
     }
-  }, [hasAccess, fetchDashboardData]);
 
-  // --- DATA CALCULATIONS ---
-  const today = useMemo(() => {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const todaySales = sales.filter(s => new Date(s.timestamp) > startOfDay);
-    const totalSales = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-    const totalCreditGiven = todaySales
-      .filter(s => s.paymentMethod === 'Credit' || s.paymentMethod === 'Mixed')
-      .reduce((sum, sale) => sum + sale.amountCredited, 0);
-    return { totalSales, totalCreditGiven };
-  }, [sales]);
-
-  const customersWithCredit = useMemo(() => {
-    return customers.filter(cust => cust.outstandingCredit > 0);
-  }, [customers]);
-
-  const totalOutstandingCredit = useMemo(() => {
-    return customers.reduce((sum, cust) => sum + cust.outstandingCredit, 0);
-  }, [customers]);
-
-  const topCreditHolders = useMemo(() => {
-    return customersWithCredit
-      .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
-      .slice(0, 5);
-  }, [customersWithCredit]);
-
-  const allLowStockAlerts = useMemo(() => {
-    return inventory.filter(item => (item.quantity || 0) <= (item.reorderLevel || 0));
-  }, [inventory]);
-
-  const lowStockAlerts = useMemo(() => {
-    return allLowStockAlerts.slice(0, 5);
-  }, [allLowStockAlerts]);
-
-  const recentSales = useMemo(() => {
-    return sales
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 5);
-  }, [sales]);
-
-  const formatTimeAgo = (timestamp) => {
-    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " years ago";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " months ago";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " days ago";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " hours ago";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " minutes ago";
-    return Math.floor(seconds) + " seconds ago";
-  };
-
-  const dashboardTitle = {
-    [USER_ROLES.OWNER]: "Owner's Dashboard",
-    [USER_ROLES.MANAGER]: "Manager's Dashboard",
-    [USER_ROLES.CASHIER]: "Cashier's Dashboard",
-  }[userRole] || "Dashboard";
-
-  if (!hasAccess) {
     return (
-      <main className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950" aria-labelledby="access-denied-title">
-        <AlertTriangle className="w-12 h-12 text-indigo-400 mb-4" aria-hidden="true" />
-        <h2 id="access-denied-title" className="text-xl font-semibold text-white">Access Denied</h2>
-        <p className="text-gray-400">You do not have permission to view the main dashboard. Please proceed to the Billing screen.</p>
-      </main>
+        <main className="min-h-screen flex flex-col bg-gray-950 text-gray-200">
+            <style>{`
+                .dashboard-scroll::-webkit-scrollbar { width: 4px; }
+                .dashboard-scroll::-webkit-scrollbar-track { background: transparent; }
+                .dashboard-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+            `}</style>
+
+            {/* --- TOP NAVIGATION BAR --- */}
+            <header className="sticky top-0 z-[100] bg-gray-950/90 backdrop-blur-md border-b border-gray-800/60 px-6 py-5">
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h1 className="text-lg font-bold tracking-tight text-white uppercase leading-none">
+                                {dashboardTitle} <span className="text-indigo-500">Terminal</span>
+                            </h1>
+                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.25em] mt-1.5 flex items-center gap-1.5">
+                                Operational Insights
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* --- CONTENT WORKSPACE --- */}
+            <div className="flex-1 overflow-y-auto dashboard-scroll px-6 py-8">
+                <div className="max-w-7xl mx-auto space-y-8">
+
+                    {/* CORE KPI CARDS */}
+                    <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        {/* REVENUE */}
+                        <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6 hover:border-emerald-500/30 transition-all group relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <TrendingUp className="w-16 h-16 text-emerald-500" />
+                            </div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Daily Gross Revenue</p>
+                            <div className="flex items-end justify-between">
+                                <h2 className="text-3xl font-bold text-white tabular-nums">₹{today.totalSales.toLocaleString('en-IN')}</h2>
+                                <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                                    <IndianRupee className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* DAILY CREDIT */}
+                        <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6 hover:border-indigo-500/30 transition-all group relative overflow-hidden">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Credit Issued (Today)</p>
+                            <div className="flex items-end justify-between">
+                                <h2 className="text-3xl font-bold text-white tabular-nums">₹{today.totalCreditGiven.toLocaleString('en-IN')}</h2>
+                                <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg">
+                                    <CreditCard className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* TOTAL DEBT */}
+                        <div className="bg-gray-900/40 border border-gray-800 rounded-2xl p-6 hover:border-rose-500/30 transition-all group relative overflow-hidden">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Total Accounts Receivable</p>
+                            <div className="flex items-end justify-between">
+                                <h2 className="text-3xl font-bold text-rose-500 tabular-nums">₹{totalOutstandingCredit.toLocaleString('en-IN')}</h2>
+                                <div className="p-2 bg-rose-500/10 text-rose-500 rounded-lg">
+                                    <Users className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* SECONDARY ANALYTICS GRID */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                        {/* STOCK STATUS */}
+                        <section className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+                            <div className="px-6 py-5 border-b border-gray-800/50 flex justify-between items-center bg-gray-900/30">
+                                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Package className="w-4 h-4 text-amber-500" /> Inventory Health
+                                </h3>
+                                <button onClick={onViewAllInventory} className="text-[10px] font-bold text-indigo-500 hover:text-white transition-colors flex items-center gap-1">
+                                    VIEW CATALOG <ArrowUpRight className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-3.5 flex-grow">
+                                {lowStockAlerts.length > 0 ? (
+                                    lowStockAlerts.map(item => (
+                                        <div key={item._id} className="flex items-center justify-between p-3.5 bg-gray-950/40 border border-gray-800/60 rounded-xl">
+                                            <div className="max-w-[140px]">
+                                                <p className="text-[11px] font-bold text-gray-200 uppercase truncate">{item.name}</p>
+                                                <p className="text-[9px] font-bold text-rose-500 uppercase mt-1 tracking-tighter">Below Threshold</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-white">{item.quantity} <span className="text-[10px] text-gray-600">UNITS</span></p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-40 flex flex-col items-center justify-center text-center opacity-40">
+                                        <Package className="w-8 h-8 mb-2" />
+                                        <p className="text-[9px] font-bold uppercase tracking-widest">Inventory Levels Optimal</p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* TOP DEBTORS */}
+                        <section className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+                            <div className="px-6 py-5 border-b border-gray-800/50 flex justify-between items-center bg-gray-900/30">
+                                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-indigo-500" /> Pending Recoveries
+                                </h3>
+                                <button onClick={onViewAllCredit} className="text-[10px] font-bold text-indigo-500 hover:text-white transition-colors flex items-center gap-1">
+                                    KHATA LEDGER <ArrowUpRight className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <div className="px-6 py-2 flex-grow">
+                                {topCreditHolders.length > 0 ? (
+                                    topCreditHolders.map((cust, idx) => (
+                                        <div key={cust._id} className={`py-4 flex items-center justify-between ${idx !== topCreditHolders.length - 1 ? 'border-b border-gray-800/50' : ''}`}>
+                                            <div>
+                                                <p className="text-[11px] font-bold text-white uppercase">{cust.name}</p>
+                                                <p className="text-[9px] font-bold text-gray-600 uppercase mt-0.5">Account Active</p>
+                                            </div>
+                                            <p className={`text-sm font-bold tabular-nums ${cust.outstandingCredit > 2000 ? 'text-rose-500' : 'text-amber-500'}`}>
+                                                ₹{cust.outstandingCredit.toLocaleString('en-IN')}
+                                            </p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-40 flex flex-col items-center justify-center text-center opacity-40">
+                                        <Users className="w-8 h-8 mb-2" />
+                                        <p className="text-[9px] font-bold uppercase tracking-widest">No Active Receivables</p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* RECENT SALES */}
+                        <section className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+                            <div className="px-6 py-5 border-b border-gray-800/50 flex justify-between items-center bg-gray-900/30">
+                                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <List className="w-4 h-4 text-emerald-500" /> Activity Stream
+                                </h3>
+                                <button onClick={onViewAllSales} className="text-[10px] font-bold text-indigo-500 hover:text-white transition-colors flex items-center gap-1">
+                                    HISTORY <ArrowUpRight className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-5 flex-grow">
+                                {recentSales.length > 0 ? (
+                                    recentSales.map((sale) => (
+                                        <div key={sale._id} className="flex items-center justify-between group">
+                                            <div className="flex items-center gap-4">
+                                                <div>
+                                                    <p className="text-[11px] font-bold text-white tabular-nums">₹{sale.totalAmount.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[9px] font-bold text-gray-600 uppercase mt-0.5">{formatTimeAgo(sale.timestamp)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-tighter ${
+                                                    sale.paymentMethod === 'Credit' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
+                                                    'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                }`}>
+                                                    {sale.paymentMethod}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-40 flex flex-col items-center justify-center text-center opacity-40">
+                                        <Activity className="w-8 h-8 mb-2" />
+                                        <p className="text-[9px] font-bold uppercase tracking-widest">No Recent Activity</p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </main>
     );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950" aria-busy="true" aria-live="polite">
-        <Loader className="w-10 h-10 animate-spin text-teal-400" aria-hidden="true" />
-        <span className="sr-only">Loading dashboard data...</span>
-      </div>
-    );
-  }
-
-  return (
-    <main className="flex flex-col h-full bg-gray-950 text-white transition-colors duration-300" itemScope itemType="https://schema.org/Dashboard"> 
-      
-      <header className="p-4 md:p-8 flex-shrink-0" itemProp="headline"> 
-        <h1 className="text-3xl font-extrabold text-white">{dashboardTitle}</h1>
-        <p className="text-sm text-gray-600 text-gray-400 mb-4" itemProp="description">Track sales, inventory, and credit in real-time.</p>
-      </header>
-
-      <div className="flex-grow overflow-y-auto px-4 md:px-8 pb-8"> 
-
-        {/* Financial Summary Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" aria-label="Today's Financial Summary">
-          <StatCard
-            title="Today's Total Sales"
-            value={today.totalSales.toFixed(2)}
-            unit="₹"
-            icon={IndianRupee}
-            colorClass="text-teal-400"
-            bgColor="bg-gray-900"
-          />
-          <StatCard
-            title="Today's New Credit Given"
-            value={today.totalCreditGiven.toFixed(2)}
-            unit="₹"
-            icon={CreditCard}
-            colorClass="text-indigo-400"
-            bgColor="bg-gray-900"
-          />
-          <StatCard
-            title="Total Credit Outstanding"
-            value={totalOutstandingCredit.toFixed(2)}
-            unit="₹"
-            icon={Users}
-            colorClass="text-red-400"
-            bgColor="bg-gray-900"
-          />
-        </section>
-
-        {/* Detailed Insights Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-          {/* Inventory Health */}
-          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="inventory-heading">
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 id="inventory-heading" className="text-xl font-semibold text-white flex items-center">
-                <Package className="w-5 h-5 mr-2 text-teal-400" aria-hidden="true" /> Inventory Alerts
-              </h2>
-              {allLowStockAlerts.length > 0 && (
-                <button
-                  onClick={onViewAllInventory}
-                  aria-label={`View all ${allLowStockAlerts.length} low stock alerts`}
-                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                >
-                  {allLowStockAlerts.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex-grow">
-              {lowStockAlerts.length > 0 ? (
-                <ul className="space-y-3 pt-2">
-                  {lowStockAlerts.map((item) => (
-                    <li key={item._id || item.id} className="flex justify-between items-center text-sm p-3 bg-red-900/40 rounded-lg border border-red-700 shadow-sm">
-                      <span className="font-medium text-red-300 truncate">{item.name}</span>
-                      <span className="text-red-400 text-xs font-semibold whitespace-nowrap">Stock: {item.quantity}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-gray-400 text-sm p-4 bg-green-900/20 rounded-lg border border-green-700 text-center font-medium">All inventory levels look great!</p>
-              )}
-            </div>
-          </section>
-
-          {/* Khata Status */}
-          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="khata-heading">
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 id="khata-heading" className="text-xl font-semibold text-white flex items-center">
-                <Users className="w-5 h-5 mr-2 text-indigo-400" aria-hidden="true" /> Top Credit Holders
-              </h2>
-              {customersWithCredit.length > 0 && (
-                <button
-                  onClick={onViewAllCredit}
-                  aria-label={`View all ${customersWithCredit.length} customers with outstanding credit`}
-                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                >
-                  {customersWithCredit.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex-grow">
-              <ul className="divide-y divide-gray-800 pt-2">
-                {topCreditHolders.length > 0 ? (
-                  topCreditHolders.map((cust) => (
-                    <li key={cust._id || cust.id} className="py-3 flex justify-between items-center text-sm">
-                      <span className="truncate w-1/2 font-medium text-gray-300">{cust.name}</span>
-                      <span className={`font-bold text-lg whitespace-nowrap ${cust.outstandingCredit > 1000 ? 'text-red-400' : 'text-yellow-400'}`}>
-                        ₹{cust.outstandingCredit.toFixed(2)}
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <p className="text-gray-400 text-sm p-4 bg-indigo-900/20 rounded-lg border border-indigo-700 text-center font-medium">No customers currently owe credit.</p>
-                )}
-              </ul>
-            </div>
-          </section>
-
-          {/* Recent Sales Activity */}
-          <section className="bg-gray-900 p-6 rounded-xl shadow-lg shadow-indigo-900/20 border border-gray-800 flex flex-col" aria-labelledby="sales-heading">
-            <div className="flex justify-between items-center mb-5 border-b border-gray-800 pb-3">
-              <h2 id="sales-heading" className="text-xl font-semibold text-white flex items-center">
-                <List className="w-5 h-5 mr-2 text-teal-400" aria-hidden="true" /> Recent Sales Activity
-              </h2>
-              {sales.length > 0 && (
-                <button
-                  onClick={onViewAllSales}
-                  aria-label="View all historical sales activity"
-                  className="cursor-pointer flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors duration-150 p-1 rounded-md -mr-1"
-                >
-                  {sales.length > 1 ? 'View All' : 'View'}
-                  <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex-grow">
-              <ul className="divide-y divide-gray-800 pt-2">
-                {recentSales.length > 0 ? (
-                  recentSales.map((sale) => {
-                    let paymentDisplay = sale.paymentMethod;
-                    let colorClass = 'bg-gray-700 text-gray-400 border border-gray-600';
-
-                    if (sale.paymentMethod === 'Credit') {
-                      paymentDisplay = `Due`;
-                      colorClass = 'bg-red-900/40 text-red-300 border border-red-700';
-                    } else if (sale.paymentMethod === 'UPI' || sale.paymentMethod === 'Cash') {
-                      paymentDisplay = 'Paid';
-                      colorClass = 'bg-green-900/40 text-green-300 border border-green-700';
-                    }
-
-                    return (
-                      <li key={sale._id || sale.id} className="py-3 flex justify-between items-center text-sm">
-                        <article className="flex flex-grow justify-between items-center">
-                          <div className="flex items-center space-x-3">
-                            <span className="font-bold text-teal-400 text-base">₹{sale.totalAmount.toFixed(2)}</span>
-                            {sale.paymentMethod === 'Mixed' ? (
-                              <>
-                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-green-900/40 text-green-300 border border-green-700">
-                                  Paid: ₹{sale.amountPaid.toFixed(0)}
-                                </span>
-                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-red-900/40 text-red-300 border border-red-700">
-                                  Due: ₹{sale.amountCredited.toFixed(0)}
-                                </span>
-                              </>
-                            ) : (
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${colorClass}`}>
-                                {paymentDisplay}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <time className="text-xs text-gray-500 whitespace-nowrap">
-                              {formatTimeAgo(sale.timestamp)}
-                            </time>
-                            {onViewSaleDetails && (
-                              <button
-                                onClick={() => onViewSaleDetails(sale)}
-                                aria-label="View transaction details"
-                                className="p-1 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-600 transition-colors duration-200"
-                              >
-                                <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                              </button>
-                            )}
-                          </div>
-                        </article>
-                      </li>
-                    );
-                  })
-                ) : (
-                  <p className="text-gray-400 text-sm p-4 bg-gray-800 rounded-lg border border-gray-700 text-center font-medium">No sales recorded yet.</p>
-                )}
-              </ul>
-            </div>
-          </section>
-        </div>
-      </div>
-    </main>
-  );
 };
 
 export default Dashboard;

@@ -1,38 +1,37 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, Loader, IndianRupee, Wifi, AlertTriangle, Eye, EyeOff, Globe, Building } from 'lucide-react';
+import { 
+    ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, 
+    Loader, IndianRupee, Wifi, AlertTriangle, Eye, EyeOff, 
+    Globe, Building, ShieldCheck, Zap
+} from 'lucide-react';
 import API from '../config/api';
 import apiClient from '../lib/apiClient';
 import axios from 'axios';
+
 const PLAN_DETAILS = {
     BASIC: {
         name: 'Basic Plan',
         price: 499,
         features: ['Unlimited Transactions', '2 Users (Owner + 1 Cashier)', 'Full Inventory Management', 'Full Digital Khata'],
         interval: 'monthly',
-        color: 'bg-indigo-600',
+        color: 'from-indigo-600 to-blue-600',
     },
     PRO: {
         name: 'Pro Plan',
         price: 799,
         features: ['Unlimited Transactions', 'Unlimited Users & Roles', 'Full Inventory & Bulk Tools', 'Khata + Automated SMS Reminders'],
         interval: 'monthly',
-        color: 'bg-teal-600',
+        color: 'from-teal-600 to-emerald-600',
     },
     PREMIUM: {
         name: 'Premium Plan',
         price: 999,
         features: ['Unlimited Transactions', 'Unlimited Users & Roles', 'Full Inventory & Bulk Tools', 'Khata + Automated SMS Reminders'],
         interval: 'monthly',
-        color: 'bg-indigo-600',
+        color: 'from-indigo-600 to-purple-600',
     }
 };
-const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 0,
-    }).format(amount);
-};
+
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return 'Email is required.';
@@ -45,21 +44,16 @@ const validateEmail = (email) => {
 const validatePhoneNumber = (phone) => {
     if (!phone) return 'Phone number is required.';
     const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(phone)) {
-        return 'Please enter a valid international phone number format (e.g., +919876543210).';
-    }
+    if (!phoneRegex.test(phone)) return 'Use international format (e.g., +919876543210).';
     return null;
 };
+
 const validateShopName = (name) => {
     if (!name || name.trim() === '') return 'Shop name is required.';
     if (name.length < 3) return 'Shop name must be at least 3 characters.';
     return null;
 };
-/**
- * Utility to load the Razorpay script dynamically.
- * @param {string} src - The script URL
- * @returns {Promise<boolean>} Resolves true if script loaded successfully.
- */
+
 const loadRazorpayScript = (src) => {
     return new Promise((resolve) => {
         const script = document.createElement('script');
@@ -69,8 +63,10 @@ const loadRazorpayScript = (src) => {
         document.body.appendChild(script);
     });
 };
-const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
-    const plan = PLAN_DETAILS[planKey] || null;
+
+const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast }) => {
+    const plan = useMemo(() => PLAN_DETAILS[planKey] || PLAN_DETAILS.BASIC, [planKey]);
+    
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -89,519 +85,264 @@ const Checkout = ({ plan: planKey, onPaymentSuccess, onBackToDashboard }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [paymentError, setPaymentError] = useState(null);
-    const selectedCountry = countryCodes.find(c => c.code === dialCode);
+
+    const selectedCountry = useMemo(() => 
+        countryCodes.find(c => c.code === dialCode) || { flag: '🇮🇳', code: '+91', name: 'India' }
+    , [countryCodes, dialCode]);
+
     const filteredCodes = useMemo(() => {
         if (!searchQuery) return countryCodes;
         const query = searchQuery.toLowerCase();
-        return countryCodes.filter(c =>
-            c.name.toLowerCase().includes(query) ||
-            c.code.includes(query)
-        );
+        return countryCodes.filter(c => c.name.toLowerCase().includes(query) || c.code.includes(query));
     }, [countryCodes, searchQuery]);
+
     const fetchCountryCodes = useCallback(async () => {
         try {
             const response = await axios.get('https://restcountries.com/v3.1/all?fields=name,idd,flag');
             const data = response.data;
-            const codes = data
-                .map(country => {
-                    const root = country.idd.root || '';
-                    const suffixes = country.idd.suffixes || [];
-                    const fullCode = suffixes.length > 0 ? `${root}${suffixes[0]}` : root;
-                    if (!fullCode) return null;
-                    return {
-                        code: fullCode,
-                        flag: country.flag,
-                        name: country.name.common,
-                        sortName: country.name.common,
-                    };
-                })
-                .filter(Boolean)
-                .reduce((acc, current) => {
-                    const x = acc.find(item => item.code === current.code);
-                    if (!x) {
-                        return acc.concat([current]);
-                    }
-                    return acc;
-                }, [])
-                .sort((a, b) => a.sortName.localeCompare(b.sortName));
-            setCountryCodes(codes);
+            const codes = data.map(country => {
+                const root = country.idd.root || '';
+                const suffixes = country.idd.suffixes || [];
+                const fullCode = suffixes.length > 0 ? `${root}${suffixes[0]}` : root;
+                if (!fullCode) return null;
+                return { code: fullCode, flag: country.flag, name: country.name.common, sortName: country.name.common };
+            }).filter(Boolean).reduce((acc, current) => {
+                if (!acc.find(item => item.code === current.code)) return acc.concat([current]);
+                return acc;
+            }, []).sort((a, b) => a.sortName.localeCompare(b.sortName));
+            setCountryCodes(codes.length > 0 ? codes : [{ code: '+91', flag: '🇮🇳', name: 'India' }]);
         } catch (error) {
-            console.error('Failed to fetch country codes:', error);
-            setCountryCodes([
-                { code: '+1', flag: '🇺🇸', name: 'United States' },
-                { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
-                { code: '+91', flag: '🇮🇳', name: 'India' },
-            ]);
+            setCountryCodes([{ code: '+91', flag: '🇮🇳', name: 'India' }]);
         }
     }, []);
+
+    useEffect(() => { fetchCountryCodes(); }, [fetchCountryCodes]);
+    
     useEffect(() => {
-        fetchCountryCodes();
-    }, [fetchCountryCodes]);
-    useEffect(() => {
-        if (dialCode) {
-            const sanitizedLocalNumber = localNumber.replace(/\D/g, '');
-            const fullNumber = dialCode + sanitizedLocalNumber;
-            if (fullNumber !== phone) {
-                setPhone(fullNumber);
-            }
-        }
-    }, [dialCode, localNumber, phone]);
-    useEffect(() => {
-        if (countryCodes.length > 0 && !dialCode) {
-            setDialCode('+91');
-        }
-    }, [countryCodes, dialCode]);
+        const sanitizedLocalNumber = localNumber.replace(/\D/g, '');
+        setPhone(dialCode + sanitizedLocalNumber);
+    }, [dialCode, localNumber]);
+
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsDropdownOpen(false);
-            }
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsDropdownOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
     const handleSelectCountry = (code) => {
         setDialCode(code);
         setIsDropdownOpen(false);
         setSearchQuery('');
-        if (phoneError) setPhoneError(null);
+        setPhoneError(null);
     };
+
     const handleNumberChange = (e) => {
-        const sanitizedNumber = e.target.value.replace(/\D/g, '');
-        setLocalNumber(sanitizedNumber);
-        if (phoneError) setPhoneError(null);
+        setLocalNumber(e.target.value.replace(/\D/g, ''));
+        setPhoneError(null);
     };
-    useEffect(() => {
-        if (!plan) {
-            setPaymentError("Invalid subscription plan selected. Please go back.");
-        }
-    }, [plan]);
+
     const handlePaymentSubmit = useCallback(async (e) => {
         e.preventDefault();
-        setPaymentError(null);
-        setEmailError(null);
-        setPhoneError(null);
-        setPasswordError(null);
-        setShopNameError(null);
-        if (!plan) {
-            setPaymentError("Plan error. Cannot proceed.");
-            return;
-        }
-        const emailValidation = validateEmail(email);
-        if (emailValidation) {
-            setEmailError(emailValidation);
-            return;
-        }
-        const phoneValidation = validatePhoneNumber(phone);
-        if (phoneValidation) {
-            setPhoneError(phoneValidation);
-            return;
-        }
-        const shopNameValidation = validateShopName(shopName);
-        if (shopNameValidation) {
-            setShopNameError(shopNameValidation);
-            return;
-        }
-        if (!password || password.length < 8) {
-            setPasswordError('Password must be 8 or more characters long.');
-            return;
-        }
+        setPaymentError(null); setEmailError(null); setPhoneError(null); setPasswordError(null); setShopNameError(null);
+        
+        const emailV = validateEmail(email); if (emailV) return setEmailError(emailV);
+        const phoneV = validatePhoneNumber(phone); if (phoneV) return setPhoneError(phoneV);
+        const shopV = validateShopName(shopName); if (shopV) return setShopNameError(shopV);
+        if (!password || password.length < 8) return setPasswordError('Password must be 8+ characters.');
+
         setIsProcessing(true);
         try {
             const razorpayLoad = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
-            if (!razorpayLoad) {
-                setPaymentError('Failed to load the Razorpay payment script. Check your network.');
-                setIsProcessing(false);
-                return;
-            }
-            const createSubscriptionUrl = `${API.createSubscription}`; // Using the new subscription endpoint
-            const subscriptionResponse = await apiClient.post(createSubscriptionUrl, {
-                plan: planKey,
-            });
+            if (!razorpayLoad) throw new Error('Razorpay failed to load.');
+
+            const subscriptionResponse = await apiClient.post(API.createSubscription, { plan: planKey || 'BASIC' });
             const { subscriptionId, currency, amount, keyId } = subscriptionResponse.data;
-            if (!subscriptionId) {
-                setPaymentError("Failed to initiate subscription mandate. Subscription ID missing from server.");
-                setIsProcessing(false);
-                return;
-            }
+
             const options = {
-                key: keyId,
-                amount: amount, // This is the ₹1 verification charge (100 paise)
-                currency: currency,
-                name: 'Pocket POS Subscription',
-                description: `Setup Mandate for ${plan.name} (1 Rupee verification)`,
-                subscription_id: subscriptionId, // <<--- CRITICAL CHANGE: Use subscription_id
+                key: keyId, amount, currency, name: 'Pocket POS',
+                description: `Mandate for ${plan.name}`,
+                subscription_id: subscriptionId,
                 handler: async (response) => {
                     setIsProcessing(true);
                     try {
-                        const verifyUrl = `${API.verifySubscription}`; // Using the new verification endpoint
-                        const verificationResponse = await apiClient.post(verifyUrl, {
+                        const vResp = await apiClient.post(API.verifySubscription, {
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
                             razorpay_subscription_id: response.razorpay_subscription_id || subscriptionId,
                         });
-                        const { success: verificationSuccess, transactionId } = verificationResponse.data;
-                        if (verificationSuccess && transactionId) {
-                            console.log('Subscription mandate verified. Creating user account with subscription ID:', transactionId);
-                            const signupResponse = await apiClient.post(API.signup, {
-                                email: email.toLowerCase().trim(),
-                                password: password,
-                                phone: phone,
-                                plan: planKey,
-                                transactionId: transactionId, // This is the Subscription ID
-                                shopName: shopName,
+                        if (vResp.data.success) {
+                            await apiClient.post(API.signup, {
+                                email: email.toLowerCase().trim(), password, phone, plan: planKey || 'BASIC',
+                                transactionId: vResp.data.transactionId, shopName
                             });
-                            if (signupResponse.data && signupResponse.data.user) {
-                                setPaymentSuccess(true);
-                                setTimeout(() => {
-                                    onPaymentSuccess({
-                                        success: true,
-                                        message: 'Account created successfully! Please login to continue.',
-                                        email: email.toLowerCase().trim()
-                                    });
-                                }, 1500);
-                            } else {
-                                setPaymentError("Account creation failed after verified mandate. Contact support.");
-                                setIsProcessing(false);
-                            }
-                        } else {
-                            setPaymentError('Subscription mandate verification failed. Please try again or contact support.');
-                            setIsProcessing(false);
+                            setPaymentSuccess(true);
+                            
+                            // Success Redirection Logic
+                            setTimeout(() => {
+                                showToast('Account created successfully! Please login.', 'success');
+                                // In App.jsx, we need to show the login screen.
+                                // We do this by setting current page to dashboard and letting the login view trigger.
+                                window.location.reload(); 
+                            }, 3000);
                         }
-
-                    } catch (error) {
-                        console.error('Verification/Signup Error:', error);
-                        setPaymentError(error.response?.data?.error || 'Verification failed. Server error.');
-                        setIsProcessing(false);
+                    } catch (err) { 
+                        setPaymentError(err.response?.data?.error || 'Verification failed.'); 
+                        setIsProcessing(false); 
                     }
                 },
-                prefill: {
-                    email: email,
-                    contact: phone,
-                    name: shopName || 'POS Shop Owner',
-                },
-                theme: {
-                    color: '#4f46e5'
-                },
-                modal: {
-                    ondismiss: () => {
-                        console.log('Razorpay popup dismissed');
-                        setIsProcessing(false);
-                    }
-                }
+                prefill: { email, contact: phone, name: shopName },
+                theme: { color: '#4f46e5' },
+                modal: { ondismiss: () => setIsProcessing(false) }
             };
-            const rzp1 = new window.Razorpay(options);
-            rzp1.open();
+            new window.Razorpay(options).open();
         } catch (error) {
-            console.error('Initial Subscription Creation Error:', error);
-            if (error.response?.data?.error) {
-                setPaymentError(error.response.data.error);
-            } else if (error.response?.data?.message) {
-                setPaymentError(error.response.data.message);
-            } else {
-                setPaymentError("Failed to connect to the server or create subscription mandate.");
-            }
+            setPaymentError(error.response?.data?.error || "Connection failed.");
             setIsProcessing(false);
         }
+    }, [plan, planKey, email, phone, password, shopName, showToast]);
 
-    }, [plan, planKey, email, phone, password, shopName, onPaymentSuccess]);
-    if (!plan) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-950 p-8">
-                <div className="text-center text-red-400">
-                    <AlertTriangle className="w-10 h-10 mx-auto mb-3" />
-                    <p className="text-xl font-semibold mb-4">Plan Not Found</p>
-                    <p className="text-gray-400">{paymentError}</p>
-                    <button onClick={onBackToDashboard} className="mt-4 text-indigo-400 hover:text-indigo-300 transition flex items-center mx-auto" disabled={isProcessing}>
-                        <ArrowLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-                    </button>
+    if (paymentSuccess) return (
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-gray-900 p-10 rounded-[1.25rem] border border-emerald-500/30 text-center shadow-2xl">
+                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle className="w-10 h-10 text-emerald-500 animate-pulse" />
+                </div>
+                <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">You're All Set!</h2>
+                <p className="text-gray-400 font-bold leading-relaxed mb-6">Account created. Your 30-day trial has started.</p>
+                <div className="flex items-center justify-center space-x-2 text-indigo-400 font-bold">
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>Redirecting to Login...</span>
                 </div>
             </div>
-        );
-    }
-    if (paymentSuccess) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-950 p-4">
-                <div className="w-full max-w-md bg-gray-800 p-10 rounded-2xl shadow-2xl text-center border border-green-600/50">
-                    <CheckCircle className="w-16 h-16 text-green-400 mx-auto animate-bounce" />
-                    <h2 className="text-3xl font-extrabold text-white mt-4">Subscription Mandate Successful!</h2>
-                    <p className="text-gray-400 mt-2">
-                        Your account has been created and your 30-day free trial has begun. Redirecting you to login...
-                    </p>
-                </div>
-            </div>
-        );
-    }
+        </div>
+    );
+
     return (
-        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-sans" itemScope itemType="https://schema.org/CheckoutPage">
-            <section className="w-full max-w-5xl bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-700">
-                <header className="text-center mb-6" itemProp="headline">
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
-                        Registration
-                    </h1>
-                    <p className="text-sm text-gray-400" itemProp="description">Start your 30-day free trial in minutes. Complete your registration and secure checkout for Pocket POS subscription.</p>
-                </header>
-                {paymentError && (
-                    <div className="p-3 mb-5 text-sm bg-red-800 text-red-100 rounded-lg text-center" role="alert">
-                        {paymentError}
-                    </div>
-                )}
-                <form onSubmit={handlePaymentSubmit}>
-                    {/* Updated grid for mobile: stacks vertically, switches to 2 columns on larger screens (lg) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch">
-                        
-                        {/* Section 1: Owner & Shop Details */}
-                        <div className="h-full order-2 lg:order-1"> {/* Order change for better mobile flow */}
-                            <div className="space-y-5 p-5 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col">
-                                <div className='flex-grow'>
-                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                        Owner & Shop Details
-                                    </h4>
-                                    
-                                    {/* Shop Name Input */}
-                                    <div className="mb-5">
-                                        <label htmlFor="shopName" className="block text-xs font-medium text-gray-300 mb-1">Shop/Business Name</label>
-                                        <div className='relative'>
-                                            <Building className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400' />
-                                            <input
-                                                type="text"
-                                                id="shopName"
-                                                value={shopName}
-                                                onChange={(e) => {
-                                                    setShopName(e.target.value);
-                                                    setShopNameError(null);
-                                                }}
-                                                placeholder="Ex: Sharma General Store"
-                                                className={`w-full pl-9 pr-3 py-2.5 bg-gray-800 border rounded-lg text-sm text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${shopNameError ? 'border-red-500' : 'border-gray-600'}`}
-                                                required
-                                                disabled={isProcessing}
-                                            />
-                                        </div>
-                                        {shopNameError && <p className="text-red-500 text-xs mt-1">{shopNameError}</p>}
-                                    </div>
-
-                                    {/* Email Input */}
-                                    <div className="mb-5">
-                                        <label htmlFor="email" className="block text-xs font-medium text-gray-300 mb-1">Email Address (for Login)</label>
-                                        <input
-                                            type="email"
-                                            id="email"
-                                            value={email}
-                                            onChange={(e) => {
-                                                setEmail(e.target.value);
-                                                setEmailError(null);
-                                            }}
-                                            placeholder="your@email.com"
-                                            className={`w-full px-3 py-2.5 bg-gray-800 border rounded-lg text-sm text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${emailError ? 'border-red-500' : 'border-gray-600'}`}
-                                            required
-                                            disabled={isProcessing}
-                                        />
-                                        {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
-                                    </div>
-                                    
-                                    {/* Phone Number Input (Complex) */}
-                                    <div className="mb-5">
-                                        <label htmlFor="phone" className="block text-xs font-medium text-gray-300 mb-1">Phone Number</label>
-                                        <div className={`
-                                            w-full flex rounded-lg transition duration-150 bg-gray-800
-                                            ${phoneError ? 'border border-red-500' : 'border border-gray-600'}
-                                            focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500
-                                        `} ref={dropdownRef}>
-                                            {/* Country Code Selector */}
-                                            <div className="relative">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                                    className={`
-                                                        bg-gray-700 text-gray-200 py-3 pl-3 pr-2 border-r border-gray-600 
-                                                        focus:outline-none rounded-l-lg cursor-pointer flex items-center justify-between
-                                                        w-auto min-w-[70px] max-w-[100px]
-                                                        text-xs sm:text-sm truncate hover:bg-gray-600 transition duration-150
-                                                        ${isDropdownOpen ? 'bg-gray-600' : ''}
-                                                    `}
-                                                    disabled={countryCodes.length === 0 || isProcessing}
-                                                >
-                                                    {countryCodes.length === 0 ? (
-                                                        <span className="text-gray-400">...</span>
-                                                    ) : (
-                                                        <>
-                                                            <span>{selectedCountry?.flag}</span>
-                                                            <span className="mx-1 font-semibold">{selectedCountry?.code}</span>
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
-                                                        </>
-                                                    )}
-                                                </button>
-                                                {isDropdownOpen && countryCodes.length > 0 && (
-                                                    <div className="absolute z-10 top-full left-0 mt-1 w-64 sm:w-72 max-h-80 overflow-y-auto bg-gray-700 rounded-lg shadow-xl border border-indigo-500/50">
-                                                        <div className="p-2 sticky top-0 bg-gray-700 border-b border-gray-600 z-20">
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Search country or code..."
-                                                                className="w-full px-3 py-2 bg-gray-800 text-gray-200 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
-                                                                value={searchQuery}
-                                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                                autoFocus
-                                                                onFocus={(e) => e.currentTarget.select()}
-                                                            />
-                                                        </div>
-                                                        <ul className="p-1">
-                                                            {filteredCodes.length > 0 ? (
-                                                                filteredCodes.map(({ code, flag, name }) => (
-                                                                    <li
-                                                                        key={code}
-                                                                        className={`
-                                                                            p-2 text-sm rounded-md cursor-pointer flex justify-between items-center
-                                                                            ${code === dialCode ? 'bg-indigo-600 text-white' : 'text-gray-200 hover:bg-gray-600'}
-                                                                        `}
-                                                                        onClick={() => handleSelectCountry(code)}
-                                                                    >
-                                                                        <span className="font-medium truncate">{flag} {name}</span>
-                                                                        <span className={`${code === dialCode ? 'font-bold' : 'text-gray-400'}`}>{code}</span>
-                                                                    </li>
-                                                                ))
-                                                            ) : (
-                                                                <li className="p-2 text-sm text-gray-400 text-center">No countries found.</li>
-                                                            )}
-                                                        </ul>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <input
-                                                type="tel"
-                                                placeholder="Enter phone number"
-                                                value={localNumber}
-                                                onChange={handleNumberChange}
-                                                className="w-full px-3 py-2.5 bg-transparent text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none rounded-r-lg text-sm"
-                                                required
-                                                autoComplete="tel-national"
-                                                disabled={countryCodes.length === 0 || isProcessing}
-                                            />
-                                        </div>
-                                        {countryCodes.length === 0 ? (
-                                            <div className="flex items-center text-indigo-500 text-xs mt-1">
-                                                <Globe className="w-3 h-3 mr-1 animate-spin" />
-                                                Fetching country codes...
-                                            </div>
-                                        ) : phoneError && (
-                                            <p className="text-red-500 text-xs mt-1">{phoneError}</p>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Password Input */}
-                                    <div>
-                                        <label htmlFor="password" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password (for Login)</label>
-                                        <div className="relative">
-                                            <input
-                                                type={showPassword ? 'text' : 'password'}
-                                                id="password"
-                                                value={password}
-                                                onChange={(e) => {
-                                                    setPassword(e.target.value);
-                                                    setPasswordError(null);
-                                                }}
-                                                placeholder="Minimum 8 characters"
-                                                className={`w-full px-3 py-2.5 pr-10 bg-white dark:bg-gray-800 border rounded-lg text-sm text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
-                                                required
-                                                disabled={isProcessing}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition duration-150"
-                                                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                            >
-                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                            </button>
-                                        </div>
-                                        {passwordError && <p className="text-red-500 text-xs mt-1">{passwordError}</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section 2: Plan Details (Order 1 for mobile visibility) */}
-                        <div className="h-full order-1 lg:order-2">
-                            <div className="space-y-6 p-5 bg-gray-50 dark:bg-gray-700 rounded-xl h-full flex flex-col justify-start">
-                                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                                    Your Subscription
-                                </h4>
-                                <div className={`p-5 rounded-xl ${plan.color} text-white shadow-2xl flex flex-col justify-between`}>
-
-                                    {/* Header: Plan Name and Interval */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-xl font-bold flex items-center">
-                                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                                            {plan.name}
-                                        </h4>
-                                        <span className="text-xs font-medium uppercase border border-white/70 px-2 py-0.5 rounded-full bg-white/10">
-                                            {plan.interval}
-                                        </span>
-                                    </div>
-
-                                    {/* Section 1: Verification Charge */}
-                                    <div className="border-t border-white/30 pt-3 pb-3">
-                                        <p className="text-xs text-white/90 mb-1 font-medium">Total Due Today (Start of Trial):</p>
-
-                                        <div className="flex items-baseline">
-                                            <p className="text-4xl font-extrabold mr-3">{formatCurrency(1)}</p>
-                                            <span className="text-sm font-semibold text-green-300">
-                                                (Verification Charge)
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Section 2: Full Plan Charge (Trial Information) */}
-                                    <div className="border-t border-white/30 pt-3">
-                                        <p className="text-xs text-white/90 mb-1 font-medium">Monthly Charge After Trial:</p>
-                                        <p className="text-3xl font-extrabold">{formatCurrency(plan.price)}</p>
-                                        <p className="text-xs text-white/80 mt-2">
-                                            Full plan charge will begin <strong>after your 30-day free trial</strong> ends.
-                                        </p>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        <main className="min-h-screen bg-gray-950 flex items-center justify-center p-4 sm:p-8 font-sans">
+            <section className="max-w-5xl w-full bg-gray-900/50 backdrop-blur-xl rounded-[1.25rem] border border-gray-800 shadow-2xl overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-12">
                     
-                    {/* Submission and Footer */}
-                    <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
-                        <button
-                            type="submit"
-                            className="cursor-pointer w-full py-3 bg-indigo-600 text-white text-base font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.005] duration-300 ease-in-out disabled:bg-indigo-400 disabled:shadow-none flex items-center justify-center"
-                            disabled={isProcessing || !plan}
-                        >
-                            {isProcessing ? (
-                                <>
-                                    <Loader className="w-4 h-4 mr-2 animate-spin" />
-                                    {window.Razorpay ? 'Processing Mandate...' : 'Creating Mandate...'}
-                                </>
-                            ) : (
-                                <>
-                                    <Lock className="w-4 h-4 mr-2" />
-                                    Setup Mandate & Start Free Trial
-                                </>
-                            )}
-                        </button>
-                        <p className="text-center text-[10px] text-gray-500 mt-4 px-4 leading-relaxed">
+                    {/* Form Side */}
+                    <div className="lg:col-span-7 p-8 sm:p-12 order-2 lg:order-1">
+                        <header className="mb-10">
+                            <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-4">
+                                <Zap className="w-3 h-3 text-indigo-400" />
+                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">30-Day Free Trial</span>
+                            </div>
+                            <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Business Registration</h1>
+                        </header>
 
-                                By proceeding, you authorize a one-time verification of ₹1 and agree to the 30-day trial terms. Future payments will be automated.
+                        <form onSubmit={handlePaymentSubmit} className="space-y-6">
+                            {paymentError && <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-2xl text-red-400 text-xs font-bold">{paymentError}</div>}
+                            
+                            <div className="grid grid-cols-1 gap-5">
+                                <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} />
+                                <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} />
+                                
+                                <div className="relative" ref={dropdownRef}>
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Mobile Number</label>
+                                    <div className={`flex bg-gray-950 rounded-2xl border transition-all ${phoneError ? 'border-red-500' : 'border-gray-800 focus-within:border-indigo-500'}`}>
+                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-4 border-r border-gray-800 flex items-center space-x-2 text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[90px]">
+                                            <span>{selectedCountry.flag}</span>
+                                            <span>{selectedCountry.code}</span>
+                                        </button>
+                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3.5 text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
+                                    </div>
+                                    {isDropdownOpen && (
+                                        <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
+                                            <input type="text" placeholder="Search country..." className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white mb-2 outline-none focus:border-indigo-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                            {filteredCodes.map(c => (
+                                                <div key={c.code} onClick={() => handleSelectCountry(c.code)} className="flex justify-between p-2 hover:bg-indigo-600 rounded-lg cursor-pointer text-xs font-bold text-gray-200">
+                                                    <span>{c.flag} {c.name}</span>
+                                                    <span className="text-gray-500">{c.code}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {phoneError && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase">{phoneError}</p>}
+                                </div>
 
-                            </p>
-                        <div className="text-center pt-3">
-                            <button
-                                type="button"
-                                onClick={onBackToDashboard}
-                                className="cursor-pointer text-xs text-gray-600 dark:text-gray-500 hover:text-indigo-400 transition flex items-center mx-auto"
-                                disabled={isProcessing}
-                            >
-                                <ArrowLeft className="w-3 h-3 mr-1 cursor-pointer" /> Cancel and go back
-                            </button>
+                                <div className="relative">
+                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={setPassword} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-9 text-gray-500 hover:text-white transition-colors">
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-gray-800">
+                                <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
+                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Setup & Start Trial</>}
+                                </button>
+                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed uppercase tracking-tighter">By proceeding, you authorize a ₹1 verification charge. No other charges during trial.</p>
+                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black uppercase text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors">
+                                    <ArrowLeft size={12} className="mr-1" /> Cancel and Go Back
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* Summary Side */}
+                    <div className="lg:col-span-5 bg-gray-950/50 p-8 sm:p-12 border-l border-gray-800 order-1 lg:order-2">
+                        <div className={`p-8 rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-2xl`}>
+                            <div className="absolute top-0 right-0 p-6 opacity-20"><ShoppingCart size={80} /></div>
+                            <div className="relative z-10">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-white/20 px-3 py-1 rounded-full mb-4 inline-block text-white">{plan.interval}</span>
+                                <h3 className="text-3xl font-black text-white tracking-tighter mb-8">{plan.name}</h3>
+                                
+                                <div className="space-y-6 mb-8">
+                                    <div className="flex justify-between items-end border-b border-white/20 pb-4">
+                                        <span className="text-[10px] font-black uppercase text-white/70">Start Trial Fee</span>
+                                        <span className="text-3xl font-black text-white">₹1</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-black uppercase text-white/70">After 30 Days</span>
+                                        <span className="text-2xl font-black text-white">₹{plan.price}</span>
+                                    </div>
+                                </div>
+
+                                <ul className="space-y-3">
+                                    {plan.features.map((f, i) => (
+                                        <li key={i} className="flex items-center text-[10px] font-black text-white uppercase tracking-wider">
+                                            <ShieldCheck size={14} className="mr-2 text-white/70" /> {f}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-8 p-6 bg-gray-900/50 rounded-2xl border border-gray-800">
+                            <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2 flex items-center">
+                                <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
+                            </h4>
+                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed uppercase tracking-tighter">Transactions are encrypted and handled by Razorpay. You can cancel your subscription anytime via the dashboard.</p>
                         </div>
                     </div>
-                </form>
+                </div>
             </section>
         </main>
     );
 };
+
+const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon }) => (
+    <div className="group">
+        <label htmlFor={id} className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400">{label}</label>
+        <div className="relative">
+            {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400">{icon}</div>}
+            <input 
+                id={id} 
+                type={type} 
+                value={value} 
+                onChange={(e) => onChange(e.target.value)} 
+                disabled={disabled}
+                placeholder={placeholder}
+                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3.5 text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
+            />
+        </div>
+        {error && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase tracking-tight">{error}</p>}
+    </div>
+);
+
 export default Checkout;

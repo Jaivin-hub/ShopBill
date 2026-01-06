@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Eye, EyeOff } from 'lucide-react';
+import { 
+    DollarSign, Eye, EyeOff, Lock, Mail, 
+    ArrowLeft, Loader2, AlertCircle, 
+    CheckCircle2, Smartphone 
+} from 'lucide-react';
 import axios from 'axios';
 import API from '../config/api';
 
@@ -13,9 +17,7 @@ apiClient.interceptors.request.use(
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 // --- Sub-Component: Login Form ---
@@ -23,88 +25,85 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
     const [showPassword, setShowPassword] = useState(false);
 
     return (
-        <section aria-labelledby="login-heading">
-            <h2 id="login-heading" className="text-3xl font-extrabold text-white text-center mb-6">
-                Welcome Back
-            </h2>
+        <section aria-labelledby="login-form" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {authError && (
-                <div 
-                    className="p-3 mb-4 text-sm text-red-100 bg-red-800/80 border border-red-600 rounded-lg text-center" 
-                    role="alert" 
-                    aria-live="assertive"
-                >
-                    {authError}
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 items-center" role="alert">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    <p className="text-[10px] font-bold text-red-200/80 uppercase tracking-wide">{authError}</p>
                 </div>
             )}
-            <form className="space-y-4" onSubmit={handleAuth} aria-label="Login form">
-                <div className="space-y-1">
-                    <label htmlFor="identifier" className="sr-only">Email or Phone Number</label>
-                    <input
-                        id="identifier"
-                        type="text"
-                        placeholder="Email Address or Phone Number"
-                        className="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150"
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        value={identifier}
-                        required
-                        autoComplete="username"
-                        aria-required="true"
-                    />
+
+            <form className="space-y-3" onSubmit={handleAuth}>
+                <div className="space-y-1.5">
+                    <label htmlFor="identifier" className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Identity</label>
+                    <div className="relative group">
+                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
+                        <input
+                            id="identifier"
+                            type="text"
+                            placeholder="Email or Phone"
+                            className="w-full pl-11 pr-4 py-3 bg-gray-900/50 border border-gray-800 text-white text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            onChange={(e) => setIdentifier(e.target.value)}
+                            value={identifier}
+                            required
+                        />
+                    </div>
                 </div>
                 
-                <div className="relative space-y-1">
-                    <label htmlFor="password" className="sr-only">Password</label>
-                    <input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
-                        className="w-full pr-12 px-4 py-3 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150"
-                        onChange={(e) => setPassword(e.target.value)}
-                        value={password}
-                        required
-                        autoComplete="current-password"
-                        aria-required="true"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-indigo-400 transition duration-150"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                        {showPassword ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
-                    </button>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                    <button
-                        type="button"
-                        onClick={() => setView('forgotPassword')}
-                        className="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300 transition duration-150"
-                    >
-                        Forgot Password?
-                    </button>
+                <div className="space-y-1.5">
+                    <div className="flex justify-between items-center px-1">
+                        <label htmlFor="password" className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Key</label>
+                        <button
+                            type="button"
+                            onClick={() => setView('forgotPassword')}
+                            className="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-white transition-colors"
+                        >
+                            Recover?
+                        </button>
+                    </div>
+                    <div className="relative group">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
+                        <input
+                            id="password"
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="••••••••"
+                            className="w-full pl-11 pr-11 py-3 bg-gray-900/50 border border-gray-800 text-white text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            onChange={(e) => setPassword(e.target.value)}
+                            value={password}
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-indigo-400"
+                        >
+                            {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                    </div>
                 </div>
 
                 <button
                     type="submit"
-                    className="cursor-pointer w-full mt-6 py-3 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
                     disabled={loading}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
                 >
-                    {loading ? 'Logging In...' : 'Log In'}
+                    {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <>Access Hub <CheckCircle2 className="w-3.5 h-3.5" /></>
+                    )}
                 </button>
             </form>
 
-            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-800">
-                New to Pocket POS?
+            <div className="pt-4 border-t border-gray-800/50 text-center">
+                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">New Merchant?</p>
                 <button
                     onClick={onBackToLanding} 
-                    className="ml-2 cursor-pointer text-teal-400 hover:text-teal-300 font-bold transition duration-150"
-                    disabled={loading}
-                    aria-label="Create a new account"
+                    className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
                 >
                     Create Account
                 </button>
-            </p>
+            </div>
         </section>
     );
 };
@@ -112,70 +111,54 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 // --- Sub-Component: Forgot Password Form ---
 const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailChange, handleEmailBlur, loading, setView, resetMessage, emailError }) => {
     return (
-        <section aria-labelledby="reset-heading">
-            <h2 id="reset-heading" className="text-3xl font-extrabold text-white text-center mb-6">
-                Reset Password
-            </h2>
+        <section aria-labelledby="reset-heading" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="text-center">
+                <h2 id="reset-heading" className="text-lg font-black text-white uppercase tracking-tighter">
+                    Reset <span className="text-teal-500">Access</span>
+                </h2>
+            </div>
 
-            {resetMessage && resetMessage.success && (
-                <div className="p-3 mb-4 text-sm text-green-100 bg-green-900/80 border border-green-700 rounded-lg text-center" role="status">
-                    <p>{resetMessage.success}</p>
-                    {resetMessage.devToken && (
-                        <p className="mt-2 text-xs font-mono break-all text-green-300">
-                            <strong>DEV ONLY</strong> Token: {resetMessage.devToken}
-                        </p>
-                    )}
+            {resetMessage?.success && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-2 text-center" role="status">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <p className="text-[10px] font-bold text-emerald-200/80 uppercase tracking-wide">{resetMessage.success}</p>
                 </div>
             )}
 
-            {resetMessage && resetMessage.error && (
-                <div className="p-3 mb-4 text-sm text-red-100 bg-red-900/80 border border-red-700 rounded-lg text-center" role="alert">
-                    {resetMessage.error}
-                </div>
-            )}
-
-            <form className="space-y-4" onSubmit={handleForgotPasswordRequest} aria-label="Password reset form">
-                <p className="text-gray-400 text-sm text-center pt-2">
-                    Enter your email address to receive a password reset link.
-                </p>
-                <div className="space-y-1">
-                    <label htmlFor="reset-email" className="sr-only">Email Address</label>
-                    <input
-                        id="reset-email"
-                        type="email"
-                        inputMode="email"
-                        placeholder="Email Address"
-                        className={`w-full px-4 py-3 bg-gray-900 border text-gray-100 rounded-lg placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition duration-150 ${emailError ? 'border-red-500' : 'border-gray-700'}`}
-                        onChange={(e) => handleEmailChange(e.target.value)}
-                        onBlur={handleEmailBlur}
-                        value={email}
-                        required
-                        autoComplete="email"
-                        aria-invalid={!!emailError}
-                    />
-                    {emailError && (
-                        <p className="text-red-400 text-sm mt-1" role="alert">{emailError}</p>
-                    )}
+            <form className="space-y-4" onSubmit={handleForgotPasswordRequest}>
+                <div className="space-y-1.5">
+                    <label htmlFor="reset-email" className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Account Email</label>
+                    <div className="relative group">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-teal-500 transition-colors" />
+                        <input
+                            id="reset-email"
+                            type="email"
+                            placeholder="your@email.com"
+                            className={`w-full pl-11 pr-4 py-3 bg-gray-900/50 border ${emailError ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all placeholder:text-gray-700`}
+                            onChange={(e) => handleEmailChange(e.target.value)}
+                            onBlur={handleEmailBlur}
+                            value={email}
+                            required
+                        />
+                    </div>
                 </div>
 
                 <button
                     type="submit"
-                    className="w-full mt-6 py-3 bg-teal-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-teal-600/30 hover:bg-teal-700 transition transform hover:scale-[1.01] duration-300 ease-in-out disabled:bg-gray-700"
                     disabled={loading || !!emailError}
+                    className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                    {loading ? 'Sending Request...' : 'Send Reset Link'}
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
                 </button>
             </form>
 
-            <p className="text-center text-gray-400 mt-6 pt-4 border-t border-gray-800">
-                <button
-                    onClick={() => setView('login')}
-                    className="ml-2 cursor-pointer text-indigo-400 hover:text-indigo-300 font-bold transition duration-150"
-                    disabled={loading}
-                >
-                    ← Back to Log In
-                </button>
-            </p>
+            <button
+                onClick={() => setView('login')}
+                className="w-full flex items-center justify-center gap-2 text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-white transition-colors py-1"
+                disabled={loading}
+            >
+                <ArrowLeft className="w-3 h-3" /> Back to Log In
+            </button>
         </section>
     );
 };
@@ -191,15 +174,12 @@ const Login = ({ onLogin, onBackToLanding }) => {
 
     const validateEmail = (inputEmail) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (/\s/.test(inputEmail)) return 'Email cannot contain spaces.';
-        if (inputEmail !== inputEmail.toLowerCase()) return 'Email must be entirely lowercase.';
-        if (!emailRegex.test(inputEmail)) return 'Please enter a valid email address.';
+        if (!emailRegex.test(inputEmail)) return 'Invalid format.';
         return null;
     };
 
     const handleEmailChange = useCallback((newEmail) => {
-        const sanitizedEmail = newEmail.toLowerCase().trim();
-        setIdentifier(sanitizedEmail);
+        setIdentifier(newEmail.toLowerCase().trim());
         if (emailError) setEmailError(null);
     }, [emailError]);
 
@@ -219,26 +199,11 @@ const Login = ({ onLogin, onBackToLanding }) => {
     const handleForgotPasswordRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setResetMessage(null);
-        const emailValidation = validateEmail(identifier); 
-        if (emailValidation) {
-            setResetMessage({ error: emailValidation });
-            setEmailError(emailValidation);
-            setLoading(false);
-            return;
-        }
-
         try {
-            const authData = { email: identifier };
-            const response = await apiClient.post(API.forgetpassword, authData);
-            setResetMessage({
-                success: response.data.message || 'Reset link has been sent.'
-            });
-            if (response.data.devResetToken) {
-                setResetMessage((prev) => ({ ...prev, devToken: response.data.devResetToken }));
-            }
+            const response = await apiClient.post(API.forgetpassword, { email: identifier });
+            setResetMessage({ success: response.data.message || 'Reset link sent.' });
         } catch (error) {
-            setResetMessage({ error: error.response?.data?.error || 'Failed to send reset link.' });
+            setResetMessage({ error: error.response?.data?.error || 'Failed.' });
         } finally {
             setLoading(false);
         }
@@ -246,87 +211,77 @@ const Login = ({ onLogin, onBackToLanding }) => {
 
     const handleAuth = async (e) => {
         e.preventDefault();
-        setAuthError(null);
-        if (!identifier || !password) {
-            setAuthError('All fields are required.');
-            return;
-        }
         setLoading(true);
-
         try {
-            const authData = { identifier, password };
-            const response = await apiClient.post(API.login, authData);
-            const data = response.data;
-
-            if (data?.token && data?.user) {
-                localStorage.setItem('userToken', data.token);
-                onLogin(data.user, data.token);
-            } else {
-                setAuthError('Login failed. Invalid credentials.');
+            const response = await apiClient.post(API.login, { identifier, password });
+            if (response.data?.token) {
+                localStorage.setItem('userToken', response.data.token);
+                onLogin(response.data.user, response.data.token);
             }
         } catch (error) {
-            setAuthError(error.response?.data?.error || 'Connection failed.');
+            setAuthError(error.response?.data?.error || 'Auth failed.');
         } finally {
             setLoading(false);
         }
     };
 
-    const renderForm = () => {
-        const commonProps = {
-            identifier,
-            setIdentifier: handleEmailChange, 
-            handleEmailBlur,
-            loading,
-            setView,
-            emailError,
-            authError,
-        };
-
-        return view === 'forgotPassword' ? (
-            <ForgotPasswordForm
-                handleForgotPasswordRequest={handleForgotPasswordRequest}
-                resetMessage={resetMessage}
-                {...commonProps}
-                email={identifier}
-                handleEmailChange={handleEmailChange}
-                handleEmailBlur={handleEmailBlur}
-            />
-        ) : (
-            <LoginForm
-                handleAuth={handleAuth}
-                identifier={identifier}
-                setIdentifier={setIdentifier} 
-                password={password}
-                setPassword={setPassword}
-                authError={authError}
-                loading={loading}
-                setView={setView}
-                onBackToLanding={onBackToLanding}
-            />
-        );
-    };
-
     return (
-        <main className="min-h-screen flex items-center justify-center bg-gray-950 p-4 font-inter" itemScope itemType="https://schema.org/WebPage">
-            <section className="w-full max-w-md bg-gray-900 p-8 md:p-10 rounded-2xl shadow-2xl shadow-indigo-900/20 border border-gray-800">
-                <header className="text-center mb-4" itemProp="headline">
-                    <DollarSign className="w-12 h-12 text-indigo-500 mx-auto" aria-hidden="true" />
-                    <h1 className="text-3xl font-extrabold text-white">Pocket POS</h1>
-                    <p className="text-sm text-gray-400 mt-2" itemProp="description">Login to your Pocket POS account to access your retail management dashboard, billing, inventory, and digital Khata ledger.</p>
-                </header>
-                {renderForm()}
-                <div className="text-center text-sm mt-8">
-                    <button
-                        onClick={onBackToLanding}
-                        className="cursor-pointer text-gray-500 hover:text-indigo-400 transition duration-150 flex items-center mx-auto"
-                        disabled={loading}
-                        aria-label="Return to landing page"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1" aria-hidden="true"><path d="M19 12H5" /><polyline points="12 19 5 12 12 5" /></svg>
-                        Back to Landing Page
-                    </button>
-                </div>
-            </section>
+        <main className="h-screen w-full flex items-center justify-center bg-gray-950 p-4 sm:p-6 overflow-hidden">
+            <div className="w-full max-w-[380px] flex flex-col relative">
+                
+                {/* Minimalist Glow */}
+                <div className="absolute -inset-10 bg-indigo-500/5 blur-[80px] -z-10 rounded-full" />
+                
+                <section className="bg-gray-950 border border-gray-800 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col">
+                    
+                    {/* Compact Header */}
+                    <header className="pt-6 pb-4 px-6 text-center bg-gray-900/20 border-b border-gray-800/50">
+                        <div className="inline-flex items-center justify-center w-11 h-11 bg-indigo-500/10 rounded-xl mb-2 border border-indigo-500/20">
+                            <DollarSign className="w-5 h-5 text-indigo-500" />
+                        </div>
+                        <h1 className="text-base font-black text-white tracking-[0.2em] uppercase">Pocket <span className="text-indigo-500">POS</span></h1>
+                    </header>
+
+                    {/* Form Body - Reduced padding and spacing */}
+                    <div className="p-6 sm:p-8">
+                        {view === 'forgotPassword' ? (
+                            <ForgotPasswordForm
+                                handleForgotPasswordRequest={handleForgotPasswordRequest}
+                                resetMessage={resetMessage}
+                                loading={loading}
+                                setView={setView}
+                                emailError={emailError}
+                                email={identifier}
+                                handleEmailChange={handleEmailChange}
+                                handleEmailBlur={handleEmailBlur}
+                            />
+                        ) : (
+                            <LoginForm
+                                handleAuth={handleAuth}
+                                identifier={identifier}
+                                setIdentifier={setIdentifier} 
+                                password={password}
+                                setPassword={setPassword}
+                                authError={authError}
+                                loading={loading}
+                                setView={setView}
+                                onBackToLanding={onBackToLanding}
+                            />
+                        )}
+                    </div>
+
+                    {/* Compact Footer */}
+                    <footer className="pb-6 px-6 text-center">
+                        <button
+                            onClick={onBackToLanding}
+                            className="inline-flex items-center gap-2 text-[9px] font-black text-gray-600 uppercase tracking-widest hover:text-indigo-400 transition-colors"
+                            disabled={loading}
+                        >
+                            <ArrowLeft className="w-2.5 h-2.5" /> Exit Terminal
+                        </button>
+                    </footer>
+                </section>
+            </div>
         </main>
     );
 };

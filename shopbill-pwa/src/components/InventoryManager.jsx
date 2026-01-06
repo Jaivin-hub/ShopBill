@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertTriangle, Loader } from 'lucide-react'; 
+import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react'; 
 import InventoryContent from './InventoryContent'; 
 
 // --- Configuration and Constants ---
@@ -18,8 +18,8 @@ const initialItemState = {
 };
 
 const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
+    // Permission Logic
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
-    const isOwner = userRole === USER_ROLES.OWNER;
     
     // --- Data States ---
     const [inventory, setInventory] = useState([]);
@@ -37,16 +37,16 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     const [sortOption, setSortOption] = useState('default'); 
     const [showStickySearch, setShowStickySearch] = useState(false);
     
-    // --- Data Fetching Logic ---
-    const fetchInventory = useCallback(async () => {
-        setIsProcessing(true); 
+    // --- Data Fetching Logic (Memoized for Pattern Consistency) ---
+    const fetchInventory = useCallback(async (isSilent = false) => {
+        if (!isSilent) setIsProcessing(true); 
         try {
             const response = await apiClient.get(API.inventory);
             setInventory(response.data);
-            showToast('Inventory data refreshed.', 'info');
+            // Only toast on manual refreshes or specific updates
         } catch (error) {
-            console.error("Failed to load inventory data:", error);
-            showToast('Error loading inventory data. Check network connection.', 'error');
+            console.error("Inventory Fetch Error:", error);
+            showToast('System Link Failure: Could not sync inventory.', 'error');
         } finally {
             setIsProcessing(false); 
             setIsLoadingInitial(false);
@@ -61,27 +61,26 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         }
     }, [hasAccess, fetchInventory]); 
 
-    // --- Sticky Search Scroll Effect ---
+    // --- Optimized Scroll Observer for Sticky UI Elements ---
     useEffect(() => {
-        if (!isOwner) return;
         const scrollTarget = document.querySelector('.scrollable-content') || window;
         
         const handleScroll = () => {
-            const scrollThreshold = 100; 
             const scrollTop = scrollTarget === window ? window.scrollY : scrollTarget.scrollTop;
-            setShowStickySearch(scrollTop > scrollThreshold);
+            // Pattern uses a 40px threshold for tighter header transitions
+            setShowStickySearch(scrollTop > 40);
         };
         
-        scrollTarget.addEventListener('scroll', handleScroll);
+        scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
         return () => scrollTarget.removeEventListener('scroll', handleScroll);
-    }, [isOwner]);
+    }, []);
     
     // --- Modal & Form Handlers ---
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'number' && name !== 'hsn' ? parseFloat(value) : value
+            [name]: type === 'number' && name !== 'hsn' ? (value === '' ? '' : parseFloat(value)) : value
         }));
     };
 
@@ -124,46 +123,44 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         setIsProcessing(true);
         try {
             const response = await apiClient.post(`${API.inventory}/bulk`, items);
-            showToast(response.data.message || `${response.data.insertedCount} items uploaded successfully!`, 'success');
-            await fetchInventory();
+            showToast(`Batch Processed: ${response.data.insertedCount} items integrated.`, 'success');
+            await fetchInventory(true);
         } catch (error) {
-            console.error('Bulk Upload Error:', error.response?.data || error.message);
-            showToast(`Error: ${error.response?.data?.error || 'Bulk upload failed.'}`, 'error');
-            setIsProcessing(false); 
-        } 
+            showToast(error.response?.data?.error || 'Batch integration failed.', 'error');
+        } finally {
+            setIsProcessing(false);
+        }
     };
     
     const handleAddItem = async () => { 
         setIsProcessing(true);
         try {
-            const dataToSend = { ...formData, _id: undefined, id: undefined }; 
+            const { _id, id, ...dataToSend } = formData; 
             await apiClient.post(API.inventory, dataToSend);
-            showToast(`New item added: ${formData.name}`, 'success');
-            await fetchInventory(); 
+            showToast(`Catalog Entry Created: ${formData.name}`, 'success');
+            await fetchInventory(true); 
             closeFormModal();
         } catch (error) {
-            showToast(`Error adding item: ${error.response?.data?.error || error.message}`, 'error');
-            setIsProcessing(false); 
-        } 
+            showToast(error.response?.data?.error || 'Add operation failed.', 'error');
+        } finally {
+            setIsProcessing(false);
+        }
     };
     
     const handleUpdateItem = async () => { 
         setIsProcessing(true);
         const itemId = formData._id || formData.id; 
-        if (!itemId) {
-            setIsProcessing(false);
-            return showToast('Error: Missing item ID.', 'error');
-        }
         try {
             const { _id, id, ...dataToSend } = formData; 
             await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
-            showToast(`${formData.name} updated successfully!`, 'success');
-            await fetchInventory(); 
+            showToast(`Entry Reconfigured: ${formData.name}`, 'success');
+            await fetchInventory(true); 
             closeFormModal();
         } catch (error) {
-            showToast(`Error updating item: ${error.response?.data?.error || error.message}`, 'error');
-            setIsProcessing(false); 
-        } 
+            showToast(error.response?.data?.error || 'Update failed.', 'error');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleFormSubmit = (e) => {
@@ -175,24 +172,26 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         if (!itemToDelete) return;
         const { id: itemId, name: itemName } = itemToDelete;
         setIsConfirmModalOpen(false);
-        setItemToDelete(null);
         setIsProcessing(true);
         try {
             await apiClient.delete(`${API.inventory}/${itemId}`);
-            showToast(`${itemName} deleted successfully.`, 'success');
-            await fetchInventory(); 
+            showToast(`Entry Purged: ${itemName}`, 'success');
+            await fetchInventory(true); 
         } catch (error) {
-            showToast(`Error deleting item: ${error.response?.data?.error || error.message}`, 'error');
-            setIsProcessing(false); 
+            showToast('Deletion protocol failed.', 'error');
+        } finally {
+            setIsProcessing(false);
+            setItemToDelete(null);
         }
     };
     
-    // --- Sorting and Filtering Logic ---
+    // --- Pattern-Optimized Memoized Filtering ---
     const sortedAndFilteredInventory = useMemo(() => {
+        const query = searchTerm.toLowerCase();
         return [...inventory]
             .filter(item => 
-                item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (item.hsn && item.hsn.toLowerCase().includes(searchTerm.toLowerCase()))
+                item.name.toLowerCase().includes(query) || 
+                (item.hsn && item.hsn.toLowerCase().includes(query))
             )
             .sort((a, b) => {
                 if (sortOption === 'low-stock') {
@@ -200,38 +199,43 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
                     const bIsLow = b.quantity <= b.reorderLevel;
                     if (aIsLow && !bIsLow) return -1;
                     if (!aIsLow && bIsLow) return 1;
-                    if (a.quantity !== b.quantity) return a.quantity - b.quantity;
+                    return a.quantity - b.quantity;
                 }
+                // Default: Alphabetical but keeps "Low Stock" at high priority
                 return a.name.localeCompare(b.name);
             });
     }, [inventory, searchTerm, sortOption]);
     
-    // --- Semantic Render Transitions ---
-    
+    // --- Render States ---
     if (!hasAccess) {
         return (
-            <main className="p-4 md:p-8 text-center h-full flex flex-col items-center justify-center bg-gray-950 transition-colors duration-300" aria-labelledby="access-denied-title">
-                <AlertTriangle className="w-12 h-12 text-red-500 mb-4" aria-hidden="true" />
-                <h1 id="access-denied-title" className="text-xl font-semibold text-gray-200">Access Denied</h1>
-                <p className="text-gray-400">Only authorized users can manage the full inventory.</p>
+            <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-8 text-center">
+                <div className="bg-red-500/10 p-6 rounded-[1.25rem] border border-red-500/20 mb-6">
+                    <AlertTriangle className="w-12 h-12 text-red-500" />
+                </div>
+                <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Access<span className="text-red-500 not-italic">Restricted</span></h1>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-4 max-w-xs leading-relaxed">
+                    Inventory management protocols are restricted to Level 2 personnel (Owners/Managers).
+                </p>
             </main>
         );
     }
 
     if (isLoadingInitial) {
          return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 bg-gray-950" aria-busy="true" aria-live="polite">
-                <Loader className="w-10 h-10 animate-spin text-teal-400" aria-hidden="true" />
-                <span className="sr-only">Loading Inventory data...</span>
+            <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-teal-500/20 blur-2xl rounded-full animate-pulse" />
+                    <Loader2 className="w-12 h-12 animate-spin text-teal-400 relative z-10" />
+                </div>
+                <p className="text-[10px] font-black text-teal-400 uppercase tracking-[0.3em] mt-8 animate-pulse">Syncing Database</p>
             </div>
         );
     }
 
     return (
         <InventoryContent
-            // Data
             inventory={sortedAndFilteredInventory}
-            // State
             loading={isProcessing} 
             isFormModalOpen={isFormModalOpen}
             isConfirmModalOpen={isConfirmModalOpen}
@@ -242,7 +246,6 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             searchTerm={searchTerm}
             sortOption={sortOption}
             showStickySearch={showStickySearch}
-            // Handlers
             setSearchTerm={setSearchTerm}
             setSortOption={setSortOption}
             setFormData={setFormData}

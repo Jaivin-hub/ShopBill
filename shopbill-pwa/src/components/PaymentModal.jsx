@@ -1,560 +1,294 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { CreditCard, IndianRupee, X, User, List, UserPlus, CornerDownRight, Search, Phone, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react'; 
-import API from '../config/api'; 
-export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
-export const ADD_NEW_CUSTOMER_ID = 'add_new'; // Special ID for the "Add New" option
+import { 
+    CreditCard, IndianRupee, X, User, Search, 
+    ShieldAlert, ChevronDown, Wallet, ArrowRight,
+    Activity, Info, Layers
+} from 'lucide-react'; 
 
-/**
- * Sub-component for Payment Modal: Handles Cash, Full Credit, or Partial/Mixed Payments
- */
-const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, onAddNewCustomer, apiClient }) => {
+export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
+export const ADD_NEW_CUSTOMER_ID = 'add_new';
+
+const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast }) => {
     const dropdownRef = useRef(null);
     const searchInputRef = useRef(null); 
+    
     const [localSelectedCustomer, setLocalSelectedCustomer] = useState(WALK_IN_CUSTOMER);
-    const [amountPaidInput, setAmountPaidInput] = useState(totalAmount.toFixed(2));
-    const [paymentType, setPaymentType] = useState('UPI');
+    const [amountPaidInput, setAmountPaidInput] = useState('');
+    const [paymentType, setPaymentType] = useState('UPI'); // 'UPI' (covers Cash/Digital) or 'Credit'
     const [isDropdownOpen, setIsDropdownOpen] = useState(false); 
     const [searchTerm, setSearchTerm] = useState(''); 
-    const [isNewCustomerFormOpen, setIsNewCustomerFormOpen] = useState(false);
-    const [newCustomerName, setNewCustomerName] = useState('');
-    const [newCustomerPhone, setNewCustomerPhone] = useState('');
-    const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState('');
-    const [formErrors, setFormErrors] = useState({}); // To show validation errors under fields
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // --- NEW STATE: For handling Credit Limit Error ---
     const [creditError, setCreditError] = useState(null);
 
-    // --- EFFECT: Reset state on modal open and set initial payment type ---
+    // Synchronize input when modal opens or total changes
     useEffect(() => {
         if (isOpen) {
-            setAmountPaidInput(totalAmount.toFixed(2));
-            const initialPaymentType = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI';
-            setPaymentType(initialPaymentType);
-            
+            setAmountPaidInput(totalAmount.toString());
+            setPaymentType(localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI');
             setSearchTerm(''); 
-            setIsNewCustomerFormOpen(false); 
-            setNewCustomerName('');
-            setNewCustomerPhone('');
-            setNewCustomerCreditLimit('');
-            setFormErrors({});
-            setIsSubmitting(false); 
             setCreditError(null); 
         }
     }, [isOpen, totalAmount, localSelectedCustomer.id]);
 
+    // UI Click logic
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsDropdownOpen(false);
-            }
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsDropdownOpen(false);
         };
         document.addEventListener("mousedown", handleClickOutside);
-        
-        if (isDropdownOpen) {
-            setTimeout(() => searchInputRef.current?.focus(), 10);
-        }
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isDropdownOpen]);
+    }, []);
 
     const khataDue = localSelectedCustomer.outstandingCredit || 0;
-    const isCreditCustomerSelected = localSelectedCustomer.id !== WALK_IN_CUSTOMER.id;
-    const amountPaid = parseFloat(amountPaidInput) || 0;
+    const creditLimit = localSelectedCustomer.creditLimit || 0;
+    const enteredPaid = parseFloat(amountPaidInput) || 0;
 
-    useEffect(() => {
-        if (paymentType === 'Credit' && !isCreditCustomerSelected) {
-            setPaymentType('UPI');
-            showToast({ message: 'Select a credit customer first to use the "Full Khata" option.', type: 'info' });
-        }
-    }, [paymentType, isCreditCustomerSelected, showToast]);
-
-    const {
-        amountCredited, 
-        changeDue,      
-        newKhataBalance, 
-        paymentMethod,
-        effectiveAmountPaid 
-    } = useMemo(() => {
-        const total = totalAmount;
-        let amountCredited = 0; 
-        let changeDue = 0;
-        let effectiveAmountPaid = amountPaid; 
-        let method = paymentType;
+    // --- LOGIC ENGINE ---
+    const { amountCredited, changeDue, paymentMethod, effectiveAmountPaid } = useMemo(() => {
+        let amtCred = 0;
+        let chgDue = 0;
+        let effPaid = 0;
+        let method = 'UPI';
 
         if (paymentType === 'Credit') {
-            amountCredited = total;
-            effectiveAmountPaid = 0; 
+            // Full amount goes to Khata
+            amtCred = totalAmount;
+            effPaid = 0;
             method = 'Credit';
-        }
-        else { 
-            if (amountPaid >= total) {
-                changeDue = Math.max(0, amountPaid - total);
-                method = 'UPI'; 
-            } else if (amountPaid < total) {
-                amountCredited = total - amountPaid;
-                method = amountPaid > 0 ? 'Mixed' : 'Credit'; 
+        } else {
+            // User is on "Direct" mode but might pay partially or extra
+            effPaid = enteredPaid;
+            if (enteredPaid >= totalAmount) {
+                chgDue = enteredPaid - totalAmount;
+                amtCred = 0;
+                method = 'UPI';
+            } else {
+                // Partial Payment Logic
+                amtCred = totalAmount - enteredPaid;
+                method = enteredPaid > 0 ? 'Mixed' : 'Credit';
             }
         }
 
-        const newKhataBalance = khataDue + amountCredited;
-        return { 
-            amountCredited, 
-            changeDue, 
-            newKhataBalance, 
-            paymentMethod: method,
-            effectiveAmountPaid 
-        };
-    }, [amountPaid, totalAmount, paymentType, khataDue]);
+        return { amountCredited: amtCred, changeDue: chgDue, paymentMethod: method, effectiveAmountPaid: effPaid };
+    }, [enteredPaid, totalAmount, paymentType]);
+
+    const newKhataBalance = khataDue + amountCredited;
+    const creditUsagePercent = creditLimit > 0 ? (newKhataBalance / creditLimit) * 100 : 0;
 
     const filteredOptions = useMemo(() => {
-        const options = [];
-        options.push({ 
-            id: ADD_NEW_CUSTOMER_ID, 
-            key: ADD_NEW_CUSTOMER_ID, 
-            name: 'Add New Credit Customer', 
-            display: 'Add New Credit Customer...', 
-            outstandingCredit: 0 
-        });
-        options.push({ 
-            ...WALK_IN_CUSTOMER,
-            key: WALK_IN_CUSTOMER.id,
-            display: 'Walk-in Customer'
-        });
-        const regularCustomers = (allCustomers || []).filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id);
-        regularCustomers.forEach(c => {
-             options.push({
-                ...c, 
-                id: c._id || c.id, 
-                key: c._id || c.id, 
-                display: `${c.name} ${c.outstandingCredit > 0 ? `(DUE: ₹${c.outstandingCredit.toFixed(0)})` : ''}`
-            });
-        });
-
-        if (!searchTerm) return options; 
-
-        const lowerCaseSearch = searchTerm.toLowerCase();
-        const specialOptions = options.slice(0, 2); 
-        const searchableCustomers = options.slice(2); 
+        const options = [
+            { id: ADD_NEW_CUSTOMER_ID, key: ADD_NEW_CUSTOMER_ID, name: 'Add New Customer', display: 'Add New Credit Account...', outstandingCredit: 0 },
+            { ...WALK_IN_CUSTOMER, key: WALK_IN_CUSTOMER.id, display: 'Walk-in Customer' }
+        ];
+        const regular = (allCustomers || []).filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id);
+        regular.forEach(c => options.push({ ...c, id: c._id || c.id, key: c._id || c.id, display: c.name }));
         
-        const filteredCustomers = searchableCustomers.filter(c => 
-            c.name.toLowerCase().includes(lowerCaseSearch) || 
-            (c.phone && c.phone.includes(searchTerm)) || 
-            (c.mobile && c.mobile.includes(searchTerm))
-        );
+        if (!searchTerm) return options;
+        const q = searchTerm.toLowerCase();
+        return options.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+    }, [allCustomers, searchTerm]);
 
-        return [...specialOptions, ...filteredCustomers];
-    }, [allCustomers, searchTerm]); 
-    
-    const handleCustomerSelect = (customer) => {
-        setIsDropdownOpen(false); 
-        setSearchTerm(''); 
-        setCreditError(null); 
-        
-        if (customer.id === ADD_NEW_CUSTOMER_ID) {
-            setIsNewCustomerFormOpen(true); 
-            return;
+    const handleConfirmPayment = async (force = false) => {
+        if (totalAmount <= 0) return showToast('Cart is empty', 'error');
+        if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
+            return showToast('Select a customer to record partial credit/Khata', 'error');
         }
         
-        setLocalSelectedCustomer(customer);
-        if (customer.id !== WALK_IN_CUSTOMER.id) {
-            setPaymentType('Credit');
-        } else {
-            setPaymentType('UPI');
-        }
-    };
-
-    const handleAddNewCustomerSubmit = async (e) => {
-        e.preventDefault();
-        
-        // VALIDATION LOGIC
-        const errors = {};
-        if (!newCustomerName.trim()) errors.name = "Customer name is required";
-        if (!newCustomerPhone.trim()) {
-            errors.phone = "Phone number is required";
-        } else if (newCustomerPhone.length < 10) {
-            errors.phone = "Enter a valid 10-digit phone number";
-        }
-        if (!newCustomerCreditLimit || parseFloat(newCustomerCreditLimit) < 0) {
-            errors.limit = "Credit limit is required";
-        }
-
-        if (Object.keys(errors).length > 0) {
-            setFormErrors(errors);
-            return;
-        }
-
-        setFormErrors({});
         setIsSubmitting(true);
         try {
-            const dataToSend = {
-                name: newCustomerName.trim(),
-                phone: newCustomerPhone.trim().replace(/[^0-9]/g, ''), 
-                creditLimit: parseFloat(newCustomerCreditLimit), 
-                initialDue: 0
-            };
-            const response = await apiClient.post(API.customers, dataToSend);
-            if (response.data && response.data.customer) {
-                const newCustomer = response.data.customer;
-                showToast({ message: `Customer "${newCustomer.name}" added successfully!`, type: 'success' });
-                setLocalSelectedCustomer(newCustomer);
-                setPaymentType('Credit'); 
-                onAddNewCustomer(newCustomer);
-                setNewCustomerName('');
-                setNewCustomerPhone('');
-                setNewCustomerCreditLimit('');
-                setIsNewCustomerFormOpen(false);
-            } else {
-                 showToast({ message: 'Customer created but response format was unexpected.', type: 'warning' });
-            }
+            // We pass the calculated values to the parent processPayment function
+            await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
+            setCreditError(null);
+            onClose();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || 'Failed to add new customer.';
-            showToast({ message: errorMessage, type: 'error' });
+            const msg = error.response?.data?.error || error.response?.data?.message || 'Transaction Failed';
+            if (msg.toLowerCase().includes('limit')) setCreditError({ message: msg });
+            else showToast(msg, 'error');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleConfirmPayment = async (force = false) => {
-        if (totalAmount <= 0) {
-            showToast({ message: 'Cart is empty. Cannot process payment.', type: 'error' });
-            return;
-        }
-        if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
-            showToast({ message: 'Please select a specific customer to add the remaining amount to Khata/Credit.', type: 'error' });
-            return;
-        }
-        if (effectiveAmountPaid < 0) {
-             showToast({ message: 'Amount paid cannot be negative.', type: 'error' });
-             return;
-        }
-        setIsSubmitting(true);
-        try {
-             await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
-             setCreditError(null);
-        } catch (error) {
-            const errorMessage = error.response?.data?.error || error.response?.data?.message || '';
-            if (errorMessage.toLowerCase().includes('limit') && errorMessage.toLowerCase().includes('exceeded')) {
-                setCreditError({ message: errorMessage });
-                showToast({ message: 'Credit limit reached!', type: 'warning' });
-            } else {
-                showToast({ message: errorMessage || 'Payment processing failed.', type: 'error' });
-            }
-            setIsSubmitting(false); 
-        }
-    };
-
     if (!isOpen) return null;
 
-    const currentCustomerDisplay = 
-        localSelectedCustomer.id === WALK_IN_CUSTOMER.id 
-            ? WALK_IN_CUSTOMER.name
-            : localSelectedCustomer.name + 
-              (localSelectedCustomer.outstandingCredit > 0 
-                ? ` (DUE: ₹${localSelectedCustomer.outstandingCredit.toFixed(0)})` 
-                : '');
-    
-    const isWalkInSelected = localSelectedCustomer.id === WALK_IN_CUSTOMER.id;
-
-    if (isNewCustomerFormOpen) {
-        return (
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-teal-700">
-                    <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-white flex items-center">
-                            <UserPlus className="w-6 h-6 text-teal-400 mr-2" />
-                            Add New Credit Customer
-                        </h2>
-                        <button onClick={() => setIsNewCustomerFormOpen(false)} className="p-2 rounded-full hover:bg-gray-700 text-gray-400" disabled={isSubmitting}>
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <form onSubmit={handleAddNewCustomerSubmit} className="p-5 space-y-4">
-                        <div>
-                            <label htmlFor="new-customer-name" className="block text-sm font-medium text-gray-300 mb-1">Customer Name</label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
-                                <input
-                                    id="new-customer-name"
-                                    type="text"
-                                    value={newCustomerName}
-                                    onChange={(e) => {setNewCustomerName(e.target.value); if(formErrors.name) setFormErrors({...formErrors, name:null});}}
-                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.name ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg`}
-                                    placeholder="Enter full name"
-                                    autoFocus
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            {formErrors.name && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.name}</p>}
-                        </div>
-                        <div>
-                            <label htmlFor="new-customer-phone" className="block text-sm font-medium text-gray-300 mb-1">Phone Number</label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
-                                <input
-                                    id="new-customer-phone"
-                                    type="tel"
-                                    value={newCustomerPhone}
-                                    onChange={(e) => {setNewCustomerPhone(e.target.value.replace(/[^0-9]/g, '')); if(formErrors.phone) setFormErrors({...formErrors, phone:null});}}
-                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg`}
-                                    placeholder="e.g., 9876543210"
-                                    maxLength="10"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            {formErrors.phone && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.phone}</p>}
-                        </div>
-                        <div>
-                            <label htmlFor="new-customer-limit" className="block text-sm font-medium text-gray-300 mb-1">Credit Limit (₹)</label>
-                            <div className="relative">
-                                <ShieldAlert className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-400" />
-                                <input
-                                    id="new-customer-limit"
-                                    type="number"
-                                    value={newCustomerCreditLimit}
-                                    onChange={(e) => {setNewCustomerCreditLimit(e.target.value); if(formErrors.limit) setFormErrors({...formErrors, limit:null});}}
-                                    className={`w-full pl-10 pr-4 py-3 border ${formErrors.limit ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-lg font-bold`}
-                                    placeholder="e.g., 5000"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            {formErrors.limit && <p className="text-red-400 text-xs mt-1 font-semibold">{formErrors.limit}</p>}
-                        </div>
-                        <button 
-                            type="submit"
-                            className="w-full mt-2 py-4 bg-teal-600 text-white rounded-xl font-extrabold text-xl shadow-2xl shadow-teal-900/50 hover:bg-teal-700 transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center"
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            ) : (
-                                <CheckCircle className="w-6 h-6 mr-2" />
-                            )}
-                            {isSubmitting ? 'Saving...' : 'Save Customer'}
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setIsNewCustomerFormOpen(false)}
-                            className="w-full py-2 text-sm text-gray-400 hover:text-white transition"
-                            disabled={isSubmitting}
-                        >
-                            Cancel and Go Back
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 border border-indigo-700">
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-white flex items-center">
-                        <IndianRupee className="w-6 h-6 text-teal-400 mr-2" />
-                        Process Payment
-                    </h2>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-400" disabled={isSubmitting}>
+        <div className="fixed inset-0 bg-gray-950/90 z-[200] flex justify-center items-start pt-6 md:pt-12 px-4 backdrop-blur-xl overflow-y-auto pb-10">
+            <div className="bg-gray-900 rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,0.5)] w-full max-w-lg border border-gray-800 overflow-hidden transition-all animate-in slide-in-from-top-4">
+                
+                {/* Header */}
+                <div className="px-8 py-6 border-b border-gray-800 flex justify-between items-center bg-gray-950/40">
+                    <div>
+                        <div className="flex items-center gap-2 text-indigo-500 mb-1">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-black uppercase tracking-[0.3em]">Execution Terminal</span>
+                        </div>
+                        <h2 className="text-xl font-black text-white uppercase tracking-tighter italic">Finalize <span className="text-indigo-500">Settlement</span></h2>
+                    </div>
+                    <button onClick={onClose} className="p-3 bg-gray-900 border border-gray-800 text-gray-500 rounded-2xl hover:text-white transition-all active:scale-90">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                <div className="p-5 space-y-5">
-                    {/* --- ERROR MESSAGE BOX --- */}
-                    {creditError && (
-                        <div className="p-4 bg-red-900/40 border border-red-500 rounded-xl flex items-start space-x-3 animate-pulse">
-                            <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
-                            <div className="text-sm">
-                                <p className="font-bold text-red-400 mb-1">CREDIT LIMIT EXCEEDED</p>
-                                <p className="text-gray-200">{creditError.message}</p>
-                                <p className="mt-1 text-red-300 text-xs font-bold underline">Click below to bypass this limit.</p>
+
+                <div className="p-8 space-y-6">
+                    {/* Customer Identity Selection */}
+                    <div className="relative" ref={dropdownRef}>
+                        <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block ml-1">Client Authorization</label>
+                        <button
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="w-full bg-gray-950 border border-gray-800 rounded-2xl px-5 py-4 flex items-center justify-between group transition-all"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${localSelectedCustomer.id === 'walk_in' ? 'bg-gray-800 text-gray-600' : 'bg-indigo-600 text-white'}`}>
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-[13px] font-black text-white uppercase">{localSelectedCustomer.name}</p>
+                                    {localSelectedCustomer.id !== 'walk_in' && (
+                                        <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+                                            Limit: ₹{creditLimit} • Bal: ₹{khataDue}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isDropdownOpen && (
+                            <div className="absolute top-[110%] left-0 w-full bg-gray-900 border border-gray-800 rounded-3xl shadow-2xl z-[210] overflow-hidden animate-in fade-in zoom-in-95">
+                                <div className="p-3 bg-gray-950/50 border-b border-gray-800">
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                                        <input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            placeholder="FILTER CLIENT REGISTRY..."
+                                            className="w-full bg-gray-900 border border-gray-800 rounded-xl py-3 pl-12 text-[10px] font-black uppercase text-white outline-none"
+                                            value={searchTerm}
+                                            onChange={e => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto p-2">
+                                    {filteredOptions.map(c => (
+                                        <div 
+                                            key={c.key} 
+                                            onClick={() => { setLocalSelectedCustomer(c); setIsDropdownOpen(false); }}
+                                            className="px-4 py-3 hover:bg-indigo-600/10 rounded-xl cursor-pointer flex justify-between items-center transition-all"
+                                        >
+                                            <span className={`text-[11px] font-black uppercase ${c.id === ADD_NEW_CUSTOMER_ID ? 'text-emerald-400' : 'text-gray-300'}`}>{c.display}</span>
+                                            {c.outstandingCredit > 0 && <span className="text-[9px] font-black text-rose-500 tabular-nums">₹{c.outstandingCredit}</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Financial Summary Card */}
+                    <div className="bg-indigo-600 rounded-[2rem] p-8 shadow-xl relative overflow-hidden group">
+                        <div className="relative z-10 flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] font-black text-indigo-100 uppercase tracking-[0.2em] mb-1">Settlement Total</p>
+                                <h3 className="text-5xl font-black text-white italic tracking-tighter">
+                                    <span className="text-2xl mr-1 not-italic opacity-50">₹</span>{totalAmount.toLocaleString()}
+                                </h3>
+                            </div>
+                            <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/5">
+                                <IndianRupee className="w-8 h-8 text-white" />
+                            </div>
+                        </div>
+                        <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
+                    </div>
+
+                    {/* Payment Mode Selector */}
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-gray-950 border border-gray-800 rounded-2xl">
+                        <button
+                            onClick={() => setPaymentType('UPI')}
+                            className={`py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${paymentType === 'UPI' ? 'bg-gray-800 text-emerald-400 border border-gray-700 shadow-lg' : 'text-gray-600'}`}
+                        >
+                            Direct Payment
+                        </button>
+                        <button
+                            onClick={() => setPaymentType('Credit')}
+                            disabled={localSelectedCustomer.id === 'walk_in'}
+                            className={`py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${paymentType === 'Credit' ? 'bg-gray-800 text-rose-500 border border-gray-700 shadow-lg' : 'text-gray-600 disabled:opacity-20'}`}
+                        >
+                            Credit (Khata)
+                        </button>
+                    </div>
+
+                    {/* Input Field - Shows only if not forced full credit */}
+                    {paymentType === 'UPI' && (
+                        <div className="space-y-2 animate-in slide-in-from-bottom-2 duration-300">
+                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Capital Received</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    value={amountPaidInput}
+                                    onChange={e => setAmountPaidInput(e.target.value)}
+                                    className="w-full bg-gray-950 border border-gray-800 focus:border-indigo-500 rounded-2xl py-5 px-6 text-3xl font-black text-white italic outline-none transition-all tabular-nums"
+                                    placeholder="0.00"
+                                />
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-700 font-black text-xs uppercase tracking-tighter">INR Buffer</div>
                             </div>
                         </div>
                     )}
 
-                    <div className="relative" ref={dropdownRef}>
-                        <h3 className="text-sm font-semibold flex items-center text-gray-300 mb-2">
-                            <User className="w-4 h-4 mr-1 text-teal-400" /> Bill To Customer:
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            className={`w-full px-4 py-3 border rounded-lg text-base font-semibold pr-10 transition-colors shadow-inner flex justify-between items-center 
-                                ${isDropdownOpen ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-indigo-600'}
-                                ${isWalkInSelected ? 'bg-gray-600 text-white' : 'bg-gray-700 text-white'}
-                            `}
-                            disabled={isSubmitting}
-                        >
-                            <span className="truncate">{currentCustomerDisplay}</span>
-                            <List className="w-5 h-5 ml-2 text-indigo-400" />
-                        </button>
-                        {isDropdownOpen && (
-                            <div className="absolute z-10 w-full mt-1 rounded-lg shadow-2xl bg-gray-700 border border-indigo-500 max-h-60 overflow-y-auto">
-                                <div className="p-2 sticky top-0 bg-gray-700 border-b border-gray-600">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <input
-                                            ref={searchInputRef}
-                                            type="text"
-                                            placeholder="Search name or mobile..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                                            onClick={(e) => e.stopPropagation()} 
-                                            disabled={isSubmitting}
-                                        />
-                                    </div>
-                                </div>
-                                {filteredOptions.length > 0 ? (
-                                    filteredOptions.map((customer) => (
-                                        <div
-                                            key={customer.key}
-                                            onClick={() => handleCustomerSelect(customer)}
-                                            className={`px-4 py-3 cursor-pointer text-sm font-medium transition-colors border-b border-gray-600 last:border-b-0 flex items-center justify-between
-                                                ${
-                                                    customer.id === localSelectedCustomer.id 
-                                                        ? 'bg-indigo-600 text-white' 
-                                                    : customer.id === ADD_NEW_CUSTOMER_ID 
-                                                        ? 'bg-teal-800/70 text-teal-300 hover:bg-teal-700 font-bold' 
-                                                    : customer.id === WALK_IN_CUSTOMER.id
-                                                        ? 'bg-gray-600 text-white hover:bg-gray-500 font-bold' 
-                                                    : 'text-gray-200 hover:bg-gray-600' 
-                                                }
-                                            `}
-                                        >
-                                            <span className="truncate">
-                                                {customer.id === ADD_NEW_CUSTOMER_ID && <UserPlus className="w-4 h-4 inline mr-2" />}
-                                                {customer.id === WALK_IN_CUSTOMER.id && <CornerDownRight className="w-4 h-4 inline mr-2" />}
-                                                {customer.id !== ADD_NEW_CUSTOMER_ID && customer.id !== WALK_IN_CUSTOMER.id && <User className="w-4 h-4 inline mr-2 text-indigo-300" />}
-                                                {customer.display}
-                                            </span>
-                                            {customer.id === localSelectedCustomer.id && (
-                                                <span className="text-xs font-bold text-teal-300">✓ SELECTED</span>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-3 text-sm text-gray-400">
-                                        No customer found matching "{searchTerm}".
-                                    </div>
-                                )}
+                    {/* Transaction Manifest (The logic result) */}
+                    <div className="p-5 bg-gray-950/50 border border-gray-800 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Type</span>
+                            <span className="text-[10px] font-black text-white uppercase">{paymentMethod}</span>
+                        </div>
+                        {effectiveAmountPaid > 0 && (
+                            <div className="flex justify-between items-center text-emerald-500">
+                                <span className="text-[9px] font-black uppercase tracking-widest">Received Cash</span>
+                                <span className="text-sm font-black italic">₹{effectiveAmountPaid.toLocaleString()}</span>
+                            </div>
+                        )}
+                        {amountCredited > 0 && (
+                            <div className="flex justify-between items-center text-rose-500">
+                                <span className="text-[9px] font-black uppercase tracking-widest">Ledger (Debt)</span>
+                                <span className="text-sm font-black italic">₹{amountCredited.toLocaleString()}</span>
+                            </div>
+                        )}
+                        {changeDue > 0 && (
+                            <div className="flex justify-between items-center text-indigo-400">
+                                <span className="text-[9px] font-black uppercase tracking-widest">Refund Due</span>
+                                <span className="text-sm font-black italic">₹{changeDue.toLocaleString()}</span>
                             </div>
                         )}
                     </div>
-                    <div className="p-4 bg-indigo-900/60 rounded-xl shadow-xl border border-indigo-600">
-                        <p className="flex justify-between items-center text-xl font-medium text-gray-200">
-                            <span>Sale Total:</span>
-                            <span className="text-4xl font-extrabold text-teal-400">₹{totalAmount.toFixed(2)}</span>
-                        </p>
-                    </div>
-                    {isCreditCustomerSelected && (
-                        <div className="flex justify-between items-center p-2 border-b border-gray-700 text-sm">
-                            <span className="font-medium text-gray-300">Customer <strong>Old</strong> Outstanding Khata:</span>
-                            <span className={`font-bold ${khataDue > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                ₹{khataDue.toFixed(2)}
-                            </span>
-                        </div>
-                    )}
-                    <div className="flex rounded-xl overflow-hidden shadow-2xl">
-                        <button
-                            onClick={() => {setPaymentType('UPI'); setCreditError(null);}}
-                            className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
-                                paymentType === 'UPI' 
-                                    ? 'bg-teal-600 text-white shadow-inner shadow-teal-900' 
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                            disabled={isSubmitting}
-                        >
-                            <IndianRupee className="w-5 h-5 inline-block mr-1" /> Cash / Mixed
-                        </button>
-                        <button
-                            onClick={() => {setPaymentType('Credit'); setCreditError(null);}}
-                            disabled={!isCreditCustomerSelected || isSubmitting}
-                            className={`cursor-pointer flex-1 py-3 text-center font-bold text-lg transition-all duration-200 ${
-                                paymentType === 'Credit' 
-                                    ? 'bg-red-600 text-white shadow-inner shadow-red-900' 
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            title={!isCreditCustomerSelected ? 'Requires a selected customer other than Walk-in' : ''}
-                        >
-                            <CreditCard className="w-5 h-5 inline-block mr-1" /> Full Khata
-                        </button>
-                    </div>
-                    {paymentType === 'UPI' && (
-                        <div className="space-y-2">
-                            <label htmlFor="amount-paid" className="block text-sm font-medium text-gray-300">Amount Received</label>
-                            <input
-                                id="amount-paid"
-                                type="number"
-                                step="0.01"
-                                value={amountPaidInput}
-                                onChange={(e) => {setAmountPaidInput(e.target.value); setCreditError(null);}}
-                                className="w-full p-4 border-2 border-teal-600 bg-gray-700 text-teal-400 rounded-xl text-3xl font-extrabold focus:ring-teal-500 focus:border-teal-500 shadow-xl transition-colors"
-                                placeholder={totalAmount.toFixed(2)}
-                                disabled={isSubmitting}
-                            />
-                        </div>
-                    )}
-                    <div className="pt-2 space-y-3">
-                        {changeDue > 0.01 && (
-                            <p className="flex justify-between font-bold text-xl text-green-400 p-3 bg-green-900/40 rounded-lg border border-green-700">
-                                <span>Change Due:</span>
-                                <span>₹{changeDue.toFixed(2)}</span>
-                            </p>
-                        )}
-                        {amountCredited > 0.01 && (
-                             <p className={`flex justify-between font-bold text-xl p-3 rounded-lg border ${
-                                 amountCredited > 0 && isCreditCustomerSelected 
-                                     ? 'bg-red-900/40 text-red-400 border-red-700'
-                                     : 'bg-yellow-900/40 text-yellow-400 border-yellow-700'
-                             }`}>
-                                <span>{paymentMethod === 'Credit' ? 'Current Sale to Khata' : 'Remaining Sale to Khata:'}</span>
-                                <span className="text-2xl font-extrabold">₹{amountCredited.toFixed(2)}</span>
-                            </p>
-                        )}
-                        {isCreditCustomerSelected && (khataDue > 0 || amountCredited > 0) && (
-                            <p className="flex justify-between text-sm text-gray-400 pt-3 border-t border-gray-700 mt-2">
-                                <span><strong>New</strong> Total Outstanding Khata Balance:</span>
-                                <span className="font-semibold text-white text-base">₹{newKhataBalance.toFixed(2)}</span>
-                            </p>
-                        )}
-                    </div>
                 </div>
-                <div className="p-5 border-t border-gray-700">
-                    <button 
-                        onClick={() => handleConfirmPayment(!!creditError)} 
-                        className={`cursor-pointer w-full py-4 text-white rounded-xl font-extrabold text-xl shadow-2xl transition active:scale-[0.99] transform disabled:opacity-50 flex items-center justify-center
-                            ${creditError ? 'bg-red-600 shadow-red-900/50 hover:bg-red-700' : 'bg-teal-600 shadow-teal-900/50 hover:bg-teal-700'}
-                        `}
-                        disabled={totalAmount <= 0 || isSubmitting} 
+
+                {/* Footer Action */}
+                <div className="p-8 bg-gray-950/60 border-t border-gray-800">
+                    {creditError && (
+                        <div className="mb-6 p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl flex gap-4 items-center animate-pulse">
+                            <ShieldAlert className="w-5 h-5 text-rose-500" />
+                            <p className="text-[10px] font-black text-rose-500 uppercase leading-relaxed">{creditError.message}</p>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => handleConfirmPayment(!!creditError)}
+                        disabled={isSubmitting}
+                        className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] flex items-center justify-center gap-3 transition-all active:scale-95 shadow-2xl ${
+                            creditError ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/30' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/40'
+                        } text-white`}
                     >
                         {isSubmitting ? (
-                            <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         ) : (
-                            <CheckCircle className="w-6 h-6 mr-2" />
+                            <>
+                                {creditError ? 'Force Bypass Registry' : 'Commit Transaction'}
+                                <ArrowRight className="w-4 h-4" />
+                            </>
                         )}
-                        {isSubmitting 
-                          ? 'Processing Transaction...' 
-                          : creditError 
-                            ? 'Bypass Limit & Confirm' 
-                            : paymentMethod === 'Credit' ? `Confirm ${paymentMethod} Transaction` : `Confirm Transaction`
-                        }
                     </button>
-                    {creditError && (
-                        <button 
-                            onClick={() => setCreditError(null)}
-                            className="w-full mt-3 text-gray-400 text-sm hover:text-white transition"
-                        >
-                            Cancel and Adjust Amount
-                        </button>
-                    )}
                 </div>
             </div>
         </div>
     );
 };
+
 export default PaymentModal;

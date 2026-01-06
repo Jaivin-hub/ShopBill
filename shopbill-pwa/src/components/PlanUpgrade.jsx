@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     ArrowLeft, CheckCircle, Crown, Zap, Building2,
-    Loader, CreditCard, AlertCircle, IndianRupee, XCircle,
+    Loader, CreditCard, AlertCircle, IndianRupee, XCircle, ChevronRight, Info, ShieldCheck
 } from 'lucide-react';
 import API from '../config/api';
 import PlanCard from './PlanCard'; 
@@ -43,54 +43,49 @@ const loadRazorpayScript = (src) => {
     });
 };
 
+// --- REDESIGNED MODALS ---
 const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, startUpgradeFlow, getModalWarningMessage }) => {
     if (!selectedPlan) return null;
     const modalWarning = getModalWarningMessage(selectedPlan);
     const isYellowWarning = modalWarning.icon === 'yellow';
+    
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 w-full max-w-sm sm:max-w-md animate-in fade-in zoom-in-50 duration-300">
-                <div className="p-5 sm:p-6 border-b border-gray-700">
-                    <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                        <Crown className="w-5 h-5 text-indigo-400" />
-                        Confirm Plan Change to {selectedPlan.name}
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
+            <div className="bg-gray-950 w-full max-w-md rounded-[1.25rem] shadow-2xl border border-gray-800 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-8 border-b border-gray-800 bg-indigo-500/5">
+                    <div className="w-16 h-16 bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-6">
+                        <Crown className="w-8 h-8 text-indigo-500" />
+                    </div>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
+                        Confirm {selectedPlan.name}
                     </h2>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Tier Transition</p>
                 </div>
-                <div className="p-5 sm:p-6">
-                    <p className="text-gray-300 mb-4 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: modalWarning.title }} />
+                
+                <div className="p-8 space-y-6">
+                    <p className="text-sm font-bold text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: modalWarning.title }} />
 
-                    <div className={`rounded-lg p-3 sm:p-4 mb-4 flex items-start gap-3 ${isYellowWarning ? 'bg-yellow-700/30' : 'bg-blue-700/30'
-                        }`}>
-                        <IndianRupee className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-1 ${isYellowWarning ? 'text-yellow-400' : 'text-blue-400'
-                            }`} />
-                        <p className={`text-xs sm:text-sm ${isYellowWarning ? 'text-yellow-300' : 'text-blue-300'
-                            }`} dangerouslySetInnerHTML={{ __html: modalWarning.detail }} />
+                    <div className={`rounded-2xl p-4 flex items-start gap-4 border ${isYellowWarning ? 'bg-amber-500/5 border-amber-500/20' : 'bg-indigo-500/5 border-indigo-500/20'}`}>
+                        <Info className={`w-5 h-5 shrink-0 ${isYellowWarning ? 'text-amber-500' : 'text-indigo-500'}`} />
+                        <p className={`text-[11px] font-bold leading-relaxed ${isYellowWarning ? 'text-amber-200/70' : 'text-indigo-200/70'}`} dangerouslySetInnerHTML={{ __html: modalWarning.detail }} />
                     </div>
                 </div>
-                <div className="p-5 sm:p-6 border-t border-gray-700 flex flex-col sm:flex-row-reverse justify-start sm:justify-between gap-3">
+
+                <div className="p-6 border-t border-gray-800 flex flex-col gap-3">
                     <button
                         onClick={() => startUpgradeFlow(selectedPlan)}
                         disabled={isUpgrading}
-                        className="w-full sm:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm font-semibold"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                     >
-                        {isUpgrading ? (
-                            <>
-                                <Loader className="w-4 h-4 animate-spin" />
-                                Processing...
-                            </>
-                        ) : (
-                            <>
-                                <CreditCard className="w-4 h-4" />
-                                Proceed to Mandate Setup
-                            </>
-                        )}
+                        {isUpgrading ? <Loader className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                        {isUpgrading ? 'Processing...' : 'Authorize Mandate'}
                     </button>
                     <button
                         onClick={() => setShowConfirmModal(false)}
                         disabled={isUpgrading}
-                        className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors cursor-pointer text-sm font-semibold"
+                        className="w-full py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-white transition"
                     >
-                        Cancel
+                        Cancel Transaction
                     </button>
                 </div>
             </div>
@@ -98,57 +93,46 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
     );
 };
 
-const CancellationModal = ({ isCancelling, planDetails, showCancelModal, setShowCancelModal, alreadyInTerminalState, isCurrentlyInTrial, handleConfirmCancellation, cancellationMessage, formatDate }) => {
+const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alreadyInTerminalState, isCurrentlyInTrial, handleConfirmCancellation, cancellationMessage, formatDate }) => {
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 w-full max-w-sm sm:max-w-md animate-in fade-in zoom-in-50 duration-300">
-                <div className="p-5 sm:p-6 border-b border-gray-700">
-                    <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                        <XCircle className="w-5 h-5 text-red-400" />
-                        {alreadyInTerminalState ? 'Subscription Status' : 'Confirm Cancellation'}
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
+            <div className="bg-gray-950 w-full max-w-md rounded-[1.25rem] shadow-2xl border border-gray-800 overflow-hidden">
+                <div className="p-8 text-center">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <XCircle className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">
+                        {alreadyInTerminalState ? 'Subscription Status' : 'Terminate Access'}
                     </h2>
-                </div>
-                <div className="p-5 sm:p-6">
-                    <p className="text-gray-300 mb-4 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: cancellationMessage }} />
+                    <div className="text-sm font-bold text-gray-400 leading-relaxed mb-6" dangerouslySetInnerHTML={{ __html: cancellationMessage }} />
 
-                    <div className="bg-red-700/30 rounded-lg p-3 sm:p-4 mb-4 flex items-start gap-3">
-                        <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 flex-shrink-0 mt-1" />
-                        <p
-                            className="text-xs sm:text-sm text-red-300 font-semibold"
+                    <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4 flex items-start gap-3 text-left">
+                        <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+                        <p className="text-[10px] font-black text-red-400 uppercase tracking-tight leading-normal"
                             dangerouslySetInnerHTML={{
                                 __html: isCurrentlyInTrial()
-                                    ? `The recurring payment mandate has been <strong>canceled</strong>. Your trial access will end on ${formatDate(planDetails.planEndDate)}, and no charge will occur.`
-                                    : `The subscription has been cancelled. Full access will continue until the current billing cycle ends on <strong>${formatDate(planDetails.planEndDate)}</strong>.`
+                                    ? `Mandate <strong>cancelled</strong>. Trial ends ${formatDate(planDetails.planEndDate)}.`
+                                    : `Active until <strong>${formatDate(planDetails.planEndDate)}</strong>. No further charges.`
                             }}
                         />
                     </div>
                 </div>
-                <div className="p-5 sm:p-6 border-t border-gray-700 flex flex-col sm:flex-row-reverse justify-start sm:justify-between gap-3">
+
+                <div className="p-6 border-t border-gray-800 flex flex-col gap-2">
                     {!alreadyInTerminalState && (
                         <button
                             onClick={handleConfirmCancellation}
                             disabled={isCancelling}
-                            className="w-full sm:w-auto px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm font-semibold"
+                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
                         >
-                            {isCancelling ? (
-                                <>
-                                    <Loader className="w-4 h-4 animate-spin" />
-                                    Cancelling...
-                                </>
-                            ) : (
-                                <>
-                                    <XCircle className="w-4 h-4" />
-                                    Confirm Cancellation
-                                </>
-                            )}
+                            {isCancelling ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : 'Confirm Cancellation'}
                         </button>
                     )}
                     <button
                         onClick={() => setShowCancelModal(false)}
-                        disabled={isCancelling}
-                        className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors cursor-pointer text-sm font-semibold"
+                        className="w-full py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-white transition"
                     >
-                        {alreadyInTerminalState ? 'Close' : 'Keep Plan'}
+                        {alreadyInTerminalState ? 'Dismiss' : 'Keep Current Plan'}
                     </button>
                 </div>
             </div>
@@ -170,6 +154,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
         subscriptionStatus: null,
     });
     const [cancellationMessage, setCancellationMessage] = useState('');
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -177,35 +162,42 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             maximumFractionDigits: 0
         }).format(amount);
     };
+
     const formatDate = (date) => {
         if (!date) return 'N/A';
         const dateObj = date instanceof Date ? date : new Date(date);
         return dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
+    };
+
     const isCurrentPlanNotExpiring = useCallback((plan) => {
         const isExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() &&
             !['active', 'authenticated'].includes(planDetails.subscriptionStatus);
         return currentPlan?.toLowerCase() === plan.id && !isExpiring;
     }, [currentPlan, planDetails.planEndDate, planDetails.subscriptionStatus]);
+
     const isUpgrade = useCallback((plan) => {
         const planOrder = { basic: 1, pro: 2, premium: 3 };
         const currentOrder = planOrder[currentPlan?.toLowerCase()] || 0;
         const planOrderValue = planOrder[plan.id] || 0;
         return planOrderValue > currentOrder;
     }, [currentPlan]);
+
     const isAlreadyCancelledOrPending = useCallback(() => {
         const finalStatusesWithFutureAccess = ['cancellation_pending', 'trial_cancellation_pending', 'cancellation_no_refund', 'cancelled'];
         return finalStatusesWithFutureAccess.includes(planDetails.subscriptionStatus) && planDetails.planEndDate > new Date();
     }, [planDetails.planEndDate, planDetails.subscriptionStatus]);
+
     const isSamePlanAndCancelled = useCallback((plan) => {
         return currentPlan?.toLowerCase() === plan.id && isAlreadyCancelledOrPending();
     }, [currentPlan, isAlreadyCancelledOrPending]);
+
     const isCurrentlyInTrial = useCallback(() => {
         const isFutureDate = planDetails.planEndDate && planDetails.planEndDate > new Date();
         const isNotFinal = !['cancelled', 'expired'].includes(planDetails.subscriptionStatus);
         const isTrialStatus = planDetails.subscriptionStatus === 'authenticated' || planDetails.subscriptionStatus === 'trial_cancellation_pending';
         return isFutureDate && isNotFinal && isTrialStatus;
     }, [planDetails.planEndDate, planDetails.subscriptionStatus]);
+
     const fetchPlanData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -223,22 +215,25 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             console.error("Error fetching plan data:", error);
             setCurrentPlan('BASIC');
             setAvailablePlans(DEMO_PLANS);
-            showToast('Failed to fetch current plan. Defaulting to Basic.', 'error');
+            showToast('Failed to sync billing data.', 'error');
         } finally {
             setIsLoading(false);
         }
     }, [apiClient, showToast]);
+
     useEffect(() => {
         fetchPlanData();
     }, [fetchPlanData]);
+
     const handleUpgradeClick = (plan) => {
         if (isCurrentPlanNotExpiring(plan) && plan.id === currentPlan?.toLowerCase()) {
-            showToast('This is your current plan.', 'info');
+            showToast('Already active on this plan.', 'info');
             return;
         }
         setSelectedPlan(plan);
         setShowConfirmModal(true);
     };
+
     const handleVerifyPlanChange = async (response, newPlanId) => {
         setIsUpgrading(true);
         setShowConfirmModal(false);
@@ -250,40 +245,24 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 newPlan: newPlanId.toUpperCase(),
             });
             if (verificationResponse.data.success) {
-                let newPlanStatus = 'active';
-                let newPlanEndDate = planDetails.planEndDate;
-                if (currentPlan === 'BASIC' || currentPlan === null) {
-                    const trialEndDate = new Date();
-                    trialEndDate.setDate(trialEndDate.getDate() + 30);
-                    newPlanEndDate = trialEndDate;
-                    newPlanStatus = 'authenticated';
-                }
-                setCurrentPlan(newPlanId.toUpperCase());
-                setPlanDetails({
-                    planEndDate: newPlanEndDate,
-                    subscriptionStatus: newPlanStatus,
-                });
-                const selectedPlanObj = availablePlans.find(p => p.id === newPlanId);
-                const actionText = isSamePlanAndCancelled(selectedPlanObj) ? 'Re-subscription' : isUpgrade(selectedPlanObj) ? 'Upgrade' : 'Downgrade';
-                const trialText = newPlanStatus === 'authenticated' ? ' You are now on a 30-day trial.' : '';
-                showToast(`Successfully completed ${actionText} to ${newPlanId.toUpperCase()}!${trialText}`, 'success');
+                showToast(`Provisioning ${newPlanId.toUpperCase()} Tier...`, 'success');
             } else {
-                showToast(verificationResponse.data.error || 'Plan change verification failed.', 'error');
+                showToast(verificationResponse.data.error || 'Verification failed.', 'error');
             }
         } catch (error) {
-            console.error("Verification error after plan change:", error);
-            showToast('An unexpected error occurred during verification. Please contact support.', 'error');
+            showToast('Sync error. Contact support.', 'error');
         } finally {
             setIsUpgrading(false);
             fetchPlanData();
         }
     };
+
     const startUpgradeFlow = async (newPlan) => {
         setIsUpgrading(true);
         setShowConfirmModal(false);
         const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
         if (!res) {
-            showToast('Razorpay SDK failed to load. Are you offline?', 'error');
+            showToast('Gateway offline.', 'error');
             setIsUpgrading(false);
             return;
         }
@@ -291,250 +270,154 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
             const serverResponse = await apiClient.post(API.upgradePlan, {
                 newPlan: newPlan.id.toUpperCase(),
             });
-            if (!serverResponse.data.success) {
-                showToast(serverResponse.data.error || 'Failed to initiate plan change.', 'error');
-                setIsUpgrading(false);
-                return;
-            }
             const { subscriptionId, amount, currency, keyId } = serverResponse.data;
             const options = {
-                key: keyId,
-                amount: amount,
-                currency: currency,
-                name: "Pocket POS Plan Upgrade",
-                description: `Mandate verification for ${newPlan.name} Plan`,
+                key: keyId, amount, currency,
+                name: "Pocket POS",
+                description: `${newPlan.name} Mandate`,
                 subscription_id: subscriptionId,
-                handler: function (response) {
-                    handleVerifyPlanChange(response, newPlan.id);
-                },
-                modal: {
-                    ondismiss: function () {
-                        showToast('Plan change canceled by user.', 'info');
-                        setIsUpgrading(false);
-                    }
-                },
-                prefill: {
-                    name: currentUser?.name || "Customer",
-                    email: currentUser?.email || "",
-                },
-                theme: {
-                    color: "#4f46e5"
-                }
+                handler: (r) => handleVerifyPlanChange(r, newPlan.id),
+                prefill: { name: currentUser?.name || "Merchant", email: currentUser?.email || "" },
+                theme: { color: "#6366f1" }
             };
             const rzp1 = new window.Razorpay(options);
             rzp1.open();
         } catch (error) {
-            console.error("Upgrade/Downgrade initiation error:", error);
-            showToast('An unexpected error occurred during plan change initiation.', 'error');
+            showToast('Gateway Error.', 'error');
             setIsUpgrading(false);
         }
     };
+
     const handlePrepareCancellation = () => {
         const planName = currentPlan;
-        const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'the end of the current billing cycle';
+        const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'cycle end';
         let msg = '';
-        const isTrial = isCurrentlyInTrial();
-        const isAlreadyPending = isAlreadyCancelledOrPending();
-        if (isAlreadyPending) {
-            const statusText = ['cancelled', 'cancellation_no_refund'].includes(planDetails.subscriptionStatus)
-                ? 'immediately cancelled'
-                : 'scheduled for cancellation';
-
-            msg = `Your subscription is already <strong>${statusText}</strong> (no future charges). Your access remains active until <strong>${endDateString}</strong>. You don't need to take any further action.`;
-        } else if (isTrial) {
-            msg = `Your current <strong>${planName}</strong> plan is in the <strong>Free Trial</strong> period (Mandate Authenticated). By confirming cancellation, we will immediately cancel the future payment mandate (no charge). Your access will remain active until the trial ends on <strong>${endDateString}</strong>.`;
+        if (isAlreadyCancelledOrPending()) {
+            msg = `Your subscription is already scheduled for termination. Access remains valid until <strong>${endDateString}</strong>.`;
+        } else if (isCurrentlyInTrial()) {
+            msg = `Cancel <strong>${planName}</strong> trial? Future mandate will be voided. Access continues until <strong>${endDateString}</strong>.`;
         } else {
-            msg = `Your <strong>${planName}</strong> subscription is currently in a <strong>paid cycle</strong>. By confirming cancellation, we will cancel the subscription immediately to stop future billing, but you will retain full access until <strong>${endDateString}</strong> as this month's payment was already processed.`;
+            msg = `Terminate <strong>${planName}</strong>? Future billing stops immediately. Premium access persists until <strong>${endDateString}</strong>.`;
         }
         setCancellationMessage(msg);
         setShowCancelModal(true);
     };
+
     const handleConfirmCancellation = async () => {
-        if (isAlreadyCancelledOrPending()) {
-            setShowCancelModal(false);
-            return;
-        }
         setIsCancelling(true);
         try {
             const response = await apiClient.post(API.cancelSubscription);
-            const { action, message } = response.data;
             if (response.data.success) {
-                showToast(message, 'success');
-                let newStatus = planDetails.subscriptionStatus;
-                if (action === 'immediate_mandate_end_access') {
-                    newStatus = 'trial_cancellation_pending';
-
-                } else if (action === 'immediate_cancel_extended_access') {
-                    newStatus = 'cancellation_no_refund';
-
-                } else if (action === 'end_of_cycle') {
-                    newStatus = 'cancellation_pending';
-                }
-                if (response.data.subscriptionStatus) {
-                    newStatus = response.data.subscriptionStatus;
-                }
-                setPlanDetails(prev => ({
-                    ...prev,
-                    subscriptionStatus: newStatus,
-                }));
-                setCancellationMessage('');
-            } else {
-                showToast(response.error || 'Failed to cancel subscription due to an unknown error.', 'error');
+                showToast('Cancellation Logged.', 'success');
+                fetchPlanData();
             }
         } catch (error) {
-            console.error("Cancellation error:", error);
-            showToast('An unexpected error occurred during cancellation.', 'error');
+            showToast('Cancellation failed.', 'error');
         } finally {
             setShowCancelModal(false);
             setIsCancelling(false);
         }
     };
-    const getPlanIcon = (planId) => {
-        switch (planId) {
-            case 'basic': return Building2;
-            case 'pro': return Zap;
-            case 'premium': return Crown;
-            default: return Building2;
-        }
-    };
-    const getPlanColor = (planId) => {
-        switch (planId) {
-            case 'basic': return 'border-gray-500 bg-gray-500/10';
-            case 'pro': return 'border-indigo-500 bg-indigo-500/10';
-            case 'premium': return 'border-purple-500 bg-purple-500/10';
-            default: return 'border-gray-500 bg-gray-500/10';
-        }
-    };
-    const getPlanTextColor = (planId) => {
-        switch (planId) {
-            case 'basic': return 'text-gray-400';
-            case 'pro': return 'text-indigo-400';
-            case 'premium': return 'text-purple-400';
-            default: return 'text-gray-400';
-        }
-    };
-    const getModalActionText = (plan) => {
-        if (isSamePlanAndCancelled(plan)) {
-            return 're-subscribe';
-        }
-        return isUpgrade(plan) ? 'upgrade' : 'downgrade';
-    };
-    const shouldShowNewTrial = currentPlan === 'BASIC';
-    const getModalWarningMessage = (selectedPlan) => {
-        const action = getModalActionText(selectedPlan);
-        const price = formatCurrency(selectedPlan.price);
-        const planName = selectedPlan.name;
-        let detailText = '';
-        let warningIcon = 'blue';
-        let currentPlanActionText = '';
-        if (isAlreadyCancelledOrPending()) {
-            currentPlanActionText = 'Your previous subscription remains cancelled';
-        } else {
-            currentPlanActionText = 'Your current subscription will be canceled immediately';
-        }
-        if (shouldShowNewTrial) {
-            detailText = `${currentPlanActionText}, and you will set up a new mandate for the new plan, which includes a <strong>new 30-day free trial</strong>.`;
-        } else if (action === 're-subscribe') {
-            detailText = `Your subscription will be renewed immediately upon mandate setup.`;
-        } else if (action === 'upgrade') {
-            detailText = `${currentPlanActionText}, and the new plan will start right away.`;
-        } else if (action === 'downgrade') {
-            warningIcon = 'yellow';
-            detailText = `${currentPlanActionText}, and the new plan will start right away, which may result in loss of features.`;
-        }
+
+    const getPlanIcon = (pId) => pId === 'premium' ? Crown : pId === 'pro' ? Zap : Building2;
+    const getPlanColor = (pId) => pId === 'premium' ? 'border-purple-500 bg-purple-500/5' : pId === 'pro' ? 'border-indigo-500 bg-indigo-500/5' : 'border-gray-700 bg-gray-800/20';
+    const getPlanTextColor = (pId) => pId === 'premium' ? 'text-purple-400' : pId === 'pro' ? 'text-indigo-400' : 'text-gray-400';
+
+    const getModalWarningMessage = (plan) => {
+        const action = isSamePlanAndCancelled(plan) ? 're-subscribe' : isUpgrade(plan) ? 'upgrade' : 'downgrade';
         return {
-            title: `You are about to <strong>${action}</strong> to the <strong>${planName}</strong> plan for <strong>${price}/month</strong>.`,
-            detail: `A new payment mandate is required. ${detailText} A ₹1 verification fee applies.`,
-            icon: warningIcon
+            title: `Confirm <strong>${action}</strong> to <strong>${plan.name}</strong> for <strong>${formatCurrency(plan.price)}/mo</strong>.`,
+            detail: `Requires new payment mandate. Current tier features will be updated immediately. Verification fee of ₹1 applies.`,
+            icon: action === 'downgrade' ? 'yellow' : 'blue'
         };
     };
-    if (isLoading || currentPlan === null) {
+
+    if (isLoading) {
         return (
-            <div className="min-h-screen p-4 pb-20 md:p-8 bg-gray-950" aria-busy="true" aria-live="polite">
-                <div className="flex flex-col items-center justify-center h-64">
-                    <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
-                    <p className="mt-4 text-gray-400">Loading current plan and available options...</p>
-                </div>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950">
+                <Loader className="w-10 h-10 animate-spin text-indigo-500" />
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-4">Validating Billing...</p>
             </div>
         );
     }
+
     const isPlanExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() &&
-        !['active', 'authenticated', 'cancelled_replaced'].includes(planDetails.subscriptionStatus);
-    const isCancellationPending = isPlanExpiring;
+        !['active', 'authenticated'].includes(planDetails.subscriptionStatus);
     const alreadyInTerminalState = isAlreadyCancelledOrPending();
+
     return (
-        <main className="min-h-screen p-4 pb-12 sm:p-6 md:p-8 bg-gray-950" itemScope itemType="https://schema.org/WebPage">
-            <header className="max-w-6xl mx-auto mb-8" itemProp="headline">
-                <button
-                    onClick={onBack}
-                    className="flex items-center text-gray-400 hover:text-indigo-400 mb-4 transition-colors text-sm"
-                    aria-label="Go back to settings"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
-                    Back to Settings
-                </button>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center" itemProp="headline">
-                    <Crown className="w-6 h-6 sm:w-8 sm:h-8 mr-3 text-indigo-500" />
-                    Manage Your Plan
-                </h1>
-                <p className="text-sm sm:text-base text-gray-400 mt-2" itemProp="description">
-                    Pick the perfect plan for your business.
-                </p>
-            </header>
-            {currentPlan && (
-                <div className="max-w-6xl mx-auto mb-8">
-                    <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 sm:p-6 flex flex-col gap-4">
-                        <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-3">
-                                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                                <div>
-                                    <p className="text-xs sm:text-sm text-gray-400">Current Plan</p>
-                                    <p className="text-lg sm:text-xl font-bold text-white">{currentPlan}</p>
-                                </div>
-                            </div>
-                            <div className="">
-                                <p className="text-xs sm:text-sm text-gray-400">
-                                    {isPlanExpiring ? 'Access Expires' : 'Billing Cycle'}
-                                </p>
-                                <p className={`text-lg sm:text-xl font-bold ${isPlanExpiring ? 'text-red-400' : 'text-white'}`}>
-                                    {isPlanExpiring ? formatDate(planDetails.planEndDate) : 'Monthly'}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handlePrepareCancellation}
-                            className={`w-full cursor-pointer px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 ${isCancellationPending
-                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                : 'bg-red-600 hover:bg-red-700 text-white'
-                                }`}
-                            disabled={isCancelling}
-                        >
-                            <XCircle className="w-4 h-4" />
-                            {isCancellationPending ? 'Manage Cancellation' : 'Cancel Subscription'}
+        <main className="min-h-screen bg-gray-950 text-gray-200 selection:bg-indigo-500/30">
+            {/* STICKY HEADER */}
+            <header className="sticky top-0 z-[100] bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/50">
+                <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
+                    <div>
+                        <button onClick={onBack} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 mb-1 hover:text-white transition-colors">
+                            <ArrowLeft className="w-3 h-3" /> Settings
                         </button>
+                        <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase flex items-center gap-2">
+                            Billing <span className="text-indigo-500 not-italic">Engine</span>
+                        </h1>
+                    </div>
+                    <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-gray-900 border border-gray-800 rounded-2xl">
+                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Secure Checkout</span>
                     </div>
                 </div>
-            )}
-            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-                {availablePlans.map((plan) => (
-                    <PlanCard
-                        key={plan.id}
-                        plan={plan}
-                        currentPlanName={currentPlan}
-                        isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
-                        isSamePlanAndCancelled={isSamePlanAndCancelled}
-                        isUpgrade={isUpgrade}
-                        isUpgrading={isUpgrading}
-                        isCancelling={isCancelling}
-                        alreadyInTerminalState={alreadyInTerminalState}
-                        formatCurrency={formatCurrency}
-                        getPlanIcon={getPlanIcon}
-                        getPlanColor={getPlanColor}
-                        getPlanTextColor={getPlanTextColor}
-                        handleUpgradeClick={handleUpgradeClick}
-                    />
-                ))}
+            </header>
+
+            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 pb-32">
+                {/* CURRENT SUBSCRIPTION CARD */}
+                {currentPlan && (
+                    <section className="bg-gray-900/40 border border-gray-800 rounded-[1.25rem] p-6 md:p-8">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="flex items-center gap-5">
+                                <div className="w-16 h-16 bg-indigo-500/10 rounded-[1.5rem] flex items-center justify-center border border-indigo-500/20">
+                                    <Zap className="w-8 h-8 text-indigo-500" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Active Tier</p>
+                                    <h2 className="text-2xl font-black text-white tracking-tighter uppercase">{currentPlan}</h2>
+                                    <p className={`text-[10px] font-bold mt-1 uppercase ${isPlanExpiring ? 'text-red-500' : 'text-emerald-500'}`}>
+                                        {isPlanExpiring ? `Terminating on ${formatDate(planDetails.planEndDate)}` : `Next Billing: ${formatDate(planDetails.planEndDate)}`}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <button
+                                onClick={handlePrepareCancellation}
+                                disabled={isCancelling}
+                                className="px-8 py-4 bg-gray-950 border border-gray-800 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                            >
+                                {isPlanExpiring ? 'Manage Cancellation' : 'Cancel Subscription'}
+                            </button>
+                        </div>
+                    </section>
+                )}
+
+                {/* PLAN GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {availablePlans.map((plan) => (
+                        <PlanCard
+                            key={plan.id}
+                            plan={plan}
+                            currentPlanName={currentPlan}
+                            isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
+                            isSamePlanAndCancelled={isSamePlanAndCancelled}
+                            isUpgrade={isUpgrade}
+                            isUpgrading={isUpgrading}
+                            isCancelling={isCancelling}
+                            alreadyInTerminalState={alreadyInTerminalState}
+                            formatCurrency={formatCurrency}
+                            getPlanIcon={getPlanIcon}
+                            getPlanColor={getPlanColor}
+                            getPlanTextColor={getPlanTextColor}
+                            handleUpgradeClick={handleUpgradeClick}
+                        />
+                    ))}
+                </div>
             </div>
+
+            {/* MODALS */}
             {showConfirmModal && selectedPlan && (
                 <ConfirmationModal
                     isUpgrading={isUpgrading}
@@ -548,7 +431,6 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack }) => {
                 <CancellationModal
                     isCancelling={isCancelling}
                     planDetails={planDetails}
-                    showCancelModal={showCancelModal}
                     setShowCancelModal={setShowCancelModal}
                     alreadyInTerminalState={alreadyInTerminalState}
                     isCurrentlyInTrial={isCurrentlyInTrial}

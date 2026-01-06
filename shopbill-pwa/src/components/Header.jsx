@@ -14,8 +14,6 @@ const Header = ({
     
     /**
      * LOGIC: Count unread notifications.
-     * UPDATED: Specifically checks for isRead === false. 
-     * With our new backend, this is now unique to the logged-in user.
      */
     const unreadCount = (notifications || []).filter(n => 
         n && n.isRead === false
@@ -23,40 +21,43 @@ const Header = ({
     
     const displayCount = unreadCount;
 
-    const baseButtonClasses = `p-2 rounded-full 
-        transition-all duration-300 active:scale-95 transform cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950`;
+    // Matches the dashboard's interactive cues: high contrast, smooth transitions, and glow shadows
+    const baseButtonClasses = `p-2 rounded-xl 
+        transition-all duration-300 active:scale-95 transform cursor-pointer outline-none 
+        border border-transparent`;
     
     const getButtonClasses = (pageName) => {
         const isActive = currentPage === pageName;
         return `${baseButtonClasses} ${
             isActive 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/50' 
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/50 shadow-lg shadow-indigo-900/40' 
+                : 'bg-gray-900/50 text-gray-400 hover:text-white hover:bg-gray-800 border-gray-800'
         }`;
     };
 
     return (
         <header
-            className={`fixed top-0 left-0 right-0 
-                   bg-gray-900 
-                   border-b border-gray-800 
-                   shadow-sm shadow-indigo-900/10
+            className="fixed top-0 left-0 right-0 
+                   bg-gray-950/95 backdrop-blur-md
+                   border-b border-gray-900 
                    md:hidden 
-                   z-30 p-4 flex justify-between items-center transition-colors duration-300`}
+                   z-50 p-4 flex justify-between items-center"
         >
-            {/* Logo Section */}
+            {/* Logo Section - Matching the Dashboard Title Font Weight */}
             <div 
-                className="flex items-center cursor-pointer" 
+                className="flex items-center cursor-pointer group" 
                 onClick={() => setCurrentPage('dashboard')}
             >
-                <h1 className="text-xl font-extrabold text-indigo-400 truncate flex items-center" itemProp="name">
-                    <Smartphone className="inline-block w-5 h-5 mr-1 sm:mr-2" aria-hidden="true" />
+                <div className="bg-indigo-600/10 p-1.5 rounded-lg mr-2 border border-indigo-500/20 group-hover:border-indigo-500/50 transition-colors">
+                    <Smartphone className="w-5 h-5 text-indigo-400" aria-hidden="true" />
+                </div>
+                <h1 className="text-lg font-bold text-white tracking-tight truncate" itemProp="name">
                     {companyName || 'Pocket POS'}
                 </h1>
             </div>
 
             {/* Action Icons */}
-            <div className="flex space-x-3 items-center">
+            <div className="flex space-x-2.5 items-center">
                 
                 {/* Notifications Button with Dynamic Badge */}
                 <button
@@ -68,7 +69,7 @@ const Header = ({
                     <Bell className="w-5 h-5" />
                     
                     {displayCount > 0 && (
-                        <span className="absolute top-0 right-0 block h-5 w-5 rounded-full ring-2 ring-gray-900 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center transform translate-x-1 -translate-y-1.5 animate-pulse">
+                        <span className="absolute -top-1 -right-1 block h-5 w-5 rounded-full ring-2 ring-gray-950 bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
                             {displayCount > 9 ? '9+' : displayCount}
                         </span>
                     )}
@@ -83,15 +84,17 @@ const Header = ({
                     <Settings className="w-5 h-5" />
                 </button>
 
-                {/* Profile Button */}
+                {/* Profile Button - Integrated Role Badge */}
                 <button
                     onClick={() => setCurrentPage('profile')} 
-                    className={`${getButtonClasses('profile')} flex items-center px-3`}
+                    className={`${getButtonClasses('profile')} flex items-center gap-2`}
                     title={`Logged in as ${userRole}`}
                 >
-                    <User className="w-5 h-5" />
+                    <div className="bg-gray-800 rounded-full p-0.5">
+                        <User className="w-4 h-4" />
+                    </div>
                     {userRole && (
-                        <span className="text-xs font-bold hidden sm:inline-block ml-2 uppercase tracking-tight">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300 hidden xs:inline-block">
                             {userRole}
                         </span>
                     )}

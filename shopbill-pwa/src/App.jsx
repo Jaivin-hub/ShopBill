@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck } from 'lucide-react';
+import {
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck
+} from 'lucide-react';
 import { io } from 'socket.io-client';
 
 // Component Imports
@@ -19,8 +21,8 @@ import Login from './components/Login';
 import NotificationsPage from './components/NotificationsPage';
 import LandingPage from './components/LandingPage';
 import ResetPassword from './components/ResetPassword';
-import StaffSetPassword from './components/StaffSetPassword'; 
-import SalesActivityPage from './components/SalesActivityPage'; 
+import StaffSetPassword from './components/StaffSetPassword';
+import SalesActivityPage from './components/SalesActivityPage';
 import UserManagement from './components/UserManagement';
 import SuperAdminDashboard from './components/superAdminDashboard';
 import SystemConfig from './components/SystemConfig';
@@ -33,6 +35,7 @@ import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
 import SupplyChainManagement from './components/SupplyChainManagement';
 
+// UpdatePrompt Component
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -57,7 +60,7 @@ const UpdatePrompt = () => {
           </div>
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
-          <button 
+          <button
             onClick={() => updateHandler && updateHandler(true)}
             className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
@@ -70,23 +73,23 @@ const UpdatePrompt = () => {
 };
 
 const UTILITY_NAV_ITEMS_CONFIG = [
-    { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-    { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+  { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+  { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
 const SUPERADMIN_NAV_ITEMS = [
-    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+  { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
 const checkDeepLinkPath = () => {
-    const path = window.location.pathname;
-    if (path.startsWith('/staff-setup/')) return 'staffSetPassword'; 
-    if (path.startsWith('/reset-password/')) return 'resetPassword'; 
-    return null; 
+  const path = window.location.pathname;
+  if (path.startsWith('/staff-setup/')) return 'staffSetPassword';
+  if (path.startsWith('/reset-password/')) return 'resetPassword';
+  return null;
 };
 
 const App = () => {
@@ -107,9 +110,9 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
 
-  const unreadCount = useMemo(() => 
+  const unreadCount = useMemo(() =>
     (notifications || []).filter(n => n && (n.isRead === false || n.isRead === undefined)).length
-  , [notifications]);
+    , [notifications]);
 
   const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
   const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
@@ -118,8 +121,8 @@ const App = () => {
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser?.shopId) return;
     try {
-        const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
-        if (response.data && response.data.alerts) setNotifications(response.data.alerts);
+      const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
+      if (response.data && response.data.alerts) setNotifications(response.data.alerts);
     } catch (error) { console.error("Error fetching notifications:", error); }
   }, [currentUser, API.notificationalert]);
 
@@ -127,19 +130,19 @@ const App = () => {
     if (!currentUser?.shopId) return;
     fetchNotificationHistory();
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
-        auth: { token: localStorage.getItem('userToken') },
-        transports: ['polling', 'websocket'],
-        withCredentials: true,
-        reconnection: true
+      auth: { token: localStorage.getItem('userToken') },
+      transports: ['polling', 'websocket'],
+      withCredentials: true,
+      reconnection: true
     });
     const socket = socketRef.current;
     socket.on('connect', () => socket.emit('join_shop', String(currentUser.shopId)));
     socket.on('new_notification', (newAlert) => {
-        setNotifications(prev => {
-            if (prev.some(n => n._id === newAlert._id)) return prev;
-            return [newAlert, ...prev];
-        });
-        showToast(newAlert.message, 'info');
+      setNotifications(prev => {
+        if (prev.some(n => n._id === newAlert._id)) return prev;
+        return [newAlert, ...prev];
+      });
+      showToast(newAlert.message, 'info');
     });
     return () => { if (socket) socket.disconnect(); };
   }, [currentUser?.shopId, fetchNotificationHistory, showToast]);
@@ -162,6 +165,13 @@ const App = () => {
     setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
   }, []);
 
+  // Handler specifically for when registration/checkout is finished
+  const handleRegistrationComplete = useCallback(() => {
+    setCurrentPage('dashboard');
+    setIsViewingLogin(true); // Open Login View automatically
+    showToast('Registration successful! Please sign in.', 'success');
+  }, [showToast]);
+
   useEffect(() => {
     const token = localStorage.getItem('userToken');
     const userJson = localStorage.getItem('currentUser');
@@ -177,19 +187,19 @@ const App = () => {
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const standardNav = [
-        { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-        { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-        { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-        { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] }, 
+      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
-  const utilityNavItems = useMemo(() => 
+  const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
-  , [userRole]);
+    , [userRole]);
 
   const handleBackToOrigin = () => {
     setCurrentPage(pageOrigin || 'dashboard');
@@ -198,7 +208,8 @@ const App = () => {
 
   const renderContent = () => {
     if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
-    
+
+    // --- PUBLIC PAGES (Accessible without Login) ---
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
     if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} />;
@@ -206,21 +217,41 @@ const App = () => {
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
 
+    if (currentPage === 'checkout') {
+      return (
+        <Checkout
+          currentUser={currentUser}
+          userRole={userRole}
+          showToast={showToast}
+          apiClient={apiClient}
+          API={API}
+          plan={selectedPlan}
+          onPaymentSuccess={handleRegistrationComplete} // Redirects to Login on success
+          onBackToDashboard={() => setCurrentPage('dashboard')}
+        />
+      );
+    }
+
+    // --- AUTHENTICATION GATE ---
     if (!currentUser) {
-        return isViewingLogin ? 
-            <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> : 
-            <LandingPage 
-              onStartApp={() => setIsViewingLogin(true)} 
-              onSelectPlan={(p) => { setSelectedPlan(p); setIsViewingLogin(true); }}
-              onViewTerms={() => { setPageOrigin('landing'); setCurrentPage('terms'); }}
-              onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
-              onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
-              onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
-            />;
+      return isViewingLogin ?
+        <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> :
+        <LandingPage
+          onStartApp={() => setIsViewingLogin(true)}
+          onSelectPlan={(p) => {
+            setSelectedPlan(p);
+            setCurrentPage('checkout');
+          }}
+          onViewTerms={() => { setPageOrigin('landing'); setCurrentPage('terms'); }}
+          onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
+          onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
+          onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
+        />
     }
 
     const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
 
+    // --- PRIVATE PAGES (Dashboard & Tools) ---
     switch (currentPage) {
       case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
       case 'billing': return <BillingPOS {...commonProps} />;
@@ -234,7 +265,6 @@ const App = () => {
       case 'superadmin_users': return <UserManagement {...commonProps} />;
       case 'superadmin_systems': return <SystemConfig {...commonProps} />;
       case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-      case 'checkout': return <Checkout {...commonProps} plan={selectedPlan} onBackToDashboard={() => setCurrentPage('dashboard')} />;
       default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
     }
   };
@@ -244,48 +274,110 @@ const App = () => {
   return (
     <ApiProvider>
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
+      <style>{`
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 5px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background: #1f2937;
+          border-radius: 10px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background: #374151;
+        }
+      `}</style>
       <div className="h-screen w-full bg-gray-950 flex flex-col overflow-hidden text-gray-200">
         <UpdatePrompt />
         {showAppUI && <Header companyName="Pocket POS" userRole={userRole.toUpperCase()} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} unreadCount={unreadCount} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
 
         <div className="flex flex-1 overflow-hidden relative">
           {showAppUI && (
-            <aside className="hidden md:flex flex-col w-64 bg-gray-900 border-r border-gray-800 z-[30] shadow-2xl">
-              <div className="p-6 font-black text-indigo-500 text-xl tracking-tighter flex items-center gap-2">
-                <Smartphone className="w-7 h-7" /> POCKET POS
+            <aside className="hidden md:flex flex-col w-64 bg-gray-950 border-r border-gray-900 z-[30] fixed inset-y-0 left-0">
+              <div className="p-8 font-black text-white text-2xl tracking-tighter flex items-center gap-2">
+                <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50">
+                  <Smartphone className="w-6 h-6" />
+                </div>
+                POCKET <span className="text-indigo-500">POS</span>
               </div>
-              <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+
+              <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto pt-4 sidebar-scroll">
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] px-3 mb-2">Main Menu</p>
                 {navItems.map(item => (
-                  <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'}`}>
-                    <item.icon className="w-6 h-6 mr-3" /> <span className="text-sm font-bold">{item.name}</span>
+                  <button
+                    key={item.id}
+                    onClick={() => setCurrentPage(item.id)}
+                    className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id
+                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-950/50'
+                      : 'text-gray-500 hover:bg-gray-900 hover:text-gray-200 border border-transparent'
+                      }`}
+                  >
+                    <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-400'}`} />
+                    <span className="text-sm font-bold tracking-tight">{item.name}</span>
                   </button>
                 ))}
-                <div className="pt-4 mt-2 border-t border-gray-800 space-y-2">
+
+                <div className="pt-6 mt-6 border-t border-gray-900 space-y-1.5">
+                  <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] px-3 mb-2">Account</p>
                   {utilityNavItems.map(item => (
-                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center p-3 rounded-xl transition-all relative ${currentPage === item.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}>
-                      <item.icon className="w-6 h-6 mr-3" /> 
-                      <span className="text-sm font-bold">{item.name}</span>
-                      {item.id === 'notifications' && unreadCount > 0 && <span className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">{unreadCount}</span>}
+                    <button
+                      key={item.id}
+                      onClick={() => setCurrentPage(item.id)}
+                      className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group ${currentPage === item.id
+                        ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
+                        : 'text-gray-500 hover:bg-gray-900 hover:text-gray-200 border border-transparent'
+                        }`}
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      <span className="text-sm font-bold tracking-tight">{item.name}</span>
+                      {item.id === 'notifications' && unreadCount > 0 && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                          {unreadCount}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
               </nav>
+
+              <div className="p-4">
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"
+                >
+                  <LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" />
+                  <span className="text-sm font-bold">Logout</span>
+                </button>
+              </div>
             </aside>
           )}
 
-          <main className={`flex-1 overflow-y-auto bg-gray-950 ${showAppUI ? 'md:ml-64 mt-16 pb-16 md:pb-0' : 'w-full'}`}>
-            <div className="max-w-7xl mx-auto min-h-full">
+          <main className={`flex-1 overflow-y-auto bg-gray-950 transition-all duration-300 ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>
+            <div className="max-w-7xl mx-auto min-h-full px-0 md:px-6">
               {renderContent()}
             </div>
           </main>
         </div>
 
-        {/* MOBILE BOTTOM NAV - ICONS INCREASED TO W-6 H-6 */}
         {showAppUI && (
-          <nav className="fixed bottom-0 inset-x-0 h-16 bg-gray-900 border-t border-gray-800 md:hidden flex items-center justify-around z-[40] px-1 shadow-2xl">
+          <nav className="fixed bottom-0 inset-x-0 h-18 bg-gray-950/90 backdrop-blur-xl border-t border-gray-900 md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.6)]">
             {navItems.map(item => (
-              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center flex-1 transition-all ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-500'}`}>
-                <item.icon className="w-6 h-6" />
+              <button
+                key={item.id}
+                onClick={() => setCurrentPage(item.id)}
+                className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id
+                  ? 'text-indigo-400'
+                  : 'text-gray-600 hover:text-gray-400'
+                  }`}
+              >
+                {currentPage === item.id && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
+                )}
+                <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
+                  <item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+                </div>
               </button>
             ))}
           </nav>

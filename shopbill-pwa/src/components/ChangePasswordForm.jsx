@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-// Assuming API is imported from a configuration file
+import { 
+    ArrowLeft, Save, Loader2, Lock, ShieldCheck, 
+    Eye, EyeOff, KeyRound, AlertCircle, CheckCircle2 
+} from 'lucide-react';
 import API from '../config/api'; 
 
-const SWIPE_THRESHOLD = 50; // Minimum horizontal distance in pixels to register a swipe
-const MAX_VERTICAL_DEVIATION = 50; // Maximum vertical travel allowed during a horizontal swipe
+const SWIPE_THRESHOLD = 50; 
+const MAX_VERTICAL_DEVIATION = 50; 
 
-// Updated to accept onLogout prop
 const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => { 
-    
     // --- Form State ---
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [errors, setErrors] = useState({}); // State for validation errors
+    const [errors, setErrors] = useState({});
+    const [showPass, setShowPass] = useState(false); // Design addition: Toggle visibility
     
     // --- Swipe State ---
     const [touchStart, setTouchStart] = useState(null);
@@ -22,7 +23,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
     const [isSwiping, setIsSwiping] = useState(false);
     const containerRef = useRef(null);
 
-    // --- Swipe Logic (Unchanged) ---
+    // --- Swipe Logic ---
     const handleTouchStart = (e) => {
         setTouchStart({ x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY });
         setTouchEnd(null);
@@ -36,17 +37,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
 
     const handleTouchEnd = () => {
         if (!touchStart || !touchEnd || !isSwiping) return;
-
         const deltaX = touchEnd.x - touchStart.x;
         const deltaY = Math.abs(touchEnd.y - touchStart.y);
-
-        const isRightSwipe = deltaX > SWIPE_THRESHOLD;
-        const isMostlyHorizontal = deltaY < MAX_VERTICAL_DEVIATION;
-
-        if (isRightSwipe && isMostlyHorizontal) {
+        if (deltaX > SWIPE_THRESHOLD && deltaY < MAX_VERTICAL_DEVIATION) {
             onBack();
         }
-
         setTouchStart(null);
         setTouchEnd(null);
         setIsSwiping(false);
@@ -55,13 +50,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-
         if ('ontouchstart' in window) {
             container.addEventListener('touchstart', handleTouchStart);
             container.addEventListener('touchmove', handleTouchMove);
             container.addEventListener('touchend', handleTouchEnd);
         }
-
         return () => {
             if ('ontouchstart' in window) {
                 container.removeEventListener('touchstart', handleTouchStart);
@@ -71,202 +64,210 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
         };
     }, [touchStart, touchEnd, isSwiping, onBack]);
 
-    // --- Validation Logic (Unchanged) ---
-
+    // --- Validation Logic ---
     const handleChange = (e) => {
         const { id, value } = e.target;
-        
-        // 1. Update state based on input ID
         if (id === 'current-pass') setCurrentPassword(value);
         if (id === 'new-pass') setNewPassword(value);
         if (id === 'confirm-pass') setConfirmNewPassword(value);
 
-        // 2. Perform instant validation and update errors state
         let currentNewPass = (id === 'new-pass') ? value : newPassword;
         let currentConfirmPass = (id === 'confirm-pass') ? value : confirmNewPassword;
         let newErrors = { ...errors };
 
-        // A. New Password Length check
         if (id === 'new-pass') {
             if (value.length > 0 && value.length < 8) {
-                newErrors.newPassword = 'New password must be at least 8 characters.';
+                newErrors.newPassword = 'Minimum 8 characters required.';
             } else {
                 delete newErrors.newPassword;
             }
         }
         
-        // B. Confirmation Match check (runs when either new or confirm changes)
         if (currentNewPass && currentConfirmPass && currentNewPass !== currentConfirmPass) {
-            newErrors.confirmNewPassword = 'New passwords must match.';
+            newErrors.confirmNewPassword = 'Passwords do not match.';
         } else if (newErrors.confirmNewPassword) {
-             // Clear the confirm password error if the fields are filled and match
             delete newErrors.confirmNewPassword;
         }
         
-        // C. Current Password requirement (clears on input, if it was previously set by validateForm or server)
         if (id === 'current-pass' && value && newErrors.currentPassword) {
              delete newErrors.currentPassword;
         }
-
         setErrors(newErrors);
     };
 
-    /**
-     * Runs full form validation, updates the error state, and returns true if valid.
-     */
     const validateForm = () => {
-        const validationErrors = {};
-        
-        if (!currentPassword) validationErrors.currentPassword = 'Current password is required.';
-        if (!newPassword) validationErrors.newPassword = 'New password is required.';
-        if (newPassword.length < 8) validationErrors.newPassword = 'New password must be at least 8 characters long.';
-        if (!confirmNewPassword) validationErrors.confirmNewPassword = 'Confirmation is required.';
-        
-        if (newPassword !== confirmNewPassword) {
-            validationErrors.confirmNewPassword = 'New passwords must match.';
-        }
-        
-        setErrors(validationErrors);
-        return Object.keys(validationErrors).length === 0;
+        const vErrors = {};
+        if (!currentPassword) vErrors.currentPassword = 'Required.';
+        if (!newPassword) vErrors.newPassword = 'Required.';
+        if (newPassword.length < 8) vErrors.newPassword = 'Must be ≥ 8 chars.';
+        if (!confirmNewPassword) vErrors.confirmNewPassword = 'Required.';
+        if (newPassword !== confirmNewPassword) vErrors.confirmNewPassword = 'Mismatch.';
+        setErrors(vErrors);
+        return Object.keys(vErrors).length === 0;
     }
 
-
-    // --- Form Submission Logic (API Integration) ---
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Run full validation on submit
         if (!validateForm()) {
-            showToast("Please fix the highlighted errors before submitting.", 'error');
+            showToast("Validation failed.", 'error');
             return;
         }
-
         setIsLoading(true);
-        // Clear any previous server errors before submission
-        setErrors(prevErrors => {
-            const { currentPassword: _, ...rest } = prevErrors;
-            return rest;
-        });
-
         try {
-            // Send PUT request to change password endpoint (PUT is semantically correct for updates)
             const response = await apiClient.put(API.passwordchange, {
                 currentPassword,
                 newPassword,
             });
-
-            // *** ADJUSTMENT HERE: Check response.data for message, as is common with Axios. ***
-            const successMessage = response.data?.message || "Password updated successfully.";
-
-            showToast(successMessage, 'success');
-                 
-            // Clear form
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmNewPassword('');
-                 
-            // CRITICAL SECURITY STEP: Log the user out after successful password change
-            if (onLogout) {
-                onLogout();
-            } else {
-                // Fallback if onLogout isn't provided (should handle navigation back)
-                onBack(); 
-            }
-            // *** END ADJUSTMENT ***
-
+            showToast(response.data?.message || "Success", 'success');
+            if (onLogout) onLogout(); else onBack();
         } catch (error) {
-            console.error("Password change failed:", error);
-            
-            // Extract error message from API response if available
-            const serverErrorMessage = error.response?.data?.error || "Failed to change password. Server error.";
-            
-            // Update the errors state for the current password field, as this is the common point 
-            // of failure (e.g., "Invalid current password") that the server confirms.
-            setErrors(prevErrors => ({ 
-                ...prevErrors, 
-                currentPassword: serverErrorMessage 
+            setErrors(prev => ({ 
+                ...prev, 
+                currentPassword: error.response?.data?.error || "Auth failure." 
             }));
-
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        // Added ref to attach swipe listeners
-        <section ref={containerRef} className="p-4 md:p-6 min-h-screen-safe bg-gray-900 rounded-xl" itemScope itemType="https://schema.org/WebPage" aria-labelledby="change-password-title">
-            <button 
-                onClick={onBack} 
-                className="flex items-center text-indigo-400 hover:underline mb-6 disabled:opacity-50"
-                disabled={isLoading}
-            >
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Settings
-            </button>
-            <h2 id="change-password-title" className="text-2xl font-bold text-white mb-6" itemProp="headline">Change Password</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="current-pass">Current Password</label>
-                    <input
-                        id="current-pass"
-                        type="password"
-                        value={currentPassword}
-                        onChange={handleChange}
-                        required
-                        disabled={isLoading}
-                        // Highlights red if client-side validation fails OR if server returns an error for this field
-                        className={`w-full p-3 border ${errors.currentPassword ? 'border-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500`}
-                    />
-                    {errors.currentPassword && <p className="text-red-400 text-xs mt-1">{errors.currentPassword}</p>}
+        <main ref={containerRef} className="min-h-screen bg-gray-950 text-gray-200 selection:bg-indigo-500/30">
+            {/* STICKY HEADER */}
+            <header className="sticky top-0 z-[100] bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/50">
+                <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div>
+                        <button 
+                            onClick={onBack} 
+                            disabled={isLoading}
+                            className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 mb-1 hover:text-white transition-colors disabled:opacity-30"
+                        >
+                            <ArrowLeft className="w-3 h-3" /> Security
+                        </button>
+                        <h1 className="text-xl font-black text-white tracking-tighter uppercase">
+                            Update <span className="text-indigo-500">Access</span>
+                        </h1>
+                    </div>
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
+                        <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                    </div>
+                </div>
+            </header>
+
+            <div className="max-w-xl mx-auto p-4 md:p-8 space-y-8 pb-32">
+                {/* SECURITY ALERT BANNER */}
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex gap-4 items-start">
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] font-bold text-amber-200/70 leading-relaxed">
+                        Changing your password will terminate all active sessions. You will be required to log in again with your new credentials.
+                    </p>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="new-pass">New Password</label>
-                    <input
-                        id="new-pass"
-                        type="password"
-                        value={newPassword}
-                        onChange={handleChange}
-                        required
-                        disabled={isLoading}
-                        className={`w-full p-3 border ${errors.newPassword ? 'border-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500`}
-                    />
-                    {errors.newPassword && <p className="text-red-400 text-xs mt-1">{errors.newPassword}</p>}
-                </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* CURRENT PASSWORD */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="current-pass">
+                            Identity Verification
+                        </label>
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                id="current-pass"
+                                type={showPass ? "text" : "password"}
+                                value={currentPassword}
+                                onChange={handleChange}
+                                required
+                                disabled={isLoading}
+                                className={`w-full pl-12 pr-12 py-4 bg-gray-900 border ${errors.currentPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                placeholder="Current Password"
+                            />
+                            {errors.currentPassword && (
+                                <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" /> {errors.currentPassword}
+                                </p>
+                            )}
+                        </div>
+                    </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="confirm-pass">Confirm New Password</label>
-                    <input
-                        id="confirm-pass"
-                        type="password"
-                        value={confirmNewPassword}
-                        onChange={handleChange}
-                        required
+                    {/* NEW PASSWORD */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="new-pass">
+                            New Credentials
+                        </label>
+                        <div className="relative">
+                            <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                id="new-pass"
+                                type={showPass ? "text" : "password"}
+                                value={newPassword}
+                                onChange={handleChange}
+                                required
+                                disabled={isLoading}
+                                className={`w-full pl-12 pr-12 py-4 bg-gray-900 border ${errors.newPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                placeholder="New Password"
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowPass(!showPass)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-indigo-400"
+                            >
+                                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                        {errors.newPassword && (
+                            <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> {errors.newPassword}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* CONFIRM PASSWORD */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="confirm-pass">
+                            Confirm New Credentials
+                        </label>
+                        <div className="relative">
+                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                id="confirm-pass"
+                                type={showPass ? "text" : "password"}
+                                value={confirmNewPassword}
+                                onChange={handleChange}
+                                required
+                                disabled={isLoading}
+                                className={`w-full pl-12 pr-4 py-4 bg-gray-900 border ${errors.confirmNewPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                placeholder="Repeat New Password"
+                            />
+                            {!errors.confirmNewPassword && confirmNewPassword && confirmNewPassword === newPassword && (
+                                <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                            )}
+                        </div>
+                        {errors.confirmNewPassword && (
+                            <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> {errors.confirmNewPassword}
+                            </p>
+                        )}
+                    </div>
+
+                    <button
+                        type="submit"
                         disabled={isLoading}
-                        className={`w-full p-3 border ${errors.confirmNewPassword ? 'border-red-500' : 'border-gray-600'} bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500`}
-                    />
-                    {errors.confirmNewPassword && <p className="text-red-400 text-xs mt-1">{errors.confirmNewPassword}</p>}
-                </div>
-                
-                <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full flex items-center justify-center bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition font-semibold shadow-md mt-6 disabled:bg-indigo-800 disabled:cursor-not-allowed"
-                >
-                    {isLoading ? (
-                        <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Changing Password...
-                        </>
-                    ) : (
-                        <>
-                            <Save className="w-5 h-5 mr-2" /> 
-                            Update Password
-                        </>
-                    )}
-                </button>
-            </form>
-        </section>
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 flex items-center justify-center gap-3"
+                    >
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Synchronizing...
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" /> 
+                                Update Credentials
+                            </>
+                        )}
+                    </button>
+                </form>
+            </div>
+        </main>
     );
 };
 

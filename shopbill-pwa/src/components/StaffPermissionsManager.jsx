@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Plus, Trash2, Users, UserPlus, X, Loader2 } from 'lucide-react';
-// Assuming API and the necessary apiClient setup is available from the context
-import API from '../config/api'; // Import the API constants object
-
-// --- Component Setup (Role Definitions/Modal remain the same as before) ---
+import { 
+    ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
+    Loader2, ShieldCheck, Mail, User, Crown, 
+    ChevronRight, Power, Info, ShieldAlert 
+} from 'lucide-react';
+import API from '../config/api';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -12,9 +13,8 @@ const ROLE_PERMISSIONS = {
     Cashier: ['Limited Dashboard', 'Billing (Point of Sale)', 'Khata Transaction Logging'],
 };
 
-// --- AddStaffModal (Unchanged logic for brevity) ---
+// --- AddStaffModal ---
 const AddStaffModal = ({ isOpen, onClose, onAddStaff, showToast, isSubmitting }) => {
-    // ... [AddStaffModal implementation is the same as the previous response] ...
     const [formData, setFormData] = useState({ name: '', email: '', role: 'Cashier' });
 
     const handleChange = (e) => {
@@ -24,114 +24,101 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, showToast, isSubmitting })
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.name || !formData.email) {
-            // showToast("Please fill in all required fields.", 'error');
-            return;
-        }
+        if (!formData.name || !formData.email) return;
         onAddStaff(formData, () => setFormData({ name: '', email: '', role: 'Cashier' }));
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-85 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
-            <div className="bg-gray-800 w-full max-w-lg rounded-xl shadow-2xl border border-gray-700 transform scale-100 transition-transform duration-300">
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-indigo-900/40 rounded-t-xl">
-                    <h2 className="text-xl font-bold text-white flex items-center">
-                        <UserPlus className="w-5 h-5 mr-3 text-indigo-300" />
-                        Add New Staff Member
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition p-1 rounded-full hover:bg-gray-700" disabled={isSubmitting}>
-                        <X className="cursor-pointer w-6 h-6" />
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
+            <div className="bg-gray-950 w-full max-w-lg rounded-[1.25rem] shadow-2xl border border-gray-800 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-8 border-b border-gray-800 flex justify-between items-center bg-indigo-500/5">
+                    <div>
+                        <h2 className="text-xl font-black text-white uppercase tracking-tighter flex items-center">
+                            <UserPlus className="w-6 h-6 mr-3 text-indigo-500" />
+                            Provision Staff
+                        </h2>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">Access Credentialing</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-500 hover:text-white transition p-2 rounded-full hover:bg-gray-900" disabled={isSubmitting}>
+                        <X className="w-6 h-6" />
                     </button>
                 </div>
                 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <p className="text-sm text-indigo-300 bg-gray-700/50 p-3 rounded-lg border border-indigo-700/50">
-                        Upon creation, an <strong>activation link</strong> will be securely sent to the provided email address for the staff member to set up their own login password.
-                    </p>
-                    
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
-                        <input
-                            type="text"
-                            id="name"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            required
-                            className="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-300"
-                            placeholder='e.g., Jane Doe'
-                            disabled={isSubmitting}
-                        />
-                    </div>
-                    
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            className="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-300"
-                            placeholder='e.g., jane@shop.com'
-                            disabled={isSubmitting}
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-1">Role/Permissions</label>
-                        <select
-                            id="role"
-                            name="role"
-                            value={formData.role}
-                            onChange={handleChange}
-                            className="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-xl focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
-                            disabled={isSubmitting}
-                        >
-                            <option className="bg-gray-700" value="Cashier">Cashier (Sales & Khata logging)</option>
-                            <option className="bg-gray-700" value="Manager">Manager (Inventory, Khata, & Standard Reports View)</option>
-                        </select>
-                    </div>
-
-                    <div className="bg-gray-700/50 p-3 rounded-xl border border-gray-600">
-                        <p className="text-sm font-semibold text-indigo-300 mb-2">
-                            Access for <strong>{formData.role}</strong>:
+                <form onSubmit={handleSubmit} className="p-8 space-y-5">
+                    <div className="flex gap-3 bg-indigo-500/5 p-4 rounded-2xl border border-indigo-500/10 mb-2">
+                        <Info className="w-5 h-5 text-indigo-400 shrink-0" />
+                        <p className="text-[11px] font-bold text-indigo-200/70 leading-relaxed">
+                            A secure <strong>activation link</strong> will be dispatched to the email provided for identity verification.
                         </p>
-                        <ul className="text-xs text-gray-300 list-disc list-inside ml-2 space-y-1">
-                            {ROLE_PERMISSIONS[formData.role].map((permission, index) => (
-                                <li key={index}>{permission}</li>
-                            ))}
-                            <li className="text-red-400 font-semibold mt-2">
-                                <span className="font-normal text-gray-400 italic">
-                                    (Note: Full Reports and Settings are exclusive to the owner role.)
-                                </span>
-                            </li>
-                        </ul>
                     </div>
                     
-                    <div className="pt-4 flex justify-end space-x-3">
-                        <button 
-                            type="button"
-                            onClick={onClose}
-                            className="cursor-pointer px-4 py-2 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition font-semibold"
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </button>
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                required
+                                className="w-full pl-12 pr-4 py-4 bg-gray-900 border border-gray-800 text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                                placeholder='Full Legal Name'
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                        
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                                className="w-full pl-12 pr-4 py-4 bg-gray-900 border border-gray-800 text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all"
+                                placeholder='Corporate Email Address'
+                                disabled={isSubmitting}
+                            />
+                        </div>
+
+                        <div className="relative">
+                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <select
+                                name="role"
+                                value={formData.role}
+                                onChange={handleChange}
+                                className="w-full pl-12 pr-4 py-4 bg-gray-900 border border-gray-800 text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none appearance-none cursor-pointer"
+                                disabled={isSubmitting}
+                            >
+                                <option value="Cashier">Cashier Tier</option>
+                                <option value="Manager">Management Tier</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-900/50 p-5 rounded-2xl border border-gray-800">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center">
+                            <ChevronRight className="w-3 h-3 mr-1 text-indigo-500" /> Permissions Manifest: {formData.role}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {ROLE_PERMISSIONS[formData.role].map((perm, idx) => (
+                                <span key={idx} className="text-[9px] font-black bg-gray-800 text-gray-300 px-2 py-1 rounded-md uppercase tracking-tighter">
+                                    {perm}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 flex flex-col gap-3">
                         <button 
                             type="submit"
-                            className="cursor-pointer px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition shadow-md flex items-center disabled:opacity-75"
+                            className="w-full py-4 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/10 flex items-center justify-center disabled:opacity-50 active:scale-95"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? (
-                                <Loader2 className="w-5 h-5 inline-block mr-1 animate-spin" />
-                            ) : (
-                                <Plus className="w-5 h-5 inline-block mr-1" />
-                            )}
-                            {isSubmitting ? 'Adding...' : 'Add Staff'}
+                            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
+                            {isSubmitting ? 'Provisioning...' : 'Add Member to Team'}
                         </button>
                     </div>
                 </form>
@@ -140,40 +127,26 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, showToast, isSubmitting })
     );
 };
 
-
-// --- StaffPermissionsManager Component (Main) ---
-
-// ADDED currentUserRole PROP
+// --- StaffPermissionsManager Main ---
 const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal, currentUserRole }) => {
-    
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Calculate permissions based on the provided user role
-    currentUserRole = 'owner'
+    currentUserRole = 'owner'; // Mocking role as requested by context
     const hasWriteAccess = currentUserRole === 'owner';
     const hasReadAccess = currentUserRole === 'owner' || currentUserRole === 'Manager';
 
-    // ====================================================================
-    // 1. DATA FETCHING (GET /api/staff)
-    // ====================================================================
     const fetchStaff = useCallback(async () => {
-        // Prevent API call if the user doesn't even have read permission
         if (!hasReadAccess) {
             setIsLoading(false);
             setStaff([]);
-            // showToast("Access denied to view staff list. Requires owner or Manager role.", 'error');
             return;
         }
-
         setIsLoading(true);
         try {
-            // Use the real API endpoint from the imported object
             const response = await apiClient.get(API.staff); 
-            
-            // Assuming the backend sends a sorted list, or we sort it here
             const sortedStaff = response.data.sort((a, b) => {
                 if (a.role === 'owner') return -1;
                 if (b.role === 'owner') return 1;
@@ -181,239 +154,165 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             });
             setStaff(sortedStaff);
         } catch (error) {
-            console.error('Failed to fetch staff:', error);
-            // This will show the actual backend error message
-            // showToast(error.response?.data?.error || 'Failed to load staff list. Check backend logs.', 'error');
+            console.error('Fetch failed:', error);
             setStaff([]);
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, showToast, hasReadAccess]); // Added hasReadAccess dependency
+    }, [apiClient, hasReadAccess]);
 
     useEffect(() => {
         fetchStaff();
-        // The dependency array includes fetchStaff to keep it fresh, but its dependencies are stable.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [apiClient]); // Re-fetch if apiClient changes (e.g., on re-login)
-    
-    // ====================================================================
-    // 2. ADD STAFF (POST /api/staff)
-    // ====================================================================
-    const handleAddStaff = async (formData, resetForm) => {
-        // Frontend check before making API call
-        if (!hasWriteAccess) {
-            //  showToast('Access denied. Only the owner can add new staff.', 'error');
-             return;
-        }
+    }, [fetchStaff]);
 
+    const handleAddStaff = async (formData, resetForm) => {
+        if (!hasWriteAccess) return;
         setIsAdding(true);
         try {
-            // Use the real API endpoint from the imported object
-            const response = await apiClient.post(API.staff, formData); 
-            
-            await fetchStaff(); // Re-fetch the complete, server-sorted list
-            
-            // showToast(response.data.message, 'success'); 
-            
+            await apiClient.post(API.staff, formData); 
+            await fetchStaff(); 
             resetForm();
             setIsAddModalOpen(false); 
         } catch (error) {
-            console.error('Failed to add staff:', error);
-            // showToast(error.response?.data?.error || 'Failed to add staff member.', 'error');
+            console.error('Add failed:', error);
         } finally {
             setIsAdding(false);
         }
     };
     
-    // ====================================================================
-    // 3. TOGGLE ACTIVE STATUS (PUT /api/staff/:id/toggle)
-    // ====================================================================
     const handleToggleActive = async (staffMember) => {
-        // Frontend check before making API call
-        if (!hasWriteAccess) {
-            //  showToast('Access denied. Only the owner can update staff status.', 'error');
-             return;
-        }
-
-        if (staffMember.role === 'owner') {
-            // showToast("Cannot deactivate the primary owner account.", 'error');
-            return;
-        }
-        
+        if (!hasWriteAccess || staffMember.role === 'owner') return;
         try {
-            // Use the real API endpoint function with the ID
-            const response = await apiClient.put(API.staffToggle(staffMember._id)); 
-            
-            await fetchStaff(); // Re-fetch the complete list to reflect the change
-
-            // showToast(response.data.message, 'info');
+            await apiClient.put(API.staffToggle(staffMember._id)); 
+            await fetchStaff();
         } catch (error) {
-            console.error('Failed to toggle status:', error);
-            // showToast(error.response?.data?.error || 'Failed to update user status.', 'error');
+            console.error('Toggle failed:', error);
         }
     };
     
-    // ====================================================================
-    // 4. REMOVE STAFF (DELETE /api/staff/:id)
-    // ====================================================================
     const handleRemoveStaff = (staffMember) => {
-        // Frontend check before opening modal/making API call
-        if (!hasWriteAccess) {
-            //  showToast('Access denied. Only the owner can remove staff.', 'error');
-             return;
-        }
-        
-        if (staffMember.role === 'owner') {
-            // showToast("Cannot remove the primary owner account.", 'error');
-            return;
-        }
+        if (!hasWriteAccess || staffMember.role === 'owner') return;
 
         setConfirmModal({
-            message: `Are you sure you want to permanently remove ${staffMember.name} from your staff? This action cannot be undone.`,
+            message: `CRITICAL: Proceed with permanent removal of ${staffMember.name}? This terminates all access credentials immediately.`,
             onConfirm: async () => {
                 setConfirmModal(null); 
                 try {
-                    // Use the real API endpoint function with the ID
                     await apiClient.delete(API.staffDelete(staffMember._id)); 
-                    
-                    await fetchStaff(); // Re-fetch the complete list to update the UI
-                    
-                    // showToast(`${staffMember.name} removed successfully.`, 'success');
+                    await fetchStaff();
                 } catch (error) {
-                    console.error('Failed to remove staff:', error);
-                    // showToast(error.response?.data?.error || 'Failed to remove staff member.', 'error');
+                    console.error('Delete failed:', error);
                 }
             },
             onCancel: () => setConfirmModal(null) 
         });
     };
     
-    // Standardized Role Badge Classes (same as original)
-    const getRoleBadgeClasses = (role) => {
+    const getRoleStyles = (role) => {
         switch (role) {
-            case 'owner':
-                return 'bg-purple-700 text-purple-200 border border-purple-600 shadow-lg';
-            case 'Manager':
-                return 'bg-indigo-900 text-indigo-300 border border-indigo-700';
-            case 'Cashier':
-                return 'bg-gray-700 text-indigo-300 border border-indigo-700';
-            default:
-                return 'bg-gray-700 text-gray-400';
+            case 'owner': return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+            case 'Manager': return 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
+            default: return 'text-gray-400 bg-gray-800 border-gray-700';
         }
-    }
-
-    const handleAddStaffClick = () => {
-        // Frontend check before opening modal
-        if (!hasWriteAccess) {
-            //  showToast('Access denied. Only the owner can add new staff.', 'error');
-             return;
-        }
-        setIsAddModalOpen(true);
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen-safe bg-gray-900 rounded-xl">
-            
-            <div className="max-w-8xl mx-auto">
-                <button 
-                    onClick={onBack} 
-                    className="cursor-pointer flex items-center text-indigo-400 hover:underline mb-6 font-medium text-sm"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Settings
-                </button>
-                
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center">
-                    <Users className="w-6 h-6 mr-3 text-indigo-400" />
-                    Staff & Permissions
-                </h2>
-                <p className="text-gray-400 mb-6 text-sm">Manage access roles, activation status, and staff accounts.</p>
-            </div>
+        <main className="min-h-screen bg-gray-950 text-gray-200 font-sans selection:bg-indigo-500/30">
+            {/* STICKY HEADER PARTNER */}
+            <header className="sticky top-0 z-[100] bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/50">
+                <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
+                    <div>
+                        <button onClick={onBack} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 mb-1 hover:text-white transition-colors">
+                            <ArrowLeft className="w-3 h-3" /> Settings
+                        </button>
+                        <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase flex items-center gap-2">
+                            Staff <span className="text-indigo-500 not-italic">Directory</span>
+                        </h1>
+                    </div>
+                    <button 
+                        onClick={() => setIsAddModalOpen(true)}
+                        disabled={isLoading || !hasWriteAccess}
+                        className="hidden sm:flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        <Plus className="w-4 h-4 mr-2" /> Add Staff
+                    </button>
+                </div>
+            </header>
 
+            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-32">
+                {/* Access Level Banner */}
+                <div className={`p-4 rounded-[1.5rem] border flex items-center gap-4 ${hasWriteAccess ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hasWriteAccess ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        {hasWriteAccess ? <Crown className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Security Authorization</p>
+                        <p className={`text-xs font-bold ${hasWriteAccess ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {hasWriteAccess ? 'Owner Mode: Full Administrative Control Active' : `Restricted Mode: ${currentUserRole} privileges applied.`}
+                        </p>
+                    </div>
+                </div>
 
-            <div className="max-w-8xl mx-auto space-y-4"> 
-                
-                <button 
-                    className="cursor-pointer w-full sm:w-auto flex items-center justify-center p-3 rounded-xl transition font-semibold shadow-md 
-                        ${hasWriteAccess ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}
-                        disabled:opacity-50 disabled:bg-gray-800"
-                    onClick={handleAddStaffClick}
-                    // Button disabled if loading OR if user doesn't have owner permission
-                    disabled={isLoading || isAdding || !hasWriteAccess}
-                    title={!hasWriteAccess ? `Your role (${currentUserRole}) cannot add staff members.` : "Add New Staff"}
-                >
-                    <Plus className="w-5 h-5 mr-2" /> Add New Staff
-                </button>
-                
-                <p className={`text-sm p-3 rounded-xl border font-semibold ${hasWriteAccess ? 'text-green-400 bg-gray-800/50 border-green-700/50' : 'text-yellow-400 bg-gray-800/50 border-yellow-700/50'}`}>
-                    {hasWriteAccess 
-                        ? 'You have owner-level access. You can add, toggle, and remove staff.'
-                        : `Current Role: ${currentUserRole}. You have read-only access (Manager) or no access (Cashier). Write operations (Add, Toggle, Remove) are disabled.`
-                    }
-                </p>
-
-                {/* Loading State */}
+                {/* Staff List */}
                 {isLoading ? (
-                    <div className="flex items-center justify-center p-8 bg-gray-800 rounded-xl">
-                        <Loader2 className="w-6 h-6 mr-3 text-indigo-400 animate-spin" />
-                        <span className="text-white">Loading Staff List...</span>
+                    <div className="flex flex-col items-center justify-center p-20 bg-gray-900/40 rounded-[1.25rem] border border-gray-800">
+                        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Synchronizing Directory...</p>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {/* Denied Read Access State */}
-                        {!hasReadAccess && (
-                            <p className="text-red-400 p-4 bg-gray-800 rounded-xl border border-red-700/50">
-                                Access denied. You do not have permission to view the staff list with the <strong>{currentUserRole}</strong> role.
-                            </p>
-                        )}
-                        {/* No Staff Found State */}
-                        {hasReadAccess && staff.length === 0 ? (
-                             <p className="text-gray-400 p-4 bg-gray-800 rounded-xl">No staff members found.</p>
+                    <div className="grid grid-cols-1 gap-4">
+                        {!hasReadAccess ? (
+                            <div className="p-8 text-center bg-gray-900/40 rounded-[1.25rem] border border-red-500/20">
+                                <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                                <p className="text-white font-black uppercase tracking-tighter">Access Denied</p>
+                                <p className="text-gray-500 text-sm font-bold mt-2">Elevated privileges required to view directory.</p>
+                            </div>
+                        ) : staff.length === 0 ? (
+                            <div className="p-20 text-center bg-gray-900/40 rounded-[1.25rem] border border-gray-800">
+                                <Users className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+                                <p className="text-gray-500 font-bold">No active staff found in directory.</p>
+                            </div>
                         ) : (
-                            // Render Staff List
                             staff.map((s) => {
-                                // Disable action buttons if the user is not the owner OR the staff member is the owner
                                 const isActionDisabled = !hasWriteAccess || s.role === 'owner';
                                 return (
                                     <div 
                                         key={s._id} 
-                                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-800 rounded-xl shadow-lg transition duration-200 border border-gray-700"
+                                        className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 bg-gray-900/40 rounded-[2rem] border border-gray-800 hover:border-gray-700 transition-all"
                                     >
-                                        
-                                        {/* User Info Block */}
-                                        <div className="flex-1 min-w-0 mb-3 sm:mb-0 sm:mr-4">
-                                            <p className="font-bold text-lg text-white">{s.name}</p>
-                                            <p className="text-sm text-gray-400 truncate">{s.email}</p> 
-                                            
-                                            {/* Role Badge - Uses getRoleBadgeClasses defined above */}
-                                            <span className={`text-xs font-bold px-3 py-1 rounded-lg mt-2 inline-block shadow-md ${getRoleBadgeClasses(s.role)}`}>
-                                                {s.role}
-                                            </span>
+                                        <div className="flex items-center gap-5 flex-1">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${getRoleStyles(s.role)}`}>
+                                                {s.role === 'owner' ? <Crown className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="text-lg font-black text-white uppercase tracking-tighter truncate leading-tight">{s.name}</h3>
+                                                <p className="text-xs font-bold text-gray-500 truncate">{s.email}</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${getRoleStyles(s.role)}`}>
+                                                        {s.role}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                         
-                                        {/* Action Block */}
-                                        <div className="flex justify-end w-full sm:w-auto space-x-3 mt-2 sm:mt-0">
-                                            {/* Status Indicator / Toggle (Indigo for ACTIVE) */}
+                                        <div className="flex items-center gap-3 w-full sm:w-auto mt-6 sm:mt-0 pt-6 sm:pt-0 border-t border-gray-800 sm:border-0">
                                             <button
                                                 onClick={() => handleToggleActive(s)}
-                                                className={`cursor-pointer flex-1 sm:flex-none text-sm font-semibold px-4 py-2 rounded-xl transition shadow-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
-                                                    s.active 
-                                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-900/50'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                                title={s.role === 'owner' ? "Cannot deactivate owner" : isActionDisabled ? `Only owner can change status (Your role: ${currentUserRole})` : (s.active ? "Click to Deactivate" : "Click to Activate")}
-                                                // Disabled if the staff member is the owner OR the current user lacks write access
                                                 disabled={isActionDisabled} 
+                                                className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                                    s.active 
+                                                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white'
+                                                    : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-500'
+                                                } disabled:opacity-20`}
                                             >
-                                                {s.active ? 'ACTIVE' : 'INACTIVE'}
+                                                <Power className="w-3.5 h-3.5" />
+                                                {s.active ? 'Active' : 'Offline'}
                                             </button>
                                             
-                                            {/* Remove Button (Red for destructive action, dark background on hover) */}
                                             <button
                                                 onClick={() => handleRemoveStaff(s)}
-                                                className="cursor-pointer p-3 text-red-400 hover:text-white hover:bg-red-600 rounded-xl transition bg-gray-700/50 border border-red-700/50 flex-none disabled:opacity-30 disabled:cursor-not-allowed"
-                                                title={s.role === 'owner' ? "Cannot remove owner" : isActionDisabled ? `Only owner can remove staff (Your role: ${currentUserRole})` : "Remove Staff"}
-                                                // Disabled if the staff member is the owner OR the current user lacks write access
                                                 disabled={isActionDisabled} 
+                                                className="p-3.5 text-red-500 hover:bg-red-500 hover:text-white bg-gray-900 border border-gray-800 rounded-2xl transition-all active:scale-95 disabled:opacity-20"
                                             >
                                                 <Trash2 className="w-5 h-5" />
                                             </button>
@@ -425,8 +324,14 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     </div>
                 )}
             </div>
+
+            <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="fixed bottom-6 right-6 sm:hidden w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 z-[150]"
+            >
+                <Plus className="w-8 h-8" />
+            </button>
             
-            {/* 3. Add Staff Modal */}
             <AddStaffModal 
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
@@ -434,9 +339,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 showToast={showToast}
                 isSubmitting={isAdding}
             />
-
-        </div>
+        </main>
     );
 };
 
-export default StaffPermissionsManager
+export default StaffPermissionsManager;

@@ -1,7 +1,7 @@
 import React from 'react'
 
 const StatCard = ({ title, value, unit, icon: Icon, colorClass }) => (
-  <article className="bg-gray-900 p-4 rounded-xl shadow-lg shadow-indigo-900/10 flex items-center justify-between transition duration-300 hover:shadow-2xl border border-gray-800" itemScope itemType="https://schema.org/QuantitativeValue">
+  <article className="bg-gray-900/40 p-4 rounded-xl shadow-lg shadow-indigo-900/10 flex items-center justify-between transition duration-300 hover:shadow-2xl border border-gray-800" itemScope itemType="https://schema.org/QuantitativeValue">
     <div className="flex flex-col">
       <p className="text-sm font-medium text-gray-400" itemProp="name">{title}</p>
       <div className="flex items-baseline mt-1">
