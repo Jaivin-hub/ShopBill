@@ -13,140 +13,144 @@ const getLocalDateString = (date) => {
 };
 
 // --- REFINED DATE FILTER ---
-const DateRangeFilter = ({ dateRange, onDateRangeChange }) => {
+const DateRangeFilter = ({ dateRange, onDateRangeChange, darkMode }) => {
+    const bgClass = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300 shadow-sm';
+    const inputBg = darkMode ? 'bg-gray-900/50' : 'bg-slate-100';
+    const textColor = darkMode ? 'text-white' : 'text-black';
+
     return (
-        <div className="flex items-center gap-1 bg-gray-950 border border-gray-800 rounded-xl p-1 shadow-inner w-full md:w-auto overflow-x-auto">
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-900/50 flex-1 md:flex-none">
+        <div className={`flex items-center gap-1 border rounded-xl p-1 w-full md:w-auto overflow-x-auto ${bgClass}`}>
+            <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg flex-1 md:flex-none ${inputBg}`}>
                 <Calendar className="w-3 h-3 text-indigo-500 shrink-0" />
                 <input
                     type="date"
                     value={dateRange.startDate || ''}
                     onChange={(e) => onDateRangeChange({ ...dateRange, startDate: e.target.value })}
-                    className="bg-transparent text-white font-bold text-[10px] focus:outline-none uppercase w-full"
+                    className={`bg-transparent font-bold text-[10px] focus:outline-none uppercase w-full ${textColor}`}
                 />
             </div>
-            <span className="text-gray-700 font-black text-[9px] px-0.5">/</span>
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-900/50 flex-1 md:flex-none">
+            <span className="text-gray-400 font-black text-[9px] px-0.5">/</span>
+            <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg flex-1 md:flex-none ${inputBg}`}>
                 <input
                     type="date"
                     value={dateRange.endDate || ''}
                     onChange={(e) => onDateRangeChange({ ...dateRange, endDate: e.target.value })}
-                    className="bg-transparent text-white font-bold text-[10px] focus:outline-none uppercase w-full"
+                    className={`bg-transparent font-bold text-[10px] focus:outline-none uppercase w-full ${textColor}`}
                 />
             </div>
         </div>
     );
 };
 
-// --- UPDATED BILL MODAL WITH CREDIT/PAID BREAKDOWN ---
-const BillModal = ({ sale, onClose, isLoading }) => {
+// --- RESTORED BILL MODAL ---
+const BillModal = ({ sale, onClose, isLoading, darkMode }) => {
     if (isLoading && !sale) return (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[300] backdrop-blur-md">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className={`fixed inset-0 flex items-center justify-center z-[300] backdrop-blur-md ${darkMode ? 'bg-gray-950/90' : 'bg-white/80'}`}>
+            <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
         </div>
     );
     if (!sale) return null;
 
-    const saleDate = new Date(sale.timestamp).toLocaleDateString('en-GB'); // DD/MM/YYYY
-    const saleTime = new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    const customerName = sale.customerName || sale.customerId?.name || 'Walk-in';
-    const amountPaid = sale.totalAmount - (sale.amountCredited || 0);
-    const billId = sale._id ? sale._id.slice(-8).toUpperCase() : 'N/A';
+    const isCredit = sale.amountCredited > 0;
+    const customerName = sale.customerName || sale.customerId?.name || 'Standard Client';
+    
+    const modalBg = darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200 shadow-2xl';
+    const headerBg = darkMode ? 'bg-gray-950/50' : 'bg-slate-50';
+    const textColor = darkMode ? 'text-white' : 'text-slate-900';
+    const secondaryText = darkMode ? 'text-gray-400' : 'text-slate-500';
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-xl animate-in fade-in duration-200">
-            <div className="rounded-3xl border border-gray-800 w-full max-w-sm overflow-hidden transform animate-in zoom-in-95 shadow-2xl">
-                
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-sm animate-in fade-in duration-200">
+            <div className={`${modalBg} rounded-xl border w-full max-w-md overflow-hidden transform animate-in zoom-in-95 shadow-2xl`}>
                 {/* Header */}
-                <div className="p-6 pb-2 relative">
-                    <button onClick={onClose} className="absolute right-6 top-6 text-gray-400 hover:text-white transition-colors">
+                <div className={`p-5 border-b flex justify-between items-center ${headerBg} ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+                    <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <Receipt className="w-3.5 h-3.5 text-indigo-500" />
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.15em]">Invoice Summary</span>
+                        </div>
+                        <h3 className={`text-base font-bold tabular-nums tracking-tight ${textColor}`}>
+                            #{sale._id.slice(-12).toUpperCase()}
+                        </h3>
+                    </div>
+                    <button 
+                        onClick={onClose} 
+                        className={`p-2 rounded-lg transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-200 text-slate-400'}`}
+                    >
                         <X className="w-5 h-5" />
                     </button>
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-2 text-indigo-400">
-                            <IndianRupee className="w-5 h-5" />
-                            <h2 className="text-lg font-black uppercase tracking-wider text-white">Sale Receipt</h2>
-                        </div>
-                        <p className="text-[10px] font-bold text-gray-500 tracking-[0.2em]">ID: {billId}</p>
-                    </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-gray-800/50 space-y-6">
-                    {/* Date & Customer Info */}
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Date & Time</p>
-                            <p className="text-xs font-black text-white">{saleDate} | {saleTime}</p>
-                        </div>
-                        <div className="text-right space-y-1">
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Customer</p>
-                            <p className="text-xs font-black text-rose-500 uppercase">{customerName}</p>
+                {/* Content */}
+                <div className="p-6 space-y-5 max-h-[50vh] overflow-y-auto custom-scroll">
+                    <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-widest ${secondaryText}`}>Billed To</span>
+                        <div className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5 text-indigo-500" />
+                            <span className={`text-sm font-bold ${textColor}`}>{customerName}</span>
                         </div>
                     </div>
 
-                    {/* Items Summary */}
-                    <div className="space-y-4">
-                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800/50 pb-2">Items Summary</p>
-                        <div className="space-y-5">
+                    <div className="space-y-3">
+                        <span className={`text-[9px] font-bold uppercase tracking-widest px-1 ${secondaryText}`}>Line Items</span>
+                        <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
                             {sale.items?.map((item, i) => (
-                                <div key={i} className="flex justify-between items-start">
+                                <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 ${darkMode ? 'border-gray-800 bg-gray-900/20' : 'border-slate-100 bg-white'}`}>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-black text-gray-100 uppercase">{item.itemId?.name || item.name || 'Item'}</span>
-                                        <span className="text-[10px] font-bold text-gray-500 tabular-nums">
-                                            {item.quantity} × ₹{(item.price || 0).toLocaleString()}
-                                        </span>
+                                        <span className={`font-bold ${textColor}`}>{item.name || 'General Item'}</span>
+                                        <span className={`text-[10px] font-medium ${secondaryText}`}>Qty: {item.quantity} × ₹{item.price?.toLocaleString()}</span>
                                     </div>
-                                    <span className="text-sm font-black text-white tabular-nums">
+                                    <span className={`font-bold tabular-nums ${textColor}`}>
                                         ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
                                     </span>
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    {/* Calculations */}
-                    <div className="pt-4 space-y-3">
-                        <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Subtotal</span>
-                            <span className="text-xs font-black text-gray-400 tabular-nums">₹{sale.totalAmount.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-t border-gray-800 pt-3">
-                            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Grand Total</span>
-                            <span className="text-2xl font-black text-indigo-400 tabular-nums italic">₹{sale.totalAmount.toLocaleString()}</span>
-                        </div>
-                    </div>
-
-                    {/* Status Box (Paid vs Credit) */}
-                    <div className={`p-4 rounded-2xl border ${sale.amountCredited > 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className={`text-[10px] font-black uppercase ${sale.amountCredited > 0 ? 'text-emerald-500' : 'text-emerald-500'}`}>Paid</span>
-                            <span className="text-[10px] font-black text-emerald-500 tabular-nums">₹{amountPaid.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-tighter">Credit Due</span>
-                            <span className="text-[10px] font-black text-rose-500 tabular-nums">₹{(sale.amountCredited || 0).toLocaleString()}</span>
-                        </div>
-                    </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="p-6 pt-2 flex gap-3">
-                    <button onClick={() => window.print()} className="flex-1 py-4 bg-white text-black text-xs font-black uppercase rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all">
-                        <Printer className="w-4 h-4" /> Print
-                    </button>
-                    <button onClick={onClose} className="flex-1 py-4 bg-indigo-600 text-white text-xs font-black uppercase rounded-2xl active:scale-95 transition-all">
-                        Close
-                    </button>
+                {/* Footer */}
+                <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-0.5">
+                            <p className={`text-[10px] font-bold uppercase tracking-widest ${secondaryText}`}>Grand Total</p>
+                            <p className={`text-2xl font-black tabular-nums tracking-tighter ${textColor}`}>₹{sale.totalAmount.toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                            <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-tight border ${isCredit ? 'border-rose-500/20 text-rose-500 bg-rose-500/5' : 'border-emerald-500/20 text-emerald-600 bg-emerald-500/5'}`}>
+                                {isCredit ? 'Payment Pending' : 'Fully Paid'}
+                            </span>
+                            {isCredit && (
+                                <span className="text-[10px] font-bold text-rose-500">Balance: ₹{sale.amountCredited.toLocaleString()}</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                        <button 
+                            onClick={() => window.print()} 
+                            className="flex-1 py-3 bg-indigo-600 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                        >
+                            <Printer className="w-4 h-4" /> Print Receipt
+                        </button>
+                        <button 
+                            onClick={onClose} 
+                            className={`flex-1 py-3 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition-all active:scale-[0.98] ${darkMode ? 'bg-gray-900 text-gray-400 border-gray-800 hover:bg-gray-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-const SalesActivityPage = ({ salesData, apiClient, showToast, onBack }) => {
+const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }) => {
     const [sales, setSales] = useState(salesData || []);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
@@ -205,41 +209,44 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack }) => {
         return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }, [sales, searchQuery]);
 
+    const mainBg = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black';
+    const cardBg = darkMode ? 'bg-gray-900/30 border-gray-800/40 hover:bg-gray-900/60' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm';
+
     return (
-        <main className="min-h-screen bg-gray-950 text-gray-200">
+        <main className={`min-h-screen transition-colors duration-300 ${mainBg}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
-            <header className="sticky top-0 z-[100] bg-gray-950/95 backdrop-blur-md border-b border-gray-800/60 px-4 md:px-6 py-4">
+            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
                 <div className="max-w-7xl mx-auto space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <button onClick={onBack} className="p-2 bg-gray-900 border border-gray-800 text-gray-400 rounded-xl">
+                            <button onClick={onBack} className={`p-2 border rounded-xl transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                             <div>
-                                <h1 className="text-base md:text-lg font-black text-white uppercase tracking-tighter leading-none">Sales <span className="text-indigo-500">History</span></h1>
-                                <p className="text-[8px] text-gray-600 font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-                                    Active Ledger
-                                </p>
+                                <h1 className={`text-base md:text-lg font-black uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                                    Sales <span className="text-indigo-600">History</span>
+                                </h1>
+                                <p className={`text-[8px] font-black uppercase tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Registry Log</p>
                             </div>
                         </div>
                         <div className="hidden md:block">
-                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
                         </div>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-3">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input 
                                 type="text"
                                 placeholder="SEARCH CLIENT..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-gray-950 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white w-full outline-none focus:border-indigo-500/50 transition-all"
+                                className={`border rounded-xl pl-10 pr-4 py-2.5 text-[10px] font-black uppercase tracking-widest w-full outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-white border-slate-300 text-black'}`}
                             />
                         </div>
                         <div className="md:hidden">
-                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
                         </div>
                     </div>
                 </div>
@@ -255,22 +262,22 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack }) => {
                         <div 
                             key={sale._id} 
                             onClick={() => fetchSaleDetail(sale._id)}
-                            className="group flex items-center justify-between p-4 bg-gray-900/30 border border-gray-800/40 rounded-2xl hover:bg-gray-900/60 transition-all cursor-pointer active:scale-[0.98]"
+                            className={`group flex items-center justify-between p-4 border rounded-2xl transition-all cursor-pointer active:scale-[0.98] ${cardBg}`}
                         >
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${sale.amountCredited > 0 ? 'bg-rose-500/5 border-rose-500/20 text-rose-500' : 'bg-indigo-500/5 border-indigo-500/20 text-indigo-500'}`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${sale.amountCredited > 0 ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' : 'bg-indigo-500/5 border-indigo-500/20 text-indigo-600'}`}>
                                     <User className="w-4 h-4" />
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                    <span className="text-[12px] font-black text-gray-100 uppercase tracking-tight truncate leading-tight">
+                                    <span className={`text-[12px] font-black uppercase tracking-tight truncate leading-tight ${darkMode ? 'text-gray-100' : 'text-slate-900'}`}>
                                         {sale.customerName || sale.customerId?.name || 'Walk-in'}
                                     </span>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[9px] font-bold text-gray-600 tabular-nums">
+                                        <span className={`text-[9px] font-bold tabular-nums ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                                             {new Date(sale.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                         </span>
-                                        <span className="w-1 h-1 bg-gray-800 rounded-full" />
-                                        <span className="text-[9px] font-bold text-gray-600 uppercase">
+                                        <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
+                                        <span className={`text-[9px] font-bold uppercase ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                                             {sale.items?.length || 0} Items
                                         </span>
                                     </div>
@@ -279,14 +286,14 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack }) => {
 
                             <div className="flex items-center gap-4 ml-2">
                                 <div className="text-right">
-                                    <p className="text-[14px] font-black text-white tabular-nums leading-tight">
+                                    <p className={`text-[14px] font-black tabular-nums leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>
                                         ₹{sale.totalAmount.toLocaleString()}
                                     </p>
-                                    <span className={`text-[8px] font-black uppercase tracking-widest ${sale.amountCredited > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                    <span className={`text-[8px] font-black uppercase tracking-widest ${sale.amountCredited > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                         {sale.amountCredited > 0 ? `DUE: ₹${sale.amountCredited}` : 'CLEARED'}
                                     </span>
                                 </div>
-                                <ArrowUpRight className="w-4 h-4 text-gray-700 group-hover:text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                                <ArrowUpRight className={`w-4 h-4 transition-all ${darkMode ? 'text-gray-700 group-hover:text-indigo-400' : 'text-slate-300 group-hover:text-indigo-600'} group-hover:translate-x-0.5 group-hover:-translate-y-0.5`} />
                             </div>
                         </div>
                     ))}
@@ -298,6 +305,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack }) => {
                     sale={selectedSaleDetail} 
                     onClose={() => setIsModalOpen(false)} 
                     isLoading={isFetchingDetail} 
+                    darkMode={darkMode}
                 />
             )}
         </main>

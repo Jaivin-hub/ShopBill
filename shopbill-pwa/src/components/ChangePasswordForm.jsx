@@ -8,14 +8,14 @@ import API from '../config/api';
 const SWIPE_THRESHOLD = 50; 
 const MAX_VERTICAL_DEVIATION = 50; 
 
-const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => { 
+const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }) => { 
     // --- Form State ---
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState({});
-    const [showPass, setShowPass] = useState(false); // Design addition: Toggle visibility
+    const [showPass, setShowPass] = useState(false); 
     
     // --- Swipe State ---
     const [touchStart, setTouchStart] = useState(null);
@@ -130,34 +130,39 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
         }
     };
 
+    // Design adjustments for light theme
+    const inputBg = darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black';
+    const borderColor = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-900';
+
     return (
-        <main ref={containerRef} className="min-h-screen bg-gray-950 text-gray-200 selection:bg-indigo-500/30">
+        <main ref={containerRef} className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black'} selection:bg-indigo-500/30`}>
             {/* STICKY HEADER */}
-            <header className="sticky top-0 z-[100] bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/50">
+            <header className={`sticky top-0 z-[100] border-b backdrop-blur-xl ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
                 <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div>
                         <button 
                             onClick={onBack} 
                             disabled={isLoading}
-                            className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 mb-1 hover:text-white transition-colors disabled:opacity-30"
+                            className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-1 transition-colors disabled:opacity-30 ${darkMode ? 'text-indigo-500 hover:text-white' : 'text-indigo-600 hover:text-indigo-800'}`}
                         >
                             <ArrowLeft className="w-3 h-3" /> Security
                         </button>
-                        <h1 className="text-xl font-black text-white tracking-tighter uppercase">
-                            Update <span className="text-indigo-500">Access</span>
+                        <h1 className={`text-xl font-black tracking-tighter uppercase ${darkMode ? 'text-white' : 'text-black'}`}>
+                            Update <span className="text-indigo-600">Access</span>
                         </h1>
                     </div>
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
-                        <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+                        <ShieldCheck className="w-5 h-5 text-indigo-600" />
                     </div>
                 </div>
             </header>
 
             <div className="max-w-xl mx-auto p-4 md:p-8 space-y-8 pb-32">
                 {/* SECURITY ALERT BANNER */}
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex gap-4 items-start">
-                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] font-bold text-amber-200/70 leading-relaxed">
+                <div className={`border rounded-2xl p-4 flex gap-4 items-start ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className={`text-[11px] font-bold leading-relaxed ${darkMode ? 'text-amber-200/70' : 'text-amber-900'}`}>
                         Changing your password will terminate all active sessions. You will be required to log in again with your new credentials.
                     </p>
                 </div>
@@ -165,11 +170,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* CURRENT PASSWORD */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="current-pass">
+                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="current-pass">
                             Identity Verification
                         </label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
                                 id="current-pass"
                                 type={showPass ? "text" : "password"}
@@ -177,11 +182,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                                 onChange={handleChange}
                                 required
                                 disabled={isLoading}
-                                className={`w-full pl-12 pr-12 py-4 bg-gray-900 border ${errors.currentPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                className={`w-full pl-12 pr-12 py-4 border text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg} ${errors.currentPassword ? 'border-red-500' : borderColor}`}
                                 placeholder="Current Password"
                             />
                             {errors.currentPassword && (
-                                <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                                <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
                                     <AlertCircle className="w-3 h-3" /> {errors.currentPassword}
                                 </p>
                             )}
@@ -190,11 +195,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
 
                     {/* NEW PASSWORD */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="new-pass">
+                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="new-pass">
                             New Credentials
                         </label>
                         <div className="relative">
-                            <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
                                 id="new-pass"
                                 type={showPass ? "text" : "password"}
@@ -202,19 +207,19 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                                 onChange={handleChange}
                                 required
                                 disabled={isLoading}
-                                className={`w-full pl-12 pr-12 py-4 bg-gray-900 border ${errors.newPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                className={`w-full pl-12 pr-12 py-4 border text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg} ${errors.newPassword ? 'border-red-500' : borderColor}`}
                                 placeholder="New Password"
                             />
                             <button 
                                 type="button"
                                 onClick={() => setShowPass(!showPass)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-indigo-400"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
                             >
                                 {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
                         {errors.newPassword && (
-                            <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                            <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" /> {errors.newPassword}
                             </p>
                         )}
@@ -222,11 +227,11 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
 
                     {/* CONFIRM PASSWORD */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1" htmlFor="confirm-pass">
+                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="confirm-pass">
                             Confirm New Credentials
                         </label>
                         <div className="relative">
-                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
                                 id="confirm-pass"
                                 type={showPass ? "text" : "password"}
@@ -234,7 +239,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                                 onChange={handleChange}
                                 required
                                 disabled={isLoading}
-                                className={`w-full pl-12 pr-4 py-4 bg-gray-900 border ${errors.confirmNewPassword ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all`}
+                                className={`w-full pl-12 pr-4 py-4 border text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg} ${errors.confirmNewPassword ? 'border-red-500' : borderColor}`}
                                 placeholder="Repeat New Password"
                             />
                             {!errors.confirmNewPassword && confirmNewPassword && confirmNewPassword === newPassword && (
@@ -242,7 +247,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                             )}
                         </div>
                         {errors.confirmNewPassword && (
-                            <p className="text-[10px] font-bold text-red-500 uppercase mt-2 ml-1 flex items-center gap-1">
+                            <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" /> {errors.confirmNewPassword}
                             </p>
                         )}
@@ -251,7 +256,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout }) => {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 flex items-center justify-center gap-3"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 flex items-center justify-center gap-3"
                     >
                         {isLoading ? (
                             <>

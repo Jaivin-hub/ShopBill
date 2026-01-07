@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { 
-  UserPlus, TrendingUp, Loader, Search, ArrowUpDown, X, 
-  Wallet, Users, Bell, ArrowUpRight, ShieldCheck, Activity,
-  Filter, Download, ChevronRight, Scale
+import {
+  UserPlus, TrendingUp, Loader, Search, X,
+  Wallet, Bell, ShieldCheck, Filter, ChevronRight,
+  Sparkles, AlertCircle, RefreshCcw, LayoutGrid
 } from 'lucide-react';
 import CustomerList from './CustomerList';
 import { PaymentModal, AddCustomerModal, HistoryModal, RemindInfoModal } from './LedgerModals';
@@ -10,14 +10,14 @@ import { PaymentModal, AddCustomerModal, HistoryModal, RemindInfoModal } from '.
 const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar { width: 4px; }
   .custom-ledger-scroll::-webkit-scrollbar-track { background: transparent; }
-  .custom-ledger-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 10px; }
-  .custom-ledger-scroll::-webkit-scrollbar-thumb:hover { background: #312e81; }
+  .custom-ledger-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+  .custom-ledger-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 `;
 
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
 
-const Ledger = ({ apiClient, API, showToast }) => {
+const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,82 +83,81 @@ const Ledger = ({ apiClient, API, showToast }) => {
     finally { setIsProcessing(false); }
   };
 
+  const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+  const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
+  const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
+
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-950">
-      <div className="flex flex-col items-center gap-4">
-        <Loader className="w-6 h-6 animate-spin text-indigo-500" />
-        <span className="text-[10px] font-bold text-gray-600 uppercase tracking-[0.3em]">Syncing Ledger Database</span>
-      </div>
+    <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
+      <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-4" />
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Authenticating Ledger...</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950 text-gray-200">
+    <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
-      {/* --- ELITE HEADER --- */}
-      <header className="sticky top-0 z-[100] bg-gray-950/90 backdrop-blur-md border-b border-gray-800/60 px-6 py-5">
+      {/* --- PREMIUM HEADER --- */}
+      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-white uppercase leading-none">
-                Receivables <span className="text-indigo-500">Terminal</span>
-              </h1>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.25em] mt-1.5 flex items-center gap-1.5">
-                Account Reconciliation Active
-              </p>
+          <div className="space-y-1">
+            <h1 className="text-xl font-black tracking-tight uppercase flex items-center gap-2">
+              Ledger <span className="text-indigo-500">Terminal</span>
+            </h1>
+            <div className="flex items-center gap-2">
+              <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.15em]">System Live • 128-bit Encrypted</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-             <button 
-              onClick={() => { setShowSearch(!showSearch); setShowSort(false); }} 
-              className={`p-2.5 rounded-lg border transition-all ${showSearch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-indigo-400 hover:border-indigo-500/30'}`}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowSearch(!showSearch); setShowSort(false); }}
+              className={`p-3 rounded-2xl border transition-all active:scale-90 ${showSearch ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
             >
-              <Search className="w-4 h-4" />
+              <Search size={18} />
             </button>
-            <button 
-              onClick={() => { setShowSort(!showSort); setShowSearch(false); }} 
-              className={`p-2.5 rounded-lg border transition-all ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-indigo-400 hover:border-indigo-500/30'}`}
+            <button
+              onClick={() => { setShowSort(!showSort); setShowSearch(false); }}
+              className={`p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
             >
-              <Filter className="w-4 h-4" />
+              <Filter size={18} />
             </button>
-            <div className="h-8 w-[1px] bg-gray-800 mx-2 hidden md:block" />
-            <button 
+            <button
               onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-              className="hidden md:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg shadow-indigo-900/20"
+              className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
             >
-              <UserPlus className="w-3.5 h-3.5" /> New Account
+              <UserPlus size={14} className="text-indigo-400" /> New Account
             </button>
           </div>
         </div>
 
-        {/* --- DYNAMIC TOOLS PANEL --- */}
+        {/* --- EXPANDABLE SEARCH/FILTER --- */}
         {(showSearch || showSort) && (
-          <div className="max-w-7xl mx-auto mt-4 animate-in fade-in slide-in-from-top-2">
+          <div className="max-w-7xl mx-auto mt-5 animate-in fade-in slide-in-from-top-3">
             {showSearch ? (
               <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  autoFocus 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  placeholder="LOCATE ACCOUNT BY IDENTIFIER (NAME, PHONE)..." 
-                  className="w-full bg-gray-950 border border-gray-800 focus:border-indigo-500/50 rounded-xl py-3.5 pl-12 pr-12 text-[11px] font-bold uppercase tracking-[0.1em] outline-none transition-all" 
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-500 transition-colors" />
+                <input
+                  autoFocus
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="SEARCH BY ACCOUNT NAME OR CONTACT..."
+                  className={`w-full border rounded-2xl py-4.5 pl-14 pr-12 text-[10px] font-black uppercase tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
                 />
-                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 cursor-pointer hover:text-white" />
+                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500" />
               </div>
             ) : (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                 {[
                   { id: 'due-high', label: 'Highest Priority' },
                   { id: 'due-low', label: 'Settled Priority' },
                   { id: 'alpha', label: 'A-Z Index' }
                 ].map((opt) => (
-                  <button 
-                    key={opt.id} 
-                    onClick={() => setSortBy(opt.id)} 
-                    className={`px-6 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-500'}`}
+                  <button
+                    key={opt.id}
+                    onClick={() => setSortBy(opt.id)}
+                    className={`px-8 py-3 rounded-2xl text-[9px] font-black uppercase border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
                   >
                     {opt.label}
                   </button>
@@ -169,63 +168,59 @@ const Ledger = ({ apiClient, API, showToast }) => {
         )}
       </header>
 
-      {/* --- CONTENT WORKSPACE --- */}
-      <main className="flex-1 px-6 py-8 dashboard-scroll">
-        <div className="max-w-7xl mx-auto space-y-8">
-          
-          {/* REVENUE STATUS CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="md:col-span-2 bg-gray-900/40 border border-gray-800 rounded-2xl p-6 relative overflow-hidden group hover:border-rose-500/30 transition-all">
-               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <TrendingUp className="w-16 h-16 text-rose-500" />
-                </div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Gross Outstanding Debt</p>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <h2 className="text-4xl font-bold text-white tabular-nums tracking-tight">₹{totalOutstanding.toLocaleString('en-IN')}</h2>
-                    <div className="flex items-center gap-2 mt-3 text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-500/10 w-fit px-2 py-1 rounded">
-                       <ShieldCheck className="w-3 h-3" /> Risk Exposure Level
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-400 tabular-nums">{hasDuesCount}</p>
-                    <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">At-Risk Accounts</p>
-                  </div>
-                </div>
-            </div>
+      {/* --- WORKSPACE --- */}
+      <main className="flex-1 px-6 py-8 overflow-y-auto custom-ledger-scroll">
+        <div className="max-w-7xl mx-auto space-y-8 pb-32">
 
-            <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => setActiveModal('remind')} 
-                  className="flex-1 bg-gray-900/40 border border-gray-800 hover:border-emerald-500/30 hover:bg-emerald-500/5 p-4 rounded-xl flex items-center justify-between transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
-                      <Bell className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[10px] font-bold text-white uppercase tracking-widest">Reminders</p>
-                      <p className="text-[9px] text-gray-500 font-medium">Auto-Notify Debtors</p>
-                    </div>
+          {/* TOP METRICS SECTION */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className={`lg:col-span-8 rounded-[24px] p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
+              {/* Background Glow */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
+
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-5">
+                  {/* Status Icon */}
+                  <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
+                    <AlertCircle size={20} />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-700 group-hover:text-emerald-500 transition-colors" />
-                </button>
+
+                  <div>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">
+                      Total Outstanding
+                    </p>
+                    <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
+                      ₹{totalOutstanding.toLocaleString('en-IN')}
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Optional Mini Status or Badge */}
+                <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Status</p>
+                  <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                    MONITORED
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* TABLE SECTION */}
-          <div className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-800/50 flex justify-between items-center bg-gray-900/30">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Registry</h3>
+          {/* ACCOUNTS LIST SECTION */}
+          <div className={`rounded-[32px] border overflow-hidden ${cardBase}`}>
+            <div className="px-8 py-7 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-500">
+                  <LayoutGrid size={20} />
+                </div>
+                <div>
+                  <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">Customer Registry</h3>
+                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">Managing {customers.length} Accounts</p>
+                </div>
               </div>
-              <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 uppercase">
-                Database Synced
-              </span>
             </div>
 
-            <div className="p-2">
+            <div className="p-4 md:p-6">
               <CustomerList
                 customersList={customers}
                 searchTerm={searchTerm}
@@ -234,49 +229,53 @@ const Ledger = ({ apiClient, API, showToast }) => {
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
                 isProcessing={isProcessing}
                 setActiveModal={setActiveModal}
+                darkMode={darkMode}
               />
             </div>
           </div>
         </div>
       </main>
 
-      {/* MOBILE QUICK ADD BUTTON */}
-      <button 
+      {/* MOBILE QUICK ADD - POSITIONED ABOVE FOOTER MENU */}
+      <button
         onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="md:hidden fixed bottom-8 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 active:scale-90 transition-transform"
+        className="md:hidden fixed bottom-20 right-6 w-16 h-16 bg-indigo-600 text-white rounded-[20px] shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
       >
-        <UserPlus className="w-6 h-6" />
+        <UserPlus size={24} />
       </button>
 
-      {/* MODAL SYSTEMS */}
+      {/* MODAL ARCHITECTURE */}
       {activeModal === 'payment' && (
-        <PaymentModal 
-          customer={selectedCustomer} 
-          amount={paymentAmount} 
-          setAmount={setPaymentAmount} 
-          onClose={() => setActiveModal(null)} 
-          onConfirm={handleRecordPayment} 
-          isProcessing={isProcessing} 
+        <PaymentModal
+          customer={selectedCustomer}
+          amount={paymentAmount}
+          setAmount={setPaymentAmount}
+          onClose={() => setActiveModal(null)}
+          onConfirm={handleRecordPayment}
+          isProcessing={isProcessing}
+          darkMode={darkMode}
         />
       )}
       {activeModal === 'add' && (
-        <AddCustomerModal 
-          data={newCustomerData} 
-          onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })} 
-          onClose={() => setActiveModal(null)} 
-          onConfirm={handleAddCustomer} 
-          isProcessing={isProcessing} 
-          isValid={!!newCustomerData.name} 
+        <AddCustomerModal
+          data={newCustomerData}
+          onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })}
+          onClose={() => setActiveModal(null)}
+          onConfirm={handleAddCustomer}
+          isProcessing={isProcessing}
+          isValid={!!newCustomerData.name}
+          darkMode={darkMode}
         />
       )}
       {activeModal === 'history' && (
-        <HistoryModal 
-          customer={selectedCustomer} 
-          onClose={() => setActiveModal(null)} 
-          fetchCustomerHistory={fetchCustomerHistory} 
+        <HistoryModal
+          customer={selectedCustomer}
+          onClose={() => setActiveModal(null)}
+          fetchCustomerHistory={fetchCustomerHistory}
+          darkMode={darkMode}
         />
       )}
-      {activeModal === 'remind' && <RemindInfoModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'remind' && <RemindInfoModal onClose={() => setActiveModal(null)} darkMode={darkMode} />}
     </div>
   );
 };

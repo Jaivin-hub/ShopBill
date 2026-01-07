@@ -17,7 +17,8 @@ const initialItemState = {
     hsn: ''
 };
 
-const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
+// Added darkMode to props
+const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => {
     // Permission Logic
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     
@@ -43,7 +44,6 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         try {
             const response = await apiClient.get(API.inventory);
             setInventory(response.data);
-            // Only toast on manual refreshes or specific updates
         } catch (error) {
             console.error("Inventory Fetch Error:", error);
             showToast('System Link Failure: Could not sync inventory.', 'error');
@@ -67,7 +67,6 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
         
         const handleScroll = () => {
             const scrollTop = scrollTarget === window ? window.scrollY : scrollTarget.scrollTop;
-            // Pattern uses a 40px threshold for tighter header transitions
             setShowStickySearch(scrollTop > 40);
         };
         
@@ -201,7 +200,6 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
                     if (!aIsLow && bIsLow) return 1;
                     return a.quantity - b.quantity;
                 }
-                // Default: Alphabetical but keeps "Low Stock" at high priority
                 return a.name.localeCompare(b.name);
             });
     }, [inventory, searchTerm, sortOption]);
@@ -209,12 +207,12 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
     // --- Render States ---
     if (!hasAccess) {
         return (
-            <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-8 text-center">
+            <main className={`min-h-screen flex flex-col items-center justify-center p-8 text-center ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
                 <div className="bg-red-500/10 p-6 rounded-[1.25rem] border border-red-500/20 mb-6">
                     <AlertTriangle className="w-12 h-12 text-red-500" />
                 </div>
-                <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Access<span className="text-red-500 not-italic">Restricted</span></h1>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-4 max-w-xs leading-relaxed">
+                <h1 className={`text-xl font-black uppercase tracking-tighter italic ${darkMode ? 'text-white' : 'text-slate-900'}`}>Access<span className="text-red-500 not-italic">Restricted</span></h1>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-4 max-w-xs leading-relaxed ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
                     Inventory management protocols are restricted to Level 2 personnel (Owners/Managers).
                 </p>
             </main>
@@ -223,7 +221,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
 
     if (isLoadingInitial) {
          return (
-            <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
+            <div className={`min-h-screen flex flex-col items-center justify-center ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
                 <div className="relative">
                     <div className="absolute inset-0 bg-teal-500/20 blur-2xl rounded-full animate-pulse" />
                     <Loader2 className="w-12 h-12 animate-spin text-teal-400 relative z-10" />
@@ -260,6 +258,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast }) => {
             handleFormSubmit={handleFormSubmit}
             confirmDeleteItem={confirmDeleteItem}
             setIsConfirmModalOpen={setIsConfirmModalOpen}
+            darkMode={darkMode} // Successfully passing darkMode down
         />
     );
 };

@@ -12,7 +12,7 @@ const getNotificationTypeDetails = (type) => {
         case 'inventory_low':
             return { 
                 icon: AlertTriangle, 
-                color: 'text-amber-400', 
+                color: 'text-amber-500', 
                 bgColor: 'bg-amber-500/10', 
                 borderColor: 'border-amber-500/20',
                 glow: 'shadow-amber-500/5',
@@ -21,7 +21,7 @@ const getNotificationTypeDetails = (type) => {
         case 'credit_exceeded':
             return { 
                 icon: ShieldAlert, 
-                color: 'text-rose-400', 
+                color: 'text-rose-500', 
                 bgColor: 'bg-rose-500/10', 
                 borderColor: 'border-rose-500/20',
                 glow: 'shadow-rose-500/5',
@@ -30,7 +30,7 @@ const getNotificationTypeDetails = (type) => {
         case 'success':
             return { 
                 icon: CheckCircle, 
-                color: 'text-emerald-400', 
+                color: 'text-emerald-500', 
                 bgColor: 'bg-emerald-500/10', 
                 borderColor: 'border-emerald-500/20',
                 glow: 'shadow-emerald-500/5',
@@ -39,7 +39,7 @@ const getNotificationTypeDetails = (type) => {
         default:
             return { 
                 icon: Info, 
-                color: 'text-indigo-400', 
+                color: 'text-indigo-500', 
                 bgColor: 'bg-indigo-500/10', 
                 borderColor: 'border-indigo-500/20',
                 glow: 'shadow-indigo-500/5',
@@ -48,7 +48,7 @@ const getNotificationTypeDetails = (type) => {
     }
 };
 
-const NotificationsPage = ({ notifications, setNotifications }) => {
+const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
     
     useEffect(() => {
         const markAsReadOnMount = async () => {
@@ -86,20 +86,28 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                ' • ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
+    // Theme Variables
+    const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
+    const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800/60' : 'bg-white/90 border-slate-200 shadow-sm';
+    const cardBase = (isNew) => {
+        if (darkMode) return isNew ? 'bg-gray-900/60 border-indigo-500/30' : 'bg-gray-900/20 border-gray-800/60';
+        return isNew ? 'bg-white border-indigo-200 shadow-md' : 'bg-slate-100/50 border-slate-200';
+    };
+
     return (
-        <main className="min-h-screen bg-gray-950 text-gray-200">
+        <main className={`min-h-screen ${themeBase} transition-colors duration-200`}>
             <style>{`
                 .notif-scroll::-webkit-scrollbar { width: 4px; }
                 .notif-scroll::-webkit-scrollbar-track { background: transparent; }
-                .notif-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+                .notif-scroll::-webkit-scrollbar-thumb { background: ${darkMode ? '#1f2937' : '#cbd5e1'}; border-radius: 4px; }
             `}</style>
 
             {/* --- ELITE HEADER --- */}
-            <header className="sticky top-0 z-[100] bg-gray-950/90 backdrop-blur-md border-b border-gray-800/60 px-6 py-6">
+            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div>
-                            <h1 className="text-lg font-bold tracking-tight text-white uppercase leading-none">
+                            <h1 className={`text-lg font-bold tracking-tight uppercase leading-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 Alert <span className="text-indigo-500">Center</span>
                             </h1>
                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.25em] mt-1.5 flex items-center gap-1.5">
@@ -109,14 +117,18 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg">
+                        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 border rounded-lg ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'}`}>
                             <Layers className="w-3 h-3 text-gray-500" />
                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{notifications.length} Signals</span>
                         </div>
                         {notifications.length > 0 && (
                             <button 
                                 onClick={handleClearAll}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 hover:border-rose-500/50 hover:bg-rose-500/5 text-gray-500 hover:text-rose-500 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95"
+                                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95 ${
+                                    darkMode 
+                                    ? 'bg-gray-900 border-gray-800 text-gray-500 hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-500' 
+                                    : 'bg-white border-slate-200 text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 shadow-sm'
+                                }`}
                             >
                                 <Trash2 className="w-3.5 h-3.5" /> Purge Feed
                             </button>
@@ -137,11 +149,7 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                         return (
                             <div 
                                 key={uniqueId} 
-                                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${
-                                    isNew 
-                                    ? 'bg-gray-900/60 border-indigo-500/30' 
-                                    : 'bg-gray-900/20 border-gray-800/60'
-                                } ${glow} hover:border-gray-700 animate-in fade-in slide-in-from-bottom-2`}
+                                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${cardBase(isNew)} ${darkMode ? glow : ''} hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-2`}
                                 style={{ animationDelay: `${index * 40}ms` }}
                             >
                                 {/* UNREAD VERTICAL ACCENT */}
@@ -161,7 +169,7 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest ${bgColor} ${color} ${borderColor}`}>
                                                 {label}
                                             </span>
-                                            <div className="flex items-center gap-1.5 text-gray-600">
+                                            <div className="flex items-center gap-1.5 text-gray-500">
                                                 <Clock className="w-3 h-3" />
                                                 <span className="text-[9px] font-bold uppercase tabular-nums">
                                                     {formatTime(notification.createdAt || notification.timestamp)}
@@ -170,18 +178,18 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                                         </div>
                                         <button
                                             onClick={() => dismissNotification(uniqueId)}
-                                            className="p-1.5 rounded-md hover:bg-gray-800 text-gray-600 hover:text-rose-500 transition-all"
+                                            className={`p-1.5 rounded-md transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-600' : 'hover:bg-slate-200 text-slate-400'} hover:text-rose-500`}
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
 
-                                    <p className={`text-sm leading-relaxed tracking-tight ${isNew ? 'text-white font-medium' : 'text-gray-400'}`}>
+                                    <p className={`text-sm leading-relaxed tracking-tight ${isNew ? (darkMode ? 'text-white font-medium' : 'text-slate-900 font-semibold') : 'text-gray-500'}`}>
                                         {notification.message}
                                     </p>
 
                                     {isNew && (
-                                        <div className="mt-3 flex items-center gap-1.5 text-[8px] font-bold text-indigo-400 uppercase tracking-widest">
+                                        <div className="mt-3 flex items-center gap-1.5 text-[8px] font-bold text-indigo-500 uppercase tracking-widest">
                                             <Zap className="w-2.5 h-2.5 fill-current" /> Priority Signal Detected
                                         </div>
                                     )}
@@ -191,12 +199,12 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
                     })
                 ) : (
                     <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="w-20 h-20 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center mb-6 relative group">
+                        <div className={`w-20 h-20 border rounded-2xl flex items-center justify-center mb-6 relative group ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                             <div className="absolute inset-0 bg-emerald-500/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <ShieldCheck className="w-10 h-10 text-gray-800 transition-colors group-hover:text-emerald-500/50" />
+                            <ShieldCheck className={`w-10 h-10 transition-colors group-hover:text-emerald-500/50 ${darkMode ? 'text-gray-800' : 'text-slate-200'}`} />
                         </div>
-                        <h3 className="text-sm font-bold text-white uppercase tracking-widest">Status Nominal</h3>
-                        <p className="text-[10px] text-gray-600 font-bold uppercase tracking-[0.2em] mt-2">
+                        <h3 className={`text-sm font-bold uppercase tracking-widest ${darkMode ? 'text-white' : 'text-slate-800'}`}>Status Nominal</h3>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-2">
                             No high-priority alerts in the active buffer
                         </p>
                     </div>
@@ -205,15 +213,15 @@ const NotificationsPage = ({ notifications, setNotifications }) => {
 
             {/* --- PERSISTENT FOOTER STATUS --- */}
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
-                 <div className="px-5 py-2.5 bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-full shadow-2xl flex items-center gap-4">
+                 <div className={`px-5 py-2.5 backdrop-blur-xl border rounded-full shadow-2xl flex items-center gap-4 ${darkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-slate-200'}`}>
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Monitor Active</span>
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em]">Monitor Active</span>
                     </div>
                     {notifications.length > 0 && (
                         <>
-                            <div className="h-3 w-px bg-gray-800" />
-                            <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-[0.2em]">{notifications.length} Live Signals</span>
+                            <div className={`h-3 w-px ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
+                            <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-[0.2em]">{notifications.length} Live Signals</span>
                         </>
                     )}
                  </div>

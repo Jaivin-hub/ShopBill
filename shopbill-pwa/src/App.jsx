@@ -103,6 +103,17 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
+  // --- THEME ENGINE STATE ---
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('themePreference');
+    return saved !== null ? JSON.parse(saved) : true; // Default to dark
+  });
+
+  // Persist theme choice
+  useEffect(() => {
+    localStorage.setItem('themePreference', JSON.stringify(darkMode));
+  }, [darkMode]);
+
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -165,10 +176,9 @@ const App = () => {
     setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
   }, []);
 
-  // Handler specifically for when registration/checkout is finished
   const handleRegistrationComplete = useCallback(() => {
     setCurrentPage('dashboard');
-    setIsViewingLogin(true); // Open Login View automatically
+    setIsViewingLogin(true);
     showToast('Registration successful! Please sign in.', 'success');
   }, [showToast]);
 
@@ -209,7 +219,6 @@ const App = () => {
   const renderContent = () => {
     if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
 
-    // --- PUBLIC PAGES (Accessible without Login) ---
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
     if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} />;
@@ -226,13 +235,12 @@ const App = () => {
           apiClient={apiClient}
           API={API}
           plan={selectedPlan}
-          onPaymentSuccess={handleRegistrationComplete} // Redirects to Login on success
+          onPaymentSuccess={handleRegistrationComplete}
           onBackToDashboard={() => setCurrentPage('dashboard')}
         />
       );
     }
 
-    // --- AUTHENTICATION GATE ---
     if (!currentUser) {
       return isViewingLogin ?
         <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> :
@@ -249,9 +257,8 @@ const App = () => {
         />
     }
 
-    const commonProps = { currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
+    const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
 
-    // --- PRIVATE PAGES (Dashboard & Tools) ---
     switch (currentPage) {
       case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
       case 'billing': return <BillingPOS {...commonProps} />;
@@ -271,63 +278,69 @@ const App = () => {
 
   const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
 
+  // Dynamic Background classes based on theme
+  const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
+  const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
+
   return (
     <ApiProvider>
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
-      <style>{`
-        .sidebar-scroll::-webkit-scrollbar {
-          width: 5px;
-        }
-        .sidebar-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .sidebar-scroll::-webkit-scrollbar-thumb {
-          background: #1f2937;
-          border-radius: 10px;
-        }
-        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-          background: #374151;
-        }
-      `}</style>
-      <div className="h-screen w-full bg-gray-950 flex flex-col overflow-hidden text-gray-200">
+      <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
-        {showAppUI && <Header companyName="Pocket POS" userRole={userRole.toUpperCase()} setCurrentPage={setCurrentPage} currentPage={currentPage} notifications={notifications} unreadCount={unreadCount} onLogout={logout} apiClient={apiClient} API={API} utilityNavItems={utilityNavItems} />}
+        
+        {showAppUI && (
+          <Header 
+            companyName="Pocket POS" 
+            userRole={userRole.toUpperCase()} 
+            setCurrentPage={setCurrentPage} 
+            currentPage={currentPage} 
+            notifications={notifications} 
+            unreadCount={unreadCount} 
+            onLogout={logout} 
+            apiClient={apiClient} 
+            API={API} 
+            utilityNavItems={utilityNavItems}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+          />
+        )}
 
         <div className="flex flex-1 overflow-hidden relative">
           {showAppUI && (
-            <aside className="hidden md:flex flex-col w-64 bg-gray-950 border-r border-gray-900 z-[30] fixed inset-y-0 left-0">
-              <div className="p-8 font-black text-white text-2xl tracking-tighter flex items-center gap-2">
+            <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
+              <div className="p-8 font-black text-2xl tracking-tighter flex items-center gap-2">
                 <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50">
-                  <Smartphone className="w-6 h-6" />
+                  <Smartphone className="w-6 h-6 text-white" />
                 </div>
-                POCKET <span className="text-indigo-500">POS</span>
+                <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
               </div>
 
               <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto pt-4 sidebar-scroll">
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] px-3 mb-2">Main Menu</p>
+                <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Main Menu</p>
                 {navItems.map(item => (
                   <button
                     key={item.id}
                     onClick={() => setCurrentPage(item.id)}
                     className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id
                       ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-950/50'
-                      : 'text-gray-500 hover:bg-gray-900 hover:text-gray-200 border border-transparent'
+                      : `border border-transparent ${navText}`
                       }`}
                   >
-                    <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-400'}`} />
+                    <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
                     <span className="text-sm font-bold tracking-tight">{item.name}</span>
                   </button>
                 ))}
 
-                <div className="pt-6 mt-6 border-t border-gray-900 space-y-1.5">
-                  <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] px-3 mb-2">Account</p>
+                <div className={`pt-6 mt-6 border-t space-y-1.5 ${darkMode ? 'border-gray-900' : 'border-slate-100'}`}>
+                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account</p>
                   {utilityNavItems.map(item => (
                     <button
                       key={item.id}
                       onClick={() => setCurrentPage(item.id)}
                       className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group ${currentPage === item.id
                         ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
-                        : 'text-gray-500 hover:bg-gray-900 hover:text-gray-200 border border-transparent'
+                        : `border border-transparent ${navText}`
                         }`}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
@@ -354,7 +367,7 @@ const App = () => {
             </aside>
           )}
 
-          <main className={`flex-1 overflow-y-auto bg-gray-950 transition-all duration-300 ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>
+          <main className={`flex-1 overflow-y-auto transition-all duration-300 ${containerBg} ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>
             <div className="max-w-7xl mx-auto min-h-full px-0 md:px-6">
               {renderContent()}
             </div>
@@ -362,14 +375,14 @@ const App = () => {
         </div>
 
         {showAppUI && (
-          <nav className="fixed bottom-0 inset-x-0 h-18 bg-gray-950/90 backdrop-blur-xl border-t border-gray-900 md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.6)]">
+          <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
             {navItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => setCurrentPage(item.id)}
                 className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id
-                  ? 'text-indigo-400'
-                  : 'text-gray-600 hover:text-gray-400'
+                  ? 'text-indigo-500'
+                  : 'text-gray-600 hover:text-indigo-400'
                   }`}
               >
                 {currentPage === item.id && (

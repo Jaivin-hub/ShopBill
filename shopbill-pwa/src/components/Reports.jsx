@@ -45,7 +45,7 @@ const getFilterDateStrings = (filterId, startStr, endStr) => {
     return getFilterDateStrings('7d', null, null);
 };
 
-const Reports = ({ apiClient, API, showToast }) => {
+const Reports = ({ apiClient, API, showToast, darkMode }) => {
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
     const [chartYAxis, setChartYAxis] = useState('revenue');
@@ -56,6 +56,12 @@ const Reports = ({ apiClient, API, showToast }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [purchases, setPurchases] = useState([]);
+
+    // Theme Variables
+    const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
+    const cardBase = darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
+    const subCardBase = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200';
+    const headerBase = darkMode ? 'bg-gray-950 border-gray-800/60' : 'bg-white border-slate-200 shadow-sm';
 
     const fetchReportData = useCallback(async () => {
         setIsLoading(true);
@@ -117,19 +123,19 @@ const Reports = ({ apiClient, API, showToast }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 text-gray-200">
+        <div className={`min-h-screen ${themeBase} transition-colors duration-200`}>
             {/* CLEAN PROFESSIONAL HEADER */}
-            <header className="sticky top-0 z-[100] bg-gray-950 border-b border-gray-800/60 px-4 md:px-8 py-4">
+            <header className={`sticky top-0 z-[100] ${headerBase} px-4 md:px-8 py-4 border-b`}>
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 uppercase">
+                        <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight flex items-center gap-2 uppercase`}>
                             Business <span className="text-indigo-500">Analytics</span>
                         </h1>
                         <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">Comprehensive store performance data</p>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+                        <div className={`flex ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border`}>
                             {DATE_FILTERS.map(filter => (
                                 <button 
                                     key={filter.id} 
@@ -140,7 +146,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => window.print()} className="p-2.5 bg-gray-900 border border-gray-800 text-gray-400 rounded-lg hover:text-white transition-all">
+                        <button onClick={() => window.print()} className={`p-2.5 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'} rounded-lg hover:text-indigo-500 transition-all`}>
                             <Printer className="w-4 h-4" />
                         </button>
                     </div>
@@ -151,17 +157,17 @@ const Reports = ({ apiClient, API, showToast }) => {
                 {/* KPI DASHBOARD */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-400" },
-                        { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-400" },
-                        { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-400" },
-                        { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-400" }
+                        { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
+                        { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500" },
+                        { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
+                        { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
                     ].map((m, i) => (
-                        <div key={i} className="bg-gray-900/50 border border-gray-800 p-5 rounded-xl hover:bg-gray-900 transition-all border-l-4 border-l-transparent hover:border-l-indigo-500">
+                        <div key={i} className={`${cardBase} p-5 rounded-xl transition-all border-l-4 border-l-transparent hover:border-l-indigo-500`}>
                             <div className="flex justify-between items-start mb-3">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{m.title}</p>
                                 <m.icon className={`w-4 h-4 ${m.color}`} />
                             </div>
-                            <h2 className="text-2xl font-bold text-white tracking-tight">
+                            <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
                                 {isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value}
                             </h2>
                         </div>
@@ -169,22 +175,22 @@ const Reports = ({ apiClient, API, showToast }) => {
                 </section>
 
                 {/* SALES PERFORMANCE CHART */}
-                <section className="bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden">
-                    <div className="p-6 border-b border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <section className={`${cardBase} rounded-xl overflow-hidden`}>
+                    <div className={`p-6 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex flex-col md:flex-row md:items-center justify-between gap-4`}>
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-white">Sales Performance</h3>
+                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'}`}>Sales Performance</h3>
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <div className="flex bg-gray-950 p-1 rounded-md border border-gray-800">
+                            <div className={`flex ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200 shadow-inner'} p-1 rounded-md border`}>
                                 {['revenue', 'bills'].map(k => (
-                                    <button key={k} onClick={() => setChartYAxis(k)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${chartYAxis === k ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>{k}</button>
+                                    <button key={k} onClick={() => setChartYAxis(k)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${chartYAxis === k ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{k}</button>
                                 ))}
                             </div>
-                            <div className="flex bg-gray-950 p-1 rounded-md border border-gray-800">
+                            <div className={`flex ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200 shadow-inner'} p-1 rounded-md border`}>
                                 {VIEW_TYPES.map(t => (
-                                    <button key={t} onClick={() => setViewType(t)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${viewType === t ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>{t}</button>
+                                    <button key={t} onClick={() => setViewType(t)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${viewType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
                                 ))}
                             </div>
                         </div>
@@ -194,7 +200,7 @@ const Reports = ({ apiClient, API, showToast }) => {
                         {isLoading ? (
                             <div className="h-full w-full flex items-center justify-center"><Loader className="animate-spin text-indigo-500 w-6 h-6" /></div>
                         ) : (
-                            <SalesChart data={chartData || []} viewType={viewType} yAxisKey={chartYAxis} />
+                            <SalesChart data={chartData || []} viewType={viewType} yAxisKey={chartYAxis} darkMode={darkMode} />
                         )}
                     </div>
                 </section>
@@ -202,9 +208,9 @@ const Reports = ({ apiClient, API, showToast }) => {
                 {/* SECONDARY INSIGHTS */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* PROCUREMENT INSIGHTS */}
-                    <div className="lg:col-span-2 bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+                    <div className={`lg:col-span-2 ${cardBase} rounded-xl p-6`}>
                         <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
                                 <Truck className="w-4 h-4 text-amber-500" />
                                 Procurement & Inventory
                             </h3>
@@ -217,9 +223,9 @@ const Reports = ({ apiClient, API, showToast }) => {
                                 { label: "Supply Chain", val: `${scmInsights.activeSuppliers} Vendors`, icon: Users, color: "text-teal-500" },
                                 { label: "Procurements", val: scmInsights.filteredPurchaseCount, icon: ShoppingCart, color: "text-indigo-500" }
                             ].map((s, i) => (
-                                <div key={i} className="p-4 bg-gray-950 border border-gray-800 rounded-lg">
+                                <div key={i} className={`p-4 ${subCardBase} border rounded-lg`}>
                                     <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
-                                    <p className="text-lg font-bold text-white">{s.val}</p>
+                                    <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.val}</p>
                                 </div>
                             ))}
                         </div>
@@ -227,24 +233,24 @@ const Reports = ({ apiClient, API, showToast }) => {
                         <div className="space-y-2">
                             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Vendor Contribution</p>
                             {scmInsights.topSuppliers.length > 0 ? scmInsights.topSuppliers.map((sup, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-950/50 rounded-lg border border-gray-800/40 hover:border-gray-700 transition-all">
+                                <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/50 border-gray-800/40' : 'bg-slate-50 border-slate-100'} rounded-lg border hover:border-indigo-500/50 transition-all`}>
                                     <div className="flex items-center gap-4">
-                                        <div className="text-[10px] font-bold text-gray-600 w-4">0{idx + 1}</div>
+                                        <div className="text-[10px] font-bold text-gray-400 w-4">0{idx + 1}</div>
                                         <div>
-                                            <p className="text-xs font-bold text-white uppercase">{sup.name}</p>
+                                            <p className={`text-xs font-bold uppercase ${darkMode ? 'text-white' : 'text-slate-800'}`}>{sup.name}</p>
                                             <p className="text-[9px] text-gray-500 font-medium uppercase">{sup.orders} Order Cycles</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-bold text-white">{formatCurrency(sup.totalSpent)}</p>
-                                        <div className="w-20 h-1 bg-gray-800 rounded-full mt-1.5 overflow-hidden">
-                                            <div className="h-full bg-amber-500" style={{ width: `${(sup.totalSpent / scmInsights.totalStockValue) * 100}%` }}></div>
+                                        <p className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(sup.totalSpent)}</p>
+                                        <div className={`w-20 h-1 ${darkMode ? 'bg-gray-800' : 'bg-slate-200'} rounded-full mt-1.5 overflow-hidden`}>
+                                            <div className="h-full bg-amber-500" style={{ width: `${(sup.totalSpent / Math.max(scmInsights.totalStockValue, 1)) * 100}%` }}></div>
                                         </div>
                                     </div>
                                 </div>
                             )) : (
-                                <div className="text-center py-10 bg-gray-950/40 rounded-lg border border-dashed border-gray-800">
-                                    <p className="text-[11px] font-medium text-gray-600 uppercase italic">No procurement history for this period</p>
+                                <div className={`text-center py-10 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+                                    <p className="text-[11px] font-medium text-gray-400 uppercase italic">No procurement history for this period</p>
                                 </div>
                             )}
                         </div>
@@ -252,38 +258,38 @@ const Reports = ({ apiClient, API, showToast }) => {
 
                     <div className="flex flex-col gap-6">
                         {/* TOP ITEMS */}
-                        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-white mb-6 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-sky-400" />
+                        <div className={`${cardBase} rounded-xl p-6`}>
+                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
+                                <TrendingUp className="w-4 h-4 text-sky-500" />
                                 Best Sellers
                             </h3>
                             <div className="space-y-2">
                                 {data.topItems.map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-950/80 border border-gray-800/50 rounded-lg">
-                                        <span className="text-xs font-bold text-gray-300 uppercase truncate pr-4">{item.name}</span>
-                                        <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit</span>
+                                    <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}>
+                                        <span className={`text-xs font-bold uppercase truncate pr-4 ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
+                                        <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* FINANCIAL STANDING */}
-                        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-white mb-6 flex items-center gap-2">
+                        <div className={`${cardBase} rounded-xl p-6`}>
+                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
                                 <Wallet className="w-4 h-4 text-red-500" />
                                 Liabilities & Equity
                             </h3>
                             <div className="space-y-4">
-                                <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-lg group">
+                                <div className={`p-4 ${darkMode ? 'bg-red-500/5 border-red-500/10' : 'bg-red-50/50 border-red-100 shadow-sm'} border rounded-lg group`}>
                                     <div className="flex justify-between items-center mb-1">
-                                        <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Credit Outstanding</p>
+                                        <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">Credit Outstanding</p>
                                         <AlertTriangle className="w-3 h-3 text-red-500 opacity-50 group-hover:opacity-100" />
                                     </div>
                                     <p className="text-xl font-bold text-red-500 tracking-tight">{formatCurrency(data.totalCreditOutstanding)}</p>
                                 </div>
-                                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
-                                    <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Lifetime Revenue</p>
-                                    <p className="text-xl font-bold text-emerald-400 tracking-tight">{formatCurrency(data.totalAllTimeRevenue)}</p>
+                                <div className={`p-4 ${darkMode ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50/50 border-emerald-100 shadow-sm'} border rounded-lg`}>
+                                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Lifetime Revenue</p>
+                                    <p className="text-xl font-bold text-emerald-600 tracking-tight">{formatCurrency(data.totalAllTimeRevenue)}</p>
                                 </div>
                             </div>
                         </div>
