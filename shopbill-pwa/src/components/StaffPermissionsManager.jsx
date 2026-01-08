@@ -38,11 +38,11 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode }) 
             <div className={`${modalBg} w-full max-w-lg rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200`}>
                 <div className={`p-8 border-b flex justify-between items-center ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
                     <div>
-                        <h2 className={`text-xl font-black uppercase tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
+                        <h2 className={`text-xl font-black  tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
                             <UserPlus className="w-6 h-6 mr-3 text-indigo-500" />
                             Provision Staff
                         </h2>
-                        <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Access Credentialing</p>
+                        <p className={`text-[10px] font-black  tracking-widest mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Access Credentialing</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-rose-500 transition p-2 rounded-full" disabled={isSubmitting}>
                         <X className="w-6 h-6" />
@@ -102,12 +102,12 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode }) 
                     </div>
 
                     <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-50 border-slate-200'}`}>
-                        <p className={`text-[10px] font-black uppercase tracking-widest mb-3 flex items-center ${darkMode ? 'text-gray-500' : 'text-slate-900'}`}>
+                        <p className={`text-[10px] font-black  tracking-widest mb-3 flex items-center ${darkMode ? 'text-gray-500' : 'text-slate-900'}`}>
                             <ChevronRight className="w-3 h-3 mr-1 text-indigo-500" /> Permissions Manifest: {formData.role}
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {ROLE_PERMISSIONS[formData.role].map((perm, idx) => (
-                                <span key={idx} className={`text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-tighter ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-slate-200 text-slate-800'}`}>
+                                <span key={idx} className={`text-[9px] font-black px-2 py-1 rounded-md  tracking-tighter ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-slate-200 text-slate-800'}`}>
                                     {perm}
                                 </span>
                             ))}
@@ -116,7 +116,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode }) 
                     
                     <button 
                         type="submit"
-                        className="w-full py-4 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition shadow-lg active:scale-95 disabled:opacity-50"
+                        className="w-full py-4 bg-indigo-600 text-white font-black text-xs  tracking-widest rounded-2xl hover:bg-indigo-500 transition shadow-lg active:scale-95 disabled:opacity-50"
                         disabled={isSubmitting}
                     >
                         {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
@@ -219,23 +219,29 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
     return (
         <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
-            {/* STICKY HEADER PARTNER */}
-            <header className={`sticky top-0 z-[100] border-b backdrop-blur-xl ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
-                <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
-                    <div>
-                        <button onClick={onBack} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-1 hover:text-indigo-500 transition-colors">
-                            <ArrowLeft className="w-3 h-3" /> Settings
+            {/* --- RESPONSIVE STICKY HEADER --- */}
+            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onBack} className={`p-2 border rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <h1 className={`text-xl md:text-2xl font-black tracking-tighter uppercase flex items-center gap-2 ${darkMode ? 'text-white' : 'text-black'}`}>
-                            Staff <span className="text-indigo-600 not-italic">Directory</span>
-                        </h1>
+                        <div>
+                            <h1 className={`text-2xl md:text-lg font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                                Staff <span className="text-indigo-600">Directory</span>
+                            </h1>
+                            <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                ACCESS CONTROL & PERMISSIONS MANAGEMENT
+                            </p>
+                        </div>
                     </div>
+                    
                     <button 
                         onClick={() => setIsAddModalOpen(true)}
                         disabled={isLoading || !hasWriteAccess}
-                        className="hidden sm:flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                        className="hidden sm:flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-[10px]  tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-indigo-600/20"
                     >
-                        <Plus className="w-4 h-4 mr-2" /> Add Staff
+                        <Plus className="w-4 h-4 mr-2" /> Add Member
                     </button>
                 </div>
             </header>
@@ -249,7 +255,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         {hasWriteAccess ? <Crown className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
                     </div>
                     <div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Security Authorization</p>
+                        <p className={`text-[10px] font-black  tracking-widest ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Security Authorization</p>
                         <p className={`text-xs font-bold ${hasWriteAccess ? (darkMode ? 'text-emerald-400' : 'text-emerald-700') : (darkMode ? 'text-amber-400' : 'text-amber-700')}`}>
                             {hasWriteAccess ? 'Owner Mode: Full Administrative Control Active' : `Restricted Mode: ${currentUserRole} privileges applied.`}
                         </p>
@@ -260,14 +266,14 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 {isLoading ? (
                     <div className={`flex flex-col items-center justify-center p-20 rounded-[1.25rem] border ${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-200'}`}>
                         <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Synchronizing Directory...</p>
+                        <p className={`text-[10px] font-black  tracking-[0.2em] ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Synchronizing Directory...</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
                         {!hasReadAccess ? (
                             <div className={`p-8 text-center rounded-[1.25rem] border ${darkMode ? 'bg-gray-900/40 border-red-500/20' : 'bg-white border-red-100'}`}>
                                 <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                                <p className={`font-black uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>Access Denied</p>
+                                <p className={`font-black  tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>Access Denied</p>
                                 <p className={`text-sm font-bold mt-2 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Elevated privileges required to view directory.</p>
                             </div>
                         ) : staff.length === 0 ? (
@@ -288,10 +294,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                                 {s.role === 'owner' ? <Crown className="w-6 h-6" /> : <User className="w-6 h-6" />}
                                             </div>
                                             <div className="min-w-0">
-                                                <h3 className={`text-lg font-black uppercase tracking-tighter truncate leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>{s.name}</h3>
+                                                <h3 className={`text-lg font-black  tracking-tighter truncate leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>{s.name}</h3>
                                                 <p className={`text-xs font-bold truncate ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>{s.email}</p>
                                                 <div className="flex items-center gap-2 mt-2">
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${getRoleStyles(s.role)}`}>
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border  tracking-widest ${getRoleStyles(s.role)}`}>
                                                         {s.role}
                                                     </span>
                                                 </div>
@@ -302,7 +308,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                             <button
                                                 onClick={() => handleToggleActive(s)}
                                                 disabled={isActionDisabled} 
-                                                className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                                className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl font-black text-[10px]  tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
                                                     s.active 
                                                     ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white'
                                                     : (darkMode ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-slate-400')

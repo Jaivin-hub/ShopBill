@@ -137,21 +137,21 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .product-grid-scroll { max-height: 450px; overflow-y: auto; }
         
-        /* Prevent Auto-Zoom on iOS without losing small-text look */
+        /* Fixed zoom logic that doesn't break page width */
         .no-zoom-input {
-          font-size: 16px !important; /* Forces browser to not zoom */
+          font-size: 16px !important; 
         }
         @media (max-width: 768px) {
           .no-zoom-input {
-            transform: scale(0.8); /* Visually shrinks it back down */
+            transform: scale(0.8);
             transform-origin: left center;
-            width: 125% !important; /* Compels width to fill the gap left by scale */
+            width: 125% !important;
           }
         }
       `}</style>
 
       {/* --- STICKY HEADER --- */}
-      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+      <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -167,7 +167,8 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
             </div>
           </div>
 
-          <div className="relative group">
+          {/* This wrapper MUST have overflow-hidden to stop the 'width: 125%' input from making the page scroll left */}
+          <div className="relative group overflow-hidden rounded-2xl">
             <Search className={`w-4.5 h-4.5 absolute left-4 top-1/2 -translate-y-1/2 z-10 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
             <input
               type="text" 
@@ -175,7 +176,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handlePhysicalScannerInput}
-              /* Changed text-[10px] to text-base (16px) and added no-zoom-input class */
               className={`no-zoom-input w-full border rounded-2xl py-3.5 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${inputBase}`}
             />
             {searchTerm && <X onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />}
@@ -184,7 +184,8 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       {/* --- WORKSPACE --- */}
-      <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
+      {/* Removed overflow-x-hidden from main to ensure sticky logic isn't blocked by overflow properties */}
+      <main className="flex-1 px-4 md:px-8 py-6">
         <div className="max-w-7xl mx-auto space-y-8 pb-44">
             
             {/* COMPACT PRODUCT CATALOG */}
@@ -234,14 +235,12 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                       </div>
                       
                       <div className="flex items-center gap-4 md:gap-8">
-                        {/* Qty Controller */}
                         <div className={`flex items-center rounded-xl border p-1 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                             <button onClick={() => updateCartQuantity(item._id, -1)} className="p-1.5 text-slate-500 hover:text-rose-500 transition-colors"><Minus className="w-3.5 h-3.5" /></button>
                             <span className="w-8 text-center text-xs font-black text-indigo-500">{item.quantity}</span>
                             <button onClick={() => updateCartQuantity(item._id, 1)} className="p-1.5 text-slate-500 hover:text-emerald-500 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
                         </div>
                         
-                        {/* Subtotal */}
                         <div className="text-right min-w-[90px]">
                             <p className="text-sm font-black text-emerald-500">₹{(item.quantity * item.price).toLocaleString()}</p>
                             <button onClick={() => removeItemFromCart(item._id)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 tracking-widest">Remove</button>

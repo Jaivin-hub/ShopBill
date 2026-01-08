@@ -132,7 +132,7 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                             <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight flex items-center gap-2 `}>
                                 Business <span className="text-indigo-500">Analytics</span>
                             </h1>
-                            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase opacity-70">Store Intelligence Unit</p>
+                            <p className="text-[10px] text-gray-500 font-bold tracking-widest  opacity-70">Store Intelligence Unit</p>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -176,14 +176,14 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                                 />
                             </div>
 
-                            <button 
+                            {/* <button 
                                 onClick={fetchReportData}
                                 className="bg-indigo-600 hover:bg-indigo-500 text-white p-1.5 px-3 rounded-lg transition-all active:scale-90 shadow-md shadow-indigo-500/20"
                                 title="Apply Range"
                             >
-                                <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">Apply</span>
+                                <span className="hidden sm:inline text-[9px] font-black  tracking-widest">Apply</span>
                                 <Check className="sm:hidden w-3.5 h-3.5" />
-                            </button>
+                            </button> */}
                         </div>
                     )}
                 </div>

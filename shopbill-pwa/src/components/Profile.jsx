@@ -20,7 +20,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
                 placeholder={placeholder}
                 readOnly={readOnly || !isEditing}
                 /* MOBILE ZOOM FIX: text-[16px] md:text-xs prevents auto-zoom on mobile */
-                className={`w-full p-4 rounded-2xl transition-all text-[16px] md:text-xs font-bold outline-none border tabular-nums
+                className={`w-full p-4 rounded-xl transition-all text-[16px] md:text-xs font-bold outline-none border tabular-nums
                     ${readOnly || !isEditing 
                         ? (darkMode ? 'border-gray-800/50 bg-gray-900/20 text-gray-500 cursor-not-allowed' : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed')
                         : (darkMode ? 'border-gray-700 bg-gray-950 text-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-2xl shadow-indigo-500/5' 
@@ -254,7 +254,7 @@ function Profile({ apiClient, showToast, darkMode }) {
                 </section>
 
                 {/* SUPPORT NOTICE */}
-                <div className={`border rounded-2xl p-6 flex gap-4 transition-colors ${darkMode ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-indigo-50 border-indigo-100'}`}>
+                <div className={`border rounded-xl p-6 flex gap-4 transition-colors ${darkMode ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-indigo-50 border-indigo-100'}`}>
                     <Info className="w-5 h-5 text-indigo-400 shrink-0" />
                     <div>
                         <p className={`text-[10px] font-bold tracking-widest mb-1 ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>Infrastructure Notice</p>

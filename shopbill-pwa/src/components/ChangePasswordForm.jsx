@@ -130,29 +130,34 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
         }
     };
 
-    // Design adjustments for light theme
+    // Design adjustments
     const inputBg = darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black';
     const borderColor = darkMode ? 'border-gray-800' : 'border-slate-300';
     const labelColor = darkMode ? 'text-gray-500' : 'text-slate-900';
 
     return (
         <main ref={containerRef} className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black'} selection:bg-indigo-500/30`}>
-            {/* STICKY HEADER */}
-            <header className={`sticky top-0 z-[100] border-b backdrop-blur-xl ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
-                <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between">
-                    <div>
+            {/* --- RESPONSIVE STICKY HEADER (Matches SalesActivityPage) --- */}
+            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
+                <div className="max-w-xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
                         <button 
                             onClick={onBack} 
                             disabled={isLoading}
-                            className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-1 transition-colors disabled:opacity-30 ${darkMode ? 'text-indigo-500 hover:text-white' : 'text-indigo-600 hover:text-indigo-800'}`}
+                            className={`p-2 border rounded-xl transition-all active:scale-95 disabled:opacity-30 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                         >
-                            <ArrowLeft className="w-3 h-3" /> Security
+                            <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <h1 className={`text-xl font-black tracking-tighter uppercase ${darkMode ? 'text-white' : 'text-black'}`}>
-                            Update <span className="text-indigo-600">Access</span>
-                        </h1>
+                        <div>
+                            <h1 className={`text-2xl md:text-lg font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                                Update <span className="text-indigo-600">Access</span>
+                            </h1>
+                            <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                SECURE CREDENTIAL SYNCHRONIZATION
+                            </p>
+                        </div>
                     </div>
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                         <ShieldCheck className="w-5 h-5 text-indigo-600" />
                     </div>
                 </div>
@@ -170,7 +175,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* CURRENT PASSWORD */}
                     <div className="space-y-2">
-                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="current-pass">
+                        <label className={`text-[10px] font-black  tracking-widest ml-1 ${labelColor}`} htmlFor="current-pass">
                             Identity Verification
                         </label>
                         <div className="relative">
@@ -186,7 +191,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                                 placeholder="Current Password"
                             />
                             {errors.currentPassword && (
-                                <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
+                                <p className="text-[10px] font-bold text-red-600  mt-2 ml-1 flex items-center gap-1">
                                     <AlertCircle className="w-3 h-3" /> {errors.currentPassword}
                                 </p>
                             )}
@@ -195,7 +200,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
 
                     {/* NEW PASSWORD */}
                     <div className="space-y-2">
-                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="new-pass">
+                        <label className={`text-[10px] font-black  tracking-widest ml-1 ${labelColor}`} htmlFor="new-pass">
                             New Credentials
                         </label>
                         <div className="relative">
@@ -219,7 +224,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                             </button>
                         </div>
                         {errors.newPassword && (
-                            <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
+                            <p className="text-[10px] font-bold text-red-600  mt-2 ml-1 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" /> {errors.newPassword}
                             </p>
                         )}
@@ -227,7 +232,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
 
                     {/* CONFIRM PASSWORD */}
                     <div className="space-y-2">
-                        <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${labelColor}`} htmlFor="confirm-pass">
+                        <label className={`text-[10px] font-black  tracking-widest ml-1 ${labelColor}`} htmlFor="confirm-pass">
                             Confirm New Credentials
                         </label>
                         <div className="relative">
@@ -247,7 +252,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                             )}
                         </div>
                         {errors.confirmNewPassword && (
-                            <p className="text-[10px] font-bold text-red-600 uppercase mt-2 ml-1 flex items-center gap-1">
+                            <p className="text-[10px] font-bold text-red-600  mt-2 ml-1 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" /> {errors.confirmNewPassword}
                             </p>
                         )}
@@ -256,7 +261,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 flex items-center justify-center gap-3"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 flex items-center justify-center gap-3"
                     >
                         {isLoading ? (
                             <>

@@ -228,7 +228,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                                 <h1 className={`text-2xl md:text-lg font-black  tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
                                     Sales <span className="text-indigo-600">History</span>
                                 </h1>
-                                <p className={`text-[8px] font-black  tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Registry Log</p>
+                                <p className={`text-[9px] font-black  tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Detailed log of all completed sales</p>
                             </div>
                         </div>
                         <div className="hidden md:block">
@@ -241,7 +241,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input 
                                 type="text"
-                                placeholder="SEARCH CLIENT..."
+                                placeholder="search client..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 /* FIXED: text-[16px] prevents mobile zoom. md:text-[10px] keeps it tiny on larger screens */
