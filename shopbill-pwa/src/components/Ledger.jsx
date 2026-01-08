@@ -13,6 +13,18 @@ const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
   .custom-ledger-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+  
+  /* Prevent Auto-Zoom on iOS */
+  .no-zoom-input {
+    font-size: 16px !important;
+  }
+  @media (max-width: 768px) {
+    .no-zoom-input {
+      transform: scale(0.8);
+      transform-origin: left center;
+      width: 125% !important;
+    }
+  }
 `;
 
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
@@ -90,7 +102,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   if (loading) return (
     <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
       <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-4" />
-      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Authenticating Ledger...</span>
+      <span className="text-[10px] font-black text-slate-500 tracking-[0.3em]">Authenticating Ledger...</span>
     </div>
   );
 
@@ -102,11 +114,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-xl font-black tracking-tight uppercase flex items-center gap-2">
+            <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
               Ledger <span className="text-indigo-500">Terminal</span>
             </h1>
             <div className="flex items-center gap-2">
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.15em]">System Live • 128-bit Encrypted</p>
+              <p className="text-[9px] text-slate-500 font-black tracking-[0.15em]">System Live • 128-bit Encrypted</p>
             </div>
           </div>
 
@@ -125,7 +137,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
             </button>
             <button
               onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-              className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95"
             >
               <UserPlus size={14} className="text-indigo-400" /> New Account
             </button>
@@ -137,15 +149,15 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           <div className="max-w-7xl mx-auto mt-5 animate-in fade-in slide-in-from-top-3">
             {showSearch ? (
               <div className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-500 transition-colors" />
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-500 transition-colors z-10" />
                 <input
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="SEARCH BY ACCOUNT NAME OR CONTACT..."
-                  className={`w-full border rounded-2xl py-4.5 pl-14 pr-12 text-[10px] font-black uppercase tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
+                  className={`no-zoom-input w-full border rounded-2xl py-4.5 pl-14 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
                 />
-                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500" />
+                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />
               </div>
             ) : (
               <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
@@ -157,7 +169,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                   <button
                     key={opt.id}
                     onClick={() => setSortBy(opt.id)}
-                    className={`px-8 py-3 rounded-2xl text-[9px] font-black uppercase border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
+                    className={`px-8 py-3 rounded-2xl text-[9px] font-black border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
                   >
                     {opt.label}
                   </button>
@@ -175,18 +187,16 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           {/* TOP METRICS SECTION */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className={`lg:col-span-8 rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
-              {/* Background Glow */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
 
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-5">
-                  {/* Status Icon */}
                   <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
                     <AlertCircle size={20} />
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">
+                    <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">
                       Total Outstanding
                     </p>
                     <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
@@ -195,9 +205,8 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                   </div>
                 </div>
 
-                {/* Optional Mini Status or Badge */}
                 <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Status</p>
+                  <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Risk Status</p>
                   <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
                     MONITORED
                   </span>
@@ -214,7 +223,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                   <LayoutGrid size={20} />
                 </div>
                 <div>
-                  <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">Customer Registry</h3>
+                  <h3 className="text-[11px] font-black text-slate-500 tracking-[0.2em]">Customer Registry</h3>
                   <p className="text-[9px] font-bold text-slate-400 mt-0.5">Managing {customers.length} Accounts</p>
                 </div>
               </div>
@@ -236,7 +245,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         </div>
       </main>
 
-      {/* MOBILE QUICK ADD - POSITIONED ABOVE FOOTER MENU */}
       <button
         onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
         className="md:hidden fixed bottom-20 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
@@ -244,7 +252,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         <UserPlus size={24} />
       </button>
 
-      {/* MODAL ARCHITECTURE */}
       {activeModal === 'payment' && (
         <PaymentModal
           customer={selectedCustomer}

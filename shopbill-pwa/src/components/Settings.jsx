@@ -39,7 +39,7 @@ const CloudUploadConfirmationModal = ({
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-in fade-in duration-200">
             <div className={`${modalBg} w-full max-w-sm rounded-2xl border overflow-hidden transform transition-all animate-in zoom-in-95 duration-200`}>
                 <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-200 bg-slate-50'}`}>
-                    <h2 className={`text-xs font-black uppercase tracking-widest flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
+                    <h2 className={`text-xs font-black  tracking-widest flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
                         <UploadCloud className="w-5 h-5 mr-3 text-indigo-500" /> Cloud Backup
                     </h2> 
                 </div>
@@ -51,16 +51,16 @@ const CloudUploadConfirmationModal = ({
                                 <ShieldCheck className="w-8 h-8 text-emerald-500" />
                             </div>
                             <div>
-                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Authenticated Account</p>
+                                <p className={`text-[10px] font-black  tracking-widest mb-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Authenticated Account</p>
                                 <p className={`text-sm font-bold tabular-nums ${darkMode ? 'text-white' : 'text-black'}`}>{accountEmail}</p>
-                                <button onClick={onDisconnect} className="text-[10px] font-bold text-rose-600 uppercase tracking-widest hover:text-rose-500 mt-4 transition-colors">
+                                <button onClick={onDisconnect} className="text-[10px] font-bold text-rose-600  tracking-widest hover:text-rose-500 mt-4 transition-colors">
                                     Change Account
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-gray-500' : 'text-black'}`}>Setup Connection</p>
+                            <p className={`text-[10px] font-black  tracking-widest ${darkMode ? 'text-gray-500' : 'text-black'}`}>Setup Connection</p>
                             <div className="relative group">
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-500 transition-colors" />
                                 <input
@@ -79,12 +79,12 @@ const CloudUploadConfirmationModal = ({
                     <button 
                         onClick={isConnected ? () => onSelectAndConfirm('google_drive') : handleConnectClick}
                         disabled={!isConnected && (!connectEmail.trim() || isConnecting)}
-                        className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
+                        className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-[10px]  tracking-[0.2em] hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
                     >
                         {isConnecting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : isConnected ? <Check className="w-4 h-4 mr-2" /> : <Link className="w-4 h-4 mr-2" />}
                         {isConnecting ? 'Syncing...' : isConnected ? 'Execute Backup' : 'Link Account'}
                     </button>
-                    <button onClick={onCancel} className={`w-full py-2 text-[10px] font-black uppercase tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-black hover:text-indigo-600'}`}>
+                    <button onClick={onCancel} className={`w-full py-2 text-[10px] font-black  tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-black hover:text-indigo-600'}`}>
                         Dismiss
                     </button>
                 </div>
@@ -101,14 +101,14 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
                 <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <LogOut className="w-8 h-8 text-rose-500" />
                 </div>
-                <h2 className={`text-md font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-white' : 'text-black'}`}>Authorize Logout</h2>
-                <p className={`text-[10px] font-bold leading-relaxed uppercase tracking-tight px-4 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>{message}</p>
+                <h2 className={`text-md font-black  tracking-widest mb-3 ${darkMode ? 'text-white' : 'text-black'}`}>Authorize Logout</h2>
+                <p className={`text-[10px] font-bold leading-relaxed  tracking-tight px-4 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>{message}</p>
             </div>
             <div className={`p-6 border-t flex gap-3 ${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-100 border-slate-200'}`}>
-                <button onClick={onCancel} className={`flex-1 py-4 border rounded-xl font-bold text-[10px] uppercase tracking-widest transition ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-slate-300 text-black hover:bg-slate-50'}`}>Stay</button>
+                <button onClick={onCancel} className={`flex-1 py-4 border rounded-xl font-bold text-[10px]  tracking-widest transition ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-slate-300 text-black hover:bg-slate-50'}`}>Stay</button>
                 <button 
                     onClick={onConfirm}
-                    className="flex-1 py-4 bg-rose-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500 active:scale-95 transition-all shadow-lg shadow-rose-900/20"
+                    className="flex-1 py-4 bg-rose-600 text-white rounded-xl font-bold text-[10px]  tracking-widest hover:bg-rose-500 active:scale-95 transition-all shadow-lg shadow-rose-900/20"
                 >
                     Logout
                 </button>
@@ -176,7 +176,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
 
     const sectionClass = `${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-300 shadow-md'} border rounded-xl overflow-hidden transition-all`;
     const sectionHeaderClass = `px-6 py-4 border-b flex justify-between items-center ${darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-slate-50 border-slate-200'}`;
-    const sectionLabelClass = `text-[10px] font-black uppercase tracking-[0.2em] flex items-center ${darkMode ? 'text-gray-500' : 'text-black'}`;
+    const sectionLabelClass = `text-[10px] font-black  tracking-[0.2em] flex items-center ${darkMode ? 'text-gray-500' : 'text-black'}`;
 
     const renderSettingsList = () => (
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
@@ -186,7 +186,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     <h2 className={sectionLabelClass}>
                         <User className="w-4 h-4 mr-3 text-indigo-500" /> Account Security
                     </h2>
-                    <span className="text-[8px] font-black px-2 py-0.5 bg-indigo-600 text-white rounded border border-indigo-700 uppercase tracking-widest">Admin</span>
+                    <span className="text-[8px] font-black px-2 py-0.5 bg-indigo-600 text-white rounded border border-indigo-700  tracking-widest">Admin</span>
                 </div>
                 <div className="p-2">
                     {currentUser?.role?.toLowerCase() === 'owner' && (
@@ -201,7 +201,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             />
                             <SettingItem 
                                 icon={Users} 
-                                title="Terminal Operators" 
+                                title="Staff Permissions" 
                                 description="Manage staff roles and access levels." 
                                 onClick={handleStaffPermissionsClick} 
                                 accentColor="text-indigo-600" 
@@ -211,7 +211,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     )}
                     <SettingItem 
                         icon={Lock} 
-                        title="Security Credentials" 
+                        title="Change Password" 
                         description="Rotate terminal login password." 
                         onClick={handleChangePasswordClick} 
                         accentColor="text-rose-600"
@@ -219,7 +219,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     />
                     <SettingItem 
                         icon={LogOut} 
-                        title="Authorize Logout" 
+                        title="Logout" 
                         description="Safe termination of session." 
                         onClick={handleLogout} 
                         accentColor="text-rose-700" 
@@ -239,20 +239,20 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     <div className="p-2">
                         <SettingItem 
                             icon={Bell} 
-                            title="Visual Alerts" 
+                            title="Notifications" 
                             description="Real-time toast notifications." 
                             actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} darkMode={darkMode} />} 
                             accentColor="text-sky-600" 
                             darkMode={darkMode}
                         />
-                        <SettingItem 
+                        {/* <SettingItem 
                             icon={UploadCloud} 
                             title="Database Mirroring" 
                             description="Encrypt and sync to cloud storage." 
                             onClick={() => setCloudSelectionModal(true)}
                             accentColor="text-indigo-600" 
                             darkMode={darkMode}
-                        />
+                        /> */}
                     </div>
                 </section>
 
@@ -266,7 +266,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     <div className="p-2">
                         <SettingItem 
                             icon={LifeBuoy} 
-                            title="Help Terminal" 
+                            title="Help & Support" 
                             description="Documentation and tech support." 
                             onClick={() => { setPageOrigin('settings'); setCurrentPage('support'); }} 
                             accentColor="text-indigo-600" 
@@ -310,10 +310,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div>
-                            <h1 className={`text-lg font-black tracking-tight uppercase leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
+                            <h1 className={`text-2xl font-black tracking-tight  leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
                                 Control <span className="text-indigo-600">Center</span>
                             </h1>
-                            <p className={`text-[9px] font-bold uppercase tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
+                            <p className={`text-[9px] font-bold  tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
                                 System Governance Active
                             </p>
                         </div>
@@ -322,7 +322,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     {cloudUploadStatus === 'loading' && (
                         <div className={`flex items-center gap-2 px-4 py-2 rounded-full animate-pulse ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-100 border-indigo-200'}`}>
                             <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
-                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Encrypting...</span>
+                            <span className="text-[9px] font-black text-indigo-600  tracking-widest">Encrypting...</span>
                         </div>
                     )}
                 </div>

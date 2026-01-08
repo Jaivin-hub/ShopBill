@@ -12,6 +12,17 @@ const ScrollbarStyles = ({ darkMode }) => (
         .custom-scrollbar::-webkit-scrollbar-track { background: ${darkMode ? 'rgba(15, 23, 42, 0.5)' : '#f1f5f9'}; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Prevent Auto-Zoom on iOS while maintaining original height */
+        @media (max-width: 768px) {
+            .no-zoom-search {
+                font-size: 16px !important;
+                /* Adjusting padding to keep height identical to sort button (approx 42px-44px) */
+                padding-top: 0px !important;
+                padding-bottom: 0px !important;
+                height: 38px !important; 
+            }
+        }
     `}} />
 );
 
@@ -69,16 +80,16 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
         <section className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
             <form onSubmit={(e) => { e.preventDefault(); const items = parseCSV(csvData); if (items) onSubmit(items); }} className={`${modalBg} w-full max-w-xl rounded-xl border overflow-hidden shadow-2xl`}>
                 <div className={`p-6 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex justify-between items-center`}>
-                    <h2 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>Bulk Data Procurement</h2>
+                    <h2 className={`text-sm font-bold tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>Bulk Data Procurement</h2>
                     <button type="button" onClick={onClose} className="p-2 hover:bg-black/5 rounded-lg text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="p-6 space-y-6">
                     <input type="file" accept=".csv" onChange={handleFileChange} className={`w-full text-[10px] ${darkMode ? 'text-gray-400' : 'text-slate-500'} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase ${darkMode ? 'file:bg-gray-800 file:text-white' : 'file:bg-slate-200 file:text-slate-700'} cursor-pointer`} />
                     <textarea value={csvData} onChange={(e) => setCsvData(e.target.value)} placeholder="Paste CSV data (Name, Price, Quantity)..." rows="5" className={`w-full p-4 ${innerBg} border ${darkMode ? 'border-gray-800 text-emerald-400' : 'border-slate-200 text-emerald-600'} rounded-lg text-xs font-mono placeholder-gray-700 focus:outline-none focus:border-indigo-500 transition-all`} />
-                    {error && <div className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</div>}
+                    {error && <div className="text-red-500 text-[10px] font-bold tracking-widest">{error}</div>}
                 </div>
                 <div className={`p-6 ${innerBg} border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
-                    <button type="submit" disabled={loading || !csvData} className="w-full py-3.5 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all">
+                    <button type="submit" disabled={loading || !csvData} className="w-full py-3.5 bg-indigo-600 text-white text-[10px] font-bold tracking-widest rounded-lg flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all">
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Execute Bulk Upload'}
                     </button>
                 </div>
@@ -89,7 +100,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
 
 const InputField = ({ label, darkMode, ...props }) => (
     <div className="space-y-1.5">
-        <label className={`text-[10px] font-bold uppercase tracking-widest ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>{label}</label>
+        <label className={`text-[10px] font-bold tracking-widest ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>{label}</label>
         <input className={`w-full p-3 ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-300`} {...props} />
     </div>
 );
@@ -103,10 +114,10 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
             <div className="flex justify-between items-start mb-4">
                 <div className="flex-1 pr-2">
                     <div className="flex items-center gap-2">
-                        <h4 className={`text-xs font-bold uppercase tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.name}</h4>
+                        <h4 className={`text-xs font-bold tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.name}</h4>
                         {isLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse" />}
                     </div>
-                    <p className={`text-[9px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                    <p className={`text-[9px] font-bold tracking-wider mt-1 flex items-center gap-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         <Hash className="w-2.5 h-2.5" /> {item.hsn || '---'}
                     </p>
                 </div>
@@ -116,7 +127,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
             </div>
             <div className={`flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-gray-800/50' : 'bg-slate-50 border-slate-100'} p-3 rounded-lg border`}>
                 <div>
-                    <p className={`text-[8px] font-bold uppercase tracking-widest ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>Inventory Level</p>
+                    <p className={`text-[8px] font-bold tracking-widest ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>Inventory Level</p>
                     <p className={`text-xs font-bold ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>{item.quantity} Units</p>
                 </div>
                 <div className="flex gap-2">
@@ -178,10 +189,10 @@ const InventoryContent = ({
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className={`text-xl font-bold uppercase tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            <h1 className={`text-xl font-bold tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 Inventory <span className="text-indigo-500">Vault</span>
                             </h1>
-                            <p className="text-[10px] text-gray-500 font-bold tracking-wider uppercase mt-1">Asset Management Interface</p>
+                            <p className="text-[10px] text-gray-500 font-bold tracking-wider mt-1">Asset Management Interface</p>
                         </div>
                         
                         <div className="flex md:hidden items-center gap-2">
@@ -204,7 +215,7 @@ const InventoryContent = ({
                         <button onClick={openBulkUploadModal} className={`p-2.5 ${darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-slate-200 hover:bg-slate-50'} border text-emerald-500 rounded-lg transition-all`} title="Bulk Import">
                             <Upload className="w-5 h-5" />
                         </button>
-                        <button onClick={openAddModal} className="px-5 py-2.5 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-all flex items-center gap-2">
+                        <button onClick={openAddModal} className="px-5 py-2.5 bg-indigo-600 text-white text-[10px] font-bold tracking-widest rounded-lg hover:bg-indigo-500 transition-all flex items-center gap-2">
                             <Plus className="w-4 h-4" /> Add Asset
                         </button>
                     </div>
@@ -218,10 +229,10 @@ const InventoryContent = ({
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                         <input
                             type="text"
-                            placeholder="SEARCH BY ASSET NAME OR HSN..."
+                            placeholder="search by asset name or HSN"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className={`w-full pl-10 pr-4 py-2.5 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} border rounded-lg text-[10px] font-bold text-white tracking-widest focus:outline-none focus:border-indigo-500 transition-all uppercase ${!darkMode && 'text-slate-900'}`}
+                            className={`no-zoom-search w-full pl-10 pr-4 py-2.5 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} border rounded-lg md:text-[10px] font-bold text-white tracking-widest focus:outline-none focus:border-indigo-500 transition-all ${!darkMode ? 'text-slate-900' : ''}`}
                         />
                         {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"><X className="w-3.5 h-3.5" /></button>}
                     </div>
@@ -229,7 +240,7 @@ const InventoryContent = ({
                     <div className="relative" ref={sortDropdownRef}>
                         <button 
                             onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)} 
-                            className={`flex items-center gap-2 px-4 py-2.5 ${darkMode ? 'bg-gray-900 border' : 'bg-white border'} rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${isSortDropdownOpen ? 'border-indigo-500 text-indigo-500' : (darkMode ? 'border-gray-800 text-gray-500' : 'border-slate-200 text-slate-500')}`}
+                            className={`flex items-center gap-2 px-4 py-2.5 ${darkMode ? 'bg-gray-900 border' : 'bg-white border'} rounded-lg text-[10px] font-bold tracking-wider transition-all ${isSortDropdownOpen ? 'border-indigo-500 text-indigo-500' : (darkMode ? 'border-gray-800 text-gray-500' : 'border-slate-200 text-slate-500')}`}
                         >
                             <ListOrdered className="w-4 h-4" />
                             <span className="hidden sm:inline">{currentSortLabel}</span>
@@ -240,7 +251,7 @@ const InventoryContent = ({
                                     <button 
                                         key={opt.value} 
                                         onClick={() => { setSortOption(opt.value); setIsSortDropdownOpen(false); }} 
-                                        className={`w-full px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider transition-colors ${sortOption === opt.value ? 'bg-indigo-600 text-white' : (darkMode ? 'text-gray-400 hover:bg-gray-800 hover:text-white' : 'text-slate-500 hover:bg-slate-50')}`}
+                                        className={`w-full px-4 py-3.5 text-left text-[10px] font-bold tracking-wider transition-colors ${sortOption === opt.value ? 'bg-indigo-600 text-white' : (darkMode ? 'text-gray-400 hover:bg-gray-800 hover:text-white' : 'text-slate-500 hover:bg-slate-50')}`}
                                     >
                                         {opt.label}
                                     </button>
@@ -256,15 +267,15 @@ const InventoryContent = ({
                 <div className="hidden lg:block rounded-xl border overflow-hidden shadow-sm overflow-x-auto custom-scrollbar" style={{ backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : 'white', borderColor: darkMode ? '#1e293b' : '#e2e8f0' }}>
                     <div className={`px-6 py-4 ${darkMode ? 'bg-gray-900 border-b border-gray-800' : 'bg-slate-50 border-b border-slate-100'} flex items-center gap-2`}>
                         <Layers className="w-4 h-4 text-indigo-500" />
-                        <h2 className={`text-[10px] font-bold uppercase tracking-widest ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>Master Inventory Log ({inventory.length} Records)</h2>
+                        <h2 className={`text-[10px] font-bold tracking-widest ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>Master Inventory Log ({inventory.length} Records)</h2>
                     </div>
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className={`${darkMode ? 'bg-gray-950 border-b border-gray-800' : 'bg-white border-b border-slate-100'}`}>
-                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest">Asset Description</th>
-                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Stock</th>
-                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Unit Price</th>
-                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 uppercase tracking-widest text-right">Management</th>
+                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 tracking-widest">Asset Description</th>
+                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 tracking-widest text-center">Stock</th>
+                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 tracking-widest text-center">Unit Price</th>
+                                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 tracking-widest text-right">Management</th>
                             </tr>
                         </thead>
                         <tbody className={`divide-y ${darkMode ? 'divide-gray-800/50' : 'divide-slate-100'}`}>
@@ -273,11 +284,11 @@ const InventoryContent = ({
                                 return (
                                     <tr key={item._id || item.id} className={`group transition-colors ${isLowStock ? 'bg-red-500/[0.02] hover:bg-red-500/[0.05]' : (darkMode ? 'hover:bg-white/[0.01]' : 'hover:bg-slate-50')}`}>
                                         <td className="px-6 py-4">
-                                            <div className={`font-bold text-xs uppercase tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                            <div className={`font-bold text-xs tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                                 {item.name}
                                                 {isLowStock && <span className="px-1.5 py-0.5 bg-red-500/10 text-red-500 text-[8px] rounded border border-red-500/20">LOW</span>}
                                             </div>
-                                            <div className={`text-[9px] font-bold mt-1 uppercase tracking-wider flex items-center gap-1.5 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                            <div className={`text-[9px] font-bold mt-1 tracking-wider flex items-center gap-1.5 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                                                 <Hash className="w-3 h-3" /> {item.hsn || '---'}
                                             </div>
                                         </td>
@@ -306,7 +317,7 @@ const InventoryContent = ({
                         {inventory.length === 0 && (
                             <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-gray-900' : 'border-slate-200'} rounded-xl`}>
                                 <Package className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Database Record Empty</p>
+                                <p className="text-[10px] font-bold text-gray-500 tracking-widest">Database Record Empty</p>
                             </div>
                         )}
                     </div>
@@ -318,7 +329,7 @@ const InventoryContent = ({
                 <section className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
                     <form onSubmit={handleFormSubmit} className={`${cardBase} w-full max-w-xl rounded-xl border overflow-hidden shadow-2xl`}>
                         <div className={`p-6 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex justify-between items-center`}>
-                            <h2 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>{isEditing ? 'Modify' : 'Register New'} Asset</h2>
+                            <h2 className={`text-sm font-bold tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>{isEditing ? 'Modify' : 'Register New'} Asset</h2>
                             <button type="button" onClick={closeFormModal} className="p-2 hover:bg-black/5 rounded-lg text-gray-500"><X className="w-5 h-5" /></button>
                         </div>
                         <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-5 ${darkMode ? 'bg-gray-950/30' : 'bg-slate-50/50'}`}>
@@ -329,7 +340,7 @@ const InventoryContent = ({
                             <InputField label="HSN Code" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} darkMode={darkMode} />
                         </div>
                         <div className={`p-6 border-t ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-white border-slate-100'}`}>
-                            <button type="submit" disabled={loading || !formData.name} className={`w-full py-3.5 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all active:scale-95 ${isEditing ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
+                            <button type="submit" disabled={loading || !formData.name} className={`w-full py-3.5 text-white text-[10px] font-bold tracking-widest rounded-lg transition-all active:scale-95 ${isEditing ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
                                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isEditing ? 'Update Asset' : 'Save To Inventory')}
                             </button>
                         </div>
@@ -342,12 +353,12 @@ const InventoryContent = ({
                     <div className={`${darkMode ? 'bg-gray-900 border-red-500/20' : 'bg-white border-slate-200'} w-full max-w-sm rounded-xl border p-6 text-center space-y-6 shadow-2xl`}>
                         <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertTriangle className="w-7 h-7 text-red-500" /></div>
                         <div>
-                            <h2 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>Authorize Deletion</h2>
-                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-widest mt-2">Permantently remove <span className={darkMode ? 'text-white' : 'text-slate-900'}>{itemToDelete?.name}</span>?</p>
+                            <h2 className={`text-sm font-bold tracking-wider ${darkMode ? 'text-white' : 'text-slate-900'}`}>Authorize Deletion</h2>
+                            <p className="text-[10px] font-medium text-gray-500 tracking-widest mt-2">Permantently remove <span className={darkMode ? 'text-white' : 'text-slate-900'}>{itemToDelete?.name}</span>?</p>
                         </div>
                         <div className="flex gap-3 pt-2">
-                            <button onClick={() => setIsConfirmModalOpen(false)} className={`flex-1 py-3 ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-slate-100 text-slate-600'} text-[10px] font-bold uppercase rounded-lg`}>Cancel</button>
-                            <button onClick={confirmDeleteItem} className="flex-1 py-3 bg-red-600 text-white text-[10px] font-bold uppercase rounded-lg">Confirm</button>
+                            <button onClick={() => setIsConfirmModalOpen(false)} className={`flex-1 py-3 ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-slate-100 text-slate-600'} text-[10px] font-bold rounded-lg`}>Cancel</button>
+                            <button onClick={confirmDeleteItem} className="flex-1 py-3 bg-red-600 text-white text-[10px] font-bold rounded-lg">Confirm</button>
                         </div>
                     </div>
                 </section>
@@ -356,7 +367,7 @@ const InventoryContent = ({
             {loading && !isFormModalOpen && !isBulkUploadModalOpen && (
                 <div className="fixed bottom-6 right-6 bg-indigo-600 text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 z-50">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Syncing Data</span>
+                    <span className="text-[10px] font-bold tracking-widest">Syncing Data</span>
                 </div>
             )}
 

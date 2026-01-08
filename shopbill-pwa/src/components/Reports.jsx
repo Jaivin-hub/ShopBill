@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Loader, Truck, AlertTriangle, ShoppingCart, Users,
-    Activity, Layers, Printer, ChevronRight, PieChart, Wallet
+    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check
 } from 'lucide-react';
 import SalesChart from './SalesChart';
 
@@ -125,31 +125,67 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
     return (
         <div className={`min-h-screen ${themeBase} transition-colors duration-200`}>
             {/* CLEAN PROFESSIONAL HEADER */}
-            <header className={`sticky top-0 z-[100] ${headerBase} px-4 md:px-8 py-4 border-b`}>
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight flex items-center gap-2 uppercase`}>
-                            Business <span className="text-indigo-500">Analytics</span>
-                        </h1>
-                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">Comprehensive store performance data</p>
+            <header className={`sticky top-0 z-[100] ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md`}>
+                <div className="max-w-7xl mx-auto space-y-3">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                        <div>
+                            <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight flex items-center gap-2 `}>
+                                Business <span className="text-indigo-500">Analytics</span>
+                            </h1>
+                            <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase opacity-70">Store Intelligence Unit</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <div className={`flex overflow-x-auto no-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border flex-1 md:flex-none`}>
+                                {DATE_FILTERS.map(filter => (
+                                    <button 
+                                        key={filter.id} 
+                                        onClick={() => setSelectedFilter(filter.id)} 
+                                        className={`px-3 py-1.5 rounded-md transition-all text-[10px] font-bold tracking-tight whitespace-nowrap ${selectedFilter === filter.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        {filter.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <button onClick={() => window.print()} className={`p-2.5 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'} rounded-lg hover:text-indigo-500 transition-all`}>
+                                <Printer className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className={`flex ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border`}>
-                            {DATE_FILTERS.map(filter => (
-                                <button 
-                                    key={filter.id} 
-                                    onClick={() => setSelectedFilter(filter.id)} 
-                                    className={`px-3 py-1.5 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight ${selectedFilter === filter.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-                                >
-                                    {filter.label}
-                                </button>
-                            ))}
+                    {/* ULTRA COMPACT SINGLE ROW CUSTOM RANGE */}
+                    {selectedFilter === 'custom' && (
+                        <div className={`flex items-center gap-1.5 p-1.5 rounded-xl border animate-in fade-in slide-in-from-top-1 duration-300 ${darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                            <div className="pl-1 hidden sm:block">
+                                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                            </div>
+                            
+                            <div className="flex items-center gap-1 flex-1">
+                                <input 
+                                    type="date" 
+                                    value={customStartDate}
+                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                    className={`w-full text-[10px] font-black px-2 py-1.5 rounded-md border outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                                />
+                                <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
+                                <input 
+                                    type="date" 
+                                    value={customEndDate}
+                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                    className={`w-full text-[10px] font-black px-2 py-1.5 rounded-md border outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                                />
+                            </div>
+
+                            <button 
+                                onClick={fetchReportData}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white p-1.5 px-3 rounded-lg transition-all active:scale-90 shadow-md shadow-indigo-500/20"
+                                title="Apply Range"
+                            >
+                                <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">Apply</span>
+                                <Check className="sm:hidden w-3.5 h-3.5" />
+                            </button>
                         </div>
-                        <button onClick={() => window.print()} className={`p-2.5 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'} rounded-lg hover:text-indigo-500 transition-all`}>
-                            <Printer className="w-4 h-4" />
-                        </button>
-                    </div>
+                    )}
                 </div>
             </header>
 
@@ -164,7 +200,7 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                     ].map((m, i) => (
                         <div key={i} className={`${cardBase} p-5 rounded-xl transition-all border-l-4 border-l-transparent hover:border-l-indigo-500`}>
                             <div className="flex justify-between items-start mb-3">
-                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{m.title}</p>
+                                <p className="text-[10px] font-bold text-gray-500  tracking-widest">{m.title}</p>
                                 <m.icon className={`w-4 h-4 ${m.color}`} />
                             </div>
                             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
@@ -179,24 +215,24 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                     <div className={`p-6 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex flex-col md:flex-row md:items-center justify-between gap-4`}>
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'}`}>Sales Performance</h3>
+                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'}`}>Sales Performance</h3>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <div className={`flex ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200 shadow-inner'} p-1 rounded-md border`}>
                                 {['revenue', 'bills'].map(k => (
-                                    <button key={k} onClick={() => setChartYAxis(k)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${chartYAxis === k ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{k}</button>
+                                    <button key={k} onClick={() => setChartYAxis(k)} className={`px-4 py-1 text-[10px] font-bold  rounded transition-all ${chartYAxis === k ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{k}</button>
                                 ))}
                             </div>
                             <div className={`flex ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200 shadow-inner'} p-1 rounded-md border`}>
                                 {VIEW_TYPES.map(t => (
-                                    <button key={t} onClick={() => setViewType(t)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded transition-all ${viewType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
+                                    <button key={t} onClick={() => setViewType(t)} className={`px-4 py-1 text-[10px] font-bold  rounded transition-all ${viewType === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    <div className="p-6 h-[350px] w-full">
+                    <div className="p-6 h-[300px] md:h-[350px] w-full">
                         {isLoading ? (
                             <div className="h-full w-full flex items-center justify-center"><Loader className="animate-spin text-indigo-500 w-6 h-6" /></div>
                         ) : (
@@ -210,11 +246,11 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                     {/* PROCUREMENT INSIGHTS */}
                     <div className={`lg:col-span-2 ${cardBase} rounded-xl p-6`}>
                         <div className="flex items-center justify-between mb-8">
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
+                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
                                 <Truck className="w-4 h-4 text-amber-500" />
                                 Procurement & Inventory
                             </h3>
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">Recent Activity</span>
+                            <span className="hidden sm:block text-[10px] font-bold text-gray-500 ">Recent Activity</span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -224,21 +260,21 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                                 { label: "Procurements", val: scmInsights.filteredPurchaseCount, icon: ShoppingCart, color: "text-indigo-500" }
                             ].map((s, i) => (
                                 <div key={i} className={`p-4 ${subCardBase} border rounded-lg`}>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
+                                    <p className="text-[9px] font-bold text-gray-500  tracking-widest mb-1">{s.label}</p>
                                     <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.val}</p>
                                 </div>
                             ))}
                         </div>
 
                         <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Vendor Contribution</p>
+                            <p className="text-[10px] font-bold text-gray-500  tracking-widest mb-4">Vendor Contribution</p>
                             {scmInsights.topSuppliers.length > 0 ? scmInsights.topSuppliers.map((sup, idx) => (
                                 <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/50 border-gray-800/40' : 'bg-slate-50 border-slate-100'} rounded-lg border hover:border-indigo-500/50 transition-all`}>
                                     <div className="flex items-center gap-4">
                                         <div className="text-[10px] font-bold text-gray-400 w-4">0{idx + 1}</div>
                                         <div>
-                                            <p className={`text-xs font-bold uppercase ${darkMode ? 'text-white' : 'text-slate-800'}`}>{sup.name}</p>
-                                            <p className="text-[9px] text-gray-500 font-medium uppercase">{sup.orders} Order Cycles</p>
+                                            <p className={`text-xs font-bold  ${darkMode ? 'text-white' : 'text-slate-800'}`}>{sup.name}</p>
+                                            <p className="text-[9px] text-gray-500 font-medium ">{sup.orders} Order Cycles</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -250,7 +286,7 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                                 </div>
                             )) : (
                                 <div className={`text-center py-10 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
-                                    <p className="text-[11px] font-medium text-gray-400 uppercase italic">No procurement history for this period</p>
+                                    <p className="text-[11px] font-medium text-gray-400  italic">No procurement history for this period</p>
                                 </div>
                             )}
                         </div>
@@ -259,14 +295,14 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                     <div className="flex flex-col gap-6">
                         {/* TOP ITEMS */}
                         <div className={`${cardBase} rounded-xl p-6`}>
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
+                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
                                 <TrendingUp className="w-4 h-4 text-sky-500" />
                                 Best Sellers
                             </h3>
                             <div className="space-y-2">
                                 {data.topItems.map((item, idx) => (
                                     <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}>
-                                        <span className={`text-xs font-bold uppercase truncate pr-4 ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
+                                        <span className={`text-xs font-bold  truncate pr-4 ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
                                         <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit</span>
                                     </div>
                                 ))}
@@ -275,20 +311,20 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
 
                         {/* FINANCIAL STANDING */}
                         <div className={`${cardBase} rounded-xl p-6`}>
-                            <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
+                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
                                 <Wallet className="w-4 h-4 text-red-500" />
                                 Liabilities & Equity
                             </h3>
                             <div className="space-y-4">
                                 <div className={`p-4 ${darkMode ? 'bg-red-500/5 border-red-500/10' : 'bg-red-50/50 border-red-100 shadow-sm'} border rounded-lg group`}>
                                     <div className="flex justify-between items-center mb-1">
-                                        <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">Credit Outstanding</p>
+                                        <p className="text-[9px] font-bold text-red-500  tracking-widest">Credit Outstanding</p>
                                         <AlertTriangle className="w-3 h-3 text-red-500 opacity-50 group-hover:opacity-100" />
                                     </div>
                                     <p className="text-xl font-bold text-red-500 tracking-tight">{formatCurrency(data.totalCreditOutstanding)}</p>
                                 </div>
                                 <div className={`p-4 ${darkMode ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50/50 border-emerald-100 shadow-sm'} border rounded-lg`}>
-                                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Lifetime Revenue</p>
+                                    <p className="text-[9px] font-bold text-emerald-600  tracking-widest mb-1">Lifetime Revenue</p>
                                     <p className="text-xl font-bold text-emerald-600 tracking-tight">{formatCurrency(data.totalAllTimeRevenue)}</p>
                                 </div>
                             </div>

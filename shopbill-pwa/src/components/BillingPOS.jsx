@@ -171,7 +171,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
             <Search className={`w-4.5 h-4.5 absolute left-4 top-1/2 -translate-y-1/2 z-10 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
             <input
               type="text" 
-              placeholder="SEARCH BY NAME, BARCODE, OR HSN..." 
+              placeholder="search by name, barcode, or hsn..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handlePhysicalScannerInput}

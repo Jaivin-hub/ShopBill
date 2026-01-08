@@ -3,7 +3,7 @@ import {
     IndianRupee, CreditCard, Users, Package,
     List, Loader2, TrendingUp, Clock, Activity, 
     ShieldCheck, RefreshCw, PlusCircle, ShoppingCart, 
-    ChevronRight, Inbox, Sparkles
+    ChevronRight, Inbox, Sparkles, Box
 } from 'lucide-react';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
@@ -35,28 +35,15 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
 
     // --- DYNAMIC CAPTIONS LOGIC ---
     const getWelcomeContent = () => {
-        const name = currentUser?.name || 'User';
         switch (userRole) {
             case USER_ROLES.OWNER:
-                return {
-                    title: `Owner's`,
-                    desc: `Manage operations and shop performance.`
-                };
+                return { title: `Owner's`, desc: `Manage operations and shop performance.` };
             case USER_ROLES.MANAGER:
-                return {
-                    title: `Manager's`,
-                    desc: `Optimize stock and daily tasks.`
-                };
+                return { title: `Manager's`, desc: `Optimize stock and daily tasks.` };
             case USER_ROLES.CASHIER:
-                return {
-                    title: `Cashier's`,
-                    desc: `Sales tracking and credit management.`
-                };
+                return { title: `Cashier's`, desc: `Sales tracking and credit management.` };
             default:
-                return {
-                    title: `Business's`,
-                    desc: `Manage operations and shop performance.`
-                };
+                return { title: `Business's`, desc: `Manage operations and shop performance.` };
         }
     };
 
@@ -84,7 +71,9 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
         return `${Math.floor(mins/1440)}d ago`;
     };
 
+    // Styling logic synced with BillingPOS
     const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
 
@@ -113,150 +102,165 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
     if (isLoading) return (
         <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
             <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-            <p className="text-xs font-medium opacity-50">Updating your business data...</p>
+            <p className="text-xs font-black opacity-40 tracking-widest">Updating Dashboard...</p>
         </div>
     );
 
     return (
-        <main className={`min-h-screen pt-2 pb-24 px-6 ${themeBase}`}>
-            <div className="max-w-7xl mx-auto space-y-8">
-                
-                {/* DYNAMIC WELCOME HERO */}
-                <header className={`sticky top-0 z-[100] pb-4  space-y-1 ${themeBase}`}>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-black tracking-tight">{welcome.title} <span className="text-indigo-500">Dashboard</span></h1>
-                    </div>
-                    <p className={`text-sm font-medium leading-relaxed max-w-2xl ${subText}`}>
-                        {welcome.desc}
-                    </p>
-                </header>
-
-                {/* COMPACT KPI SECTION */}
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
+        <div className={`min-h-screen flex flex-col transition-colors duration-300 ${themeBase}`}>
+            {/* --- MATCHING STICKY HEADER --- */}
+            <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center">
                         <div>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Sales Today</p>
-                            <h2 className="text-2xl font-black">₹{today.totalSales.toLocaleString('en-IN')}</h2>
+                            <h1 className="text-2xl font-black tracking-tight">
+                                {welcome.title} <span className="text-indigo-500">Dashboard</span>
+                            </h1>
+                            <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] ">
+                                {welcome.desc}
+                            </p>
                         </div>
-                        <div className="p-3 bg-emerald-500/10 rounded-xl"><TrendingUp className="text-emerald-500 w-6 h-6" /></div>
-                    </div>
-
-                    <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Credit Issued</p>
-                            <h2 className="text-2xl font-black">₹{today.totalCredit.toLocaleString('en-IN')}</h2>
+                        <div className="hidden md:flex gap-2">
+                            <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-black tracking-widest opacity-60">SYSTEM ONLINE</span>
+                            </div>
                         </div>
-                        <div className="p-3 bg-blue-500/10 rounded-xl"><CreditCard className="text-blue-500 w-6 h-6" /></div>
                     </div>
-
-                    <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pending Ledger</p>
-                            <h2 className={`text-2xl font-black ${totalOwed > 0 ? 'text-rose-500' : ''}`}>₹{totalOwed.toLocaleString('en-IN')}</h2>
-                        </div>
-                        <div className="p-3 bg-rose-500/10 rounded-xl"><Users className="text-rose-500 w-6 h-6" /></div>
-                    </div>
-                </section>
-
-                {/* QUICK ACTIONS BAR */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button onClick={() => setCurrentPage('billing')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
-                        <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-500/20"><PlusCircle size={18}/></div>
-                        <span className="text-xs font-black uppercase tracking-tight">New Bill</span>
-                    </button>
-                    <button onClick={() => setCurrentPage('inventory')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
-                        <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg shadow-amber-500/20"><Package size={18}/></div>
-                        <span className="text-xs font-black uppercase tracking-tight">Add Stock</span>
-                    </button>
-                    <button onClick={() => setCurrentPage('khata')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
-                        <div className="bg-blue-500 p-2 rounded-xl text-white shadow-lg shadow-blue-500/20"><Users size={18}/></div>
-                        <span className="text-xs font-black uppercase tracking-tight">Ledger</span>
-                    </button>
-                    <button onClick={fetchDashboardData} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
-                        <div className="bg-slate-600 p-2 rounded-xl text-white shadow-lg shadow-slate-500/20"><RefreshCw size={18}/></div>
-                        <span className="text-xs font-black uppercase tracking-tight">Sync</span>
-                    </button>
                 </div>
+            </header>
 
-                {/* MAIN CONTENT GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Low Stock Section */}
-                    <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
-                        <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                            <h3 className="text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-2"><Package size={16} className="text-amber-500"/> Low Stock</h3>
-                            {lowStock.length > 0 && <button onClick={onViewAllInventory} className="text-[10px] font-bold text-indigo-500">MANAGE</button>}
+            {/* --- MAIN WORKSPACE --- */}
+            <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
+                <div className="max-w-7xl mx-auto space-y-8 pb-12">
+                    
+                    {/* COMPACT KPI SECTION */}
+                    <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500  tracking-widest mb-1">Total Sales Today</p>
+                                <h2 className="text-2xl font-black">₹{today.totalSales.toLocaleString('en-IN')}</h2>
+                            </div>
+                            <div className="p-3 bg-emerald-500/10 rounded-xl"><TrendingUp className="text-emerald-500 w-6 h-6" /></div>
                         </div>
-                        <div className="flex-1 min-h-[220px]">
-                            {lowStock.length > 0 ? (
-                                <div className="p-5 space-y-3">
-                                    {lowStock.map(item => (
-                                        <div key={item._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
-                                            <span className="text-sm font-semibold">{item.name}</span>
-                                            <span className={`text-xs font-black px-2 py-0.5 rounded ${darkMode ? 'bg-rose-500/10 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{item.quantity} Left</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState icon={Package} title="Fully Stocked" message="Every item is ready on the shelves." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
-                            )}
+
+                        <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500  tracking-widest mb-1">Credit Issued</p>
+                                <h2 className="text-2xl font-black">₹{today.totalCredit.toLocaleString('en-IN')}</h2>
+                            </div>
+                            <div className="p-3 bg-blue-500/10 rounded-xl"><CreditCard className="text-blue-500 w-6 h-6" /></div>
                         </div>
+
+                        <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${cardBase}`}>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500  tracking-widest mb-1">Pending Ledger</p>
+                                <h2 className={`text-2xl font-black ${totalOwed > 0 ? 'text-rose-500' : ''}`}>₹{totalOwed.toLocaleString('en-IN')}</h2>
+                            </div>
+                            <div className="p-3 bg-rose-500/10 rounded-xl"><Users className="text-rose-500 w-6 h-6" /></div>
+                        </div>
+                    </section>
+
+                    {/* QUICK ACTIONS BAR */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <button onClick={() => setCurrentPage('billing')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
+                            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-500/20"><PlusCircle size={18}/></div>
+                            <span className="text-xs font-black  tracking-tight">New Bill</span>
+                        </button>
+                        <button onClick={() => setCurrentPage('inventory')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
+                            <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg shadow-amber-500/20"><Package size={18}/></div>
+                            <span className="text-xs font-black  tracking-tight">Add Stock</span>
+                        </button>
+                        <button onClick={() => setCurrentPage('khata')} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
+                            <div className="bg-blue-500 p-2 rounded-xl text-white shadow-lg shadow-blue-500/20"><Users size={18}/></div>
+                            <span className="text-xs font-black  tracking-tight">Ledger</span>
+                        </button>
+                        <button onClick={fetchDashboardData} className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}>
+                            <div className="bg-slate-600 p-2 rounded-xl text-white shadow-lg shadow-slate-500/20"><RefreshCw size={18}/></div>
+                            <span className="text-xs font-black  tracking-tight">Sync</span>
+                        </button>
                     </div>
 
-                    {/* Customer Credit Section */}
-                    <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
-                        <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                            <h3 className="text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-2"><Clock size={16} className="text-blue-500"/> Recovery</h3>
-                            {topDebtors.length > 0 && <button onClick={onViewAllCredit} className="text-[10px] font-bold text-indigo-500">LEDGER</button>}
-                        </div>
-                        <div className="flex-1 min-h-[220px]">
-                            {topDebtors.length > 0 ? (
-                                <div className="p-5 space-y-3">
-                                    {topDebtors.map(c => (
-                                        <div key={c._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
-                                            <span className="text-sm font-semibold">{c.name}</span>
-                                            <span className="text-sm font-black">₹{c.outstandingCredit.toLocaleString('en-IN')}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState icon={Users} title="All Clear" message="No pending dues at the moment." actionText="Open Ledger" onAction={() => setCurrentPage('khata')} />
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Recent Sales Section */}
-                    <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
-                        <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                            <h3 className="text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-2"><Activity size={16} className="text-emerald-500"/> Activities</h3>
-                            {recentSales.length > 0 && <button onClick={onViewAllSales} className="text-[10px] font-bold text-indigo-500">HISTORY</button>}
-                        </div>
-                        <div className="flex-1 min-h-[220px]">
-                            {recentSales.length > 0 ? (
-                                <div className="p-5 space-y-4">
-                                    {recentSales.map(sale => (
-                                        <div key={sale._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
-                                            <div>
-                                                <p className="text-sm font-black">₹{sale.totalAmount.toLocaleString('en-IN')}</p>
-                                                <p className="text-[10px] opacity-50 font-bold uppercase tracking-tighter">{formatTime(sale.timestamp)}</p>
+                    {/* MAIN CONTENT GRID */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Low Stock Section */}
+                        <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
+                            <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
+                                <h3 className="text-[11px] font-black  tracking-[0.1em] flex items-center gap-2"><Package size={16} className="text-amber-500"/> Low Stock</h3>
+                                {lowStock.length > 0 && <button onClick={onViewAllInventory} className="text-[10px] font-bold text-indigo-500">MANAGE</button>}
+                            </div>
+                            <div className="flex-1 min-h-[220px]">
+                                {lowStock.length > 0 ? (
+                                    <div className="p-5 space-y-3">
+                                        {lowStock.map(item => (
+                                            <div key={item._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
+                                                <span className="text-sm font-semibold">{item.name}</span>
+                                                <span className={`text-xs font-black px-2 py-0.5 rounded ${darkMode ? 'bg-rose-500/10 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{item.quantity} Left</span>
                                             </div>
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
-                                                sale.paymentMethod === 'Cash' 
-                                                ? (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100') 
-                                                : (darkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-100')
-                                            }`}>
-                                                {sale.paymentMethod.toUpperCase()}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState icon={ShoppingCart} title="Awaiting Sales" message="Open counter to start selling." actionText="Open POS" onAction={() => setCurrentPage('billing')} />
-                            )}
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <EmptyState icon={Package} title="Fully Stocked" message="Every item is ready on the shelves." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Customer Credit Section */}
+                        <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
+                            <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
+                                <h3 className="text-[11px] font-black  tracking-[0.1em] flex items-center gap-2"><Clock size={16} className="text-blue-500"/> Recovery</h3>
+                                {topDebtors.length > 0 && <button onClick={onViewAllCredit} className="text-[10px] font-bold text-indigo-500">LEDGER</button>}
+                            </div>
+                            <div className="flex-1 min-h-[220px]">
+                                {topDebtors.length > 0 ? (
+                                    <div className="p-5 space-y-3">
+                                        {topDebtors.map(c => (
+                                            <div key={c._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
+                                                <span className="text-sm font-semibold">{c.name}</span>
+                                                <span className="text-sm font-black">₹{c.outstandingCredit.toLocaleString('en-IN')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <EmptyState icon={Users} title="All Clear" message="No pending dues at the moment." actionText="Open Ledger" onAction={() => setCurrentPage('khata')} />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Recent Sales Section */}
+                        <div className={`rounded-3xl border flex flex-col overflow-hidden transition-all ${cardBase}`}>
+                            <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
+                                <h3 className="text-[11px] font-black  tracking-[0.1em] flex items-center gap-2"><Activity size={16} className="text-emerald-500"/> Activities</h3>
+                                {recentSales.length > 0 && <button onClick={onViewAllSales} className="text-[10px] font-bold text-indigo-500">HISTORY</button>}
+                            </div>
+                            <div className="flex-1 min-h-[220px]">
+                                {recentSales.length > 0 ? (
+                                    <div className="p-5 space-y-4">
+                                        {recentSales.map(sale => (
+                                            <div key={sale._id} className="flex justify-between items-center group p-2 hover:bg-slate-500/5 rounded-lg transition-colors">
+                                                <div>
+                                                    <p className="text-sm font-black">₹{sale.totalAmount.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[10px] opacity-50 font-bold  tracking-tighter">{formatTime(sale.timestamp)}</p>
+                                                </div>
+                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                                                    sale.paymentMethod === 'Cash' 
+                                                    ? (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100') 
+                                                    : (darkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-100')
+                                                }`}>
+                                                    {sale.paymentMethod.toUpperCase()}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <EmptyState icon={ShoppingCart} title="Awaiting Sales" message="Open the counter to start selling." actionText="Open POS" onAction={() => setCurrentPage('billing')} />
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </main>
+            </main>
+        </div>
     );
 };
 
