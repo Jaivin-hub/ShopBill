@@ -169,12 +169,12 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       {/* --- WORKSPACE --- */}
-      <main className="flex-1 px-6 py-8 overflow-y-auto custom-ledger-scroll">
+      <main className="flex-1 px-4 py-3 overflow-y-auto custom-ledger-scroll">
         <div className="max-w-7xl mx-auto space-y-8 pb-32">
 
           {/* TOP METRICS SECTION */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className={`lg:col-span-8 rounded-[24px] p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
+            <div className={`lg:col-span-8 rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
               {/* Background Glow */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
 
@@ -207,7 +207,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           </div>
 
           {/* ACCOUNTS LIST SECTION */}
-          <div className={`rounded-[32px] border overflow-hidden ${cardBase}`}>
+          <div className={`rounded-xl border overflow-hidden ${cardBase}`}>
             <div className="px-8 py-7 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-500">
@@ -239,7 +239,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       {/* MOBILE QUICK ADD - POSITIONED ABOVE FOOTER MENU */}
       <button
         onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="md:hidden fixed bottom-20 right-6 w-16 h-16 bg-indigo-600 text-white rounded-[20px] shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
+        className="md:hidden fixed bottom-20 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
       >
         <UserPlus size={24} />
       </button>

@@ -125,7 +125,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
   if (isLoading) return (
     <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
         <Loader className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-        <p className="text-xs font-black opacity-40 uppercase tracking-widest">Initializing Terminal...</p>
+        <p className="text-xs font-black opacity-40 tracking-widest">Initializing Terminal...</p>
     </div>
   );
 
@@ -136,6 +136,18 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .product-grid-scroll { max-height: 450px; overflow-y: auto; }
+        
+        /* Prevent Auto-Zoom on iOS without losing small-text look */
+        .no-zoom-input {
+          font-size: 16px !important; /* Forces browser to not zoom */
+        }
+        @media (max-width: 768px) {
+          .no-zoom-input {
+            transform: scale(0.8); /* Visually shrinks it back down */
+            transform-origin: left center;
+            width: 125% !important; /* Compels width to fill the gap left by scale */
+          }
+        }
       `}</style>
 
       {/* --- STICKY HEADER --- */}
@@ -146,7 +158,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               <h1 className="text-2xl font-black tracking-tight">
                 Billing <span className="text-indigo-500">Terminal</span>
               </h1>
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em]">Active Session • High Performance Mode</p>
+              <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">Active Session • High Performance Mode</p>
             </div>
             <div className="flex gap-2">
                 <button onClick={() => setIsCameraScannerOpen(true)} className={`p-2.5 border rounded-xl transition-all active:scale-90 ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}>
@@ -156,16 +168,17 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
           </div>
 
           <div className="relative group">
-            <Search className={`w-4.5 h-4.5 absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
+            <Search className={`w-4.5 h-4.5 absolute left-4 top-1/2 -translate-y-1/2 z-10 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
             <input
               type="text" 
               placeholder="SEARCH BY NAME, BARCODE, OR HSN..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handlePhysicalScannerInput}
-              className={`w-full border rounded-2xl py-3.5 pl-12 pr-12 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${inputBase}`}
+              /* Changed text-[10px] to text-base (16px) and added no-zoom-input class */
+              className={`no-zoom-input w-full border rounded-2xl py-3.5 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${inputBase}`}
             />
-            {searchTerm && <X onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500" />}
+            {searchTerm && <X onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />}
           </div>
         </div>
       </header>
@@ -174,12 +187,12 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
       <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
         <div className="max-w-7xl mx-auto space-y-8 pb-44">
             
-            {/* COMPACT PRODUCT CATALOG (More items per row) */}
+            {/* COMPACT PRODUCT CATALOG */}
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex items-center gap-2">
                     <Box className="w-4 h-4 text-indigo-500" />
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Catalog ({filteredInventory.length})</p>
+                    <p className="text-[10px] font-black text-slate-500 tracking-widest">Catalog ({filteredInventory.length})</p>
                 </div>
                 <p className="text-[9px] font-bold text-slate-400">Click to add</p>
               </div>
@@ -193,7 +206,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                         className={`p-3 rounded-xl border transition-all text-left active:scale-95 group relative overflow-hidden ${cardBase} hover:border-indigo-500/50`}
                     >
                         <div className="relative z-10">
-                            <p className="text-[9px] font-black uppercase truncate mb-1 leading-tight group-hover:text-indigo-500">{item.name}</p>
+                            <p className="text-[9px] font-black truncate mb-1 leading-tight group-hover:text-indigo-500">{item.name}</p>
                             <p className="text-xs font-black text-emerald-500 tracking-tighter">₹{item.price}</p>
                         </div>
                         <div className={`absolute bottom-1 right-1 text-[8px] font-black px-1 rounded ${darkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
@@ -209,15 +222,15 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
             <section>
               <div className="flex items-center gap-2 mb-4 px-1">
                 <ShoppingCart className="w-4 h-4 text-indigo-500" />
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Billing List ({cart.length})</p>
+                <p className="text-[10px] font-black text-slate-500 tracking-widest">Billing List ({cart.length})</p>
               </div>
 
               <div className="space-y-2">
                   {[...cart].reverse().map(item => (
                   <div key={item._id} className={`rounded-2xl border p-4 flex items-center justify-between transition-all hover:bg-indigo-500/[0.02] ${cardBase}`}>
                       <div className="flex-1 truncate pr-4">
-                        <p className="text-xs font-black uppercase truncate mb-0.5">{item.name}</p>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
+                        <p className="text-xs font-black truncate mb-0.5">{item.name}</p>
+                        <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
                       </div>
                       
                       <div className="flex items-center gap-4 md:gap-8">
@@ -231,7 +244,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                         {/* Subtotal */}
                         <div className="text-right min-w-[90px]">
                             <p className="text-sm font-black text-emerald-500">₹{(item.quantity * item.price).toLocaleString()}</p>
-                            <button onClick={() => removeItemFromCart(item._id)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 uppercase tracking-widest">Remove</button>
+                            <button onClick={() => removeItemFromCart(item._id)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 tracking-widest">Remove</button>
                         </div>
                       </div>
                   </div>
@@ -242,7 +255,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                         <div className="bg-indigo-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                             <ShoppingCart className="w-8 h-8 text-indigo-500/40" />
                         </div>
-                        <h3 className="text-sm font-black uppercase tracking-widest opacity-40">Cart is Empty</h3>
+                        <h3 className="text-sm font-black tracking-widest opacity-40">Cart is Empty</h3>
                         <p className="text-[10px] font-medium text-slate-500 mt-1">Select items from the catalog above to bill</p>
                     </div>
                   )}
@@ -256,42 +269,39 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         <footer className={`fixed bottom-0 left-0 right-0 z-[100] border-t px-4 md:px-8 py-5 shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
             
-            {/* Bill Summary Card */}
             <div className={`w-full md:flex-1 border rounded-2xl px-6 py-4 flex items-center justify-between shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
               <div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total Payable</p>
+                <p className="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-1">Total Payable</p>
                 <p className="text-2xl font-black tracking-tighter text-indigo-500">₹{totalAmount.toLocaleString('en-IN')}</p>
               </div>
               <div className="flex gap-4">
                   <div className="text-right border-r border-slate-700/30 pr-4">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Items</p>
+                    <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Items</p>
                     <p className="text-sm font-black">{cart.length}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Qty</p>
+                    <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Qty</p>
                     <p className="text-sm font-black">{cart.reduce((a, b) => a + b.quantity, 0)}</p>
                   </div>
               </div>
             </div>
 
-            {/* Primary Actions */}
             <div className="w-full md:w-auto flex items-center gap-3 h-[68px]">
               <button
                 onClick={handleCancelTransaction}
                 className={`group h-full px-6 border rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
               >
                 <XCircle className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Discard</span>
+                <span className="text-[10px] font-black tracking-widest">Discard</span>
               </button>
 
               <button
                 onClick={() => setIsPaymentModalOpen(true)}
-                className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95"
+                className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-[11px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95"
               >
                 Collect Payment <ChevronRight className="w-5 h-5" />
               </button>
             </div>
-
           </div>
         </footer>
       )}

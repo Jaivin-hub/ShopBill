@@ -182,7 +182,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <h1 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tighter uppercase leading-none`}>
               Supply <span className="text-indigo-500">Chain</span>
             </h1>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1.5">Manage stock arrivals and vendors</p>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1.5">Manage stock arrivals</p>
           </div>
 
           <div className={`${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>

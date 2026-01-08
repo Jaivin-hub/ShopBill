@@ -40,22 +40,22 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
             case USER_ROLES.OWNER:
                 return {
                     title: `Owner's`,
-                    desc: `Hello ${name}, here’s how your business is performing today.`
+                    desc: `Manage operations and shop performance.`
                 };
             case USER_ROLES.MANAGER:
                 return {
-                    title: `Manager`,
-                    desc: `Ready to optimize? Monitor inventory levels and oversee daily operations from here.`
+                    title: `Manager's`,
+                    desc: `Optimize stock and daily tasks.`
                 };
             case USER_ROLES.CASHIER:
                 return {
-                    title: `Cashier`,
-                    desc: `Track your personal sales performance and manage active customer credit.`
+                    title: `Cashier's`,
+                    desc: `Sales tracking and credit management.`
                 };
             default:
                 return {
-                    title: `Business`,
-                    desc: `Monitor your daily activities and manage your shop efficiently.`
+                    title: `Business's`,
+                    desc: `Manage operations and shop performance.`
                 };
         }
     };
@@ -122,7 +122,7 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
             <div className="max-w-7xl mx-auto space-y-8">
                 
                 {/* DYNAMIC WELCOME HERO */}
-                <header className={`sticky top-0 z-[100]  space-y-1 ${themeBase}`}>
+                <header className={`sticky top-0 z-[100] pb-4  space-y-1 ${themeBase}`}>
                     <div className="flex items-center gap-2">
                         <h1 className="text-2xl font-black tracking-tight">{welcome.title} <span className="text-indigo-500">Dashboard</span></h1>
                     </div>
@@ -250,7 +250,7 @@ const Dashboard = ({ darkMode, userRole, currentUser, apiClient, API, showToast,
                                     ))}
                                 </div>
                             ) : (
-                                <EmptyState icon={ShoppingCart} title="Awaiting Sales" message="Open the bill counter to start selling." actionText="Open POS" onAction={() => setCurrentPage('billing')} />
+                                <EmptyState icon={ShoppingCart} title="Awaiting Sales" message="Open counter to start selling." actionText="Open POS" onAction={() => setCurrentPage('billing')} />
                             )}
                         </div>
                     </div>
