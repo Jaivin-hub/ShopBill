@@ -163,6 +163,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <input type="text" value={newCustomerName} placeholder="Customer Name"
                                 onChange={(e) => {setNewCustomerName(e.target.value); setFormErrors({...formErrors, name: null})}}
                                 className={`w-full border rounded-lg py-2.5 px-3 text-[11px] font-bold outline-none mt-1 ${theme.input} ${formErrors.name ? 'border-rose-500 ring-1 ring-rose-500' : 'focus:border-emerald-500'}`}
+                                style={{ fontSize: '16px' }}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -171,6 +172,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 <input type="tel" maxLength="10" value={newCustomerPhone} placeholder="9876..."
                                     onChange={(e) => {setNewCustomerPhone(e.target.value.replace(/[^0-9]/g, '')); setFormErrors({...formErrors, phone: null})}}
                                     className={`w-full border rounded-lg py-2.5 px-3 text-[11px] font-bold outline-none mt-1 ${theme.input} ${formErrors.phone ? 'border-rose-500 ring-1 ring-rose-500' : 'focus:border-emerald-500'}`}
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
                             <div>
@@ -178,6 +180,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 <input type="number" value={newCustomerCreditLimit} placeholder="5000"
                                     onChange={(e) => {setNewCustomerCreditLimit(e.target.value); setFormErrors({...formErrors, limit: null})}}
                                     className={`w-full border rounded-lg py-2.5 px-3 text-[11px] font-bold outline-none mt-1 ${theme.input} ${formErrors.limit ? 'border-rose-500 ring-1 ring-rose-500' : 'focus:border-emerald-500'}`}
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
                         </div>
@@ -237,7 +240,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                         <User className={`w-4 h-4 ${localSelectedCustomer.id === WALK_IN_CUSTOMER.id ? 'text-slate-500' : 'text-indigo-500'}`} />
                                     </div>
                                     <div className="truncate">
-                                        {console.log('localSelectedCustomer',localSelectedCustomer)}
                                         <p className="text-[11px] font-black uppercase truncate">{localSelectedCustomer.name}</p>
                                         {localSelectedCustomer.id !== 'walk_in' && (
                                             <div className="flex items-center gap-2 mt-0.5">
@@ -258,9 +260,15 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                     <div className="p-3 border-b border-inherit bg-slate-500/5">
                                         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-500/10">
                                             <Search className="w-3.5 h-3.5 text-slate-400" />
-                                            <input autoFocus type="text" placeholder="Search by name or mobile..." 
+                                            <input 
+                                                type="text" 
+                                                inputMode="search"
+                                                placeholder="Search by name or mobile..." 
                                                 className="w-full bg-transparent text-[11px] font-bold outline-none"
-                                                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                                style={{ fontSize: '16px' }} // Prevents iOS/Mobile zoom
+                                                value={searchTerm} 
+                                                onChange={e => setSearchTerm(e.target.value)} 
+                                            />
                                         </div>
                                     </div>
 
@@ -351,6 +359,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                     value={amountPaidInput} 
                                     onChange={e => {setAmountPaidInput(e.target.value); setCreditError(null);}}
                                     className={`w-full border rounded-xl py-3.5 pl-8 pr-4 text-sm font-black outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${theme.input}`}
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
                         </div>
