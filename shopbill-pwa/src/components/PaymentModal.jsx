@@ -23,6 +23,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     useEffect(() => {
         if (isOpen) {
             setAmountPaidInput(totalAmount.toString());
+            // Reset to UPI by default, but if a credit customer is picked, keep context
             setPaymentType(localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI');
             setSearchTerm(''); 
             setCreditError(null); 
@@ -41,29 +42,36 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const creditLimit = localSelectedCustomer.creditLimit || 0;
     const enteredPaid = parseFloat(amountPaidInput) || 0;
 
-    const { amountCredited, changeDue, paymentMethod, effectiveAmountPaid } = useMemo(() => {
+   const { amountCredited, changeDue, paymentMethod, effectiveAmountPaid } = useMemo(() => {
         let amtCred = 0;
         let chgDue = 0;
         let effPaid = 0;
         let method = 'UPI';
 
+        const total = parseFloat(totalAmount) || 0;
+        const paid = parseFloat(amountPaidInput) || 0;
+
         if (paymentType === 'Credit') {
-            amtCred = totalAmount;
+            amtCred = total;
             effPaid = 0;
             method = 'Credit';
         } else {
-            effPaid = enteredPaid;
-            if (enteredPaid >= totalAmount) {
-                chgDue = enteredPaid - totalAmount;
+            // Case: User pays more than or equal to total
+            if (paid >= total) {
+                effPaid = total; // We only record up to total as "paid"
+                chgDue = paid - total;
                 amtCred = 0;
                 method = 'Cash/UPI';
-            } else {
-                amtCred = totalAmount - enteredPaid;
-                method = enteredPaid > 0 ? 'Split Payment' : 'Credit';
+            } 
+            // Case: Partial Payment (The 100 paid, 400 credit scenario)
+            else {
+                effPaid = paid;
+                amtCred = total - paid;
+                method = paid > 0 ? 'Split Payment' : 'Credit';
             }
         }
         return { amountCredited: amtCred, changeDue: chgDue, paymentMethod: method, effectiveAmountPaid: effPaid };
-    }, [enteredPaid, totalAmount, paymentType]);
+    }, [amountPaidInput, totalAmount, paymentType]);
 
     const filteredOptions = useMemo(() => {
         const options = [
@@ -80,19 +88,32 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
     const handleConfirmPayment = async (force = false) => {
         if (totalAmount <= 0) return showToast('Cart is empty', 'error');
+        
+        // CRITICAL CHECK: If any amount is going to Credit, a real customer MUST be selected
         if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
-            return showToast('Please select a customer for Credit/Partial payments', 'error');
+            return showToast(`Please select a Customer to record the ₹${amountCredited.toLocaleString()} credit balance.`, 'error');
         }
         
         setIsSubmitting(true);
         try {
-            await processPayment(effectiveAmountPaid, amountCredited, paymentMethod, localSelectedCustomer, force);
+            // Send the exact split to the backend
+            await processPayment(
+                effectiveAmountPaid, 
+                amountCredited, 
+                paymentMethod, 
+                localSelectedCustomer, 
+                force
+            );
             setCreditError(null);
             onClose();
         } catch (error) {
             const msg = error.response?.data?.error || error.response?.data?.message || 'Transaction Failed';
-            if (msg.toLowerCase().includes('limit')) setCreditError({ message: msg });
-            else showToast(msg, 'error');
+            // If backend returns a limit error, show the override button
+            if (msg.toLowerCase().includes('limit')) {
+                setCreditError({ message: msg });
+            } else {
+                showToast(msg, 'error');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -100,7 +121,6 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
     if (!isOpen) return null;
 
-    // Theme dynamic classes
     const modalBg = darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200';
     const headerBg = darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-50 border-slate-200';
     const subBg = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200';

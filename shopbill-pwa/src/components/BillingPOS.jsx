@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 
@@ -12,6 +12,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastAddedId, setLastAddedId] = useState(null);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -46,7 +47,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, searchTerm, scannedBarcode]);
 
-  const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => c._id !== WALK_IN_CUSTOMER._id)], [customers]);
+  const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id)], [customers]);
 
   const addItemToCart = useCallback((itemToAdd) => {
     setCart(prevCart => {
@@ -61,6 +62,9 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
       }
       return [...prevCart, { ...itemToAdd, quantity: 1 }];
     });
+    
+    setLastAddedId(itemToAdd._id);
+    setTimeout(() => setLastAddedId(null), 500);
   }, [inventory, showToast]);
 
   const updateCartQuantity = useCallback((itemId, amount) => {
@@ -88,25 +92,48 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
     showToast("Transaction Discarded", "info");
   };
 
-  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
+  const scrollToCart = () => {
+    const cartSection = document.getElementById('billing-list-section');
+    if (cartSection) {
+      cartSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // UPDATED: Process Payment now handles mixed/split data correctly
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, force = false) => {
     if (totalAmount <= 0) return;
+    
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
+    
+    // Construct the payload to match the backend expectation
     const saleData = {
-      totalAmount, paymentMethod, customer: customerToBill.name,
-      customerId: customerToBill._id,
-      items: cart.map(item => ({ itemId: item._id, name: item.name, quantity: item.quantity, price: item.price })),
-      amountPaid, amountCredited,
+      totalAmount: totalAmount,
+      paymentMethod: paymentMethod, // 'Split Payment', 'Cash/UPI', or 'Credit'
+      customer: customerToBill.name,
+      customerId: (customerToBill._id || customerToBill.id),
+      items: cart.map(item => ({ 
+        itemId: item._id, 
+        name: item.name, 
+        quantity: item.quantity, 
+        price: item.price 
+      })),
+      // Ensure these are numbers
+      amountPaid: parseFloat(amountPaid) || 0,
+      amountCredited: parseFloat(amountCredited) || 0,
+      forceOverride: force 
     };
+
     try {
       await apiClient.post(API.sales, saleData);
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
-      fetchData();
+      fetchData(); // Refresh inventory and customer balances
     } catch (error) {
-      showToast('Process error.', 'error');
+      // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
+      throw error; 
     }
-  }, [totalAmount, cart, apiClient, API.sales, fetchData, showToast]);
+  }, [totalAmount, cart, apiClient, API.sales, fetchData, showToast])
 
   const handlePhysicalScannerInput = (e) => {
     if (e.key === 'Enter' && searchTerm) {
@@ -116,7 +143,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
     }
   }
 
-  // Styling logic based on Dashboard theme
   const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
@@ -136,21 +162,18 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .product-grid-scroll { max-height: 450px; overflow-y: auto; }
-        
-        /* Fixed zoom logic that doesn't break page width */
-        .no-zoom-input {
-          font-size: 16px !important; 
-        }
+        .no-zoom-input { font-size: 16px !important; }
         @media (max-width: 768px) {
-          .no-zoom-input {
-            transform: scale(0.8);
-            transform-origin: left center;
-            width: 125% !important;
-          }
+          .no-zoom-input { transform: scale(0.8); transform-origin: left center; width: 125% !important; }
         }
+        @keyframes cartPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .cart-animate { animation: cartPulse 0.3s ease-in-out; }
       `}</style>
 
-      {/* --- STICKY HEADER --- */}
       <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -167,7 +190,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
             </div>
           </div>
 
-          {/* This wrapper MUST have overflow-hidden to stop the 'width: 125%' input from making the page scroll left */}
           <div className="relative group overflow-hidden rounded-2xl">
             <Search className={`w-4.5 h-4.5 absolute left-4 top-1/2 -translate-y-1/2 z-10 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
             <input
@@ -183,19 +205,14 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         </div>
       </header>
 
-      {/* --- WORKSPACE --- */}
-      {/* Removed overflow-x-hidden from main to ensure sticky logic isn't blocked by overflow properties */}
       <main className="flex-1 px-4 md:px-8 py-6">
         <div className="max-w-7xl mx-auto space-y-8 pb-44">
-            
-            {/* COMPACT PRODUCT CATALOG */}
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex items-center gap-2">
                     <Box className="w-4 h-4 text-indigo-500" />
                     <p className="text-[10px] font-black text-slate-500 tracking-widest">Catalog ({filteredInventory.length})</p>
                 </div>
-                <p className="text-[9px] font-bold text-slate-400">Click to add</p>
               </div>
               
               <div className="product-grid-scroll custom-scroll pr-2">
@@ -204,7 +221,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                     <button
                         key={item._id}
                         onClick={() => addItemToCart(item)}
-                        className={`p-3 rounded-xl border transition-all text-left active:scale-95 group relative overflow-hidden ${cardBase} hover:border-indigo-500/50`}
+                        className={`p-3 rounded-xl border transition-all text-left active:scale-95 group relative overflow-hidden ${cardBase} hover:border-indigo-500/50 ${lastAddedId === item._id ? 'border-indigo-500 ring-2 ring-indigo-500/20' : ''}`}
                     >
                         <div className="relative z-10">
                             <p className="text-[9px] font-black truncate mb-1 leading-tight group-hover:text-indigo-500">{item.name}</p>
@@ -219,8 +236,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               </div>
             </section>
 
-            {/* BILLING ITEMS */}
-            <section>
+            <section id="billing-list-section">
               <div className="flex items-center gap-2 mb-4 px-1">
                 <ShoppingCart className="w-4 h-4 text-indigo-500" />
                 <p className="text-[10px] font-black text-slate-500 tracking-widest">Billing List ({cart.length})</p>
@@ -255,7 +271,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
                             <ShoppingCart className="w-8 h-8 text-indigo-500/40" />
                         </div>
                         <h3 className="text-sm font-black tracking-widest opacity-40">Cart is Empty</h3>
-                        <p className="text-[10px] font-medium text-slate-500 mt-1">Select items from the catalog above to bill</p>
                     </div>
                   )}
               </div>
@@ -263,12 +278,29 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         </div>
       </main>
 
-      {/* --- FLOATING ACTION FOOTER --- */}
+      {cart.length > 0 && (
+          <div className="md:hidden fixed bottom-[100px] left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-bottom-4 fade-in duration-300">
+              <button 
+                onClick={scrollToCart}
+                className="bg-indigo-600 text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-3 active:scale-90 transition-transform cart-animate"
+              >
+                  <div className="relative">
+                    <ShoppingCart className="w-4 h-4" />
+                    <span className="absolute -top-2 -right-2 bg-rose-500 text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full border-2 border-indigo-600">
+                        {cart.length}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest">View Cart</span>
+                  <ArrowDown className="w-3 h-3 animate-bounce" />
+              </button>
+          </div>
+      )}
+
       {cart.length > 0 && (
         <footer className={`fixed bottom-0 left-0 right-0 z-[100] border-t px-4 md:px-8 py-5 shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
             
-            <div className={`w-full md:flex-1 border rounded-2xl px-6 py-4 flex items-center justify-between shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+            <div className={`w-full md:flex-1 border rounded-2xl px-6 py-4 flex items-center justify-between shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
               <div>
                 <p className="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-1">Total Payable</p>
                 <p className="text-2xl font-black tracking-tighter text-indigo-500">₹{totalAmount.toLocaleString('en-IN')}</p>
@@ -305,7 +337,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         </footer>
       )}
 
-      {/* MODALS */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
