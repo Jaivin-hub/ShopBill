@@ -43,7 +43,7 @@ const loadRazorpayScript = (src) => {
     });
 };
 
-// --- REDESIGNED MODALS ---
+// --- MODALS ---
 const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, startUpgradeFlow, getModalWarningMessage, darkMode }) => {
     if (!selectedPlan) return null;
     const modalWarning = getModalWarningMessage(selectedPlan);
@@ -56,17 +56,19 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
                     <div className="w-16 h-16 bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-6">
                         <Crown className="w-8 h-8 text-indigo-500" />
                     </div>
-                    <h2 className={`text-2xl font-black  tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>
+                    <h2 className={`text-2xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>
                         Confirm {selectedPlan.name}
                     </h2>
-                    <p className={`text-xs font-bold  tracking-widest mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Tier Transition</p>
+                    <p className={`text-xs font-bold tracking-widest mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Tier Transition</p>
                 </div>
                 
                 <div className="p-8 space-y-6">
                     <p className={`text-sm font-bold leading-relaxed ${darkMode ? 'text-gray-300' : 'text-slate-800'}`} dangerouslySetInnerHTML={{ __html: modalWarning.title }} />
 
                     <div className={`rounded-2xl p-4 flex items-start gap-4 border ${isYellowWarning ? 'bg-amber-500/5 border-amber-500/20' : 'bg-indigo-500/5 border-indigo-500/20'}`}>
-                        <Info className={`w-5 h-5 shrink-0 ${isYellowWarning ? 'text-amber-500' : 'text-indigo-500'}`} />
+                        <span className="mt-1">
+                            <Info className={`w-5 h-5 shrink-0 ${isYellowWarning ? 'text-amber-500' : 'text-indigo-500'}`} />
+                        </span>
                         <p className={`text-[11px] font-bold leading-relaxed ${isYellowWarning ? (darkMode ? 'text-amber-200/70' : 'text-amber-900') : (darkMode ? 'text-indigo-200/70' : 'text-indigo-900')}`} dangerouslySetInnerHTML={{ __html: modalWarning.detail }} />
                     </div>
                 </div>
@@ -75,7 +77,7 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
                     <button
                         onClick={() => startUpgradeFlow(selectedPlan)}
                         disabled={isUpgrading}
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                     >
                         {isUpgrading ? <Loader className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
                         {isUpgrading ? 'Processing...' : 'Authorize Mandate'}
@@ -83,7 +85,7 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
                     <button
                         onClick={() => setShowConfirmModal(false)}
                         disabled={isUpgrading}
-                        className={`w-full py-3 text-[10px] font-black  tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-slate-500 hover:text-black'}`}
+                        className={`w-full py-3 text-[10px] font-black tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-slate-500 hover:text-black'}`}
                     >
                         Cancel Transaction
                     </button>
@@ -101,14 +103,14 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <XCircle className="w-8 h-8 text-red-500" />
                     </div>
-                    <h2 className={`text-xl font-black  tracking-tighter mb-2 ${darkMode ? 'text-white' : 'text-black'}`}>
+                    <h2 className={`text-xl font-black tracking-tighter mb-2 ${darkMode ? 'text-white' : 'text-black'}`}>
                         {alreadyInTerminalState ? 'Subscription Status' : 'Terminate Access'}
                     </h2>
                     <div className={`text-sm font-bold leading-relaxed mb-6 ${darkMode ? 'text-gray-400' : 'text-slate-700'}`} dangerouslySetInnerHTML={{ __html: cancellationMessage }} />
 
                     <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4 flex items-start gap-3 text-left">
                         <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-                        <p className={`text-[10px] font-black  tracking-tight leading-normal ${darkMode ? 'text-red-400' : 'text-red-700'}`}
+                        <p className={`text-[10px] font-black tracking-tight leading-normal ${darkMode ? 'text-red-400' : 'text-red-700'}`}
                             dangerouslySetInnerHTML={{
                                 __html: isCurrentlyInTrial()
                                     ? `Mandate <strong>cancelled</strong>. Trial ends ${formatDate(planDetails.planEndDate)}.`
@@ -123,14 +125,14 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
                         <button
                             onClick={handleConfirmCancellation}
                             disabled={isCancelling}
-                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black text-xs  tracking-widest transition-all active:scale-95"
+                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black text-xs tracking-widest transition-all active:scale-95"
                         >
                             {isCancelling ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : 'Confirm Cancellation'}
                         </button>
                     )}
                     <button
                         onClick={() => setShowCancelModal(false)}
-                        className={`w-full py-3 text-[10px] font-black  tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-slate-500 hover:text-black'}`}
+                        className={`w-full py-3 text-[10px] font-black tracking-widest transition ${darkMode ? 'text-gray-500 hover:text-white' : 'text-slate-500 hover:text-black'}`}
                     >
                         {alreadyInTerminalState ? 'Dismiss' : 'Keep Current Plan'}
                     </button>
@@ -202,7 +204,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         setIsLoading(true);
         try {
             const planResponse = await apiClient.get(API.currentPlan);
-            const fetchedPlanName = planResponse?.data?.plan?.to() || 'BASIC';
+            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || 'BASIC';
             const fetchedPlanEndDate = planResponse?.data?.planEndDate ? new Date(planResponse.data.planEndDate) : null;
             const fetchedSubscriptionStatus = planResponse?.data?.subscriptionStatus || null;
             setCurrentPlan(fetchedPlanName);
@@ -242,10 +244,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 razorpay_subscription_id: response.razorpay_subscription_id,
-                newPlan: newPlanId.to(),
+                newPlan: newPlanId.toUpperCase(),
             });
             if (verificationResponse.data.success) {
-                showToast(`Provisioning ${newPlanId.to()} Tier...`, 'success');
+                showToast(`Provisioning ${newPlanId.toUpperCase()} Tier...`, 'success');
             } else {
                 showToast(verificationResponse.data.error || 'Verification failed.', 'error');
             }
@@ -268,7 +270,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         }
         try {
             const serverResponse = await apiClient.post(API.upgradePlan, {
-                newPlan: newPlan.id.to(),
+                newPlan: newPlan.id.toUpperCase(),
             });
             const { subscriptionId, amount, currency, keyId } = serverResponse.data;
             const options = {
@@ -327,7 +329,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         return (
             <div className={`min-h-screen flex flex-col items-center justify-center ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
                 <Loader className="w-10 h-10 animate-spin text-indigo-500" />
-                <p className={`text-[10px] font-black  tracking-widest mt-4 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Validating Billing...</p>
+                <p className={`text-[10px] font-black tracking-widest mt-4 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Validating Billing...</p>
             </div>
         );
     }
@@ -345,32 +347,36 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         };
     };
 
+    // --- UPDATED DESIGN: MATCHING SETTINGS HEADER ---
+    const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white/95 border-slate-300 shadow-sm';
+
     return (
         <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
-            {/* --- RESPONSIVE STICKY HEADER (Matches SalesActivityPage) --- */}
-            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
+            {/* UPDATED STICKY HEADER PARTNER */}
+            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={onBack} className={`p-2 border rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    <div className="flex items-center gap-4">
+                        <button onClick={onBack} className={`p-2 border rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                         <div>
-                            <h1 className={`text-2xl md:text-lg font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                            <h1 className={`text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
                                 Billing <span className="text-indigo-600">Engine</span>
                             </h1>
-                            <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                High performance subscription management
+                            <p className={`text-[9px] font-bold tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
+                                Secure Gateway Active
                             </p>
                         </div>
                     </div>
-                    <div className={`hidden md:flex items-center gap-3 px-4 py-2 border rounded-xl ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-50 border-slate-200'}`}>
-                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span className={`text-[10px] font-black  tracking-widest ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>Secure Gateway Active</span>
+
+                    <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-full border ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
+                        <ShieldCheck className={`w-3 h-3 ${darkMode ? 'text-indigo-500' : 'text-emerald-600'}`} />
+                        <span className={`text-[9px] font-black tracking-widest ${darkMode ? 'text-indigo-500' : 'text-emerald-600'}`}>PROTECTED BY AES-256</span>
                     </div>
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 pb-32">
+            <div className="max-w-7xl mx-auto p-6 md:p-10 pb-32 space-y-8">
                 {/* CURRENT SUBSCRIPTION CARD */}
                 {currentPlan && (
                     <section className={`border rounded-[1.25rem] p-6 md:p-8 ${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-300 shadow-md'}`}>
@@ -380,9 +386,9 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                                     <Zap className="w-8 h-8 text-indigo-600" />
                                 </div>
                                 <div>
-                                    <p className={`text-[10px] font-black  tracking-[0.2em] ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Active Tier</p>
-                                    <h2 className={`text-2xl font-black tracking-tighter  ${darkMode ? 'text-white' : 'text-black'}`}>{currentPlan}</h2>
-                                    <p className={`text-[10px] font-bold mt-1  ${isPlanExpiring ? 'text-red-600' : 'text-emerald-600'}`}>
+                                    <p className={`text-[10px] font-black tracking-[0.2em] ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Active Tier</p>
+                                    <h2 className={`text-2xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>{currentPlan}</h2>
+                                    <p className={`text-[10px] font-bold mt-1 ${isPlanExpiring ? 'text-red-600' : 'text-emerald-600'}`}>
                                         {isPlanExpiring ? `Terminating on ${formatDate(planDetails.planEndDate)}` : `Next Billing: ${formatDate(planDetails.planEndDate)}`}
                                     </p>
                                 </div>
@@ -391,7 +397,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                             <button
                                 onClick={handlePrepareCancellation}
                                 disabled={isCancelling}
-                                className={`px-8 py-4 border rounded-2xl font-black text-xs  tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-gray-950 border-gray-800 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-slate-50 border-slate-300 text-red-600 hover:bg-red-600 hover:text-white'}`}
+                                className={`px-8 py-4 border rounded-2xl font-black text-xs tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-gray-950 border-gray-800 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-slate-50 border-slate-300 text-red-600 hover:bg-red-600 hover:text-white'}`}
                             >
                                 {isPlanExpiring ? 'Manage Cancellation' : 'Cancel Subscription'}
                             </button>

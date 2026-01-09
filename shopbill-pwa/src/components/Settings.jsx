@@ -131,7 +131,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
     const handleStaffPermissionsClick = () => setCurrentView('staff');
     const handleChangePasswordClick = () => setCurrentView('password');
-    const handlePlanUpgradeClick = () => setCurrentView('plan');
+    const handlePlanUpgradeClick = () => {
+        setPageOrigin('settings');
+        setCurrentPage('planUpgrade');
+    }
     
     const handleLogout = () => {
         setConfirmModal({
@@ -292,8 +295,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                 return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} darkMode={darkMode} />;
             case 'staff':
                 return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} setConfirmModal={setConfirmModal} darkMode={darkMode} />;
-            case 'plan':
-                return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={() => setCurrentView('main')} darkMode={darkMode} />;
             case 'main':
             default:
                 return renderSettingsList();

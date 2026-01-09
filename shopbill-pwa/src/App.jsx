@@ -34,6 +34,7 @@ import SupportPage from './components/SupportPage';
 import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
 import SupplyChainManagement from './components/SupplyChainManagement';
+import PlanUpgrade from './components/PlanUpgrade';
 
 // UpdatePrompt Component
 const UpdatePrompt = () => {
@@ -225,6 +226,15 @@ const App = () => {
     if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} />;
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
+    if (currentPage === 'planUpgrade') {
+        return <PlanUpgrade 
+          apiClient={apiClient} 
+          showToast={showToast} 
+          currentUser={currentUser} 
+          onBack={handleBackToOrigin} 
+          darkMode={darkMode} 
+        />;
+    }
 
     if (currentPage === 'checkout') {
       return (
