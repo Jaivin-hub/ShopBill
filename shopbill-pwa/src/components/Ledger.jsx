@@ -14,15 +14,15 @@ const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   
-  /* Prevent Auto-Zoom on iOS */
+  /* Prevent Auto-Zoom on iOS and Horizontal Jump */
   .no-zoom-input {
     font-size: 16px !important;
   }
   @media (max-width: 768px) {
     .no-zoom-input {
-      transform: scale(0.8);
+      transform: scale(0.9);
       transform-origin: left center;
-      width: 125% !important;
+      width: 111% !important;
     }
   }
 `;
@@ -107,14 +107,14 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
+    <div className={`h-screen flex flex-col overflow-hidden transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
-      {/* --- PREMIUM HEADER --- */}
-      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+      {/* --- STICKY HEADER --- */}
+      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-4 md:py-6 flex-none ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl md:text-2xl font-black tracking-tight flex items-center gap-2">
               Ledger <span className="text-indigo-500">Terminal</span>
             </h1>
             <div className="flex items-center gap-2">
@@ -125,13 +125,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setShowSearch(!showSearch); setShowSort(false); }}
-              className={`p-3 rounded-2xl border transition-all active:scale-90 ${showSearch ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
+              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSearch ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
             >
               <Search size={18} />
             </button>
             <button
               onClick={() => { setShowSort(!showSort); setShowSearch(false); }}
-              className={`p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
+              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
             >
               <Filter size={18} />
             </button>
@@ -144,23 +144,23 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           </div>
         </div>
 
-        {/* --- EXPANDABLE SEARCH/FILTER --- */}
+        {/* --- EXPANDABLE SEARCH/FILTER (Stay inside Header) --- */}
         {(showSearch || showSort) && (
-          <div className="max-w-7xl mx-auto mt-5 animate-in fade-in slide-in-from-top-3">
+          <div className="max-w-7xl mx-auto mt-4 animate-in fade-in slide-in-from-top-3">
             {showSearch ? (
-              <div className="relative group">
+              <div className="relative group px-1">
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-500 transition-colors z-10" />
                 <input
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="SEARCH BY ACCOUNT NAME OR CONTACT..."
-                  className={`no-zoom-input w-full border rounded-2xl py-4.5 pl-14 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
+                  placeholder="SEARCH ACCOUNT..."
+                  className={`no-zoom-input w-full border rounded-2xl py-4 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
                 />
-                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />
+                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />
               </div>
             ) : (
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
                 {[
                   { id: 'due-high', label: 'Highest Priority' },
                   { id: 'due-low', label: 'Settled Priority' },
@@ -169,7 +169,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                   <button
                     key={opt.id}
                     onClick={() => setSortBy(opt.id)}
-                    className={`px-8 py-3 rounded-2xl text-[9px] font-black border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
+                    className={`px-6 py-3 rounded-2xl text-[9px] font-black border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
                   >
                     {opt.label}
                   </button>
@@ -181,43 +181,41 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       {/* --- WORKSPACE --- */}
-      <main className="flex-1 px-4 py-3 overflow-y-auto custom-ledger-scroll">
-        <div className="max-w-7xl mx-auto space-y-8 pb-32">
+      <main className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-ledger-scroll">
+        <div className="max-w-7xl mx-auto space-y-4 pb-32">
 
           {/* TOP METRICS SECTION */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className={`lg:col-span-8 rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
+          <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 flex-none ${cardBase}`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
 
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-5">
-                  <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
-                    <AlertCircle size={20} />
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">
-                      Total Outstanding
-                    </p>
-                    <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
-                      ₹{totalOutstanding.toLocaleString('en-IN')}
-                    </h2>
-                  </div>
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-5">
+                <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
+                  <AlertCircle size={20} />
                 </div>
 
-                <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Risk Status</p>
-                  <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
-                    MONITORED
-                  </span>
+                <div>
+                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">
+                    Total Outstanding
+                  </p>
+                  <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
+                    ₹{totalOutstanding.toLocaleString('en-IN')}
+                  </h2>
                 </div>
+              </div>
+
+              <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Risk Status</p>
+                <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                  MONITORED
+                </span>
               </div>
             </div>
           </div>
 
           {/* ACCOUNTS LIST SECTION */}
           <div className={`rounded-xl border overflow-hidden ${cardBase}`}>
-            <div className="px-8 py-7 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
+            <div className="px-6 py-5 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-500">
                   <LayoutGrid size={20} />
@@ -229,7 +227,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
               </div>
             </div>
 
-            <div className="p-4 md:p-6">
+            <div className="p-3 md:p-6">
               <CustomerList
                 customersList={customers}
                 searchTerm={searchTerm}
@@ -245,9 +243,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         </div>
       </main>
 
+      {/* MOBILE FAB */}
       <button
         onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="md:hidden fixed bottom-20 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
+        className="md:hidden fixed bottom-24 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
       >
         <UserPlus size={24} />
       </button>
