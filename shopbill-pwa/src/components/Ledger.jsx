@@ -114,7 +114,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
               Ledger <span className="text-indigo-500">Terminal</span>
             </h1>
             <div className="flex items-center gap-2">

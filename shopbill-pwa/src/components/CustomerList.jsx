@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react'; 
 import { 
-    List, IndianRupee, History, Phone, Search, 
+    IndianRupee, History, Phone, Search, 
     ShieldAlert, CheckCircle2, UserCircle2, BellRing,
-    ChevronRight, ArrowUpRight, Scale, AlertCircle
+    ArrowUpRight, AlertCircle, Wallet
 } from 'lucide-react';
 
 const CustomerList = ({ 
@@ -40,8 +40,8 @@ const CustomerList = ({
         const limitUsage = creditLimit > 0 ? Math.min((outstandingAmount / creditLimit) * 100, 100) : 0;
         
         // Theme-aware styles
-        const cardBg = darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
-        const innerBg = darkMode ? 'bg-gray-950/50 border-gray-800/50' : 'bg-slate-50 border-slate-100';
+        const cardBg = darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
+        const innerBg = darkMode ? 'bg-slate-950/40 border-slate-800/60' : 'bg-slate-50/80 border-slate-100';
         
         let statusConfig = {
             label: 'Settled', color: 'text-emerald-500', bg: 'bg-emerald-500/10',
@@ -50,107 +50,116 @@ const CustomerList = ({
 
         if (isOverLimit) {
             statusConfig = {
-                label: 'Limit Exceeded', color: 'text-red-500', bg: 'bg-red-500/10',
-                border: 'border-red-500/30', icon: ShieldAlert
+                label: 'Limit Over', color: 'text-rose-500', bg: 'bg-rose-500/10',
+                border: 'border-rose-500/30', icon: ShieldAlert
             };
         } else if (outstandingAmount > 0) {
             statusConfig = {
-                label: 'Outstanding', color: 'text-amber-500', bg: 'bg-amber-500/10',
+                label: 'Pending', color: 'text-amber-500', bg: 'bg-amber-500/10',
                 border: 'border-amber-500/20', icon: AlertCircle
             };
         }
 
         return (
-            <div key={customer._id} className={`${cardBg} border rounded-xl p-5 group transition-all duration-300 hover:border-indigo-500/50 flex flex-col justify-between`}>
-                <div>
-                    {/* HEADER SECTION */}
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${statusConfig.bg} ${statusConfig.border}`}>
-                                <UserCircle2 className={`w-5 h-5 ${statusConfig.color}`} />
-                            </div>
-                            <div className="flex flex-col">
-                                <h3 className={`text-sm font-black uppercase tracking-tight truncate max-w-[140px] ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    {customer.name}
-                                </h3>
-                                <span className={`text-[9px] font-bold uppercase tracking-widest ${statusConfig.color} flex items-center gap-1`}>
-                                    <statusConfig.icon className="w-2.5 h-2.5" /> {statusConfig.label}
-                                </span>
+            <div key={customer._id} className={`${cardBg} border rounded-2xl p-4 flex flex-col transition-all duration-300 hover:ring-2 hover:ring-indigo-500/20 group`}>
+                
+                {/* 1. TOP SECTION: Identity & Status */}
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 transition-all ${statusConfig.bg} ${statusConfig.border}`}>
+                            <UserCircle2 className={`w-6 h-6 ${statusConfig.color}`} />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className={`text-[13px] font-black  tracking-tight truncate leading-none mb-1.5 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {customer.name}
+                            </h3>
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-black  tracking-widest ${statusConfig.bg} ${statusConfig.border} ${statusConfig.color}`}>
+                                <statusConfig.icon className="w-2 h-2" /> {statusConfig.label}
                             </div>
                         </div>
-                        {outstandingAmount > 0 && (
-                            <button 
-                                onClick={() => setActiveModal('remind')}
-                                className={`p-2 rounded-lg border transition-all ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-amber-600 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-amber-500 hover:text-white'}`}
-                            >
-                                <BellRing className="w-3.5 h-3.5" />
-                            </button>
-                        )}
                     </div>
+                    {outstandingAmount > 0 && (
+                        <button 
+                            onClick={() => setActiveModal('remind')}
+                            className={`p-2 rounded-lg border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-amber-600 hover:text-white' : 'bg-white border-slate-200 text-slate-500 hover:bg-amber-500 hover:text-white'}`}
+                        >
+                            <BellRing className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
 
-                    {/* BALANCE DATA */}
-                    <div className={`${innerBg} border rounded-lg p-4 mb-4`}>
-                        <div className="flex justify-between items-end">
-                            <div className="space-y-1">
-                                <p className="text-[8px] font-black text-gray-500 uppercase tracking-[0.15em]">Due Balance</p>
-                                <p className={`text-2xl font-black italic tracking-tighter ${outstandingAmount > 0 ? statusConfig.color : 'text-gray-400 opacity-40'}`}>
-                                    ₹{outstandingAmount.toLocaleString('en-IN')}
-                                </p>
+                {/* 2. MIDDLE SECTION: Balance Detail */}
+                <div className={`${innerBg} border rounded-xl p-4 mb-4 relative overflow-hidden`}>
+                    <div className="relative z-10">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-[8px] font-black text-slate-500  tracking-widest mb-1 opacity-70">Current Balance</p>
+                                <div className="flex items-center gap-1">
+                                    <span className={`text-sm font-black ${outstandingAmount > 0 ? 'text-indigo-500' : 'text-slate-400'}`}>₹</span>
+                                    <p className={`text-2xl font-black tracking-tighter ${outstandingAmount > 0 ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-400 opacity-40'}`}>
+                                        {outstandingAmount.toLocaleString('en-IN')}
+                                    </p>
+                                </div>
                             </div>
                             <div className="text-right">
                                 {customer.phone && (
-                                    <div className={`flex items-center justify-end gap-1 text-[9px] font-mono font-bold ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                                    <div className={`flex items-center justify-end gap-1.5 text-[9px] font-bold ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                         <Phone className="w-2.5 h-2.5" /> {customer.phone}
                                     </div>
                                 )}
-                                {creditLimit > 0 && (
-                                    <div className="text-[8px] font-black text-gray-500 uppercase mt-1">Limit: ₹{creditLimit.toLocaleString()}</div>
-                                )}
+                                <div className="mt-2">
+                                    <p className="text-[7px] font-black text-slate-400  tracking-tighter">Credit Cap</p>
+                                    <p className={`text-[10px] font-black ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        {creditLimit > 0 ? `₹${creditLimit.toLocaleString()}` : 'No Limit'}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* PROGRESS BAR */}
+                        {/* Progress Indicator */}
                         {creditLimit > 0 && (
-                            <div className="mt-4 space-y-1">
-                                <div className="flex justify-between text-[7px] font-black uppercase text-gray-500 tracking-widest">
-                                    <span>Credit Usage</span>
-                                    <span className={isOverLimit ? 'text-red-500' : ''}>{Math.round(limitUsage)}%</span>
+                            <div className="mt-4 pt-3 border-t border-slate-500/10">
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-[7px] font-black text-slate-500  tracking-[0.1em]">Utilization</span>
+                                    <span className={`text-[8px] font-black ${isOverLimit ? 'text-rose-500' : 'text-indigo-500'}`}>{Math.round(limitUsage)}%</span>
                                 </div>
-                                <div className={`h-1 w-full rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`}>
+                                <div className={`h-1.5 w-full rounded-full overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}>
                                     <div 
-                                        className={`h-full transition-all duration-700 ${isOverLimit ? 'bg-red-500' : 'bg-indigo-500'}`}
+                                        className={`h-full transition-all duration-1000 ease-out rounded-full ${isOverLimit ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-indigo-500'}`}
                                         style={{ width: `${limitUsage}%` }}
                                     />
                                 </div>
                             </div>
                         )}
                     </div>
+                    {/* Watermark Icon */}
+                    <Wallet className={`absolute -right-2 -bottom-2 w-12 h-12 opacity-[0.03] ${darkMode ? 'text-white' : 'text-slate-900'}`} />
                 </div>
 
-                {/* ACTION BUTTONS */}
-                <div className="flex gap-2 pt-2">
+                {/* 3. BOTTOM SECTION: Actions */}
+                <div className="grid grid-cols-2 gap-2">
                     <button 
                         onClick={() => openHistoryModal(customer)} 
-                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border transition-all active:scale-95 ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+                        className={`py-3 rounded-xl text-[9px] font-black  tracking-widest flex items-center justify-center gap-2 border transition-all active:scale-95 ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'}`}
                     >
-                        <History className="w-3.5 h-3.5" /> History
+                        <History className="w-3.5 h-3.5 opacity-60" /> History
                     </button>
                     <button 
                         onClick={() => openPaymentModal(customer)} 
                         disabled={isProcessing || outstandingAmount <= 0} 
-                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-sm
+                        className={`py-3 rounded-xl text-[9px] font-black  tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg
                             ${outstandingAmount > 0 
-                                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' 
-                                : `cursor-not-allowed border ${darkMode ? 'bg-gray-900 text-gray-700 border-gray-800' : 'bg-slate-50 text-slate-300 border-slate-200'}`
+                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20' 
+                                : `cursor-not-allowed border ${darkMode ? 'bg-slate-900 text-slate-700 border-slate-800 shadow-none' : 'bg-slate-100 text-slate-300 border-slate-200 shadow-none'}`
                             }`}
                     >
                         {outstandingAmount > 0 ? (
                             <>
-                                <IndianRupee className="w-3.5 h-3.5" /> Collect
+                                <IndianRupee className="w-3 h-3" /> Collect
                             </>
                         ) : (
                             <>
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Settled
+                                <CheckCircle2 className="w-3 h-3" /> Settled
                             </>
                         )}
                     </button>
@@ -160,18 +169,18 @@ const CustomerList = ({
     };
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-24">
             {processedCustomers.length > 0 ? (
                 processedCustomers.map(renderCustomerCard)
             ) : (
-                <div className={`col-span-full py-20 text-center rounded-2xl border-2 border-dashed transition-all ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className={`inline-flex p-5 rounded-xl mb-4 ${darkMode ? 'bg-gray-900' : 'bg-white shadow-sm'}`}>
-                        <Search className={`w-10 h-10 ${darkMode ? 'text-gray-800' : 'text-slate-200'}`} />
+                <div className={`col-span-full py-24 text-center rounded-[2rem] border-2 border-dashed transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className={`inline-flex p-6 rounded-2xl mb-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
+                        <Search className={`w-12 h-12 ${darkMode ? 'text-slate-800' : 'text-slate-200'}`} />
                     </div>
-                    <p className={`text-lg font-black uppercase tracking-tighter ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                    <h4 className={`text-xl font-black  tracking-tighter ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         No Accounts Found
-                    </p>
-                    <p className="text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-[0.2em]">Refine search filters</p>
+                    </h4>
+                    <p className="text-[10px] font-bold text-slate-500 mt-2  tracking-[0.3em] opacity-60">Try adjusting your filters</p>
                 </div>
             )}
         </div>
