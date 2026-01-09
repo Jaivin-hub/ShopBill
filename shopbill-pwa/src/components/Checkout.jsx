@@ -209,7 +209,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-10 h-10 text-emerald-500 animate-pulse" />
                 </div>
-                <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">You're All Set!</h2>
+                <h2 className="text-3xl font-black text-white  tracking-tighter mb-4">You're All Set!</h2>
                 <p className="text-gray-400 font-bold leading-relaxed mb-6">Account created. Your 30-day trial has started.</p>
                 <div className="flex items-center justify-center space-x-2 text-indigo-400 font-bold">
                     <Loader className="w-4 h-4 animate-spin" />
@@ -229,9 +229,9 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                         <header className="mb-10">
                             <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-4">
                                 <Zap className="w-3 h-3 text-indigo-400" />
-                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">30-Day Free Trial</span>
+                                <span className="text-[10px] font-black text-indigo-400  tracking-widest">30-Day Free Trial</span>
                             </div>
-                            <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Business Registration</h1>
+                            <h1 className="text-3xl font-black text-white  tracking-tighter">Business Registration</h1>
                         </header>
 
                         <form onSubmit={handlePaymentSubmit} className="space-y-6">
@@ -242,7 +242,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} />
                                 
                                 <div className="relative" ref={dropdownRef}>
-                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Mobile Number</label>
+                                    <label className="text-[10px] font-black text-gray-500  tracking-widest mb-2 block">Mobile Number</label>
                                     <div className={`flex bg-gray-950 rounded-2xl border transition-all ${phoneError ? 'border-red-500' : 'border-gray-800 focus-within:border-indigo-500'}`}>
                                         <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-4 border-r border-gray-800 flex items-center space-x-2 text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[90px]">
                                             <span>{selectedCountry.flag}</span>
@@ -261,7 +261,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                             ))}
                                         </div>
                                     )}
-                                    {phoneError && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase">{phoneError}</p>}
+                                    {phoneError && <p className="text-red-500 text-[10px] mt-1 font-bold ">{phoneError}</p>}
                                 </div>
 
                                 <div className="relative">
@@ -273,11 +273,11 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                             </div>
 
                             <div className="pt-6 border-t border-gray-800">
-                                <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
+                                <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black  tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
                                     {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Setup & Start Trial</>}
                                 </button>
-                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed uppercase tracking-tighter">By proceeding, you authorize a ₹1 verification charge. No other charges during trial.</p>
-                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black uppercase text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors">
+                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed  tracking-tighter">By proceeding, you authorize a ₹1 verification charge. No other charges during trial.</p>
+                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black  text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors">
                                     <ArrowLeft size={12} className="mr-1" /> Cancel and Go Back
                                 </button>
                             </div>
@@ -289,23 +289,23 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                         <div className={`p-8 rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-2xl`}>
                             <div className="absolute top-0 right-0 p-6 opacity-20"><ShoppingCart size={80} /></div>
                             <div className="relative z-10">
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-white/20 px-3 py-1 rounded-full mb-4 inline-block text-white">{plan.interval}</span>
+                                <span className="text-[10px] font-black  tracking-[0.2em] bg-white/20 px-3 py-1 rounded-full mb-4 inline-block text-white">{plan.interval}</span>
                                 <h3 className="text-3xl font-black text-white tracking-tighter mb-8">{plan.name}</h3>
                                 
                                 <div className="space-y-6 mb-8">
                                     <div className="flex justify-between items-end border-b border-white/20 pb-4">
-                                        <span className="text-[10px] font-black uppercase text-white/70">Start Trial Fee</span>
+                                        <span className="text-[10px] font-black  text-white/70">Start Trial Fee</span>
                                         <span className="text-3xl font-black text-white">₹1</span>
                                     </div>
                                     <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-black uppercase text-white/70">After 30 Days</span>
+                                        <span className="text-[10px] font-black  text-white/70">After 30 Days</span>
                                         <span className="text-2xl font-black text-white">₹{plan.price}</span>
                                     </div>
                                 </div>
 
                                 <ul className="space-y-3">
                                     {plan.features.map((f, i) => (
-                                        <li key={i} className="flex items-center text-[10px] font-black text-white uppercase tracking-wider">
+                                        <li key={i} className="flex items-center text-[10px] font-black text-white  tracking-wider">
                                             <ShieldCheck size={14} className="mr-2 text-white/70" /> {f}
                                         </li>
                                     ))}
@@ -314,10 +314,10 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                         </div>
                         
                         <div className="mt-8 p-6 bg-gray-900/50 rounded-2xl border border-gray-800">
-                            <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2 flex items-center">
+                            <h4 className="text-[10px] font-black text-white  tracking-widest mb-2 flex items-center">
                                 <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
                             </h4>
-                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed uppercase tracking-tighter">Transactions are encrypted and handled by Razorpay. You can cancel your subscription anytime via the dashboard.</p>
+                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed  tracking-tighter">Transactions are encrypted and handled by Razorpay. You can cancel your subscription anytime via the dashboard.</p>
                         </div>
                     </div>
                 </div>
@@ -328,7 +328,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
 
 const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon }) => (
     <div className="group">
-        <label htmlFor={id} className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400">{label}</label>
+        <label htmlFor={id} className="text-[10px] font-black text-gray-500  tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400">{label}</label>
         <div className="relative">
             {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400">{icon}</div>}
             <input 
@@ -341,7 +341,7 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3.5 text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>
-        {error && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase tracking-tight">{error}</p>}
+        {error && <p className="text-red-500 text-[10px] mt-1 font-bold  tracking-tight">{error}</p>}
     </div>
 );
 

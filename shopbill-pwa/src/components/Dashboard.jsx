@@ -123,7 +123,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     if (isLoading) return (
         <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
             <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-            <p className="text-xs font-black opacity-40 tracking-widest uppercase">Syncing Dashboard...</p>
+            <p className="text-xs font-black opacity-40 tracking-widest ">Syncing Dashboard...</p>
         </div>
     );
 
@@ -133,7 +133,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-black tracking-tight">{welcome.title} <span className="text-indigo-500">Dashboard</span></h1>
-                        <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] uppercase">{welcome.desc}</p>
+                        <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] ">{welcome.desc}</p>
                     </div>
                     <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border border-inherit">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -150,7 +150,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 uppercase">Total Sales Today</p>
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Total Sales Today</p>
                                     <h2 className="text-2xl font-black">₹{today.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
                                 </div>
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><TrendingUp size={20} /></div>
@@ -159,7 +159,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 uppercase">Credit Issued Today</p>
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Credit Issued Today</p>
                                     <h2 className="text-2xl font-black">₹{today.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
                                 </div>
                                 <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CreditCard size={20} /></div>
@@ -168,7 +168,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 uppercase">Outstanding Ledger</p>
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Outstanding Ledger</p>
                                     <h2 className={`text-2xl font-black ${totalOwed > 0 ? 'text-rose-500' : ''}`}>₹{totalOwed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
                                 </div>
                                 <div className="p-3 bg-rose-500/10 rounded-xl text-rose-500"><Users size={20} /></div>
@@ -190,7 +190,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                 className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}
                             >
                                 <div className={`${btn.color} p-2 rounded-xl text-white shadow-lg`}><btn.icon size={18} /></div>
-                                <span className="text-xs font-black tracking-tight uppercase">{btn.label}</span>
+                                <span className="text-xs font-black tracking-tight ">{btn.label}</span>
                             </button>
                         ))}
                     </div>
@@ -200,7 +200,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         {/* INVENTORY */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 uppercase">
+                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
                                     <Package size={16} className="text-amber-500" /> Low Stock
                                 </h3>
                                 {lowStock.length > 0 && (
@@ -234,7 +234,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         {/* RECOVERY/CREDIT */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 uppercase">
+                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
                                     <Clock size={16} className="text-blue-500" /> Top Debtors
                                 </h3>
                                 {topDebtors.length > 0 && (
@@ -266,7 +266,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         {/* ACTIVITY SECTION */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
-                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 uppercase">
+                                <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
                                     <Activity size={16} className="text-emerald-500" /> Recent Sales
                                 </h3>
                                 {sales.length > 0 && (
@@ -306,7 +306,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                                             </span>
                                                         </>
                                                     ) : (
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${sale.paymentMethod === 'Cash' || sale.paymentMethod === 'UPI'
+                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border  ${sale.paymentMethod === 'Cash' || sale.paymentMethod === 'UPI'
                                                             ? (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100')
                                                             : (darkMode ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-100')
                                                             }`}>

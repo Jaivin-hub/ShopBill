@@ -31,7 +31,7 @@ const formatDate = (isoString) => {
 };
 
 const getPlanStyles = (plan) => {
-    switch (String(plan).toUpperCase()) { // Ensure case insensitivity
+    switch (String(plan).to()) { // Ensure case insensitivity
         case SHOP_PLANS.PREMIUM:
             return 'bg-purple-800/50 text-purple-300 border-purple-700';
         case SHOP_PLANS.PRO:
@@ -201,7 +201,7 @@ const generateDummyPaymentData = (shopName, plan) => {
             date: paymentDate.toISOString(),
             amount: price,
             status: status,
-            transactionId: `TXN${Math.random().toString(36).substring(2, 11).toUpperCase()}`,
+            transactionId: `TXN${Math.random().toString(36).substring(2, 11).to()}`,
             method: ['Credit Card', 'Debit Card', 'Bank Transfer', 'UPI'][Math.floor(Math.random() * 4)],
         });
     }
@@ -332,7 +332,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                 <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
                                     <div className="flex items-center gap-2 mb-3">
                                         <IndianRupee className="w-5 h-5 text-indigo-400" aria-hidden="true" />
-                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Current Plan</h3>
+                                        <h3 className="text-sm font-semibold text-gray-400  tracking-wider">Current Plan</h3>
                                     </div>
                                     <p className="text-2xl font-bold text-white mb-1">{paymentData.currentPlan}</p>
                                     <p className="text-sm text-gray-400">{paymentData.billingCycle} Billing</p>
@@ -341,7 +341,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                 <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl p-5 border border-indigo-500/30">
                                     <div className="flex items-center gap-2 mb-3">
                                         <Calendar className="w-5 h-5 text-indigo-400" aria-hidden="true" />
-                                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Next Payment</h3>
+                                        <h3 className="text-sm font-semibold text-gray-400  tracking-wider">Next Payment</h3>
                                     </div>
                                     <p className="text-2xl font-bold text-white mb-1">
                                         ₹{paymentData.upcomingPayment.amount.toFixed(2)}
@@ -437,7 +437,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         phone: user.phone || 'N/A', // 👈 NEW FIELD
         
         status: user.isActive !== false ? 'Active' : 'Inactive', 
-        plan: (user.plan || SHOP_PLANS.BASIC).toUpperCase(), // Ensure uppercase for style matching
+        plan: (user.plan || SHOP_PLANS.BASIC).to(), // Ensure  for style matching
         staffCount: { owner: 1, manager: user.managerCount || 0, cashier: user.cashierCount || 0 }, 
         performanceTrend: user.performanceTrend || { metric: "N/A", trend: 'flat' }, 
         // subscriptionStatus is now the actual status from the backend
@@ -629,7 +629,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                             <thead className="bg-gradient-to-r from-gray-800/90 to-gray-800/70 sticky top-0 z-10 border-b border-gray-700/50">
                                 <tr>
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200 group"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300  tracking-wider cursor-pointer hover:bg-gray-700/40 transition-all duration-200 group"
                                         onClick={() => handleSort('name')}
                                         scope="col"
                                     >
@@ -640,7 +640,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     </th>
                                     {/* 🚨 NEW COLUMN: Email */}
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300  tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         scope="col"
                                         onClick={() => handleSort('email')}
                                     >
@@ -651,7 +651,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     </th>
                                     {/* 🚨 NEW COLUMN: Phone */}
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300  tracking-wider hidden md:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         scope="col"
                                         onClick={() => handleSort('phone')}
                                     >
@@ -662,7 +662,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     </th>
                                     {/* Date Joined (Kept) */}
                                     <th 
-                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-left text-xs font-semibold text-gray-300  tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-700/40 transition-all duration-200"
                                         scope="col"
                                         onClick={() => handleSort('dateJoined')}
                                     >
@@ -673,7 +673,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                     </th>
                                     {/* Plan (Now Clickable) */}
                                     <th 
-                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300  tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('plan')}
                                     >
                                         <div className="flex justify-center items-center gap-2">
@@ -681,17 +681,17 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="plan" />
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider" scope="col">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300  tracking-wider" scope="col">
                                         Staff
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300  tracking-wider hidden md:table-cell">
                                         Performance
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider" scope="col">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300  tracking-wider" scope="col">
                                         Status
                                     </th>
                                     <th 
-                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
+                                        className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300  tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/40 transition-all duration-200"
                                         onClick={() => handleSort('subscriptionStatus')}
                                     >
                                         <div className="flex justify-center items-center gap-2">
@@ -700,7 +700,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SortIcon columnKey="subscriptionStatus" />
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider" scope="col">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-300  tracking-wider" scope="col">
                                         Actions
                                     </th>
                                 </tr>
@@ -764,7 +764,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     className={`px-3 py-1.5 inline-flex items-center text-xs font-semibold rounded-lg border transition-all duration-200 ${getPlanStyles(shop.plan)}`}
                                                 >
                                                     <IndianRupee className='w-3.5 h-3.5 mr-1.5' />
-                                                    {shop.plan.toUpperCase()}
+                                                    {shop.plan.to()}
                                                 </span>
                                             </td>
                                             {/* Staff Summary */}
