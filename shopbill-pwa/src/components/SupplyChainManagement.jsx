@@ -25,6 +25,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
   const inputBase = darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
+  // Dynamic color for date text
+  const dateTextColor = darkMode ? 'text-white' : 'text-slate-900';
 
   const [inventorySort, setInventorySort] = useState('low-stock');
   const [inventorySearch, setInventorySearch] = useState('');
@@ -188,7 +190,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <h1 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tighter leading-none`}>
               Supply <span className="text-indigo-500">Chain</span>
             </h1>
-            <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1.5 ">Inventory Inbound</p>
+            <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1.5 ">Efficient Supply Management</p>
           </div>
 
           <div className={`${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
@@ -263,7 +265,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Invoice Number</label>
                       <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-xs font-mono`} placeholder="Optional" />
                     </div>
-                    <div className="space-y-1.5 max-w-full">
+                    <div className="space-y-1.5 w-full">
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Arrival Date</label>
                       <div className="relative w-full overflow-hidden rounded-xl">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10 pointer-events-none" />
@@ -271,7 +273,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           type="date" 
                           value={purchaseForm.date} 
                           onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} 
-                          className={`w-full ${inputBase} pl-9 pr-4 py-3 rounded-xl outline-none text-[10px] font-bold border-transparent focus:border-indigo-500 appearance-none`}
+                          className={`w-full ${inputBase} ${dateTextColor} pl-9 pr-4 py-3 rounded-xl outline-none text-[10px] font-bold border-transparent focus:border-indigo-500 appearance-none`}
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                         />
                       </div>
                     </div>
@@ -365,11 +368,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <div className="flex items-center gap-2 overflow-x-hidden w-full md:w-auto mt-2 md:mt-0">
                     <div className="relative flex-1 md:w-36">
                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-indigo-500 z-10 pointer-events-none" />
-                       <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full ${inputBase} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                       <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full ${inputBase} ${dateTextColor} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
                     </div>
                     <div className="relative flex-1 md:w-36">
                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-indigo-500 z-10 pointer-events-none" />
-                       <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full ${inputBase} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                       <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full ${inputBase} ${dateTextColor} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
                     </div>
                   </div>
                 )}
