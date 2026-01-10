@@ -188,7 +188,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <h1 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tighter leading-none`}>
               Supply <span className="text-indigo-500">Chain</span>
             </h1>
-            <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1.5 uppercase">Inventory Inbound</p>
+            <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1.5 ">Inventory Inbound</p>
           </div>
 
           <div className={`${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
@@ -216,7 +216,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
               <form onSubmit={handlePurchaseSubmit} className={`${cardBase} rounded-2xl p-6 space-y-6 overflow-hidden`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">Arrival Entry</span>
+                  <span className="text-[10px] font-black text-indigo-400 tracking-widest ">Arrival Entry</span>
                   <button type="button" onClick={() => setIsScannerModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/10 text-indigo-400 rounded-lg border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
                     <ScanLine className="w-4 h-4" />
                     <span className="text-[9px] font-black ">Scan Code</span>
@@ -261,7 +261,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Invoice Number</label>
-                      <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-xs font-mono`} placeholder="OPTIONAL" />
+                      <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-xs font-mono`} placeholder="Optional" />
                     </div>
                     <div className="space-y-1.5 max-w-full">
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Arrival Date</label>
@@ -284,7 +284,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     <span className={`text-xl font-black italic ${darkMode ? 'text-white' : 'text-slate-900'}`}>₹{(Number(purchaseForm.quantity || 0) * Number(purchaseForm.purchasePrice || 0)).toLocaleString()}</span>
                   </div>
                   <button disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-black text-[10px] tracking-[0.2em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3">
-                    {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : <>POST STOCK ENTRY <ArrowRight className="w-4 h-4" /></>}
+                    {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : <>Post stock entry <ArrowRight className="w-4 h-4" /></>}
                   </button>
                 </div>
               </form>
@@ -348,7 +348,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               ].map((stat, i) => (
                 <div key={i} className={`${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-slate-200'} border p-2 md:p-4 rounded-xl flex flex-col items-center text-center shadow-sm`}>
                   <div className={`p-1.5 md:p-2 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200'} rounded-lg mb-1 md:mb-2 border`}><stat.icon className="w-3 md:w-4 h-3 md:h-4 text-indigo-500" /></div>
-                  <p className="text-[7px] md:text-[8px] font-black text-gray-600 tracking-widest mb-0.5 uppercase">{stat.label}</p>
+                  <p className="text-[7px] md:text-[8px] font-black text-gray-600 tracking-widest mb-0.5 ">{stat.label}</p>
                   <p className={`text-xs md:text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{stat.val}</p>
                 </div>
               ))}
@@ -377,7 +377,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
               <div className="md:hidden p-4 space-y-3 overflow-y-auto max-h-[50vh] custom-scrollbar">
                 {filteredHistory.length === 0 ? (
-                  <p className="text-center text-[10px] text-gray-500 font-black py-10 uppercase tracking-widest">No records found</p>
+                  <p className="text-center text-[10px] text-gray-500 font-black py-10  tracking-widest">No records found</p>
                 ) : filteredHistory.map(record => (
                   <div key={record._id} className={`${cardBase} p-4 rounded-xl border-l-4 border-l-indigo-500`}>
                     <div className="flex justify-between items-start mb-2">
@@ -387,12 +387,12 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       </div>
                       <div className="text-right">
                          <span className="bg-indigo-500/10 text-indigo-500 px-2 py-1 rounded text-[9px] font-black">+{record.quantity} Units</span>
-                         <p className="text-[8px] font-black text-gray-500 mt-1 uppercase">@ ₹{record.purchasePrice}</p>
+                         <p className="text-[8px] font-black text-gray-500 mt-1 ">@ ₹{record.purchasePrice}</p>
                       </div>
                     </div>
                     <div className="flex justify-between items-end pt-2 border-t border-gray-800/30">
                       <div>
-                        <p className="text-[8px] text-gray-500 font-black uppercase">Vendor: {record.supplierId?.name}</p>
+                        <p className="text-[8px] text-gray-500 font-black ">Vendor: {record.supplierId?.name}</p>
                         <p className="text-[8px] text-gray-500 font-bold">{new Date(record.date).toLocaleDateString()}</p>
                       </div>
                       <p className="text-xs font-black text-emerald-500">₹{((record.quantity || 0) * (record.purchasePrice || 0)).toLocaleString()}</p>
@@ -422,7 +422,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                         </td>
                         <td className="px-6 py-4">
                           <p className={`font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{record.productId?.name}</p>
-                          <p className="text-[8px] text-gray-500 font-bold mt-0.5 uppercase tracking-tighter">HSN: {record.productId?.hsn || '---'}</p>
+                          <p className="text-[8px] text-gray-500 font-bold mt-0.5  tracking-tighter">HSN: {record.productId?.hsn || '---'}</p>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-slate-100 text-slate-600'} px-2 py-1 rounded text-[9px] font-black border ${darkMode ? 'border-gray-700' : 'border-slate-200'}`}>
@@ -494,7 +494,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 <input placeholder="HSN / Barcode Data" value={productForm.hsn} onChange={e => setProductForm({ ...productForm, hsn: e.target.value })} className={`flex-1 ${inputBase} p-3 rounded-xl outline-none text-[10px] font-mono`} />
                 <button type="button" onClick={() => setIsScannerModalOpen(true)} className={`p-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-slate-100 border-slate-200'} rounded-xl border hover:bg-indigo-600 hover:text-white text-indigo-500 transition-all`}><ScanLine className="w-4 h-4" /></button>
               </div>
-              <button className="w-full bg-indigo-600 py-3 rounded-xl text-[10px] font-black text-white tracking-widest hover:bg-indigo-500 transition-all shadow-xl uppercase">Register Product</button>
+              <button className="w-full bg-indigo-600 py-3 rounded-xl text-[10px] font-black text-white tracking-widest hover:bg-indigo-500 transition-all shadow-xl ">Register Product</button>
             </div>
           </form>
         </div>
@@ -506,7 +506,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className={`relative w-full max-w-md ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} rounded-2xl border max-h-[75vh] flex flex-col overflow-hidden animate-in zoom-in duration-200 shadow-2xl`}>
             <div className={`p-5 border-b ${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black tracking-widest text-indigo-500 uppercase">{isProductPickerOpen ? 'Select Product' : 'Select Vendor'}</h3>
+                <h3 className="text-[10px] font-black tracking-widest text-indigo-500 ">{isProductPickerOpen ? 'Select Product' : 'Select Vendor'}</h3>
                 <X className="w-4 h-4 text-gray-400 cursor-pointer hover:text-red-500" onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} />
               </div>
               <div className="relative">
@@ -542,8 +542,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <div className="space-y-4">
               <input required placeholder="Business / Vendor Name" value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-xs`} />
               <input required type="tel" placeholder="Phone Number" value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-xs`} />
-              <input placeholder="Tax ID / GSTIN (Optional)" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-[10px] font-mono text-indigo-500 uppercase`} />
-              <button className={`w-full mt-2 ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'} py-3 rounded-xl font-black text-[10px] tracking-widest transition-all shadow-xl uppercase`}>Save Vendor</button>
+              <input placeholder="Tax ID / GSTIN (Optional)" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-[10px] font-mono text-indigo-500 `} />
+              <button className={`w-full mt-2 ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'} py-3 rounded-xl font-black text-[10px] tracking-widest transition-all shadow-xl `}>Save Vendor</button>
             </div>
           </form>
         </div>
