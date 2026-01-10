@@ -320,7 +320,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
         {activeTab === 'history' && (
           <div className="flex flex-col animate-in fade-in duration-500 space-y-4">
-            {/* CONDENSED STATS FOR MOBILE */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 shrink-0">
               {[
                 { label: 'Logged Units', val: historyTotals.totalQty, icon: Package },
@@ -351,7 +350,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 )}
               </div>
 
-              {/* MOBILE HISTORY CARD VIEW */}
               <div className="md:hidden p-4 space-y-3 overflow-y-auto max-h-[50vh] custom-scrollbar">
                 {filteredHistory.length === 0 ? (
                   <p className="text-center text-[10px] text-gray-500 font-black py-10  tracking-widest">No records found</p>
@@ -378,7 +376,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 ))}
               </div>
 
-              {/* DESKTOP HISTORY TABLE VIEW */}
               <div className="hidden md:block overflow-auto custom-scrollbar flex-1 min-h-0">
                 <table className="w-full text-left min-w-[800px]">
                   <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-gray-900' : 'bg-slate-100'} text-[9px] font-black text-gray-500 tracking-widest border-b ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
@@ -443,7 +440,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               ))}
             </div>
 
-            {/* FLOATING ACTION BUTTON (FAB) FOR VENDORS */}
             <button 
               onClick={() => setIsSupplierModalOpen(true)} 
               className="fixed bottom-[85px] right-6 md:bottom-10 md:right-10 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all z-[100] group"
@@ -533,6 +529,21 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       </div>
 
       <style jsx global>{`
+        /* Prevent mobile auto-zoom on input focus */
+        input, select, textarea {
+          font-size: 16px !important;
+          touch-action: manipulation;
+        }
+        @media (min-width: 768px) {
+          input, select, textarea {
+            font-size: inherit !important;
+          }
+        }
+        /* Mobile specific font overrides for design consistency */
+        input.text-xs, input.text-[10px] {
+          font-size: 16px !important;
+        }
+
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: ${darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
