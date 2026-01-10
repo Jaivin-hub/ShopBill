@@ -231,7 +231,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 Staff <span className="text-indigo-600">Directory</span>
                             </h1>
                             <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                ACCESS CONTROL & PERMISSIONS MANAGEMENT
+                                Access control & pemissions management
                             </p>
                         </div>
                     </div>

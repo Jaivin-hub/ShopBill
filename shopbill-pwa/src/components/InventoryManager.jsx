@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react'; 
-import InventoryContent from './InventoryContent'; 
+import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react';
+import InventoryContent from './InventoryContent';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
-  OWNER: 'owner', 
-  MANAGER: 'manager',
-  CASHIER: 'cashier', 
+    OWNER: 'owner',
+    MANAGER: 'manager',
+    CASHIER: 'cashier',
 };
 
 const initialItemState = {
@@ -17,30 +17,33 @@ const initialItemState = {
     hsn: ''
 };
 
+
 // Added darkMode to props
 const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => {
     // Permission Logic
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
-    
+    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+
+
     // --- Data States ---
     const [inventory, setInventory] = useState([]);
-    const [isLoadingInitial, setIsLoadingInitial] = useState(true); 
-    
+    const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+
     // --- UI/Form States ---
-    const [isFormModalOpen, setIsFormModalOpen] = useState(false); 
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
-    const [isProcessing, setIsProcessing] = useState(false); 
-    const [formData, setFormData] = useState(initialItemState); 
-    const [isEditing, setIsEditing] = useState(false); 
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [formData, setFormData] = useState(initialItemState);
+    const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortOption, setSortOption] = useState('default'); 
+    const [sortOption, setSortOption] = useState('default');
     const [showStickySearch, setShowStickySearch] = useState(false);
-    
+
     // --- Data Fetching Logic (Memoized for Pattern Consistency) ---
     const fetchInventory = useCallback(async (isSilent = false) => {
-        if (!isSilent) setIsProcessing(true); 
+        if (!isSilent) setIsProcessing(true);
         try {
             const response = await apiClient.get(API.inventory);
             setInventory(response.data);
@@ -48,7 +51,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             console.error("Inventory Fetch Error:", error);
             showToast('System Link Failure: Could not sync inventory.', 'error');
         } finally {
-            setIsProcessing(false); 
+            setIsProcessing(false);
             setIsLoadingInitial(false);
         }
     }, [apiClient, API.inventory, showToast]);
@@ -57,23 +60,23 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         if (hasAccess) {
             fetchInventory();
         } else {
-             setIsLoadingInitial(false);
+            setIsLoadingInitial(false);
         }
-    }, [hasAccess, fetchInventory]); 
+    }, [hasAccess, fetchInventory]);
 
     // --- Optimized Scroll Observer for Sticky UI Elements ---
     useEffect(() => {
         const scrollTarget = document.querySelector('.scrollable-content') || window;
-        
+
         const handleScroll = () => {
             const scrollTop = scrollTarget === window ? window.scrollY : scrollTarget.scrollTop;
             setShowStickySearch(scrollTop > 40);
         };
-        
+
         scrollTarget.addEventListener('scroll', handleScroll, { passive: true });
         return () => scrollTarget.removeEventListener('scroll', handleScroll);
     }, []);
-    
+
     // --- Modal & Form Handlers ---
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
@@ -91,9 +94,9 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
 
     const handleEditClick = (item) => {
         setIsEditing(true);
-        setFormData({ 
-            _id: item._id, 
-            id: item.id,   
+        setFormData({
+            _id: item._id,
+            id: item.id,
             name: item.name,
             price: item.price || 0,
             quantity: item.quantity || 0,
@@ -113,10 +116,10 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         setItemToDelete({ id: itemId, name: itemName });
         setIsConfirmModalOpen(true);
     };
-    
+
     const openBulkUploadModal = () => setIsBulkUploadModalOpen(true);
     const closeBulkUploadModal = () => setIsBulkUploadModalOpen(false);
-    
+
     const handleBulkUpload = async (items) => {
         closeBulkUploadModal();
         setIsProcessing(true);
@@ -130,14 +133,14 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             setIsProcessing(false);
         }
     };
-    
-    const handleAddItem = async () => { 
+
+    const handleAddItem = async () => {
         setIsProcessing(true);
         try {
-            const { _id, id, ...dataToSend } = formData; 
+            const { _id, id, ...dataToSend } = formData;
             await apiClient.post(API.inventory, dataToSend);
             showToast(`Catalog Entry Created: ${formData.name}`, 'success');
-            await fetchInventory(true); 
+            await fetchInventory(true);
             closeFormModal();
         } catch (error) {
             showToast(error.response?.data?.error || 'Add operation failed.', 'error');
@@ -145,15 +148,15 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             setIsProcessing(false);
         }
     };
-    
-    const handleUpdateItem = async () => { 
+
+    const handleUpdateItem = async () => {
         setIsProcessing(true);
-        const itemId = formData._id || formData.id; 
+        const itemId = formData._id || formData.id;
         try {
-            const { _id, id, ...dataToSend } = formData; 
+            const { _id, id, ...dataToSend } = formData;
             await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
             showToast(`Entry Reconfigured: ${formData.name}`, 'success');
-            await fetchInventory(true); 
+            await fetchInventory(true);
             closeFormModal();
         } catch (error) {
             showToast(error.response?.data?.error || 'Update failed.', 'error');
@@ -166,7 +169,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         e.preventDefault();
         isEditing ? handleUpdateItem() : handleAddItem();
     };
-    
+
     const confirmDeleteItem = async () => {
         if (!itemToDelete) return;
         const { id: itemId, name: itemName } = itemToDelete;
@@ -175,7 +178,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         try {
             await apiClient.delete(`${API.inventory}/${itemId}`);
             showToast(`Entry Purged: ${itemName}`, 'success');
-            await fetchInventory(true); 
+            await fetchInventory(true);
         } catch (error) {
             showToast('Deletion protocol failed.', 'error');
         } finally {
@@ -183,13 +186,13 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             setItemToDelete(null);
         }
     };
-    
+
     // --- Pattern-Optimized Memoized Filtering ---
     const sortedAndFilteredInventory = useMemo(() => {
         const query = searchTerm.toLowerCase();
         return [...inventory]
-            .filter(item => 
-                item.name.toLowerCase().includes(query) || 
+            .filter(item =>
+                item.name.toLowerCase().includes(query) ||
                 (item.hsn && item.hsn.toLowerCase().includes(query))
             )
             .sort((a, b) => {
@@ -203,7 +206,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
                 return a.name.localeCompare(b.name);
             });
     }, [inventory, searchTerm, sortOption]);
-    
+
     // --- Render States ---
     if (!hasAccess) {
         return (
@@ -220,13 +223,10 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
     }
 
     if (isLoadingInitial) {
-         return (
-            <div className={`min-h-screen flex flex-col items-center justify-center ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-                <div className="relative">
-                    <div className="absolute inset-0 bg-teal-500/20 blur-2xl rounded-full animate-pulse" />
-                    <Loader2 className="w-12 h-12 animate-spin text-teal-400 relative z-10" />
-                </div>
-                <p className="text-[10px] font-black text-teal-400 uppercase tracking-[0.3em] mt-8 animate-pulse">Syncing Database</p>
+        return (
+            <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
+                <p className="text-xs font-black opacity-40 tracking-widest ">Syncing Inventory...</p>
             </div>
         );
     }
@@ -234,10 +234,10 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
     return (
         <InventoryContent
             inventory={sortedAndFilteredInventory}
-            loading={isProcessing} 
+            loading={isProcessing}
             isFormModalOpen={isFormModalOpen}
             isConfirmModalOpen={isConfirmModalOpen}
-            isBulkUploadModalOpen={isBulkUploadModalOpen} 
+            isBulkUploadModalOpen={isBulkUploadModalOpen}
             formData={formData}
             isEditing={isEditing}
             itemToDelete={itemToDelete}

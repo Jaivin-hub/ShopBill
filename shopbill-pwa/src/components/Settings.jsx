@@ -101,7 +101,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
                 <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <LogOut className="w-8 h-8 text-rose-500" />
                 </div>
-                <h2 className={`text-md font-black  tracking-widest mb-3 ${darkMode ? 'text-white' : 'text-black'}`}>Authorize Logout</h2>
+                <h2 className={`text-md font-black  tracking-widest mb-3 ${darkMode ? 'text-white' : 'text-black'}`}>Confirm Logout</h2>
                 <p className={`text-[10px] font-bold leading-relaxed  tracking-tight px-4 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>{message}</p>
             </div>
             <div className={`p-6 border-t flex gap-3 ${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-100 border-slate-200'}`}>
@@ -129,8 +129,14 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
-    const handleStaffPermissionsClick = () => setCurrentView('staff');
-    const handleChangePasswordClick = () => setCurrentView('password');
+    const handleStaffPermissionsClick = () => {
+        setPageOrigin('settings');
+        setCurrentPage('staffPermissions');
+    }
+    const handleChangePasswordClick = () => {
+        setPageOrigin('settings');
+        setCurrentPage('passwordChange');
+    }
     const handlePlanUpgradeClick = () => {
         setPageOrigin('settings');
         setCurrentPage('planUpgrade');
@@ -291,10 +297,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
 
     const renderContent = () => {
         switch (currentView) {
-            case 'password':
-                return <ChangePasswordForm apiClient={apiClient} onLogout={onLogout} onBack={() => setCurrentView('main')} darkMode={darkMode} />;
-            case 'staff':
-                return <StaffPermissionsManager onBack={() => setCurrentView('main')} apiClient={apiClient} setConfirmModal={setConfirmModal} darkMode={darkMode} />;
             case 'main':
             default:
                 return renderSettingsList();

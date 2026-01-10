@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 
@@ -150,7 +150,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
 
   if (isLoading) return (
     <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-        <Loader className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
         <p className="text-xs font-black opacity-40 tracking-widest">Initializing Terminal...</p>
     </div>
   );

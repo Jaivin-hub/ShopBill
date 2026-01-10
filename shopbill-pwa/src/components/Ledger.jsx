@@ -102,7 +102,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   if (loading) return (
     <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
       <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-4" />
-      <span className="text-[10px] font-black text-slate-500 tracking-[0.3em]">Authenticating Ledger...</span>
+      <span className="text-[10px] font-black text-slate-500 tracking-[0.3em]">Syncing Ledger...</span>
     </div>
   );
 

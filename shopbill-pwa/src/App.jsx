@@ -35,6 +35,8 @@ import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
 import SupplyChainManagement from './components/SupplyChainManagement';
 import PlanUpgrade from './components/PlanUpgrade';
+import StaffPermissionsManager from './components/StaffPermissionsManager';
+import ChangePasswordForm from './components/ChangePasswordForm';
 
 // UpdatePrompt Component
 const UpdatePrompt = () => {
@@ -228,6 +230,24 @@ const App = () => {
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
     if (currentPage === 'planUpgrade') {
         return <PlanUpgrade 
+          apiClient={apiClient} 
+          showToast={showToast} 
+          currentUser={currentUser} 
+          onBack={handleBackToOrigin} 
+          darkMode={darkMode} 
+        />;
+    }
+    if (currentPage === 'staffPermissions') {
+        return <StaffPermissionsManager 
+          apiClient={apiClient} 
+          showToast={showToast} 
+          currentUser={currentUser} 
+          onBack={handleBackToOrigin} 
+          darkMode={darkMode} 
+        />;
+    }
+    if (currentPage === 'passwordChange') {
+        return <ChangePasswordForm 
           apiClient={apiClient} 
           showToast={showToast} 
           currentUser={currentUser} 
