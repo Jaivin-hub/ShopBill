@@ -254,7 +254,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Arrival Date</label>
-                      <div className="relative">
+                      <div className="relative w-full">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10" />
                         <input type="date" value={purchaseForm.date} onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} className={`w-full ${inputBase} pl-9 pr-4 py-3 rounded-xl outline-none text-[10px] font-bold`} />
                       </div>
@@ -346,9 +346,9 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   ))}
                 </div>
                 {selectedFilter === 'custom' && (
-                  <div className="flex items-center gap-2">
-                    <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-32 md:w-auto ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
-                    <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-32 md:w-auto ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                  <div className="flex items-center gap-2 overflow-x-hidden w-full md:w-auto">
+                    <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`flex-1 md:w-32 ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                    <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`flex-1 md:w-32 ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
                   </div>
                 )}
               </div>
