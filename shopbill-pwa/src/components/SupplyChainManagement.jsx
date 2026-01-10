@@ -46,6 +46,17 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '', gstin: '' });
   const [productForm, setProductForm] = useState({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
 
+  // Auto-set custom range to current month
+  useEffect(() => {
+    if (selectedFilter === 'custom' && (!customStartDate || !customEndDate)) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const today = now.toISOString().split('T')[0];
+      setCustomStartDate(firstDay);
+      setCustomEndDate(today);
+    }
+  }, [selectedFilter]);
+
   const fetchSCMData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -203,7 +214,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         {activeTab === 'purchase' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-              <form onSubmit={handlePurchaseSubmit} className={`${cardBase} rounded-2xl p-6 space-y-6`}>
+              <form onSubmit={handlePurchaseSubmit} className={`${cardBase} rounded-2xl p-6 space-y-6 overflow-hidden`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">Arrival Entry</span>
                   <button type="button" onClick={() => setIsScannerModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/10 text-indigo-400 rounded-lg border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
@@ -221,7 +232,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           <span className={`text-[11px] font-bold truncate ${selectedProduct ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-gray-400'}`}>{selectedProduct ? selectedProduct.name : 'Choose Item...'}</span>
                           <ChevronDown className="w-4 h-4 text-gray-500" />
                         </button>
-                        <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-indigo-600 p-3 rounded-xl hover:bg-indigo-500 text-white"><Plus className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-indigo-600 p-3 rounded-xl hover:bg-indigo-500 text-white shrink-0"><Plus className="w-4 h-4" /></button>
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -231,7 +242,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           <span className={`text-[11px] font-bold truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-gray-400'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Vendor...'}</span>
                           <ChevronDown className="w-4 h-4 text-gray-500" />
                         </button>
-                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-3 rounded-xl hover:text-indigo-400 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-slate-200 border-slate-300'}`}><Users className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-3 rounded-xl hover:text-indigo-400 border shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-slate-200 border-slate-300'}`}><Users className="w-4 h-4" /></button>
                       </div>
                     </div>
                   </div>
@@ -252,11 +263,16 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Invoice Number</label>
                       <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-xs font-mono`} placeholder="OPTIONAL" />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 max-w-full">
                       <label className="text-[9px] font-black text-gray-500 tracking-widest ml-1">Arrival Date</label>
-                      <div className="relative w-full">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10" />
-                        <input type="date" value={purchaseForm.date} onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} className={`w-full ${inputBase} pl-9 pr-4 py-3 rounded-xl outline-none text-[10px] font-bold`} />
+                      <div className="relative w-full overflow-hidden rounded-xl">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10 pointer-events-none" />
+                        <input 
+                          type="date" 
+                          value={purchaseForm.date} 
+                          onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} 
+                          className={`w-full ${inputBase} pl-9 pr-4 py-3 rounded-xl outline-none text-[10px] font-bold border-transparent focus:border-indigo-500 appearance-none`}
+                        />
                       </div>
                     </div>
                   </div>
@@ -346,9 +362,15 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   ))}
                 </div>
                 {selectedFilter === 'custom' && (
-                  <div className="flex items-center gap-2 overflow-x-hidden w-full md:w-auto">
-                    <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`flex-1 md:w-32 ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
-                    <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`flex-1 md:w-32 ${inputBase} text-[10px] font-bold p-2 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                  <div className="flex items-center gap-2 overflow-x-hidden w-full md:w-auto mt-2 md:mt-0">
+                    <div className="relative flex-1 md:w-36">
+                       <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-indigo-500 z-10 pointer-events-none" />
+                       <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full ${inputBase} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                    </div>
+                    <div className="relative flex-1 md:w-36">
+                       <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-indigo-500 z-10 pointer-events-none" />
+                       <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full ${inputBase} text-[10px] font-bold p-2 pl-8 rounded-lg outline-none border border-transparent focus:border-indigo-500 shadow-sm transition-colors text-slate-900 dark:text-white`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -550,9 +572,23 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: ${darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+        
+        /* Fixed date picker visual for mobile */
+        input[type="date"] {
+           position: relative;
+        }
         input[type="date"]::-webkit-calendar-picker-indicator { 
-          filter: ${darkMode ? 'invert(1)' : 'none'}; 
+          background: transparent;
+          bottom: 0;
+          color: transparent;
           cursor: pointer;
+          height: auto;
+          left: 0;
+          position: absolute;
+          right: 0;
+          top: 0;
+          width: auto;
+          filter: ${darkMode ? 'invert(1)' : 'none'}; 
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
