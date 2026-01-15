@@ -743,6 +743,7 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
     try {
         const shopId = req.params.id;
 
+        // 1. Verify shop owner
         const owner = await User.findOne({ _id: shopId, role: 'owner' });
         if (!owner) {
             return res.status(404).json({ success: false, message: 'Shop/Owner not found.' });
@@ -751,29 +752,31 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         const plan = owner.plan || 'BASIC';
         const subscriptionId = owner.transactionId;
 
-        // 1. Fetch Local Payment History
+        // 2. Fetch Local Payment History
         const paymentHistory = await Payment.find({ shopId: shopId })
             .sort({ paymentDate: -1 })
             .limit(12);
 
-        // 2. FETCH ACTUAL DATA FROM RAZORPAY
-        let nextPaymentDate;
+        // 3. FETCH DATA DIRECTLY FROM RAZORPAY API
+        let nextPaymentDate = null;
+
         if (subscriptionId) {
             try {
+                // This call fetches the live subscription object from Razorpay
                 const subscription = await rzp.subscriptions.fetch(subscriptionId);
                 
-                // current_end is the UNIX timestamp (seconds) when the current cycle ends
-                // This will match the "Next Due" date shown on your Razorpay dashboard
+                // Razorpay uses UNIX timestamps in seconds. 
+                // subscription.current_end is the exact moment the current cycle ends (Next Due Date).
                 if (subscription.current_end) {
                     nextPaymentDate = new Date(subscription.current_end * 1000);
                 }
             } catch (rzpError) {
-                console.error('RZP Fetch Error:', rzpError);
-                // Fallback logic if RZP API fails
+                console.error('Razorpay API Error:', rzpError.description || rzpError);
+                // If API fails, we fall back to manual calculation below
             }
         }
 
-        // 3. Fallback Calculation (only if RZP API fails or no subscriptionId)
+        // 4. FALLBACK (Only if Razorpay API fails or subscriptionId is missing)
         if (!nextPaymentDate) {
             const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
             const referenceDate = lastSuccessfulPayment 
@@ -784,11 +787,14 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
             nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
         }
 
+        // 5. Response Formatting
         const planPrices = { 'BASIC': 499, 'PRO': 799, 'PREMIUM': 999 };
         const price = planPrices[plan] || planPrices['BASIC'];
 
         const now = new Date();
-        const daysUntilPayment = Math.max(0, Math.ceil((nextPaymentDate - now) / (1000 * 60 * 60 * 24)));
+        // Calculate days difference
+        const diffTime = nextPaymentDate - now;
+        const daysUntilPayment = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         res.json({
             success: true,
@@ -802,7 +808,7 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
                     method: 'Razorpay Auto-Debit', 
                 })),
                 upcomingPayment: {
-                    date: nextPaymentDate.toISOString(),
+                    date: nextPaymentDate.toISOString(), // This will now be Jan 14
                     amount: price,
                     daysUntil: daysUntilPayment
                 },
