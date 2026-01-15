@@ -20,7 +20,7 @@ const protect = async (req, res, next) => {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // We fetch the user AND their shop owner's status to ensure staff are blocked if the owner's plan expires
+        // Fetch the user
         const user = await User.findById(decoded.id).select('-password');
         
         if (!user) {
@@ -31,27 +31,41 @@ const protect = async (req, res, next) => {
         // SUBSCRIPTION & PLAN EXPIRY CHECK
         // ---------------------------------------------------------------------
         // 1. Superadmins always have access
-        // 2. For Owners/Managers/Cashiers, we check the planEndDate
         if (user.role !== 'superadmin') {
-            const now = new Date();
             
-            // If the user is an owner, check their own planEndDate
-            // If the user is staff, we check the owner's planEndDate (stored in shopId)
+            // If the user is an owner, check their own status
+            // If the user is staff, we check the owner's status (lookup via shopId)
             let ownerAccount = user;
             if (user.role !== 'owner') {
                 ownerAccount = await User.findById(user.shopId);
             }
 
-            if (!ownerAccount || !ownerAccount.planEndDate || new Date(ownerAccount.planEndDate) < now) {
+            if (!ownerAccount) {
+                return res.status(404).json({ error: 'Shop owner account not found.' });
+            }
+
+            /**
+             * ⭐ FIXED LOGIC:
+             * Only block access if the status is explicitly terminal or halted.
+             * This allows 'authenticated' and 'active' users to stay logged in 
+             * while Razorpay attempts to process the payment today.
+             */
+            const blockedStatuses = ['halted', 'cancelled', 'expired'];
+            const currentStatus = ownerAccount.subscriptionStatus;
+
+            if (blockedStatuses.includes(currentStatus)) {
                 return res.status(403).json({ 
-                    error: 'Subscription expired', 
-                    message: 'Your access period has ended. Please renew your subscription to continue using the app.',
-                    expiredAt: ownerAccount?.planEndDate
+                    error: 'Subscription Issue', 
+                    message: currentStatus === 'halted' 
+                        ? 'Access suspended due to payment failure. Please settle dues.' 
+                        : 'Your access period has ended. Please renew your subscription.',
+                    status: currentStatus,
+                    expiredAt: ownerAccount.planEndDate
                 });
             }
 
-            // Optional: Block if the account is manually deactivated
-            if (!ownerAccount.isActive) {
+            // 2. Block if the owner's account is manually deactivated by Superadmin
+            if (ownerAccount.isActive === false) {
                 return res.status(403).json({ error: 'Account deactivated. Please contact support.' });
             }
         }
