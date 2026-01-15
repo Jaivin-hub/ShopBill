@@ -6,6 +6,11 @@ const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Payment = require('../models/Payment');
 const router = express.Router();
+const Razorpay = require('razorpay');
+const rzp = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 /**
  * Superadmin middleware wrapper:
@@ -738,75 +743,61 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
     try {
         const shopId = req.params.id;
 
-        // 1. Verify shop owner exists
         const owner = await User.findOne({ _id: shopId, role: 'owner' });
         if (!owner) {
-            return res.status(404).json({
-                success: false,
-                message: 'Shop/Owner not found.'
-            });
+            return res.status(404).json({ success: false, message: 'Shop/Owner not found.' });
         }
 
         const plan = owner.plan || 'BASIC';
-        const subscriptionId = owner.transactionId; // Current active RZP Subscription ID
+        const subscriptionId = owner.transactionId;
 
-        // --- FIXED STEP 2: Fetch ALL Payment/Attempt History by shopId only ---
-        // Fetch ALL payment records associated with this shopId. 
-        // This includes history from previous subscription IDs as the shopId is permanent.
-        const query = { shopId: shopId }; 
-        
-        // Remove the problematic filtering block:
-        /*
+        // 1. Fetch Local Payment History
+        const paymentHistory = await Payment.find({ shopId: shopId })
+            .sort({ paymentDate: -1 })
+            .limit(12);
+
+        // 2. FETCH ACTUAL DATA FROM RAZORPAY
+        let nextPaymentDate;
         if (subscriptionId) {
-            // This line was excluding old history:
-            query.subscriptionId = subscriptionId; 
+            try {
+                const subscription = await rzp.subscriptions.fetch(subscriptionId);
+                
+                // current_end is the UNIX timestamp (seconds) when the current cycle ends
+                // This will match the "Next Due" date shown on your Razorpay dashboard
+                if (subscription.current_end) {
+                    nextPaymentDate = new Date(subscription.current_end * 1000);
+                }
+            } catch (rzpError) {
+                console.error('RZP Fetch Error:', rzpError);
+                // Fallback logic if RZP API fails
+            }
         }
-        */
 
-        const paymentHistory = await Payment.find(query)
-            .sort({ paymentDate: -1 }) // Sort by newest first
-            .limit(12); // Fetch the last 12 records
+        // 3. Fallback Calculation (only if RZP API fails or no subscriptionId)
+        if (!nextPaymentDate) {
+            const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
+            const referenceDate = lastSuccessfulPayment 
+                ? new Date(lastSuccessfulPayment.paymentDate) 
+                : new Date(owner.createdAt);
+            
+            nextPaymentDate = new Date(referenceDate);
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        }
 
-        const planPrices = {
-            'BASIC': 499,
-            'PRO': 799,
-            'PREMIUM': 999
-        };
+        const planPrices = { 'BASIC': 499, 'PRO': 799, 'PREMIUM': 999 };
         const price = planPrices[plan] || planPrices['BASIC'];
 
-
-        // --- REVISED STEP 3: Determine the last successful payment date ---
-        // We look through the ENTIRE paymentHistory (including old plans) to find 
-        // the last time the user successfully paid. This should accurately calculate
-        // the next payment date for the new plan, continuing from the last paid cycle.
-        const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
-
-        // Reference date for next payment calculation:
-        // Use the last successful payment date, OR the user's signup date (for the start of billing)
-        const referenceDate = lastSuccessfulPayment 
-            ? new Date(lastSuccessfulPayment.paymentDate) 
-            : new Date(owner.createdAt); 
-        // -----------------------------------------------------------------
-
-
-        // 4. Calculate the Next Payment Date (approx. 1 month from reference date)
-        const nextPaymentDate = new Date(referenceDate);
-        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-        
         const now = new Date();
         const daysUntilPayment = Math.max(0, Math.ceil((nextPaymentDate - now) / (1000 * 60 * 60 * 24)));
 
-        // 5. Structure the response
         res.json({
             success: true,
             data: {
-                // Map the DB records to the expected frontend format
                 paymentHistory: paymentHistory.map(p => ({
                     id: p._id,
                     date: p.paymentDate.toISOString(),
                     amount: p.amount, 
                     status: p.status, 
-                    // Use the paymentId if available (for charged events), fallback to subscriptionId
                     transactionId: p.paymentId || p.subscriptionId, 
                     method: 'Razorpay Auto-Debit', 
                 })),
