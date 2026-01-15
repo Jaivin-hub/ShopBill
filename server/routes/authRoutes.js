@@ -1,18 +1,18 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');   
-const crypto = require('crypto');     
-const User = require('../models/User'); 
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
-const sendEmail = require('../utils/sendEmail'); 
+const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET; 
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Function from server.js
 const generateToken = (id, shopId, role) => {
     return jwt.sign({ id, shopId, role }, JWT_SECRET, {
-        expiresIn: '30d', 
+        expiresIn: '30d',
     });
 };
 
@@ -24,8 +24,8 @@ const generateToken = (id, shopId, role) => {
  * @access Public
  */
 router.post('/login', async (req, res) => {
-    const { identifier, password } = req.body; 
-    
+    const { identifier, password } = req.body;
+
     if (!identifier || !password) {
         return res.status(400).json({ error: 'Email/Phone and password are required.' });
     }
@@ -33,13 +33,13 @@ router.post('/login', async (req, res) => {
     try {
         let searchIdentifiers = [];
         const isEmail = identifier.includes('@');
-        
+
         if (isEmail) {
             searchIdentifiers.push(identifier.toLowerCase());
         } else {
             const cleanedIdentifier = identifier.replace(/[\s\-\(\)]/g, '');
             searchIdentifiers.push(cleanedIdentifier);
-            const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91'; 
+            const defaultCountryCode = process.env.DEFAULT_COUNTRY_CODE || '+91';
             if (!cleanedIdentifier.startsWith('+')) {
                 searchIdentifiers.push(defaultCountryCode + cleanedIdentifier);
             }
@@ -47,35 +47,50 @@ router.post('/login', async (req, res) => {
 
         const orQuery = searchIdentifiers.flatMap(id => [
             { email: id },
-            { phone: id } 
+            { phone: id }
         ]);
 
         const user = await User.findOne({ $or: orQuery });
 
         if (user && (await user.matchPassword(password))) {
-            
+
             // 1. Basic Active Check
-            if (user.isActive === false) { 
-                 return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
+            if (user.isActive === false) {
+                return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
             }
 
             // --- NEW SUBSCRIPTION VALIDATION DURING LOGIN ---
             if (user.role !== 'superadmin') {
-                const now = new Date();
-                
-                // Identify the owner account to check the plan status
+                // Identify the owner account to check the status
                 let ownerAccount = user;
                 if (user.role !== 'owner') {
-                    // If staff is logging in, fetch their owner's data
                     ownerAccount = await User.findById(user.shopId);
                 }
 
-                // Check if planEndDate exists and if it has already passed
-                if (!ownerAccount || !ownerAccount.planEndDate || new Date(ownerAccount.planEndDate) < now) {
-                    return res.status(403).json({ 
-                        error: 'Access Expired', 
-                        message: 'Your subscription period has ended. Please renew the plan to log in.',
-                        expiredAt: ownerAccount?.planEndDate
+                if (!ownerAccount) {
+                    return res.status(404).json({ error: 'Shop owner account not found.' });
+                }
+
+                /**
+                 * ⭐ LOGIC FIX: 
+                 * Do not block just because of the date. Block only if the status 
+                 * explicitly indicates that the subscription is no longer valid.
+                 */
+                const invalidStatuses = ['halted', 'cancelled', 'expired'];
+                const isStatusInvalid = invalidStatuses.includes(ownerAccount.subscriptionStatus);
+
+                // Check if plan is expired AND status is not active (Safety fallback)
+                const now = new Date();
+                const isPastGracePeriod = ownerAccount.planEndDate && (new Date(ownerAccount.planEndDate) < now);
+
+                if (isStatusInvalid || (isPastGracePeriod && ownerAccount.subscriptionStatus !== 'active')) {
+                    return res.status(403).json({
+                        error: 'Subscription Issue',
+                        message: ownerAccount.subscriptionStatus === 'halted'
+                            ? 'Your payment failed and access is halted. Please pay the due amount.'
+                            : 'Your subscription is no longer active. Please renew to continue.',
+                        status: ownerAccount.subscriptionStatus,
+                        expiredAt: ownerAccount.planEndDate
                     });
                 }
             }
@@ -110,7 +125,7 @@ router.post('/login', async (req, res) => {
 router.post('/signup', async (req, res) => {
     // UPDATED: Destructure shopName, plan, and transactionId
     const { email, password, phone, plan, transactionId, shopName } = req.body;
-    
+
     // REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
     if (!email || !password || !plan || !transactionId || !shopName) {
         return res.status(400).json({ error: 'Email, password, shop name, plan, and transaction ID are required for owner signup.' });
@@ -122,7 +137,7 @@ router.post('/signup', async (req, res) => {
         if (userExists) {
             return res.status(400).json({ error: 'User already exists with this email or phone number.' });
         }
-        
+
         // Also check if a shop with this name already exists
         const shopNameExists = await User.findOne({ shopName });
         if (shopNameExists) {
@@ -138,18 +153,18 @@ router.post('/signup', async (req, res) => {
             email,
             password,
             phone: phone || null,
-            role: 'owner', 
+            role: 'owner',
             // Temporary shopId, will be replaced by _id immediately after creation
-            shopId: new mongoose.Types.ObjectId(), 
+            shopId: new mongoose.Types.ObjectId(),
             plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
             transactionId: transactionId, // Save the subscription ID
-            shopName: shopName, 
+            shopName: shopName,
             planEndDate: trialEndDate, // 🔥 INITIALIZE THE END DATE
             subscriptionStatus: 'authenticated',
         });
-        
+
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
-        newUser.shopId = newUser._id; 
+        newUser.shopId = newUser._id;
         await newUser.save();
 
         const token = generateToken(newUser._id, newUser.shopId, newUser.role);
@@ -163,7 +178,7 @@ router.post('/signup', async (req, res) => {
                 shopId: newUser.shopId,
                 phone: newUser.phone,
                 plan: newUser.plan,
-                shopName: newUser.shopName, 
+                shopName: newUser.shopName,
             }
         });
 
@@ -171,7 +186,7 @@ router.post('/signup', async (req, res) => {
         console.error('Signup Error:', error);
         // Mongoose validation errors will be caught here if they involve unique constraints
         if (error.code === 11000) { // Duplicate key error code
-             return res.status(400).json({ error: 'A user or shop with this email/shop name already exists.' });
+            return res.status(400).json({ error: 'A user or shop with this email/shop name already exists.' });
         }
         res.status(500).json({ error: 'Server error during signup.' });
     }
@@ -186,7 +201,7 @@ router.get('/profile', protect, async (req, res) => {
     try {
         // req.user is already populated by 'protect' middleware
         const user = await User.findById(req.user.id).select('-password');
-        
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -228,12 +243,12 @@ router.get('/profile', protect, async (req, res) => {
  * @access  Private
  */
 router.put('/profile', protect, async (req, res) => {
-    const { 
-        phone, 
-        shopName, 
-        taxId, 
-        address, 
-        profileImageUrl 
+    const {
+        phone,
+        shopName,
+        taxId,
+        address,
+        profileImageUrl
     } = req.body;
 
     try {
@@ -276,12 +291,12 @@ router.put('/profile', protect, async (req, res) => {
 
     } catch (error) {
         console.error('Error updating profile:', error);
-        
+
         // Handle MongoDB Unique Error for ShopName
         if (error.code === 11000) {
             return res.status(400).json({ error: 'Shop name is already taken. Please choose another.' });
         }
-        
+
         res.status(500).json({ error: 'Server error updating profile.' });
     }
 });
@@ -296,7 +311,7 @@ router.put('/profile', protect, async (req, res) => {
  */
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
-    let user = null; 
+    let user = null;
 
     if (!email) {
         return res.status(400).json({ error: 'Email is required to request a password reset.' });
@@ -309,7 +324,7 @@ router.post('/forgot-password', async (req, res) => {
             // SECURITY BEST PRACTICE: Respond with a generic success message 
             return res.json({ message: 'Password reset link has been sent.' });
         }
-        
+
         // 1. Generate a secure, unique, and non-hashed token for the email link
         const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -322,9 +337,9 @@ router.post('/forgot-password', async (req, res) => {
         // 3. Set the hashed token and expiration time (e.g., 10 minutes)
         user.resetPasswordToken = resetTokenHash;
         user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-        
+
         await user.save({ validateBeforeSave: false });
-        
+
         // 4. Construct the reset URL using the plaintext token
         const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
@@ -345,14 +360,14 @@ router.post('/forgot-password', async (req, res) => {
             });
 
             // 6. Send generic success response
-            res.json({ 
+            res.json({
                 message: 'Password reset link has been sent.',
                 devResetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
             });
 
         } catch (mailError) {
             console.error('Email sending failed:', mailError);
-            
+
             // If email fails, clear the token from the user
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
@@ -394,21 +409,21 @@ router.put('/reset-password/:resetToken', async (req, res) => {
         // 3. Find user by hashed token and ensure token hasn't expired
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpire: { $gt: Date.now() }, 
+            resetPasswordExpire: { $gt: Date.now() },
         });
 
         if (!user) {
             return res.status(400).json({ error: 'Invalid or expired password reset token. Please request a new one.' });
         }
-        
+
         // 4. Update the password
-        user.password = newPassword; 
-        
+        user.password = newPassword;
+
         // 5. Clear the reset fields to invalidate the token immediately
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
 
-        await user.save(); 
+        await user.save();
 
         // 6. Success response
         res.json({ message: 'Password reset successfully. You can now log in with your new password.' });
@@ -430,8 +445,8 @@ router.put('/reset-password/:resetToken', async (req, res) => {
 router.put('/activate/:activationToken', async (req, res) => {
     const { activationToken } = req.params;
     const { newPassword } = req.body;
-    console.log('activationToken',activationToken);
-    console.log('newPassword',newPassword)
+    console.log('activationToken', activationToken);
+    console.log('newPassword', newPassword)
 
     // 1. Basic password validation
     if (!newPassword || newPassword.length < 8) {
@@ -448,20 +463,20 @@ router.put('/activate/:activationToken', async (req, res) => {
         // 3. Find user by hashed token and ensure token hasn't expired
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpire: { $gt: Date.now() }, 
+            resetPasswordExpire: { $gt: Date.now() },
         });
 
         if (!user) {
             return res.status(400).json({ error: 'Invalid or expired activation token. Please ask your manager to resend the link.' });
         }
-        
+
         // 4. Update the password and clear the reset/activation fields
-        user.password = newPassword; 
+        user.password = newPassword;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
 
         // Mongoose pre-save hook will hash the new password before saving
-        await user.save(); 
+        await user.save();
 
         // 5. Success response
         res.json({ message: 'Account activated and password set successfully. You can now log in.' });
@@ -482,49 +497,49 @@ router.put('/activate/:activationToken', async (req, res) => {
  */
 router.put('/password/change', protect,
     async (req, res) => {
-    
-    const { currentPassword, newPassword } = req.body;
-    
-    // We rely on 'protect' middleware to set req.user.id
-    const userId = req.user?.id; // Safely access user ID
-    if (!userId) {
-        // This condition should only be hit if the middleware failed to attach the user
-        return res.status(401).json({ error: 'Not authorized, token failed.' });
-    }
 
-    if (!currentPassword || !newPassword) {
-        return res.status(400).json({ error: 'Current password and new password are required.' });
-    }
+        const { currentPassword, newPassword } = req.body;
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
+        // We rely on 'protect' middleware to set req.user.id
+        const userId = req.user?.id; // Safely access user ID
+        if (!userId) {
+            // This condition should only be hit if the middleware failed to attach the user
+            return res.status(401).json({ error: 'Not authorized, token failed.' });
         }
 
-        // 1. Verify current password
-        if (!(await user.matchPassword(currentPassword))) {
-            return res.status(401).json({ error: 'Invalid current password.' });
-        }
-        // 2. Check if new password is too short (or add other validation)
-        if (newPassword.length < 8) {
-             return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required.' });
         }
 
-        // 3. Update password
-        user.password = newPassword; 
-        
-        // The User model's pre-save hook will automatically hash the new password.
-        await user.save(); 
+        try {
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found.' });
+            }
 
-        // Send a success response
-        res.json({ message: 'Password updated successfully. You will be logged out to re-authenticate with your new password.' });
+            // 1. Verify current password
+            if (!(await user.matchPassword(currentPassword))) {
+                return res.status(401).json({ error: 'Invalid current password.' });
+            }
+            // 2. Check if new password is too short (or add other validation)
+            if (newPassword.length < 8) {
+                return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+            }
 
-    } catch (error) {
-        console.error('Change Password Error:', error);
-        res.status(500).json({ error: 'Server error during password change.' });
-    }
-});
+            // 3. Update password
+            user.password = newPassword;
+
+            // The User model's pre-save hook will automatically hash the new password.
+            await user.save();
+
+            // Send a success response
+            res.json({ message: 'Password updated successfully. You will be logged out to re-authenticate with your new password.' });
+
+        } catch (error) {
+            console.error('Change Password Error:', error);
+            res.status(500).json({ error: 'Server error during password change.' });
+        }
+    });
 
 
 router.post('/data/sync', protect, async (req, res) => {
@@ -535,30 +550,30 @@ router.post('/data/sync', protect, async (req, res) => {
         console.log(`Force Sync requested by User: ${userId} for Shop: ${shopId}`);
 
         // --- Mock Data Sync Logic (Replace with actual data fetching/packaging) ---
-        
+
         // For now, we simulate the success response which the frontend expects:
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: 'Server data retrieved and ready for client update.',
             recordsUpdated: 150, // Example of useful metadata to send back
             // data: allShopData, // Send the actual data payload here if needed for sync
         });
-        
+
     } catch (error) {
         console.error('Force Sync Server Error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to complete server synchronization.', 
-            message: error.message 
+        res.status(500).json({
+            success: false,
+            error: 'Failed to complete server synchronization.',
+            message: error.message
         });
     }
 });
 
 router.get('/current-plan', protect, async (req, res) => {
     try {
-        const userId = req.user.id; 
-        
+        const userId = req.user.id;
+
         // 1. Find the user by ID and SELECT the new fields
         const user = await User.findById(userId).select('plan planEndDate subscriptionStatus');
 
@@ -567,7 +582,7 @@ router.get('/current-plan', protect, async (req, res) => {
         }
 
         // 2. Return the plan and end date
-        res.json({ 
+        res.json({
             success: true,
             plan: user.plan || 'BASIC', // Default to BASIC if plan is null/undefined
             planEndDate: user.planEndDate, // 🔥 Include the end date

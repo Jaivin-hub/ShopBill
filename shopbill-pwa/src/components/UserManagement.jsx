@@ -8,7 +8,7 @@ const STAFF_ROLES = {
 };
 
 const SHOP_PLANS = {
-    BASIC: 'BASIC', 
+    BASIC: 'BASIC',
     PRO: 'PRO',
     PREMIUM: 'PREMIUM',
 };
@@ -16,7 +16,7 @@ const SHOP_PLANS = {
 // --- GLOBAL UTILITY: COMPARES CALENDAR DATES ONLY (YYYY-MM-DD) ---
 const calculateDueStatus = (endDateString) => {
     if (!endDateString) return { text: 'N/A', isUrgent: false };
-    
+
     try {
         const endDate = new Date(endDateString);
         const now = new Date();
@@ -48,7 +48,7 @@ const formatDateUTC = (isoString) => {
         const year = d.getUTCFullYear();
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const month = monthNames[d.getUTCMonth()];
-        
+
         return `${month} ${day}, ${year}`;
     } catch (e) {
         return 'Invalid Date';
@@ -167,7 +167,7 @@ const SubscriptionStatusBadge = ({ status }) => {
             borderColor = 'border-gray-500/30';
             text = status;
     }
-    
+
     const IconComponent = icon;
     return (
         <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${bgColor} ${color} border ${borderColor} min-w-[110px]`}>
@@ -180,7 +180,7 @@ const SubscriptionStatusBadge = ({ status }) => {
 const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, API, showToast }) => {
     const [paymentData, setPaymentData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     useEffect(() => {
         if (isOpen && shopId) {
             const fetchPaymentData = async () => {
@@ -202,7 +202,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
             fetchPaymentData();
         }
     }, [isOpen, shopId, apiClient, API, showToast]);
-    
+
     if (!isOpen) return null;
 
     if (isLoading) {
@@ -216,7 +216,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
             </div>
         );
     }
-    
+
     const getStatusBadge = (status) => {
         const s = status?.toLowerCase();
         if (s === 'paid') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30"><CheckCircle className="w-3.5 h-3.5" />Paid</span>;
@@ -225,78 +225,81 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
     };
 
     const nextPaymentStatus = calculateDueStatus(paymentData?.upcomingPayment?.date || paymentData?.planEndDate);
-    
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <header className="flex items-center justify-between p-6 border-b border-gray-800 bg-gradient-to-r from-gray-800/50 to-gray-800/30">
+                <header className="flex items-center justify-between p-4 md:p-6 border-b border-gray-800 bg-gradient-to-r from-gray-800/50 to-gray-800/30">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                            <CreditCard className="w-6 h-6 text-indigo-400" />
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                            <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-indigo-400" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">Payment History</h2>
-                            <p className="text-sm text-gray-400">{shopName}</p>
+                            <h2 className="text-lg md:text-xl font-bold text-white">Payment History</h2>
+                            <p className="text-xs md:text-sm text-gray-400">{shopName}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
                         <X className="w-5 h-5" />
                     </button>
                 </header>
-                
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
                     {paymentData ? (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <IndianRupee className="w-5 h-5 text-indigo-400" />
-                                        <h3 className="text-sm font-semibold text-gray-400 tracking-wider">Current Plan</h3>
+                            {/* 🚀 FIXED: Changed grid-cols-1 to grid-cols-2 for mobile row layout */}
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                <div className="bg-gray-800/50 rounded-xl p-3 md:p-5 border border-gray-700/50">
+                                    <div className="flex items-center gap-2 mb-2 md:mb-3">
+                                        <IndianRupee className="w-4 h-4 md:w-5 md:h-5 text-indigo-400" />
+                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider uppercase">Plan</h3>
                                     </div>
-                                    <p className="text-2xl font-bold text-white mb-1">{paymentData.currentPlan || shopPlan}</p>
-                                    <p className="text-sm text-gray-400">Monthly Billing</p>
+                                    <p className="text-lg md:text-2xl font-bold text-white mb-1">{paymentData.currentPlan || shopPlan}</p>
+                                    <p className="text-[10px] md:text-sm text-gray-400">Monthly</p>
                                 </div>
-                                <div className={`bg-gradient-to-br rounded-xl p-5 border transition-all duration-300 ${nextPaymentStatus.isUrgent ? 'from-red-500/10 to-orange-500/10 border-red-500/40' : 'from-indigo-500/10 to-purple-500/10 border-indigo-500/30'}`}>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Calendar className={`w-5 h-5 ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
-                                        <h3 className="text-sm font-semibold text-gray-400 tracking-wider">Next Payment</h3>
+
+                                <div className={`bg-gradient-to-br rounded-xl p-3 md:p-5 border transition-all duration-300 ${nextPaymentStatus.isUrgent ? 'from-red-500/10 to-orange-500/10 border-red-500/40' : 'from-indigo-500/10 to-purple-500/10 border-indigo-500/30'}`}>
+                                    <div className="flex items-center gap-2 mb-2 md:mb-3">
+                                        <Calendar className={`w-4 h-4 md:w-5 md:h-5 ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
+                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider uppercase">Next Due</h3>
                                     </div>
-                                    <p className="text-2xl font-bold text-white mb-1">
-                                        ₹{paymentData.upcomingPayment?.amount?.toFixed(2) || '0.00'}
+                                    <p className="text-lg md:text-2xl font-bold text-white mb-1">
+                                        ₹{paymentData.upcomingPayment?.amount?.toFixed(0) || '0'}
                                     </p>
-                                    <p className={`text-sm font-bold uppercase tracking-tight ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`}>
+                                    <p className={`text-[10px] md:text-sm font-bold uppercase tracking-tight ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`}>
                                         {nextPaymentStatus.text}
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-[10px] text-gray-500 mt-1 truncate">
                                         {formatDateUTC(paymentData.upcomingPayment?.date || paymentData?.planEndDate)}
                                     </p>
                                 </div>
                             </div>
+
                             <div>
-                                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                <h3 className="text-base md:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                                     <Clock className="w-5 h-5 text-indigo-400" />Payment History
                                 </h3>
                                 <div className="space-y-3">
                                     {paymentData.paymentHistory && paymentData.paymentHistory.length > 0 ? (
                                         paymentData.paymentHistory.map((payment) => (
-                                            <article key={payment.id} className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/30 hover:border-gray-600/50 transition-all">
+                                            <article key={payment.id} className="bg-gray-800/30 rounded-lg p-3 md:p-4 border border-gray-700/30 hover:border-gray-600/50 transition-all">
                                                 <div className="flex items-center justify-between">
-                                                    <div className="flex-1">
+                                                    <div className="flex-1 overflow-hidden">
                                                         <div className="flex items-center gap-3 mb-2">
                                                             <span className="text-sm font-semibold text-white">₹{payment.amount?.toFixed(2)}</span>
                                                             {getStatusBadge(payment.status)}
                                                         </div>
-                                                        <div className="flex items-center gap-4 text-xs text-gray-400">
+                                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] md:text-xs text-gray-400">
                                                             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatDateUTC(payment.date)}</span>
                                                             <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5" />{payment.method || 'Online'}</span>
-                                                            <span className="text-gray-500">ID: {payment.transactionId}</span>
+                                                            <span className="text-gray-500 truncate">ID: {payment.transactionId}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </article>
                                         ))
                                     ) : (
-                                        <p className="text-center py-4 text-gray-600 border border-dashed border-gray-800 rounded-lg">No previous transaction records.</p>
+                                        <p className="text-center py-8 text-gray-600 border border-dashed border-gray-800 rounded-lg text-sm">No previous transaction records.</p>
                                     )}
                                 </div>
                             </div>
@@ -305,8 +308,8 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                         <div className="text-center py-10 text-gray-500">No payment data found.</div>
                     )}
                 </div>
-                <div className="p-6 border-t border-gray-800 bg-gray-800/30 flex justify-end">
-                    <button onClick={onClose} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-all">
+                <div className="p-4 md:p-6 border-t border-gray-800 bg-gray-800/30 flex justify-end">
+                    <button onClick={onClose} className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-all text-sm md:text-base">
                         Close
                     </button>
                 </div>
@@ -315,8 +318,8 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
     );
 };
 
-const UserManagement = ({ apiClient, API, showToast, currentUser }) => { 
-    const [shops, setShops] = useState([]); 
+const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
+    const [shops, setShops] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState({ key: 'dateJoined', direction: 'descending' });
@@ -325,16 +328,16 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     const mapUserToShop = (user) => {
         const dueStatus = calculateDueStatus(user.planEndDate);
         return {
-            id: user._id, 
+            id: user._id,
             dateSortValue: user.createdAt,
-            dateJoined: formatDateUTC(user.createdAt), 
-            name: user.shopName || user.email.split('@')[0], 
+            dateJoined: formatDateUTC(user.createdAt),
+            name: user.shopName || user.email.split('@')[0],
             email: user.email || 'N/A',
             phone: user.phone || 'N/A',
-            status: user.isActive !== false ? 'Active' : 'Inactive', 
-            plan: String(user.plan || 'BASIC').toUpperCase(), 
-            staffCount: { manager: user.managerCount || 0, cashier: user.cashierCount || 0 }, 
-            performanceTrend: user.performanceTrend || { metric: "0.00%", trend: 'flat' }, 
+            status: user.isActive !== false ? 'Active' : 'Inactive',
+            plan: String(user.plan || 'BASIC').toUpperCase(),
+            staffCount: { manager: user.managerCount || 0, cashier: user.cashierCount || 0 },
+            performanceTrend: user.performanceTrend || { metric: "0.00%", trend: 'flat' },
             subscriptionStatus: user.subscriptionStatus || 'created',
             planEndDate: user.planEndDate,
             dueStatus: dueStatus
@@ -354,7 +357,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, API, showToast]); 
+    }, [apiClient, API, showToast]);
 
     useEffect(() => {
         if (currentUser?.role === 'superadmin') fetchShops();
@@ -370,7 +373,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     };
 
     const filteredAndSortedShops = useMemo(() => {
-        let filtered = shops.filter(shop => 
+        let filtered = shops.filter(shop =>
             shop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             shop.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
             shop.phone.toLowerCase().includes(searchTerm.toLowerCase())
@@ -379,10 +382,10 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         return filtered.sort((a, b) => {
             let aValue = a[sortBy.key];
             let bValue = b[sortBy.key];
-            
+
             if (sortBy.key === 'dateJoined') {
-                return sortBy.direction === 'ascending' 
-                    ? new Date(a.dateSortValue) - new Date(b.dateSortValue) 
+                return sortBy.direction === 'ascending'
+                    ? new Date(a.dateSortValue) - new Date(b.dateSortValue)
                     : new Date(b.dateSortValue) - new Date(a.dateSortValue);
             }
 
@@ -398,7 +401,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
             const response = await apiClient.delete(API.superadminShopDetails(shopId));
             if (response.data.success) {
                 setShops(prev => prev.filter(s => s.id !== shopId));
-                showToast(`Shop deleted.`, 'success'); 
+                showToast(`Shop deleted.`, 'success');
             }
         } catch (error) {
             showToast('Delete failed.', 'error');
@@ -424,14 +427,14 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
         <main className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
             <header className="p-4 md:p-6 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-gray-950 z-10">
                 <h1 className="text-xl md:text-2xl font-bold text-white flex items-center">
-                    <Building className="w-6 h-6 mr-2 md:mr-3 text-indigo-400" /> 
+                    <Building className="w-6 h-6 mr-2 md:mr-3 text-indigo-400" />
                     <span className="hidden xs:block">Shop Management</span>
                     <span className="xs:hidden">Shops</span>
                     <button onClick={handleRefresh} disabled={isLoading} className="ml-4 p-2 rounded-lg bg-gray-900 hover:bg-gray-800 transition-all cursor-pointer">
                         <RotateCw className={`w-4 h-4 text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
                     </button>
                 </h1>
-                
+
                 <div className="hidden sm:block relative w-64 md:w-80">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
@@ -510,7 +513,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
 
                                         <div className="space-y-1">
                                             <div className="flex items-center text-xs text-gray-400 gap-2 overflow-hidden">
-                                                <Mail className="w-3.5 h-3.5 text-gray-600 shrink-0" /> 
+                                                <Mail className="w-3.5 h-3.5 text-gray-600 shrink-0" />
                                                 <span className="truncate">{shop.email}</span>
                                             </div>
                                             <div className="flex items-center text-xs text-gray-400 gap-2">
@@ -598,7 +601,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                     </>
                 )}
             </div>
-            
+
             <PaymentModal
                 isOpen={paymentModal.isOpen}
                 onClose={handleClosePaymentModal}
