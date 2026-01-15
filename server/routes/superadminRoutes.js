@@ -757,34 +757,35 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
             .sort({ paymentDate: -1 })
             .limit(12);
 
-        // 3. FETCH DATA DIRECTLY FROM RAZORPAY API
+        // 3. FETCH DATA DIRECTLY FROM RAZORPAY API (The Source of Truth)
         let nextPaymentDate = null;
 
         if (subscriptionId) {
             try {
-                // This call fetches the live subscription object from Razorpay
-                const subscription = await rzp.subscriptions.fetch(subscriptionId);
+                // Fetch the live subscription object
+                const subscription = await razorpay.subscriptions.fetch(subscriptionId);
                 
-                // Razorpay uses UNIX timestamps in seconds. 
-                // subscription.current_end is the exact moment the current cycle ends (Next Due Date).
-                if (subscription.current_end) {
-                    nextPaymentDate = new Date(subscription.current_end * 1000);
+                /**
+                 * ⭐ FIXED LOGIC:
+                 * During trial, Razorpay uses 'charge_at'.
+                 * During active billing, Razorpay uses 'current_end'.
+                 * We take whichever one represents the "Next Due Date".
+                 */
+                const rzpTimestamp = subscription.charge_at || subscription.current_end;
+                
+                if (rzpTimestamp) {
+                    nextPaymentDate = new Date(rzpTimestamp * 1000);
                 }
             } catch (rzpError) {
-                console.error('Razorpay API Error:', rzpError.description || rzpError);
-                // If API fails, we fall back to manual calculation below
+                console.error('Razorpay API Sync Error:', rzpError.description || rzpError);
             }
         }
 
         // 4. FALLBACK (Only if Razorpay API fails or subscriptionId is missing)
         if (!nextPaymentDate) {
-            const lastSuccessfulPayment = paymentHistory.find(p => p.status === 'paid');
-            const referenceDate = lastSuccessfulPayment 
-                ? new Date(lastSuccessfulPayment.paymentDate) 
-                : new Date(owner.createdAt);
-            
-            nextPaymentDate = new Date(referenceDate);
-            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+            // Use the planEndDate stored in DB (which is now synced via Webhook/Verify routes)
+            // or default to owner creation + 30 days
+            nextPaymentDate = owner.planEndDate || new Date(new Date(owner.createdAt).setDate(new Date(owner.createdAt).getDate() + 30));
         }
 
         // 5. Response Formatting
@@ -792,9 +793,8 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         const price = planPrices[plan] || planPrices['BASIC'];
 
         const now = new Date();
-        // Calculate days difference
         const diffTime = nextPaymentDate - now;
-        const daysUntilPayment = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const daysUntilPayment = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
         res.json({
             success: true,
@@ -808,7 +808,7 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
                     method: 'Razorpay Auto-Debit', 
                 })),
                 upcomingPayment: {
-                    date: nextPaymentDate.toISOString(), // This will now be Jan 14
+                    date: nextPaymentDate.toISOString(),
                     amount: price,
                     daysUntil: daysUntilPayment
                 },

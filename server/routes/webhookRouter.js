@@ -1,4 +1,4 @@
-// webhooks/razorpay.js (FINAL FIXED VERSION)
+// webhooks/razorpay.js (FINAL FIXED VERSION - SYNCED WITH RAZORPAY TIMESTAMPS)
 
 const express = require('express');
 const crypto = require('crypto');
@@ -71,8 +71,6 @@ router.post('/razorpay', async (req, res) => {
         console.log(`[WEBHOOK SUBSCRIPTION ID] ${subscriptionId}`); 
 
         // 3. Find the Shop/Owner associated with this subscription ID
-        // ⭐ CLEANUP FIX: Since pendingTransactionId is removed from the User model, 
-        // we clean up the lookup. This is simpler and more robust.
         const owner = await User.findOne({ 
             role: 'owner', 
             transactionId: subscriptionId
@@ -89,27 +87,16 @@ router.post('/razorpay', async (req, res) => {
         // 4. Handle Subscription Status Changes (Updates the User model)
 
         if (event === 'subscription.activated') {
-            
-            // This event handles the initial mandate activation. Since the client is responsible
-            // for the final database update via /verify-plan-change (which gets the plan details and User ID),
-            // this webhook does NOT need to do heavy lifting, preventing race conditions.
-            
-            // We just ensure the status is 'authenticated' (or similar pending state)
             await User.updateOne({ _id: owner._id }, {
                 $set: {
                     subscriptionStatus: 'authenticated', 
                     lastStatusUpdate: new Date(),
                 }
             });
-            
             console.log(`[WEBHOOK SUCCESS] Subscription ACTIVATED (Mandate confirmed) for ${owner.shopName}. Status updated to 'authenticated'.`);
-            
             return res.json({ success: true, message: 'Subscription mandate activated and user status updated.' });
             
         } else if (event === 'subscription.cancelled') {
-            
-            // ⭐ CRITICAL FIX: Only set to generic 'cancelled' if the status is NOT 'cancelled_replaced'.
-            // This prevents a webhook for the old plan overriding the upgrade state.
             if (owner.subscriptionStatus !== 'cancelled_replaced') {
                 await User.updateOne({ _id: owner._id }, {
                     $set: {
@@ -118,15 +105,10 @@ router.post('/razorpay', async (req, res) => {
                     }
                 });
                 console.log(`[WEBHOOK SUCCESS] Subscription CANCELLED for ${owner.shopName}. Status updated to 'cancelled'.`);
-            } else {
-                 console.log(`[WEBHOOK LOG] Subscription CANCELLED event received for old subscription, but status is 'cancelled_replaced'. Skipping database update.`);
             }
-
-            // Stop processing further
             return res.json({ success: true, message: 'Subscription cancelled event handled.' });
 
         } else if (event === 'subscription.halted') {
-            // ... (Halted logic remains the same, still falls through to payment record step)
             await User.updateOne({ _id: owner._id }, {
                 $set: {
                     subscriptionStatus: 'halted',
@@ -138,17 +120,16 @@ router.post('/razorpay', async (req, res) => {
 
         // --- 5. Handle Payment Attempt Events (Creates a Payment history record) ---
         
-        // Only run for charged or failed events
         if (event === 'subscription.charged' || event === 'payment.failed' || event === 'subscription.halted') {
             const paymentEntity = payload.payment?.entity;
+            const subscriptionEntity = payload.subscription?.entity; // Get subscription details
+            
             let paymentStatus = 'pending';
             let paymentId = paymentEntity?.id;
             let amountInPaise = paymentEntity?.amount;
             let amountInCurrency = amountInPaise / 100;
 
-            // Fallback needed if amount is not present (e.g., in some failed events)
             const fallbackPrices = { 'BASIC': 499, 'PRO': 799, 'PREMIUM': 999 };
-            // Use the amount from Razorpay if available, otherwise use the plan price
             const finalAmount = amountInCurrency || fallbackPrices[owner.plan] || 0; 
 
             const updateFields = { lastStatusUpdate: new Date() };
@@ -156,26 +137,30 @@ router.post('/razorpay', async (req, res) => {
             if (event === 'subscription.charged' && paymentEntity?.status === 'captured') {
                 paymentStatus = 'paid';
                 
-                // Determine the next billing date (always assume 1 month/30 days from now)
-                const nextMonth = new Date();
-                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                // ⭐ CRITICAL FIX: Use the 'current_end' timestamp provided by Razorpay
+                // This converts Razorpay's UNIX timestamp (seconds) to Javascript Date (milliseconds)
+                // This ensures the date matches the dashboard (e.g., Jan 14) exactly.
+                let nextBillingDate;
+                if (subscriptionEntity && subscriptionEntity.current_end) {
+                    nextBillingDate = new Date(subscriptionEntity.current_end * 1000);
+                } else {
+                    // Fallback only if payload data is missing
+                    nextBillingDate = new Date();
+                    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+                }
                 
-                // 🔥 CRITICAL: Map successful charge to 'active' status
                 updateFields.subscriptionStatus = 'active'; 
-                updateFields.planEndDate = nextMonth;      
+                updateFields.planEndDate = nextBillingDate;      
 
                 await User.updateOne({ _id: owner._id }, { $set: updateFields });
                 
-                // 🔥 DEBUG: Log the date update
-                console.log(`[WEBHOOK CHARGED] Plan End Date updated to: ${nextMonth.toISOString()}. Status set to 'active'.`);
+                console.log(`[WEBHOOK SUCCESS] Plan End Date SYNCED with Razorpay: ${nextBillingDate.toISOString()}. Status set to 'active'.`);
 
             } else if (event === 'payment.failed' || event === 'subscription.halted') {
                 paymentStatus = 'failed';
                 if (!paymentId) {
                     paymentId = `ATTEMPT_${Date.now()}_${subscriptionId}`;
                 }
-                
-                // Log the failure details
                 console.warn(`[WEBHOOK FAILED] Payment attempt failed for ${owner.shopName}. Payment ID: ${paymentId}`);
             }
 
@@ -191,17 +176,13 @@ router.post('/razorpay', async (req, res) => {
                 razorpayPayload: req.body,
             });
 
-            // 🔥 DEBUG: Log the payment record creation
             console.log(`[WEBHOOK SUCCESS] Payment recorded in DB. ID: ${paymentRecord._id}. Status: ${paymentStatus}.`);
         }
 
-        // 6. Send successful response to Razorpay (required for all processed events)
         res.json({ success: true, message: 'Webhook received and processed.' });
 
     } catch (error) {
         console.error('[WEBHOOK CRITICAL ERROR] Failed to process webhook:', error);
-        console.error('Error Details:', error.message);
-        // CRITICAL: Always respond with 200 OK to prevent Razorpay from endlessly retrying
         res.json({ success: true, message: 'Server error during processing, but acknowledged.' });
     }
 });

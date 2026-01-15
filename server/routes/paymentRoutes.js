@@ -1,21 +1,14 @@
-
-
 const express = require('express');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const { protect } = require('../middleware/authMiddleware');
 const axios = require('axios');
 const User = require('../models/User')
-
 const router = express.Router();
-
-// --- 1. Initialize Razorpay Instance ---
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
-
-// --- Constants for Payments ---
 const PLAN_DETAILS = {
     BASIC: {
         plan_id: process.env.BASIC_PLAN,
@@ -30,16 +23,6 @@ const PLAN_DETAILS = {
         description: 'Pocket POS Premium Plan'
     },
 };
-
-// ------------------------------------------------------------------
-// --- CORE RAZORPAY SUBSCRIPTION FLOW ---
-// ------------------------------------------------------------------
-
-/**
- * @route POST /api/payment/create-subscription
- * @desc Creates a new Razorpay Subscription Mandate. Includes 30-day free trial logic.
- * @access Public
- */
 router.post('/create-subscription', async (req, res) => {
     const { plan } = req.body;
 
@@ -55,18 +38,13 @@ router.post('/create-subscription', async (req, res) => {
             error: `Configuration Error: Razorpay Plan ID for '${plan}' is missing on the server. Please check environment variables (e.g., PREMIUM_PLAN).`
         });
     }
-
-    // --- 30-DAY FREE TRIAL LOGIC ---
     const trialDays = 30;
     const startAtTimestamp = Math.floor(Date.now() / 1000) + (trialDays * 24 * 60 * 60);
-
     const subscriptionOptions = {
         plan_id: plan_id,
         customer_notify: 1,
         total_count: 1200,
         start_at: startAtTimestamp,
-
-        // Add a small ₹1 charge for mandate setup verification
         addons: [{
             item: {
                 name: 'Verification Charge',
@@ -105,19 +83,12 @@ router.post('/create-subscription', async (req, res) => {
 });
 
 
-/**
- * @route POST /api/payment/verify-subscription
- * @desc Verifies the signature and refunds the verification fee.
- * @access Public
- */
 router.post('/verify-subscription', async (req, res) => {
 
-    // 1. Extract verification data
     const {
         razorpay_payment_id,
         razorpay_signature,
         razorpay_subscription_id,
-        // The plan is optional here, but kept for future logging/debugging
     } = req.body;
 
     if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
@@ -125,9 +96,7 @@ router.post('/verify-subscription', async (req, res) => {
     }
 
     try {
-        // --- MANDATE VERIFICATION ---
         const body = razorpay_payment_id + '|' + razorpay_subscription_id;
-
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
@@ -136,8 +105,6 @@ router.post('/verify-subscription', async (req, res) => {
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
-
-            // --- 2. INSTANT REFUND LOGIC ---
             const refundAmount = 100;
             const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
             const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -152,10 +119,7 @@ router.post('/verify-subscription', async (req, res) => {
 
             } catch (refundError) {
                 console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
-                // Proceed with success as the mandate is verified.
             }
-
-            // --- 3. FINAL SUCCESS RESPONSE ---
             res.json({
                 success: true,
                 message: 'Subscription mandate verified and refund initiated.',
@@ -163,7 +127,6 @@ router.post('/verify-subscription', async (req, res) => {
             });
 
         } else {
-            // FAILURE: Signature mismatch 
             res.status(400).json({
                 success: false,
                 error: 'Subscription mandate verification failed. Signature mismatch.',
@@ -176,12 +139,6 @@ router.post('/verify-subscription', async (req, res) => {
     }
 });
 
-
-/**
- * @route POST /api/payment/cancel-subscription
- * @desc Cancels a Razorpay subscription dynamically based on trial or paid cycle.
- * @access Private (Requires 'protect')
- */
 router.post('/cancel-subscription', protect, async (req, res) => {
     const userId = req.user._id;
 
@@ -296,11 +253,6 @@ router.post('/cancel-subscription', protect, async (req, res) => {
     }
 });
 
-/**
- * @route POST /api/payment/upgrade-plan
- * @desc Handles plan change (Upgrade/Downgrade/Re-subscribe). Cancels old subscription immediately and creates a new mandate.
- * @access Private (Requires 'protect')
- */
 router.post('/upgrade-plan', protect, async (req, res) => {
     const userId = req.user._id;
     const { newPlan } = req.body; // e.g., 'PRO' or 'PREMIUM'
@@ -444,12 +396,6 @@ router.post('/upgrade-plan', protect, async (req, res) => {
     }
 });
 
-
-/**
-* @route POST /api/payment/verify-plan-change
-* @desc Verifies the signature for the new subscription mandate after plan change and sets the new 30-day planEndDate.
-* @access Public
-*/
 router.post('/verify-plan-change', async (req, res) => {
     const {
         razorpay_payment_id,
@@ -474,7 +420,6 @@ router.post('/verify-plan-change', async (req, res) => {
         const isAuthentic = expectedSignature === razorpay_signature;
         
         if (!isAuthentic) {
-            // FAILURE: Signature mismatch 
             return res.status(400).json({
                 success: false,
                 error: 'Subscription mandate verification failed. Signature mismatch.',
@@ -493,15 +438,13 @@ router.post('/verify-plan-change', async (req, res) => {
                 { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
             );
             console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
-
         } catch (refundError) {
             console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
-            // Proceed with success as the mandate is verified.
         }
 
-        // --- 3. FINAL USER MODEL UPDATE (FIXED LOGIC) ---
+        // --- 3. FINAL USER MODEL UPDATE ---
         
-        // ⭐ CRITICAL FIX: Fetch the subscription details to get the User ID from the notes
+        // Fetch the subscription details from Razorpay to get User ID and Official Dates
         const subscriptionDetails = await razorpay.subscriptions.fetch(razorpay_subscription_id);
         const storedUserId = subscriptionDetails.notes?.userId;
         
@@ -509,35 +452,46 @@ router.post('/verify-plan-change', async (req, res) => {
             console.error(`[VERIFY ERROR] Subscription ${razorpay_subscription_id} missing stored userId in RZP notes.`);
             return res.status(404).json({ 
                 success: false, 
-                error: 'Could not find user information in transaction data. Please contact support.' 
+                error: 'Could not find user information in transaction data.' 
             });
         }
 
-        // Use the permanently stored User ID for the stable lookup
         const userToUpdate = await User.findById(storedUserId);
 
         if (!userToUpdate) {
              console.warn(`CRITICAL WARNING: User for plan change verification not found. Query ID: ${storedUserId}`);
              return res.status(404).json({ 
                  success: false, 
-                 error: 'Could not find user for plan verification. Please contact support. (Database lookup failed via User ID).' 
+                 error: 'Could not find user for plan verification.' 
              });
         }
         
-        // --- Update the user ---
+        // --- SYNC DATE WITH RAZORPAY ---
 
-        // Set the next billing date 30 days from now.
-        const nextBillingDate = new Date();
-        nextBillingDate.setDate(nextBillingDate.getDate() + 30); 
+        /**
+         * ⭐ FIXED LOGIC: Instead of manually adding 30 days, we use Razorpay's schedule.
+         * For a new trial/mandate, Razorpay uses 'charge_at' for the first full payment.
+         * If 'charge_at' is missing, we use 'current_end'.
+         */
+        const rzpTimestamp = subscriptionDetails.charge_at || subscriptionDetails.current_end;
+        
+        let officialBillingDate;
+        if (rzpTimestamp) {
+            // Convert UNIX seconds to JS Milliseconds
+            officialBillingDate = new Date(rzpTimestamp * 1000);
+        } else {
+            // Absolute fallback if Razorpay doesn't return a timestamp
+            officialBillingDate = new Date();
+            officialBillingDate.setDate(officialBillingDate.getDate() + 30);
+        }
 
         const updateFields = {
             plan: newPlan.toUpperCase(),
-            planEndDate: nextBillingDate, // New cycle end date (30 days from now)
-            subscriptionStatus: 'active', // New mandate is authenticated and active
-            transactionId: razorpay_subscription_id, // Update to the new subscription ID
+            planEndDate: officialBillingDate, // Official date from Razorpay (Jan 14)
+            subscriptionStatus: 'active', 
+            transactionId: razorpay_subscription_id, 
         };
         
-        // Update the user now that the mandate is verified. 
         await User.updateOne({ _id: userToUpdate._id }, { 
             $set: updateFields
         });
@@ -545,7 +499,7 @@ router.post('/verify-plan-change', async (req, res) => {
         // --- 4. SUCCESS RESPONSE ---
         res.json({
             success: true,
-            message: `Successfully switched to the ${newPlan} plan. Your new plan starts immediately! Your first full charge is scheduled for ${nextBillingDate.toLocaleDateString('en-IN')}.`,
+            message: `Successfully switched to the ${newPlan} plan. Your first full charge is scheduled for ${officialBillingDate.toLocaleDateString('en-IN')}.`,
             transactionId: razorpay_subscription_id,
         });
 
