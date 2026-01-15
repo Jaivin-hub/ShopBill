@@ -59,9 +59,8 @@ router.post('/login', async (req, res) => {
                 return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
             }
 
-            // --- NEW SUBSCRIPTION VALIDATION DURING LOGIN ---
+            // --- SUBSCRIPTION VALIDATION ---
             if (user.role !== 'superadmin') {
-                // Identify the owner account to check the status
                 let ownerAccount = user;
                 if (user.role !== 'owner') {
                     ownerAccount = await User.findById(user.shopId);
@@ -72,25 +71,22 @@ router.post('/login', async (req, res) => {
                 }
 
                 /**
-                 * ⭐ LOGIC FIX: 
-                 * Do not block just because of the date. Block only if the status 
-                 * explicitly indicates that the subscription is no longer valid.
+                 * ⭐ UPDATED LOGIC:
+                 * We ONLY block if the status is 'halted', 'cancelled', or 'expired'.
+                 * Statuses like 'active', 'authenticated', 'created', or 'pending' 
+                 * should ALWAYS be allowed, regardless of the 'planEndDate'.
                  */
-                const invalidStatuses = ['halted', 'cancelled', 'expired'];
-                const isStatusInvalid = invalidStatuses.includes(ownerAccount.subscriptionStatus);
+                const blockedStatuses = ['halted', 'cancelled', 'expired'];
+                const currentStatus = ownerAccount.subscriptionStatus;
 
-                // Check if plan is expired AND status is not active (Safety fallback)
-                const now = new Date();
-                const isPastGracePeriod = ownerAccount.planEndDate && (new Date(ownerAccount.planEndDate) < now);
-
-                if (isStatusInvalid || (isPastGracePeriod && ownerAccount.subscriptionStatus !== 'active')) {
+                if (blockedStatuses.includes(currentStatus)) {
                     return res.status(403).json({
-                        error: 'Subscription Issue',
-                        message: ownerAccount.subscriptionStatus === 'halted'
-                            ? 'Your payment failed and access is halted. Please pay the due amount.'
-                            : 'Your subscription is no longer active. Please renew to continue.',
-                        status: ownerAccount.subscriptionStatus,
-                        expiredAt: ownerAccount.planEndDate
+                        error: 'Access Restricted',
+                        message: currentStatus === 'halted' 
+                            ? 'Your subscription is halted due to a payment failure. Please settle the dues.' 
+                            : 'Your subscription has expired or was cancelled.',
+                        status: currentStatus,
+                        planEndDate: ownerAccount.planEndDate
                     });
                 }
             }
