@@ -30,15 +30,15 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 items-center justify-between" role="alert">
                     <div className="flex gap-2 items-center">
                         <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                        <p className="text-[10px] font-bold text-red-200/80 uppercase tracking-wide">
+                        <p className="text-[10px] font-bold text-red-200/80  tracking-wide">
                             {authError}
                         </p>
                     </div>
 
-                    {/* Contact Support Link */}
                     <button
+                        type="button"
                         onClick={() => setCurrentPage('support')}
-                        className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline uppercase tracking-tighter transition-colors"
+                        className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline  tracking-tighter transition-colors"
                     >
                         Contact Support
                     </button>
@@ -47,14 +47,15 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 
             <form className="space-y-3" onSubmit={handleAuth}>
                 <div className="space-y-1.5">
-                    <label htmlFor="identifier" className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Identity</label>
+                    <label htmlFor="identifier" className="text-[9px] font-black text-gray-500  tracking-widest ml-1">Identity</label>
                     <div className="relative group">
                         <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
                         <input
                             id="identifier"
                             type="text"
                             placeholder="Email or Phone"
-                            className="w-full pl-11 pr-4 py-3 bg-gray-900/50 border border-gray-800 text-white text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            /* Changed text-sm to text-base (16px) to prevent iOS zoom */
+                            className="w-full pl-11 pr-4 py-3 bg-gray-900/50 border border-gray-800 text-white text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
                             onChange={(e) => setIdentifier(e.target.value)}
                             value={identifier}
                             required
@@ -64,13 +65,13 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center px-1">
-                        <label htmlFor="password" className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Key</label>
+                        <label htmlFor="password" className="text-[9px] font-black text-gray-500  tracking-widest">Password</label>
                         <button
                             type="button"
                             onClick={() => setView('forgotPassword')}
-                            className="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-white transition-colors"
+                            className="text-[9px] font-black text-indigo-500  tracking-widest hover:text-white transition-colors"
                         >
-                            Recover?
+                            Forgot Password?
                         </button>
                     </div>
                     <div className="relative group">
@@ -79,7 +80,8 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder="••••••••"
-                            className="w-full pl-11 pr-11 py-3 bg-gray-900/50 border border-gray-800 text-white text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            /* Changed text-sm to text-base (16px) to prevent iOS zoom */
+                            className="w-full pl-11 pr-11 py-3 bg-gray-900/50 border border-gray-800 text-white text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
                             onChange={(e) => setPassword(e.target.value)}
                             value={password}
                             required
@@ -97,7 +99,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                 <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[11px]  tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
                 >
                     {loading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -108,10 +110,10 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
             </form>
 
             <div className="pt-4 border-t border-gray-800/50 text-center">
-                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">New Merchant?</p>
+                <p className="text-[9px] font-bold text-gray-500  tracking-widest mb-2">New Merchant?</p>
                 <button
                     onClick={onBackToLanding}
-                    className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
+                    className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px]  tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
                 >
                     Create Account
                 </button>
@@ -125,7 +127,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
     return (
         <section aria-labelledby="reset-heading" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="text-center">
-                <h2 id="reset-heading" className="text-lg font-black text-white uppercase tracking-tighter">
+                <h2 id="reset-heading" className="text-lg font-black text-white  tracking-tighter">
                     Reset <span className="text-teal-500">Access</span>
                 </h2>
             </div>
@@ -133,20 +135,21 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
             {resetMessage?.success && (
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-2 text-center" role="status">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <p className="text-[10px] font-bold text-emerald-200/80 uppercase tracking-wide">{resetMessage.success}</p>
+                    <p className="text-[10px] font-bold text-emerald-200/80  tracking-wide">{resetMessage.success}</p>
                 </div>
             )}
 
             <form className="space-y-4" onSubmit={handleForgotPasswordRequest}>
                 <div className="space-y-1.5">
-                    <label htmlFor="reset-email" className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Account Email</label>
+                    <label htmlFor="reset-email" className="text-[9px] font-black text-gray-500  tracking-widest ml-1">Account Email</label>
                     <div className="relative group">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-teal-500 transition-colors" />
                         <input
                             id="reset-email"
                             type="email"
                             placeholder="your@email.com"
-                            className={`w-full pl-11 pr-4 py-3 bg-gray-900/50 border ${emailError ? 'border-red-500' : 'border-gray-800'} text-white text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all placeholder:text-gray-700`}
+                            /* Changed text-sm to text-base (16px) to prevent iOS zoom */
+                            className={`w-full pl-11 pr-4 py-3 bg-gray-900/50 border ${emailError ? 'border-red-500' : 'border-gray-800'} text-white text-base md:text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all placeholder:text-gray-700`}
                             onChange={(e) => handleEmailChange(e.target.value)}
                             onBlur={handleEmailBlur}
                             value={email}
@@ -158,7 +161,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                 <button
                     type="submit"
                     disabled={loading || !!emailError}
-                    className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-black text-[11px]  tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
                 </button>
@@ -166,7 +169,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
 
             <button
                 onClick={() => setView('login')}
-                className="w-full flex items-center justify-center gap-2 text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-white transition-colors py-1"
+                className="w-full flex items-center justify-center gap-2 text-[9px] font-black text-indigo-500  tracking-widest hover:text-white transition-colors py-1"
                 disabled={loading}
             >
                 <ArrowLeft className="w-3 h-3" /> Back to Log In
@@ -241,20 +244,17 @@ const Login = ({ onLogin, onBackToLanding, setCurrentPage }) => {
         <main className="h-screen w-full flex items-center justify-center bg-gray-950 p-4 sm:p-6 overflow-hidden">
             <div className="w-full max-w-[380px] flex flex-col relative">
 
-                {/* Minimalist Glow */}
                 <div className="absolute -inset-10 bg-indigo-500/5 blur-[80px] -z-10 rounded-full" />
 
                 <section className="bg-gray-950 border border-gray-800 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col">
 
-                    {/* Compact Header */}
                     <header className="pt-6 pb-4 px-6 text-center bg-gray-900/20 border-b border-gray-800/50">
                         <div className="inline-flex items-center justify-center w-11 h-11 bg-indigo-500/10 rounded-xl mb-2 border border-indigo-500/20">
                             <DollarSign className="w-5 h-5 text-indigo-500" />
                         </div>
-                        <h1 className="text-base font-black text-white tracking-[0.2em] uppercase">Pocket <span className="text-indigo-500">POS</span></h1>
+                        <h1 className="text-base font-black text-white tracking-[0.2em] ">Pocket <span className="text-indigo-500">POS</span></h1>
                     </header>
 
-                    {/* Form Body - Reduced padding and spacing */}
                     <div className="p-6 sm:p-8">
                         {view === 'forgotPassword' ? (
                             <ForgotPasswordForm
@@ -283,11 +283,10 @@ const Login = ({ onLogin, onBackToLanding, setCurrentPage }) => {
                         )}
                     </div>
 
-                    {/* Compact Footer */}
                     <footer className="pb-6 px-6 text-center">
                         <button
                             onClick={onBackToLanding}
-                            className="inline-flex items-center gap-2 text-[9px] font-black text-gray-600 uppercase tracking-widest hover:text-indigo-400 transition-colors"
+                            className="inline-flex items-center gap-2 text-[9px] font-black text-gray-600  tracking-widest hover:text-indigo-400 transition-colors"
                             disabled={loading}
                         >
                             <ArrowLeft className="w-2.5 h-2.5" /> Exit Terminal
