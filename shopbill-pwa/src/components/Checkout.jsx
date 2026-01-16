@@ -244,11 +244,11 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 <div className="relative" ref={dropdownRef}>
                                     <label className="text-[10px] font-black text-gray-500  tracking-widest mb-2 block">Mobile Number</label>
                                     <div className={`flex bg-gray-950 rounded-2xl border transition-all ${phoneError ? 'border-red-500' : 'border-gray-800 focus-within:border-indigo-500'}`}>
-                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-4 border-r border-gray-800 flex items-center space-x-2 text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[90px]">
+                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-4 border-r border-gray-800 flex items-center space-x-2 text-base md:text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[90px]">
                                             <span>{selectedCountry.flag}</span>
                                             <span>{selectedCountry.code}</span>
                                         </button>
-                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3.5 text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
+                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3.5 text-base md:text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
                                         <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
@@ -338,7 +338,7 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 onChange={(e) => onChange(e.target.value)} 
                 disabled={disabled}
                 placeholder={placeholder}
-                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3.5 text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
+                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3.5 text-base md:text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>
         {error && <p className="text-red-500 text-[10px] mt-1 font-bold  tracking-tight">{error}</p>}

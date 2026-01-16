@@ -116,9 +116,9 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                             <CreditCard className="w-5 h-5 text-white" />
                         </div>
-                        <span className="text-xl font-black text-white tracking-tighter uppercase">Pocket <span className="text-indigo-500">POS</span></span>
+                        <span className="text-xl font-black text-white tracking-tighter ">Pocket <span className="text-indigo-500">POS</span></span>
                     </div>
-                    <button onClick={onStartApp} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest py-2.5 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
+                    <button onClick={onStartApp} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black  tracking-widest py-2.5 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
                         {content.getStarted}
                     </button>
                 </div>
@@ -131,7 +131,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                     <div className="max-w-7xl mx-auto px-4 text-center">
                         <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full mb-6">
                             <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{content.tagline}</span>
+                            <span className="text-[10px] font-black text-indigo-400  tracking-[0.2em]">{content.tagline}</span>
                         </div>
                         <h1 className="text-4xl md:text-7xl font-black text-white leading-[1.1] tracking-tighter mb-6">
                             {renderTitle(content.title, gradientWord)}
@@ -140,10 +140,10 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             {content.subtitle}
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center gap-4">
-                            <a href="#pricing" className="px-10 py-4 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-[2rem] hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 active:scale-95 text-center">
+                            <a href="#pricing" className="px-10 py-4 bg-indigo-600 text-white font-black text-xs  tracking-widest rounded-[2rem] hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 active:scale-95 text-center">
                                 {content.startTrial}
                             </a>
-                            <a href="#features" className="px-10 py-4 bg-gray-900 text-gray-300 font-black text-xs uppercase tracking-widest rounded-[2rem] border border-gray-800 hover:bg-gray-800 transition-all text-center">
+                            <a href="#features" className="px-10 py-4 bg-gray-900 text-gray-300 font-black text-xs  tracking-widest rounded-[2rem] border border-gray-800 hover:bg-gray-800 transition-all text-center">
                                 {content.exploreFeatures}
                             </a>
                         </div>
@@ -158,7 +158,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 <section id="features" className="py-24 bg-gray-950">
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="text-center mb-20">
-                            <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter mb-4">{content.featuresTitle}</h2>
+                            <h2 className="text-3xl md:text-5xl font-black text-white  tracking-tighter mb-4">{content.featuresTitle}</h2>
                             <p className="text-gray-500 font-bold">{content.featuresSubtitle}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -176,7 +176,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 <section id="pricing" className="py-24">
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="text-center mb-16">
-                            <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter mb-4">{content.pricingTitle}</h2>
+                            <h2 className="text-3xl md:text-5xl font-black text-white  tracking-tighter mb-4">{content.pricingTitle}</h2>
                             <p className="text-gray-500 font-bold">{content.pricingSubtitle}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -212,7 +212,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
 
             <footer className="bg-gray-900 border-t border-gray-800 py-12 text-center">
                 <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex flex-wrap justify-center gap-6 mb-8 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex flex-wrap justify-center gap-6 mb-8 text-[10px] font-black  tracking-widest">
                         <FooterLink onClick={onViewPolicy} label={content.privacy} />
                         <FooterLink onClick={onViewTerms} label={content.terms} />
                         <FooterLink onClick={onViewSupport} label={content.support} />
@@ -230,15 +230,15 @@ const FeatureItem = ({ icon, title, desc, color }) => (
         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-${color}-500/10 text-${color}-500`}>
             {React.cloneElement(icon, { size: 28 })}
         </div>
-        <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-3">{title}</h3>
+        <h3 className="text-xl font-black text-white  tracking-tighter mb-3">{title}</h3>
         <p className="text-gray-500 font-bold text-sm leading-relaxed">{desc}</p>
     </div>
 );
 
 const PriceCard = ({ plan, price, desc, items, btn, featured, onSelect }) => (
     <div className={`relative p-10 rounded-[1.25rem] border-2 transition-all ${featured ? 'bg-indigo-600 border-indigo-400 shadow-2xl shadow-indigo-500/20 scale-105 z-10' : 'bg-gray-900 border-gray-800 hover:border-gray-700'}`}>
-        {featured && <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-teal-400 text-gray-900 text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full">{content.recommended}</div>}
-        <h3 className="text-2xl font-black uppercase tracking-tighter mb-2 text-white">{plan}</h3>
+        {featured && <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-teal-400 text-gray-900 text-[10px] font-black  tracking-widest px-4 py-1 rounded-full">{content.recommended}</div>}
+        <h3 className="text-2xl font-black  tracking-tighter mb-2 text-white">{plan}</h3>
         <p className={`text-xs font-bold mb-6 ${featured ? 'text-indigo-100' : 'text-gray-500'}`}>{desc}</p>
         <div className="mb-8">
             <span className="text-5xl font-black tracking-tighter text-white">₹{price}</span>
@@ -253,7 +253,7 @@ const PriceCard = ({ plan, price, desc, items, btn, featured, onSelect }) => (
         </ul>
         <button 
             onClick={onSelect} 
-            className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 cursor-pointer ${featured ? 'bg-white text-indigo-600 hover:bg-gray-100 shadow-lg' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+            className={`w-full py-4 rounded-2xl font-black text-[10px]  tracking-widest transition-all active:scale-95 cursor-pointer ${featured ? 'bg-white text-indigo-600 hover:bg-gray-100 shadow-lg' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
         >
             {btn}
         </button>
