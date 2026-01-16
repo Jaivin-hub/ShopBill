@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    DollarSign, Eye, EyeOff, Lock, Mail, 
-    ArrowLeft, Loader2, AlertCircle, 
-    CheckCircle2, Smartphone 
+import {
+    DollarSign, Eye, EyeOff, Lock, Mail,
+    ArrowLeft, Loader2, AlertCircle,
+    CheckCircle2, Smartphone
 } from 'lucide-react';
 import axios from 'axios';
 import API from '../config/api';
@@ -21,15 +21,27 @@ apiClient.interceptors.request.use(
 );
 
 // --- Sub-Component: Login Form ---
-const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError, onBackToLanding }) => {
+const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError, onBackToLanding, setCurrentPage }) => {
     const [showPassword, setShowPassword] = useState(false);
 
     return (
         <section aria-labelledby="login-form" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {authError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 items-center" role="alert">
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    <p className="text-[10px] font-bold text-red-200/80 uppercase tracking-wide">{authError}</p>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 items-center justify-between" role="alert">
+                    <div className="flex gap-2 items-center">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                        <p className="text-[10px] font-bold text-red-200/80 uppercase tracking-wide">
+                            {authError}
+                        </p>
+                    </div>
+
+                    {/* Contact Support Link */}
+                    <button
+                        onClick={() => setCurrentPage('support')}
+                        className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline uppercase tracking-tighter transition-colors"
+                    >
+                        Contact Support
+                    </button>
                 </div>
             )}
 
@@ -49,7 +61,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         />
                     </div>
                 </div>
-                
+
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center px-1">
                         <label htmlFor="password" className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Key</label>
@@ -98,7 +110,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
             <div className="pt-4 border-t border-gray-800/50 text-center">
                 <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">New Merchant?</p>
                 <button
-                    onClick={onBackToLanding} 
+                    onClick={onBackToLanding}
                     className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
                 >
                     Create Account
@@ -163,14 +175,14 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
     );
 };
 
-const Login = ({ onLogin, onBackToLanding }) => {
-    const [view, setView] = useState('login'); 
-    const [identifier, setIdentifier] = useState(''); 
+const Login = ({ onLogin, onBackToLanding, setCurrentPage }) => {
+    const [view, setView] = useState('login');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [authError, setAuthError] = useState(null);
     const [resetMessage, setResetMessage] = useState(null);
-    const [emailError, setEmailError] = useState(null); 
+    const [emailError, setEmailError] = useState(null);
 
     const validateEmail = (inputEmail) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -228,12 +240,12 @@ const Login = ({ onLogin, onBackToLanding }) => {
     return (
         <main className="h-screen w-full flex items-center justify-center bg-gray-950 p-4 sm:p-6 overflow-hidden">
             <div className="w-full max-w-[380px] flex flex-col relative">
-                
+
                 {/* Minimalist Glow */}
                 <div className="absolute -inset-10 bg-indigo-500/5 blur-[80px] -z-10 rounded-full" />
-                
+
                 <section className="bg-gray-950 border border-gray-800 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col">
-                    
+
                     {/* Compact Header */}
                     <header className="pt-6 pb-4 px-6 text-center bg-gray-900/20 border-b border-gray-800/50">
                         <div className="inline-flex items-center justify-center w-11 h-11 bg-indigo-500/10 rounded-xl mb-2 border border-indigo-500/20">
@@ -259,13 +271,14 @@ const Login = ({ onLogin, onBackToLanding }) => {
                             <LoginForm
                                 handleAuth={handleAuth}
                                 identifier={identifier}
-                                setIdentifier={setIdentifier} 
+                                setIdentifier={setIdentifier}
                                 password={password}
                                 setPassword={setPassword}
                                 authError={authError}
                                 loading={loading}
                                 setView={setView}
                                 onBackToLanding={onBackToLanding}
+                                setCurrentPage={setCurrentPage}
                             />
                         )}
                     </div>

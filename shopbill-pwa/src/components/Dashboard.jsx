@@ -8,7 +8,7 @@ import {
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
-const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails }) => {
+const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
 
     // --- States ---
@@ -18,22 +18,35 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchDashboardData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const [invResponse, custResponse, salesResponse] = await Promise.all([
-                apiClient.get(API.inventory),
-                apiClient.get(API.customers),
-                apiClient.get(API.sales),
-            ]);
-            setInventory(invResponse.data || []);
-            setCustomers(custResponse.data || []);
-            setSales(salesResponse.data || []);
-        } catch (error) {
-            showToast('Could not update data. Please check connection.', 'error');
-        } finally {
-            setIsLoading(false);
+    setIsLoading(true);
+    try {
+        const [invResponse, custResponse, salesResponse] = await Promise.all([
+            apiClient.get(API.inventory),
+            apiClient.get(API.customers),
+            apiClient.get(API.sales),
+        ]);
+
+        // Standard success path
+        setInventory(invResponse.data || []);
+        setCustomers(custResponse.data || []);
+        setSales(salesResponse.data || []);
+        
+    } catch (error) {
+        // 1. Check if the error is a 403 and has the "halted" status
+        const errorData = error.response?.data;
+        
+        if (error.response?.status === 403 && errorData?.status === 'halted') {
+            showToast(errorData.message || 'Subscription Issue. Logging out...', 'error');
+            onLogout(); // Trigger immediate logout
+            return;
         }
-    }, [apiClient, API, showToast]);
+
+        // 2. Fallback for other errors (network issues, 500s, etc.)
+        showToast('Could not update data. Please check connection.', 'error');
+    } finally {
+        setIsLoading(false);
+    }
+}, [apiClient, API, showToast, onLogout]);
 
     useEffect(() => {
         if (hasAccess) fetchDashboardData();

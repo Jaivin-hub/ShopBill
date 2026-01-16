@@ -273,7 +273,7 @@ const App = () => {
 
     if (!currentUser) {
       return isViewingLogin ?
-        <Login onLogin={handleLoginSuccess} showToast={showToast} onBackToLanding={() => setIsViewingLogin(false)} /> :
+        <Login onLogin={handleLoginSuccess} showToast={showToast} setCurrentPage={setCurrentPage} onBackToLanding={() => setIsViewingLogin(false)} /> :
         <LandingPage
           onStartApp={() => setIsViewingLogin(true)}
           onSelectPlan={(p) => {
