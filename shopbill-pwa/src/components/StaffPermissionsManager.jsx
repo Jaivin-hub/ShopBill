@@ -336,7 +336,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
             <button 
                 onClick={() => setIsAddModalOpen(true)}
-                className="fixed bottom-6 right-6 sm:hidden w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 z-[150]"
+                className="fixed bottom-25 right-6 sm:hidden w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 z-[150]"
             >
                 <Plus className="w-8 h-8" />
             </button>

@@ -1,44 +1,56 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
   ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-// Component Imports
-import InventoryManager from './components/InventoryManager';
-import Dashboard from './components/Dashboard';
+// Core Component Imports (Keep these eager as they are small or essential)
 import API from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { USER_ROLES } from './utils/constants';
-import BillingPOS from './components/BillingPOS';
 import Header from './components/Header';
-import Ledger from './components/Ledger';
-import Reports from './components/Reports';
-import SettingsPage from './components/Settings';
-import Profile from './components/Profile';
-import Login from './components/Login';
-import NotificationsPage from './components/NotificationsPage';
-import LandingPage from './components/LandingPage';
-import ResetPassword from './components/ResetPassword';
-import StaffSetPassword from './components/StaffSetPassword';
-import SalesActivityPage from './components/SalesActivityPage';
-import UserManagement from './components/UserManagement';
-import SuperAdminDashboard from './components/superAdminDashboard';
-import SystemConfig from './components/SystemConfig';
-import GlobalReport from './components/GlobalReport';
-import Checkout from './components/Checkout';
-import TermsAndConditions from './components/TermsAndConditions';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import SupportPage from './components/SupportPage';
-import AffiliatePage from './components/AffiliatePage';
 import SEO from './components/SEO';
-import SupplyChainManagement from './components/SupplyChainManagement';
-import PlanUpgrade from './components/PlanUpgrade';
-import StaffPermissionsManager from './components/StaffPermissionsManager';
-import ChangePasswordForm from './components/ChangePasswordForm';
+import Login from './components/Login';
+import LandingPage from './components/LandingPage';
 
-// UpdatePrompt Component
+// Lazy Load Heavy Components to improve initial paint time
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const InventoryManager = lazy(() => import('./components/InventoryManager'));
+const BillingPOS = lazy(() => import('./components/BillingPOS'));
+const Ledger = lazy(() => import('./components/Ledger'));
+const Reports = lazy(() => import('./components/Reports'));
+const SettingsPage = lazy(() => import('./components/Settings'));
+const Profile = lazy(() => import('./components/Profile'));
+const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
+const ResetPassword = lazy(() => import('./components/ResetPassword'));
+const StaffSetPassword = lazy(() => import('./components/StaffSetPassword'));
+const SalesActivityPage = lazy(() => import('./components/SalesActivityPage'));
+const UserManagement = lazy(() => import('./components/UserManagement'));
+const SuperAdminDashboard = lazy(() => import('./components/superAdminDashboard'));
+const SystemConfig = lazy(() => import('./components/SystemConfig'));
+const GlobalReport = lazy(() => import('./components/GlobalReport'));
+const Checkout = lazy(() => import('./components/Checkout'));
+const TermsAndConditions = lazy(() => import('./components/TermsAndConditions'));
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
+const SupportPage = lazy(() => import('./components/SupportPage'));
+const AffiliatePage = lazy(() => import('./components/AffiliatePage'));
+const SupplyChainManagement = lazy(() => import('./components/SupplyChainManagement'));
+const PlanUpgrade = lazy(() => import('./components/PlanUpgrade'));
+const StaffPermissionsManager = lazy(() => import('./components/StaffPermissionsManager'));
+const ChangePasswordForm = lazy(() => import('./components/ChangePasswordForm'));
+
+// Professional Loading Placeholder
+const PageLoader = ({ darkMode }) => (
+  <div className={`h-full w-full flex flex-col items-center justify-center space-y-4 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
+    <div className="relative">
+      <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+      <Smartphone className="w-5 h-5 text-indigo-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+    </div>
+    <p className="text-[10px] font-black tracking-[0.3em] uppercase text-indigo-500 animate-pulse">Synchronizing</p>
+  </div>
+);
+
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -98,7 +110,10 @@ const checkDeepLinkPath = () => {
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
   const [pageOrigin, setPageOrigin] = useState('dashboard');
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const userJson = localStorage.getItem('currentUser');
+    return userJson ? JSON.parse(userJson) : null;
+  });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [toast, setToast] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
@@ -106,13 +121,11 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
-  // --- THEME ENGINE STATE ---
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
-    return saved !== null ? JSON.parse(saved) : true; // Default to dark
+    return saved !== null ? JSON.parse(saved) : true;
   });
 
-  // Persist theme choice
   useEffect(() => {
     localStorage.setItem('themePreference', JSON.stringify(darkMode));
   }, [darkMode]);
@@ -187,12 +200,8 @@ const App = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('userToken');
-    const userJson = localStorage.getItem('currentUser');
-    if (token && userJson && token !== 'undefined') {
-      try {
-        const user = JSON.parse(userJson);
-        setCurrentUser({ ...user, role: user.role.toLowerCase() });
-      } catch (e) { logout(); }
+    if (!token || token === 'undefined') {
+      logout();
     }
     setIsLoadingAuth(false);
   }, [logout]);
@@ -228,33 +237,9 @@ const App = () => {
     if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} />;
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
-    if (currentPage === 'planUpgrade') {
-        return <PlanUpgrade 
-          apiClient={apiClient} 
-          showToast={showToast} 
-          currentUser={currentUser} 
-          onBack={handleBackToOrigin} 
-          darkMode={darkMode} 
-        />;
-    }
-    if (currentPage === 'staffPermissions') {
-        return <StaffPermissionsManager 
-          apiClient={apiClient} 
-          showToast={showToast} 
-          currentUser={currentUser} 
-          onBack={handleBackToOrigin} 
-          darkMode={darkMode} 
-        />;
-    }
-    if (currentPage === 'passwordChange') {
-        return <ChangePasswordForm 
-          apiClient={apiClient} 
-          showToast={showToast} 
-          currentUser={currentUser} 
-          onBack={handleBackToOrigin} 
-          darkMode={darkMode} 
-        />;
-    }
+    if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
+    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
+    if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {
       return (
@@ -289,26 +274,30 @@ const App = () => {
 
     const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
 
-    switch (currentPage) {
-      case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
-      case 'billing': return <BillingPOS {...commonProps} />;
-      case 'khata': return <Ledger {...commonProps} />;
-      case 'inventory': return <InventoryManager {...commonProps} />;
-      case 'scm': return <SupplyChainManagement {...commonProps} />;
-      case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
-      case 'notifications': return <NotificationsPage {...commonProps} />;
-      case 'settings': return <SettingsPage {...commonProps} />;
-      case 'profile': return <Profile {...commonProps} />;
-      case 'superadmin_users': return <UserManagement {...commonProps} />;
-      case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-      case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-      default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
-    }
+    return (
+      <Suspense fallback={<PageLoader darkMode={darkMode} />}>
+        {(() => {
+          switch (currentPage) {
+            case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+            case 'billing': return <BillingPOS {...commonProps} />;
+            case 'khata': return <Ledger {...commonProps} />;
+            case 'inventory': return <InventoryManager {...commonProps} />;
+            case 'scm': return <SupplyChainManagement {...commonProps} />;
+            case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
+            case 'notifications': return <NotificationsPage {...commonProps} />;
+            case 'settings': return <SettingsPage {...commonProps} />;
+            case 'profile': return <Profile {...commonProps} />;
+            case 'superadmin_users': return <UserManagement {...commonProps} />;
+            case 'superadmin_systems': return <SystemConfig {...commonProps} />;
+            case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+            default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+          }
+        })()}
+      </Suspense>
+    );
   };
 
   const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
-
-  // Dynamic Background classes based on theme
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
@@ -318,7 +307,6 @@ const App = () => {
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
-        
         {showAppUI && (
           <Header 
             companyName="Pocket POS" 
@@ -335,7 +323,6 @@ const App = () => {
             setDarkMode={setDarkMode}
           />
         )}
-
         <div className="flex flex-1 overflow-hidden relative">
           {showAppUI && (
             <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
@@ -345,34 +332,18 @@ const App = () => {
                 </div>
                 <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
               </div>
-
               <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto pt-4 sidebar-scroll">
                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Main Menu</p>
                 {navItems.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
-                    className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id
-                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-950/50'
-                      : `border border-transparent ${navText}`
-                      }`}
-                  >
+                  <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
                     <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
                     <span className="text-sm font-bold tracking-tight">{item.name}</span>
                   </button>
                 ))}
-
                 <div className={`pt-6 mt-6 border-t space-y-1.5 ${darkMode ? 'border-gray-900' : 'border-slate-100'}`}>
                   <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account</p>
                   {utilityNavItems.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => setCurrentPage(item.id)}
-                      className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group ${currentPage === item.id
-                        ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
-                        : `border border-transparent ${navText}`
-                        }`}
-                    >
+                    <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : `border border-transparent ${navText}`}`}>
                       <item.icon className="w-5 h-5 mr-3" />
                       <span className="text-sm font-bold tracking-tight">{item.name}</span>
                       {item.id === 'notifications' && unreadCount > 0 && (
@@ -384,43 +355,21 @@ const App = () => {
                   ))}
                 </div>
               </nav>
-
-              <div className="p-4">
-                <button
-                  onClick={logout}
-                  className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"
-                >
-                  <LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" />
-                  <span className="text-sm font-bold">Logout</span>
-                </button>
-              </div>
+              <div className="p-4"><button onClick={logout} className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"><LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" /><span className="text-sm font-bold">Logout</span></button></div>
             </aside>
           )}
-
           <main className={`flex-1 overflow-y-auto transition-all duration-300 ${containerBg} ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>
             <div className="max-w-7xl mx-auto min-h-full px-0 md:px-6">
               {renderContent()}
             </div>
           </main>
         </div>
-
         {showAppUI && (
           <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
             {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentPage(item.id)}
-                className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id
-                  ? 'text-indigo-500'
-                  : 'text-gray-600 hover:text-indigo-400'
-                  }`}
-              >
-                {currentPage === item.id && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
-                )}
-                <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
-                  <item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-                </div>
+              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
+                {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
+                <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}><item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} /></div>
               </button>
             ))}
           </nav>

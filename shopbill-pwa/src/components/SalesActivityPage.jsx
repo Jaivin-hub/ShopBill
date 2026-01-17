@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
     IndianRupee, AlertTriangle, Calendar, ArrowLeft, X, Clock, 
-    Search, User, Activity, ExternalLink, ArrowUpRight, Receipt, Printer
+    Search, User, Activity, ExternalLink, ArrowRight, Receipt, Printer, Filter, RotateCcw
 } from 'lucide-react';
 import API from '../config/api';
 
@@ -19,14 +19,13 @@ const DateRangeFilter = ({ dateRange, onDateRangeChange, darkMode }) => {
     const textColor = darkMode ? 'text-white' : 'text-black';
 
     return (
-        <div className={`flex items-center gap-1 border rounded-xl p-1 w-full md:w-auto overflow-x-auto ${bgClass}`}>
+        <div className={`flex items-center gap-1 border rounded-xl p-1 w-full md:w-auto overflow-x-auto animate-in slide-in-from-top-2 duration-200 ${bgClass}`}>
             <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg flex-1 md:flex-none ${inputBg}`}>
                 <Calendar className="w-3 h-3 text-indigo-500 shrink-0" />
                 <input
                     type="date"
                     value={dateRange.startDate || ''}
                     onChange={(e) => onDateRangeChange({ ...dateRange, startDate: e.target.value })}
-                    /* Added text-[16px] and md:text-[10px] to prevent mobile zoom while keeping desktop design */
                     className={`bg-transparent font-bold text-[16px] md:text-[10px] focus:outline-none w-full ${textColor}`}
                 />
             </div>
@@ -36,7 +35,6 @@ const DateRangeFilter = ({ dateRange, onDateRangeChange, darkMode }) => {
                     type="date"
                     value={dateRange.endDate || ''}
                     onChange={(e) => onDateRangeChange({ ...dateRange, endDate: e.target.value })}
-                    /* Added text-[16px] and md:text-[10px] to prevent mobile zoom */
                     className={`bg-transparent font-bold text-[16px] md:text-[10px] focus:outline-none w-full ${textColor}`}
                 />
             </div>
@@ -64,7 +62,6 @@ const BillModal = ({ sale, onClose, isLoading, darkMode }) => {
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-sm animate-in fade-in duration-200">
             <div className={`${modalBg} rounded-xl border w-full max-w-md overflow-hidden transform animate-in zoom-in-95 shadow-2xl`}>
-                {/* Header */}
                 <div className={`p-5 border-b flex justify-between items-center ${headerBg} ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
@@ -83,7 +80,6 @@ const BillModal = ({ sale, onClose, isLoading, darkMode }) => {
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="p-6 space-y-5 max-h-[50vh] overflow-y-auto custom-scroll">
                     <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
                         <span className={`text-[9px] font-bold  tracking-widest ${secondaryText}`}>Billed To</span>
@@ -111,7 +107,6 @@ const BillModal = ({ sale, onClose, isLoading, darkMode }) => {
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex justify-between items-center">
                         <div className="space-y-0.5">
@@ -153,13 +148,20 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
     const [isLoadingSales, setIsLoadingSales] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     
+    // UI State for Toggles
+    const [showSearch, setShowSearch] = useState(false);
+    const [showFilter, setShowFilter] = useState(false);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
 
+    const defaultStartDate = getLocalDateString(new Date(new Date().setDate(new Date().getDate() - 7)));
+    const defaultEndDate = getLocalDateString(new Date());
+
     const [dateRange, setDateRange] = useState({
-        startDate: getLocalDateString(new Date(new Date().setDate(new Date().getDate() - 7))),
-        endDate: getLocalDateString(new Date()),
+        startDate: defaultStartDate,
+        endDate: defaultEndDate,
     });
 
     useEffect(() => {
@@ -213,45 +215,69 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
 
     const mainBg = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black';
     const cardBg = darkMode ? 'bg-gray-900/30 border-gray-800/40 hover:bg-gray-900/60' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm';
+    const btnClass = (active) => `p-2.5 border rounded-xl transition-all flex items-center justify-center ${active ? 'bg-indigo-600 border-indigo-600 text-white' : (darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')}`;
 
     return (
         <main className={`min-h-screen transition-colors duration-300 ${mainBg}`}>
-            {/* --- RESPONSIVE STICKY HEADER --- */}
             <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
                 <div className="max-w-7xl mx-auto space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <button onClick={onBack} className={`p-2 border rounded-xl transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            <button onClick={onBack} className={btnClass(false)}>
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                             <div>
-                                <h1 className={`text-2xl md:text-lg font-black  tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                                <h1 className={`text-xl md:text-lg font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
                                     Sales <span className="text-indigo-600">History</span>
                                 </h1>
-                                <p className={`text-[9px] font-black  tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Detailed log of all completed sales</p>
+                                <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Detailed log of all completed sales</p>
                             </div>
                         </div>
-                        <div className="hidden md:block">
-                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
+
+                        {/* --- Action Buttons --- */}
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => {
+                                    setShowSearch(!showSearch);
+                                    if(showSearch) setSearchQuery(''); // Clear search on hide
+                                }} 
+                                className={btnClass(showSearch)}
+                            >
+                                {showSearch ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setShowFilter(!showFilter);
+                                    if(showFilter) setDateRange({ startDate: defaultStartDate, endDate: defaultEndDate });
+                                }} 
+                                className={btnClass(showFilter)}
+                            >
+                                {showFilter ? <X className="w-5 h-5" /> : <Filter className="w-5 h-5" />}
+                            </button>
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row gap-3">
-                        <div className="relative flex-1">
+                    {/* --- Expandable Search --- */}
+                    {showSearch && (
+                        <div className="relative animate-in slide-in-from-top-2 duration-200">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input 
+                                autoFocus
                                 type="text"
-                                placeholder="search client..."
+                                placeholder="search client name..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                /* FIXED: text-[16px] prevents mobile zoom. md:text-[10px] keeps it tiny on larger screens */
-                                className={`border rounded-xl pl-10 pr-4 py-2.5 text-[16px] md:text-[10px] font-black tracking-widest w-full outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-white border-slate-300 text-black'}`}
+                                className={`border rounded-xl pl-10 pr-4 py-3 text-[16px] md:text-[10px] font-black tracking-widest w-full outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-white border-slate-300 text-black'}`}
                             />
                         </div>
-                        <div className="md:hidden">
+                    )}
+
+                    {/* --- Expandable Date Filter --- */}
+                    {showFilter && (
+                        <div className="animate-in slide-in-from-top-2 duration-200">
                             <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
                         </div>
-                    </div>
+                    )}
                 </div>
             </header>
 
@@ -261,45 +287,54 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                         <div className="py-20 flex justify-center">
                             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                         </div>
-                    ) : filteredSales.map((sale) => (
-                        <div 
-                            key={sale._id} 
-                            onClick={() => fetchSaleDetail(sale._id)}
-                            className={`group flex items-center justify-between p-4 border rounded-2xl transition-all cursor-pointer active:scale-[0.98] ${cardBg}`}
-                        >
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${sale.amountCredited > 0 ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' : 'bg-indigo-500/5 border-indigo-500/20 text-indigo-600'}`}>
-                                    <User className="w-4 h-4" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                    <span className={`text-[12px] font-black  tracking-tight truncate leading-tight ${darkMode ? 'text-gray-100' : 'text-slate-900'}`}>
-                                        {sale.customerName || sale.customerId?.name || 'Walk-in'}
-                                    </span>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[9px] font-bold tabular-nums ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                            {new Date(sale.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    ) : filteredSales.length > 0 ? (
+                        filteredSales.map((sale) => (
+                            <div 
+                                key={sale._id} 
+                                onClick={() => fetchSaleDetail(sale._id)}
+                                className={`group flex items-center justify-between p-4 border rounded-2xl transition-all cursor-pointer active:scale-[0.98] ${cardBg}`}
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${sale.amountCredited > 0 ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' : 'bg-indigo-500/5 border-indigo-500/20 text-indigo-600'}`}>
+                                        <User className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className={`text-[12px] font-black  tracking-tight truncate leading-tight ${darkMode ? 'text-gray-100' : 'text-slate-900'}`}>
+                                            {sale.customerName || sale.customerId?.name || 'Walk-in'}
                                         </span>
-                                        <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
-                                        <span className={`text-[9px] font-bold  ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                            {sale.items?.length || 0} Items
-                                        </span>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className={`text-[9px] font-bold tabular-nums ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                                {new Date(sale.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </span>
+                                            <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
+                                            <span className={`text-[9px] font-bold  ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                                {sale.items?.length || 0} Items
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center gap-4 ml-2">
-                                <div className="text-right">
-                                    <p className={`text-[14px] font-black tabular-nums leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>
-                                        ₹{sale.totalAmount.toLocaleString()}
-                                    </p>
-                                    <span className={`text-[8px] font-black  tracking-widest ${sale.amountCredited > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                        {sale.amountCredited > 0 ? `DUE: ₹${sale.amountCredited}` : 'CLEARED'}
-                                    </span>
+                                <div className="flex items-center gap-4 ml-2">
+                                    <div className="text-right">
+                                        <p className={`text-[14px] font-black tabular-nums leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>
+                                            ₹{sale.totalAmount.toLocaleString()}
+                                        </p>
+                                        <span className={`text-[8px] font-black  tracking-widest ${sale.amountCredited > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                            {sale.amountCredited > 0 ? `DUE: ₹${sale.amountCredited}` : 'CLEARED'}
+                                        </span>
+                                    </div>
+                                    <ArrowRight className={`w-4 h-4 transition-all ${darkMode ? 'text-gray-700 group-hover:text-indigo-400' : 'text-slate-300 group-hover:text-indigo-600'} group-hover:translate-x-0.5 group-hover:-translate-y-0.5`} />
                                 </div>
-                                <ArrowUpRight className={`w-4 h-4 transition-all ${darkMode ? 'text-gray-700 group-hover:text-indigo-400' : 'text-slate-300 group-hover:text-indigo-600'} group-hover:translate-x-0.5 group-hover:-translate-y-0.5`} />
                             </div>
+                        ))
+                    ) : (
+                        <div className="py-20 text-center space-y-3">
+                            <div className="w-12 h-12 bg-slate-100 dark:bg-gray-900 rounded-full flex items-center justify-center mx-auto">
+                                <Search className="w-6 h-6 text-slate-300 dark:text-gray-700" />
+                            </div>
+                            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">No transactions found</p>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
 

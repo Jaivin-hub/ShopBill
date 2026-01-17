@@ -149,9 +149,9 @@ const ScannerModal = ({
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">Lens Intelligence</span>
+                            <span className="text-[10px] font-black text-cyan-500  tracking-[0.2em]">Lens Intelligence</span>
                         </div>
-                        <h2 className={`text-xl font-black uppercase tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <h2 className={`text-xl font-black  tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             Live Scanner
                         </h2>
                     </div>
@@ -202,7 +202,7 @@ const ScannerModal = ({
                                     <Loader className="w-12 h-12 text-cyan-500 animate-spin" />
                                     <ScanLine className="absolute top-0 left-0 w-12 h-12 text-cyan-300/30" />
                                 </div>
-                                <span className="text-sm font-black text-white uppercase tracking-widest">Calibrating Optics...</span>
+                                <span className="text-sm font-black text-white  tracking-widest">Calibrating Optics...</span>
                             </div>
                         )}
 
@@ -210,7 +210,7 @@ const ScannerModal = ({
                         <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
                             <div className="px-4 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10 flex items-center gap-2">
                                 <Focus className="w-3 h-3 text-cyan-400" />
-                                <span className="text-[10px] font-bold text-white uppercase tracking-tighter">Tap screen to manual focus</span>
+                                <span className="text-[10px] font-bold text-white  tracking-tighter">Tap screen to manual focus</span>
                             </div>
                         </div>
                     </div>
@@ -219,30 +219,30 @@ const ScannerModal = ({
                 {/* Status/Footer Section */}
                 <div className={`p-6 pt-2 border-t ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex flex-col items-center justify-center gap-1 mb-6">
-                        <p className={`text-xs font-black uppercase tracking-widest ${lookupStatus === 'scanning' ? 'text-gray-500' : 'text-cyan-500'}`}>
+                        <p className={`text-xs font-black  tracking-widest ${lookupStatus === 'scanning' ? 'text-gray-500' : 'text-cyan-500'}`}>
                             System Status
                         </p>
                         <p className={`text-lg font-black tracking-tight tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {lookupStatus === 'scanning' ? "ALIGNED & SCANNING..." : 
+                            {lookupStatus === 'scanning' ? "SCANNING..." : 
                              lookupStatus === 'lookingUp' ? "DECODING SYMBOL..." : 
                              lookupStatus === 'found' ? "DATA RETRIEVED" : "IDLE"}
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                          <button 
                             onClick={onClose}
-                            className={`py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                            className={`py-4 rounded-2xl font-black  text-[10px] tracking-widest transition-all ${darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                             disabled={isBusy || isAutoClosing}
                         >
-                            Abort
+                            Cancel
                         </button>
-                        <button 
+                        {/* <button 
                             disabled={true}
-                            className={`py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50`}
+                            className={`py-4 rounded-2xl font-black  text-[10px] tracking-widest transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50`}
                         >
                             {isAutoClosing ? 'Redirecting...' : 'Manual Input'}
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>
