@@ -60,7 +60,7 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
 
         <div className={`p-4 rounded-2xl border flex flex-col items-center ${darkMode ? 'bg-rose-500/5 border-rose-500/10' : 'bg-rose-50 border-rose-100'}`}>
           <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${darkMode ? 'text-rose-500/60' : 'text-rose-400'}`}>Current Due</span>
-          <span className={`text-3xl font-black italic ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>₹{customer?.outstandingCredit?.toLocaleString('en-IN') || '0'}</span>
+          <span className={`text-3xl font-black ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>₹{customer?.outstandingCredit?.toLocaleString('en-IN') || '0'}</span>
         </div>
 
         <div className="relative">
@@ -157,7 +157,7 @@ export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = 
             Create Account
           </button>
           {!isValid && !isProcessing && (
-            <p className={`text-center text-[10px] font-bold mt-4 uppercase tracking-widest italic ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
+            <p className={`text-center text-[10px] font-bold mt-4 uppercase tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
           )}
         </div>
       </form>
@@ -199,7 +199,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                         </div>
                         <div className="text-right whitespace-nowrap">
                             <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-rose-500' : 'text-rose-400'}`}>Balance Due</p>
-                            <p className={`text-xl font-black italic ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>₹{customer?.outstandingCredit?.toLocaleString('en-IN')}</p>
+                            <p className={`text-xl font-black ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>₹{customer?.outstandingCredit?.toLocaleString('en-IN')}</p>
                         </div>
                     </div>
 
@@ -225,7 +225,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                             <Calendar className="w-3 h-3 mr-1" /> {formatDate(t.timestamp)}
                                         </div>
                                     </div>
-                                    <div className={`font-black text-lg italic ${isCredit ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-teal-400' : 'text-teal-600')}`}>
+                                    <div className={`font-black text-lg ${isCredit ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-teal-400' : 'text-teal-600')}`}>
                                         {isCredit ? '+' : '-'} ₹{t.amount?.toLocaleString('en-IN')}
                                     </div>
                                 </div>

@@ -18,35 +18,35 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        const [invResponse, custResponse, salesResponse] = await Promise.all([
-            apiClient.get(API.inventory),
-            apiClient.get(API.customers),
-            apiClient.get(API.sales),
-        ]);
+        setIsLoading(true);
+        try {
+            const [invResponse, custResponse, salesResponse] = await Promise.all([
+                apiClient.get(API.inventory),
+                apiClient.get(API.customers),
+                apiClient.get(API.sales),
+            ]);
 
-        // Standard success path
-        setInventory(invResponse.data || []);
-        setCustomers(custResponse.data || []);
-        setSales(salesResponse.data || []);
-        
-    } catch (error) {
-        // 1. Check if the error is a 403 and has the "halted" status
-        const errorData = error.response?.data;
-        
-        if (error.response?.status === 403 && errorData?.status === 'halted') {
-            showToast(errorData.message || 'Subscription Issue. Logging out...', 'error');
-            onLogout(); // Trigger immediate logout
-            return;
+            // Standard success path
+            setInventory(invResponse.data || []);
+            setCustomers(custResponse.data || []);
+            setSales(salesResponse.data || []);
+
+        } catch (error) {
+            // 1. Check if the error is a 403 and has the "halted" status
+            const errorData = error.response?.data;
+
+            if (error.response?.status === 403 && errorData?.status === 'halted') {
+                showToast(errorData.message || 'Subscription Issue. Logging out...', 'error');
+                onLogout(); // Trigger immediate logout
+                return;
+            }
+
+            // 2. Fallback for other errors (network issues, 500s, etc.)
+            showToast('Could not update data. Please check connection.', 'error');
+        } finally {
+            setIsLoading(false);
         }
-
-        // 2. Fallback for other errors (network issues, 500s, etc.)
-        showToast('Could not update data. Please check connection.', 'error');
-    } finally {
-        setIsLoading(false);
-    }
-}, [apiClient, API, showToast, onLogout]);
+    }, [apiClient, API, showToast, onLogout]);
 
     useEffect(() => {
         if (hasAccess) fetchDashboardData();
@@ -163,8 +163,12 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Total Sales Today</p>
-                                    <h2 className="text-2xl font-black">₹{today.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                                        Total Sales Today
+                                    </p>
+                                    <h2 className="text-2xl font-black text-emerald-400">
+                                        ₹{today.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </h2>
                                 </div>
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><TrendingUp size={20} /></div>
                             </div>
@@ -172,8 +176,12 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Credit Issued Today</p>
-                                    <h2 className="text-2xl font-black">₹{today.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                                        Credit Given Today
+                                    </p>
+                                    <h2 className="text-2xl font-black text-amber-400">
+                                        ₹{today.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </h2>
                                 </div>
                                 <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CreditCard size={20} /></div>
                             </div>
@@ -239,7 +247,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                         ))}
                                     </div>
                                 ) : (
-                                    <EmptyState icon={Package} title="Optimal Levels" message="All stock levels are currently healthy." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
+                                    <EmptyState icon={Package} title="Optimal Levels" message="All stock levels healthy." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
                                 )}
                             </div>
                         </div>

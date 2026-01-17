@@ -286,7 +286,7 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                                 </div>
                             )) : (
                                 <div className={`text-center py-10 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
-                                    <p className="text-[11px] font-medium text-gray-400  italic">No procurement history for this period</p>
+                                    <p className="text-[11px] font-medium text-gray-400">No procurement history for this period</p>
                                 </div>
                             )}
                         </div>

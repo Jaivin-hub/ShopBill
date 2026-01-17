@@ -252,7 +252,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                 <div className="bg-gray-800/50 rounded-xl p-3 md:p-5 border border-gray-700/50">
                                     <div className="flex items-center gap-2 mb-2 md:mb-3">
                                         <IndianRupee className="w-4 h-4 md:w-5 md:h-5 text-indigo-400" />
-                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider uppercase">Plan</h3>
+                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider">Plan</h3>
                                     </div>
                                     <p className="text-lg md:text-2xl font-bold text-white mb-1">{paymentData.currentPlan || shopPlan}</p>
                                     <p className="text-[10px] md:text-sm text-gray-400">Monthly</p>
@@ -261,12 +261,12 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                 <div className={`bg-gradient-to-br rounded-xl p-3 md:p-5 border transition-all duration-300 ${nextPaymentStatus.isUrgent ? 'from-red-500/10 to-orange-500/10 border-red-500/40' : 'from-indigo-500/10 to-purple-500/10 border-indigo-500/30'}`}>
                                     <div className="flex items-center gap-2 mb-2 md:mb-3">
                                         <Calendar className={`w-4 h-4 md:w-5 md:h-5 ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
-                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider uppercase">Next Due</h3>
+                                        <h3 className="text-[10px] md:text-sm font-semibold text-gray-400 tracking-wider">Next Due</h3>
                                     </div>
                                     <p className="text-lg md:text-2xl font-bold text-white mb-1">
                                         ₹{paymentData.upcomingPayment?.amount?.toFixed(0) || '0'}
                                     </p>
-                                    <p className={`text-[10px] md:text-sm font-bold uppercase tracking-tight ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`}>
+                                    <p className={`text-[10px] md:text-sm font-bold tracking-tight ${nextPaymentStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`}>
                                         {nextPaymentStatus.text}
                                     </p>
                                     <p className="text-[10px] text-gray-500 mt-1 truncate">
@@ -482,7 +482,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                 </div>
                                                 <div>
                                                     <h3 className="text-white font-bold leading-tight">{shop.name}</h3>
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Joined {shop.dateJoined}</p>
+                                                    <p className="text-[10px] text-gray-500 tracking-widest">Joined {shop.dateJoined}</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-1">
@@ -511,14 +511,21 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1">
-                                            <div className="flex items-center text-xs text-gray-400 gap-2 overflow-hidden">
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                            <a
+                                                href={`mailto:${shop.email}`}
+                                                className="flex items-center text-xs text-gray-400 gap-2 hover:text-indigo-400 transition-colors overflow-hidden max-w-[150px] md:max-w-none"
+                                            >
                                                 <Mail className="w-3.5 h-3.5 text-gray-600 shrink-0" />
                                                 <span className="truncate">{shop.email}</span>
-                                            </div>
-                                            <div className="flex items-center text-xs text-gray-400 gap-2">
-                                                <Phone className="w-3.5 h-3.5 text-gray-600 shrink-0" /> {shop.phone}
-                                            </div>
+                                            </a>
+                                            <a
+                                                href={`tel:${shop.phone}`}
+                                                className="flex items-center text-xs text-gray-400 gap-2 hover:text-indigo-400 transition-colors shrink-0"
+                                            >
+                                                <Phone className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                                                <span>{shop.phone}</span>
+                                            </a>
                                         </div>
 
                                         <div className="pt-3 border-t border-gray-800 flex justify-between items-center">
@@ -539,18 +546,18 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                 <table className="min-w-full table-auto divide-y divide-gray-800">
                                     <thead className="bg-gray-800/80 sticky top-0 z-10">
                                         <tr>
-                                            <th onClick={() => handleSort('name')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors">
+                                            <th onClick={() => handleSort('name')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider cursor-pointer hover:text-white transition-colors">
                                                 <div className="flex items-center">Shop <SortIcon columnKey="name" /></div>
                                             </th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Contact Details</th>
-                                            <th onClick={() => handleSort('dateJoined')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors">
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider">Contact Details</th>
+                                            <th onClick={() => handleSort('dateJoined')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider cursor-pointer hover:text-white transition-colors">
                                                 <div className="flex items-center">Joined <SortIcon columnKey="dateJoined" /></div>
                                             </th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Plan / Due</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Staffing</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Growth</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Subscription</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Plan / Due</th>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Staffing</th>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Growth</th>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Subscription</th>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-800">
@@ -574,7 +581,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">{shop.dateJoined}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter border ${getPlanStyles(shop.plan)}`}>
+                                                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-black tracking-tighter border ${getPlanStyles(shop.plan)}`}>
                                                                 {shop.plan}
                                                             </span>
                                                             <span className={`text-[10px] flex items-center gap-1 ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-gray-500'}`}>

@@ -222,7 +222,7 @@ const ScannerModal = ({
                         <p className={`text-xs font-black uppercase tracking-widest ${lookupStatus === 'scanning' ? 'text-gray-500' : 'text-cyan-500'}`}>
                             System Status
                         </p>
-                        <p className={`text-lg font-black italic tracking-tight tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`text-lg font-black tracking-tight tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             {lookupStatus === 'scanning' ? "ALIGNED & SCANNING..." : 
                              lookupStatus === 'lookingUp' ? "DECODING SYMBOL..." : 
                              lookupStatus === 'found' ? "DATA RETRIEVED" : "IDLE"}

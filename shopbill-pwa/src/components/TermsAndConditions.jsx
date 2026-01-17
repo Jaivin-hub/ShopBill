@@ -93,7 +93,7 @@ const TermsAndConditions = ({ onBack, origin }) => {
                                 </div>
                                 <div className="pl-2 sm:pl-14 space-y-3">
                                     <p className="text-sm text-gray-400">To use Pocket POS, you must provide accurate information, including a valid phone number and business name.</p>
-                                    <p className="text-sm text-gray-400 font-medium italic">You are solely responsible for maintaining the confidentiality of your credentials.</p>
+                                    <p className="text-sm text-gray-400 font-medium">You are solely responsible for maintaining the confidentiality of your credentials.</p>
                                 </div>
                             </section>
 
@@ -109,7 +109,7 @@ const TermsAndConditions = ({ onBack, origin }) => {
                                     <p className="text-sm text-gray-400">Fees are based on selected tiers (Basic, Pro, Premium) per month plus applicable taxes.</p>
                                     <div className="bg-amber-900/20 border-l-4 border-amber-500 p-5 rounded-r-xl accent-box">
                                         <p className="font-bold text-amber-400 mb-1">Trial Period:</p>
-                                        <p className="text-amber-100/70 text-sm italic">Any free trial offered is for 30 days. Access may be restricted unless a payment method is added after the trial.</p>
+                                        <p className="text-amber-100/70 text-sm">Any free trial offered is for 30 days. Access may be restricted unless a payment method is added after the trial.</p>
                                     </div>
                                 </div>
                             </section>

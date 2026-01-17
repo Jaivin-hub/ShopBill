@@ -100,7 +100,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
                         </div>
                         <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             File must include a header row with: <strong className="text-indigo-400">name, price, quantity</strong>. 
-                            Optional: <span className="italic">reorderlevel, hsn</span>.
+                            Optional: <span className="">reorderlevel, hsn</span>.
                         </p>
                     </div>
 
@@ -197,11 +197,13 @@ const InventoryContent = ({
     };
 
     return (
-        <div className={`h-screen flex flex-col overflow-hidden ${themeBase} transition-colors duration-200`}>
+        /* min-h-screen allows the window to scroll naturally */
+        <div className={`min-h-screen flex flex-col ${themeBase} transition-colors duration-200`}>
             <ScrollbarStyles darkMode={darkMode} />
 
             {/* --- STICKY STACK (Header + Search/Sort) --- */}
-            <div className="flex-none z-[100] shadow-sm">
+            {/* sticky top-0 makes the header stick to the browser window */}
+            <div className="sticky top-0 z-[100] shadow-sm flex-none">
                 {/* Header */}
                 <header className={`backdrop-blur-xl border-b px-4 md:px-8 py-5 ${darkMode ? 'bg-slate-950/80 border-slate-800/60' : 'bg-white/80 border-slate-200'}`}>
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -256,8 +258,9 @@ const InventoryContent = ({
                 </div>
             </div>
 
-            {/* --- SCROLLABLE CONTENT --- */}
-            <main className="flex-1 overflow-y-auto custom-scrollbar">
+            {/* --- CONTENT --- */}
+            {/* Removed overflow-y-auto so the main page body handles scrolling */}
+            <main className="flex-1">
                 <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
                     <div className="hidden lg:block rounded-2xl border overflow-hidden shadow-sm overflow-x-auto" style={{ backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.4)' : 'white', borderColor: darkMode ? '#1e293b' : '#e2e8f0' }}>
                         <div className={`px-6 py-5 ${darkMode ? 'bg-slate-900 border-b border-slate-800' : 'bg-slate-50 border-b border-slate-100'} flex items-center gap-2`}>

@@ -107,11 +107,12 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   );
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden transition-all duration-500 ${themeBase}`}>
+    /* Changed from h-screen to min-h-screen to allow natural document scroll (same as POS) */
+    <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
       {/* --- STICKY HEADER --- */}
-      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-6 py-4 md:py-6 flex-none ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+      <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-6 py-4 md:py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl md:text-2xl font-black tracking-tight flex items-center gap-2">
@@ -144,7 +145,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           </div>
         </div>
 
-        {/* --- EXPANDABLE SEARCH/FILTER (Stay inside Header) --- */}
+        {/* --- EXPANDABLE SEARCH/FILTER --- */}
         {(showSearch || showSort) && (
           <div className="max-w-7xl mx-auto mt-4 animate-in fade-in slide-in-from-top-3">
             {showSearch ? (
@@ -154,8 +155,8 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="SEARCH ACCOUNT..."
-                  className={`no-zoom-input w-full border rounded-2xl py-4 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200'}`}
+                  placeholder="search account..."
+                  className="no-zoom-input w-full border rounded-2xl py-4 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all bg-transparent"
                 />
                 <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />
               </div>
@@ -181,11 +182,12 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       {/* --- WORKSPACE --- */}
-      <main className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-ledger-scroll">
+      {/* Removed flex-1 and overflow-y-auto to allow the whole page to scroll, matching POS behavior */}
+      <main className="px-4 py-4">
         <div className="max-w-7xl mx-auto space-y-4 pb-32">
 
           {/* TOP METRICS SECTION */}
-          <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 flex-none ${cardBase}`}>
+          <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
 
             <div className="relative z-10 flex items-center justify-between">

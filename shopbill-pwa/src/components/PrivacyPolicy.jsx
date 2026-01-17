@@ -144,7 +144,7 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                 <div className="pl-2 sm:pl-14 space-y-5">
                                     <div className="bg-teal-900/20 border-l-4 border-teal-500 p-5 rounded-r-xl accent-box">
                                         <p className="font-bold text-teal-400 mb-1">The "No-Sell" Promise:</p>
-                                        <p className="text-teal-100/70 text-sm italic">We do not sell, trade, or rent your business or customer data to third-party marketing companies. Ever.</p>
+                                        <p className="text-teal-100/70 text-sm">We do not sell, trade, or rent your business or customer data to third-party marketing companies. Ever.</p>
                                     </div>
                                     <p className="text-sm text-gray-400">All data is transmitted via secure encrypted protocols (SSL/TLS) and stored on protected cloud servers.</p>
                                 </div>

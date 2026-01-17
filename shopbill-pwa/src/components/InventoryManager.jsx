@@ -214,7 +214,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
                 <div className="bg-red-500/10 p-6 rounded-[1.25rem] border border-red-500/20 mb-6">
                     <AlertTriangle className="w-12 h-12 text-red-500" />
                 </div>
-                <h1 className={`text-xl font-black uppercase tracking-tighter italic ${darkMode ? 'text-white' : 'text-slate-900'}`}>Access<span className="text-red-500 not-italic">Restricted</span></h1>
+                <h1 className={`text-xl font-black uppercase tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>Access<span className="text-red-500">Restricted</span></h1>
                 <p className={`text-[10px] font-bold uppercase tracking-widest mt-4 max-w-xs leading-relaxed ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
                     Inventory management protocols are restricted to Level 2 personnel (Owners/Managers).
                 </p>
