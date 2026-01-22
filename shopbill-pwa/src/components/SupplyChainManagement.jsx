@@ -242,7 +242,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           <span className={`text-sm font-black truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-gray-500'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Vendor...'}</span>
                           <ChevronDown className="w-5 h-5 text-gray-500" />
                         </button>
-                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-4 rounded-2xl hover:text-indigo-400 border transition-all ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-slate-200 border-slate-300'}`}><Users className="w-5 h-5" /></button>
+                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-4 rounded-2xl hover:text-indigo-400 border transition-all ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-slate-200 border-slate-300'}`}><Plus className="w-5 h-5" /></button>
                       </div>
                     </div>
                   </div>

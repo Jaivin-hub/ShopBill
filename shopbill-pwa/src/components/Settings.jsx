@@ -332,7 +332,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
             </header>
             )}
 
-            <div className="max-w-7xl mx-auto p-6 md:p-10 pb-32">
+            <div className="max-w-7xl mx-auto p-4 md:p-10 pb-32">
                 {renderContent()}
             </div>
             

@@ -40,17 +40,6 @@ const PlanUpgrade = lazy(() => import('./components/PlanUpgrade'));
 const StaffPermissionsManager = lazy(() => import('./components/StaffPermissionsManager'));
 const ChangePasswordForm = lazy(() => import('./components/ChangePasswordForm'));
 
-// Professional Loading Placeholder
-const PageLoader = ({ darkMode }) => (
-  <div className={`h-full w-full flex flex-col items-center justify-center space-y-4 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-    <div className="relative">
-      <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-      <Smartphone className="w-5 h-5 text-indigo-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-    </div>
-    <p className="text-[10px] font-black tracking-[0.3em] uppercase text-indigo-500 animate-pulse">Synchronizing</p>
-  </div>
-);
-
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [updateHandler, setUpdateHandler] = useState(null);
@@ -208,16 +197,23 @@ const App = () => {
 
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
+
+    // Check if the current user/shop has a premium plan
+    // Adjust 'premium' to whatever string or boolean logic your backend uses (e.g., currentUser.isPremium)
+    const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
+
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
       { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      { id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+      // SCM now only shows if the user is on a premium plan
+      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] }] : []),
       { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     ];
+    
     return standardNav.filter(item => item.roles.includes(userRole));
-  }, [userRole]);
+  }, [userRole, currentUser]);
 
   const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
@@ -275,7 +271,7 @@ const App = () => {
     const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
 
     return (
-      <Suspense fallback={<PageLoader darkMode={darkMode} />}>
+      <Suspense>
         {(() => {
           switch (currentPage) {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;

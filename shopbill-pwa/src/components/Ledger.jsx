@@ -5,7 +5,12 @@ import {
   Sparkles, AlertCircle, RefreshCcw, LayoutGrid
 } from 'lucide-react';
 import CustomerList from './CustomerList';
-import { PaymentModal, AddCustomerModal, HistoryModal, RemindInfoModal } from './LedgerModals';
+import { 
+  PaymentModal, 
+  AddCustomerModal, 
+  HistoryModal, 
+  RemindModal 
+} from './LedgerModals';
 
 const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar { width: 4px; }
@@ -41,6 +46,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
+
+  // New states for the Reminder feature
+  const [reminderMessage, setReminderMessage] = useState('');
+  const [reminderType, setReminderType] = useState('whatsapp');
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -95,6 +104,42 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
     finally { setIsProcessing(false); }
   };
 
+  // Logic to handle sending the reminder via Backend
+  const handleSendReminder = async () => {
+    if (!reminderMessage.trim()) return showToast('Message cannot be empty', 'error');
+    setIsProcessing(true);
+    try {
+      await apiClient.post(`${API.customers}/${selectedCustomer._id}/remind`, {
+        message: reminderMessage,
+        type: reminderType // 'whatsapp' or 'sms'
+      });
+      showToast(`Reminder sent via ${reminderType.toUpperCase()}`, 'success');
+      setActiveModal(null);
+    } catch (e) { 
+      showToast('Failed to send reminder', 'error'); 
+    } finally { 
+      setIsProcessing(false); 
+    }
+  };
+
+  // UPDATED: Function to initialize the reminder modal with default text correctly
+  const openRemindModal = (customer) => {
+    // 1. Set the customer reference
+    setSelectedCustomer(customer);
+    
+    // 2. Set default channel
+    setReminderType('whatsapp'); 
+    
+    // 3. Construct the Dynamic Default Message
+    const defaultMsg = `Hi ${customer.name}, this is a friendly reminder from our store regarding your outstanding balance of ₹${(customer.outstandingCredit || 0).toLocaleString('en-IN')}. Please settle it at your earliest convenience. Thank you!`;
+    
+    // 4. Set the message state before opening the modal
+    setReminderMessage(defaultMsg);
+    
+    // 5. Finally, open the modal
+    setActiveModal('remind');
+  };
+
   const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
@@ -107,7 +152,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   );
 
   return (
-    /* Changed from h-screen to min-h-screen to allow natural document scroll (same as POS) */
     <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
@@ -182,7 +226,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       {/* --- WORKSPACE --- */}
-      {/* Removed flex-1 and overflow-y-auto to allow the whole page to scroll, matching POS behavior */}
       <main className="px-4 py-4">
         <div className="max-w-7xl mx-auto space-y-4 pb-32">
 
@@ -236,6 +279,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                 sortBy={sortBy}
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
+                openRemindModal={openRemindModal}
                 isProcessing={isProcessing}
                 setActiveModal={setActiveModal}
                 darkMode={darkMode}
@@ -283,7 +327,19 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           darkMode={darkMode}
         />
       )}
-      {activeModal === 'remind' && <RemindInfoModal onClose={() => setActiveModal(null)} darkMode={darkMode} />}
+      {activeModal === 'remind' && (
+        <RemindModal 
+          customer={selectedCustomer}
+          message={reminderMessage}
+          setMessage={setReminderMessage}
+          type={reminderType}
+          setType={setReminderType}
+          onClose={() => setActiveModal(null)} 
+          onConfirm={handleSendReminder}
+          isProcessing={isProcessing}
+          darkMode={darkMode} 
+        />
+      )}
     </div>
   );
 };

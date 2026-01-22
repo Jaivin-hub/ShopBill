@@ -39,62 +39,85 @@ router.get('/', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
-    // FIX: Use the corrected helper function 'isowner'
     if (!isowner(req.user.role)) {
         return res.status(403).json({ error: 'Access denied. Only the owner can add new staff.' });
     }
     
-    const { name, email, role, phone } = req.body; // Added phone for completeness
+    const { name, email, role, phone } = req.body;
 
     if (!name || !email || !role) {
         return res.status(400).json({ error: 'Please provide name, email, and role.' });
     }
     
-    // FIX: Check for PascalCase 'owner' role escalation
     if (role === 'owner') {
         return res.status(400).json({ error: 'Cannot create an owner account through this route.' });
     }
     
-    // Ensure the role is valid (Manager or Cashier - assuming PascalCase)
     if (role !== 'Manager' && role !== 'Cashier') {
         return res.status(400).json({ error: 'Invalid role specified. Must be Manager or Cashier.' });
     }
 
-    let newUser = null;
-    let newStaff = null;
-    
     try {
-        // --- 1. Check for Existing Staff/User (UPDATED ERROR MESSAGE) ---
+        // --- 0. PLAN LIMIT VALIDATION ---
+        // Fetch owner details to get the latest plan info
+        const owner = await User.findById(req.user.shopId);
+        const currentStaffCount = await Staff.countDocuments({ shopId: req.user.shopId });
+
+        const plan = owner.plan || 'BASIC'; // Fallback to BASIC if null
+
+        if (plan === 'BASIC') {
+            // Basic: 1 Owner + 1 Staff total
+            if (currentStaffCount >= 1) {
+                return res.status(403).json({ 
+                    error: 'Plan Limit Reached: The BASIC plan allows only 1 staff member. Please upgrade to PRO for more seats.' 
+                });
+            }
+        } else if (plan === 'PRO') {
+            // Pro: 1 Owner + 1 Manager + 1 Cashier (Total 2 staff)
+            if (currentStaffCount >= 2) {
+                return res.status(403).json({ 
+                    error: 'Plan Limit Reached: The PRO plan allows 2 staff members (1 Manager & 1 Cashier). Upgrade to PREMIUM for unlimited staff.' 
+                });
+            }
+            
+            // Optional: Strict check if you want exactly one of each for PRO
+            const existingRoleCount = await Staff.countDocuments({ shopId: req.user.shopId, role: role });
+            if (existingRoleCount >= 1) {
+                return res.status(403).json({ 
+                    error: `Plan Limit Reached: The PRO plan allows only one ${role}.` 
+                });
+            }
+        } 
+        // PREMIUM plan allows unlimited, so no check needed here.
+
+        // --- 1. Check for Existing Staff/User ---
         const existingUser = await User.findOne({ email });
-        if (existingUser && existingUser.shopId.toString() === req.user.shopId.toString()) {
+        if (existingUser) {
             return res.status(409).json({ 
-                error: `Staff creation failed. The email address **${email}** is already registered for an existing user or staff member in this shop. Please use a different email.` 
+                error: `The email ${email} is already registered. Please use a different email.` 
             });
         }
         
-        // --- 2. Create the User Login Record (No Password) ---
-        // Includes the temporary fix for the shopName unique index issue
-        newUser = await User.create({
+        // --- 2. Create the User Login Record ---
+        const newUser = await User.create({
             email,
             phone: phone || null,
             shopId: req.user.shopId,
-            role, // Manager or Cashier
-            shopName: `staff-temp-${req.user.shopId}-${email}` // Temporary unique value
-            // password is not set here, it will be set by the activation link
+            role, 
+            shopName: `staff-temp-${req.user.shopId}-${email}`,
+            isActive: true
         });
 
-        // --- 3. Create the Staff/Permission Record ---
-        newStaff = await Staff.create({
+        // --- 3. Create the Staff record ---
+        const newStaff = await Staff.create({
             shopId: req.user.shopId,
-            userId: newUser._id, // Link to the new User login account
+            userId: newUser._id,
             name,
             email,
             role,
             active: true 
         });
         
-        // ... (Steps 4 and 5: Token Generation and Email Sending) ...
-
         // --- 4. Generate Activation Token ---
         const activationToken = crypto.randomBytes(32).toString('hex');
         const activationTokenHash = crypto
@@ -102,49 +125,40 @@ router.post('/', protect, async (req, res) => {
             .update(activationToken)
             .digest('hex');
 
-        // Store the hashed token and expiration time (24 hours) on the User model
         newUser.resetPasswordToken = activationTokenHash;
         newUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; 
         await newUser.save({ validateBeforeSave: false }); 
         
-        // --- 5. Construct the Activation URL and Email Content ---
+        // --- 5. Email Sending ---
         const activationUrl = `${process.env.CLIENT_URL}/staff-setup/${activationToken}`;
-
         const message = `
             <h1>Welcome to Pocket POS, ${name}!</h1>
-            <p>Your shop owner has added you as a **${role}** staff member.</p>
-            <p>Please click on the link below to set your secure login password and activate your account:</p>
-            <a href=${activationUrl} clicktracking=off style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Set Up My Password</a>
-            <p style="margin-top: 20px;">The link is valid for 24 hours.</p>
+            <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
+            <p>Click below to set your password and activate your account:</p>
+            <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
         `;
 
         try {
             await sendEmail({
                 to: newUser.email,
-                subject: 'Pocket POS Account Activation & Password Setup',
+                subject: 'Pocket POS Account Activation',
                 html: message,
             });
 
             res.status(201).json({ 
-                message: `Staff member ${newStaff.name} added. Activation email sent to ${newStaff.email}.`, 
-                staff: newStaff,
-                devActivationToken: process.env.NODE_ENV === 'development' ? activationToken : undefined
+                message: `Staff member ${newStaff.name} added. Activation email sent.`, 
+                staff: newStaff 
             });
 
         } catch (mailError) {
-            console.error('Staff activation email failed:', mailError);
-            
-            // ROLLBACK: Delete the created User and Staff records if email fails
-            if (newUser) await User.deleteOne({ _id: newUser._id });
-            if (newStaff) await Staff.deleteOne({ _id: newStaff._id });
-
-            return res.status(500).json({ error: 'Staff creation failed. Could not send the activation email.' });
+            await User.deleteOne({ _id: newUser._id });
+            await Staff.deleteOne({ _id: newStaff._id });
+            return res.status(500).json({ error: 'Failed to send activation email. Rolling back.' });
         }
 
     } catch (error) {
         console.error('Staff POST error:', error.message);
-        // If the error occurred before User/Staff creation, it's safe to return 500
-        res.status(500).json({ error: error.message || 'Failed to add new staff member.' });
+        res.status(500).json({ error: 'Internal Server Error.' });
     }
 });
 

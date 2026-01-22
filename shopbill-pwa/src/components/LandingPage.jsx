@@ -47,7 +47,7 @@ const content = {
     choosePremium: "Choose Premium",
     unlimitedTxn: "Unlimited Bills",
     user2: "2 Users (Owner + Staff)",
-    userUnlimited: "Unlimited Staff Accounts",
+    userUnlimited: "3 Users (Owner + Cashier + Manager)",
     fullInv: "Standard Inventory",
     fullInvBulk: "Advanced Stock & Orders",
     khataFull: "Full Digital Khata",
@@ -194,14 +194,14 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 desc={content.proDesc} 
                                 items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS]} 
                                 btn={content.choosePro} 
-                                featured={true} 
                                 onSelect={() => onSelectPlan('PRO')} 
                             />
                             <PriceCard 
                                 plan={content.premiumPlan} 
                                 price="999" 
+                                featured={true} 
                                 desc={content.premiumDesc} 
-                                items={["All Pro Features", "Multiple Outlets", "Bulk Stock Tools", "Priority Support"]} 
+                                items={["All Pro Features", "Unlimited Staff", "Advanced Stock & Orders", "Supply Chain Tools", "Khata + Auto SMS Reminders"]} 
                                 btn={content.choosePremium} 
                                 onSelect={() => onSelectPlan('PREMIUM')} 
                             />

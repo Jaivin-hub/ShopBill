@@ -178,7 +178,7 @@ const InventoryContent = ({
 
     const sortOptions = [
         { value: 'default', label: 'Alphabetical' },
-        { value: 'low-stock', label: 'Priority Check' },
+        { value: 'low-stock', label: 'Low stock' },
     ];
     const currentSortLabel = sortOptions.find(opt => opt.value === sortOption)?.label;
 

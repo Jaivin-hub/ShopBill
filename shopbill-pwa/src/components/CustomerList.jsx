@@ -13,7 +13,8 @@ const CustomerList = ({
     isProcessing,
     openHistoryModal,
     setActiveModal,
-    darkMode
+    darkMode,
+    openRemindModal
 }) => {
     const processedCustomers = useMemo(() => {
         let result = [...(customersList || [])];
@@ -80,7 +81,7 @@ const CustomerList = ({
                     </div>
                     {outstandingAmount > 0 && (
                         <button 
-                            onClick={() => setActiveModal('remind')}
+                            onClick={() => openRemindModal(customer)}
                             className={`p-2 rounded-lg border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-amber-600 hover:text-white' : 'bg-white border-slate-200 text-slate-500 hover:bg-amber-500 hover:text-white'}`}
                         >
                             <BellRing className="w-3.5 h-3.5" />
