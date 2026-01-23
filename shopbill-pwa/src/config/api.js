@@ -20,6 +20,7 @@ const API = {
     staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT (for active status)
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
+    staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,
 
     // Existing Business Endpoints
     inventory: API_BASE_URL + '/inventory',

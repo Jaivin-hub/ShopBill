@@ -12,21 +12,21 @@ const PLAN_DETAILS = {
     BASIC: {
         name: 'Basic Plan',
         price: 499,
-        features: ['Unlimited Transactions', '2 Users (Owner + 1 Cashier)', 'Full Inventory Management', 'Full Digital Khata'],
+        features: ['2 Users (Owner + 1 Staff)', 'Full Inventory', 'Digital Khata'],
         interval: 'monthly',
         color: 'from-indigo-600 to-blue-600',
     },
     PRO: {
         name: 'Pro Plan',
         price: 799,
-        features: ['Unlimited Transactions', 'Unlimited Users & Roles', 'Full Inventory & Bulk Tools', 'Khata + Automated SMS Reminders'],
+        features: ['3 Users (Owner+Mgr+Cashier)', 'Bulk Tools', 'SMS Reminders'],
         interval: 'monthly',
         color: 'from-teal-600 to-emerald-600',
     },
     PREMIUM: {
         name: 'Premium Plan',
         price: 999,
-        features: ['Unlimited Transactions', 'Unlimited Users & Roles', 'Full Inventory & Bulk Tools', 'Khata + Automated SMS Reminders'],
+        features: ['Unlimited Users', 'Supply Chain Mgmt', 'Advanced Reports'],
         interval: 'monthly',
         color: 'from-indigo-600 to-purple-600',
     }
@@ -178,12 +178,8 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 transactionId: vResp.data.transactionId, shopName
                             });
                             setPaymentSuccess(true);
-                            
-                            // Success Redirection Logic
                             setTimeout(() => {
                                 showToast('Account created successfully! Please login.', 'success');
-                                // In App.jsx, we need to show the login screen.
-                                // We do this by setting current page to dashboard and letting the login view trigger.
                                 window.location.reload(); 
                             }, 3000);
                         }
@@ -204,51 +200,95 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
     }, [plan, planKey, email, phone, password, shopName, showToast]);
 
     if (paymentSuccess) return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
-            <div className="max-w-md w-full bg-gray-900 p-10 rounded-[1.25rem] border border-emerald-500/30 text-center shadow-2xl">
-                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle className="w-10 h-10 text-emerald-500 animate-pulse" />
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6 text-white">
+            <div className="max-w-md w-full bg-gray-900 p-8 rounded-3xl border border-emerald-500/30 text-center shadow-2xl">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle className="w-8 h-8 text-emerald-500 animate-pulse" />
                 </div>
-                <h2 className="text-3xl font-black text-white  tracking-tighter mb-4">You're All Set!</h2>
+                <h2 className="text-2xl font-black tracking-tighter mb-4">You're All Set!</h2>
                 <p className="text-gray-400 font-bold leading-relaxed mb-6">Account created. Your 30-day trial has started.</p>
                 <div className="flex items-center justify-center space-x-2 text-indigo-400 font-bold">
                     <Loader className="w-4 h-4 animate-spin" />
-                    <span>Redirecting to Login...</span>
+                    <span className="text-xs">Redirecting to Login...</span>
                 </div>
             </div>
         </div>
     );
 
     return (
-        <main className="min-h-screen bg-gray-950 flex items-center justify-center p-4 sm:p-8 font-sans">
-            <section className="max-w-5xl w-full bg-gray-900/50 backdrop-blur-xl rounded-[1.25rem] border border-gray-800 shadow-2xl overflow-hidden">
-                <div className="grid grid-cols-1 lg:grid-cols-12">
+        <main className="min-h-screen bg-gray-950 flex items-center justify-center p-0 sm:p-6 lg:p-8 font-sans">
+            <section className="max-w-5xl w-full bg-gray-950 sm:bg-gray-900/50 sm:backdrop-blur-xl sm:rounded-[2rem] sm:border sm:border-gray-800 shadow-2xl overflow-hidden">
+                <div className="flex flex-col lg:grid lg:grid-cols-12">
                     
-                    {/* Form Side */}
-                    <div className="lg:col-span-7 p-8 sm:p-12 order-2 lg:order-1">
-                        <header className="mb-10">
-                            <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-4">
-                                <Zap className="w-3 h-3 text-indigo-400" />
-                                <span className="text-[10px] font-black text-indigo-400  tracking-widest">30-Day Free Trial</span>
+                    {/* Compact Summary Side (Top on Mobile) */}
+                    <div className="lg:col-span-4 bg-gray-900 lg:bg-gray-950/50 p-4 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-gray-800">
+                        <div className={`p-5 lg:p-8 rounded-2xl lg:rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-xl`}>
+                            <div className="absolute -top-2 -right-2 p-4 opacity-10 lg:opacity-20 hidden sm:block">
+                                <ShoppingCart size={60} className="lg:w-20 lg:h-20" />
                             </div>
-                            <h1 className="text-3xl font-black text-white  tracking-tighter">Business Registration</h1>
+                            <div className="relative z-10">
+                                <div className="flex justify-between items-start mb-4 lg:mb-8">
+                                    <div>
+                                        <span className="text-[9px] font-black tracking-[0.2em] bg-white/20 px-2 py-0.5 rounded-full mb-1 inline-block text-white uppercase">{plan.interval}</span>
+                                        <h3 className="text-xl lg:text-2xl font-black text-white tracking-tighter">{plan.name}</h3>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="block text-[9px] font-black text-white/70 uppercase">After Trial</span>
+                                        <span className="text-xl lg:text-2xl font-black text-white">₹{plan.price}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex lg:flex-col items-center lg:items-start justify-between border-t border-white/20 pt-4 lg:space-y-4">
+                                    <div className="flex flex-col lg:w-full">
+                                        <span className="text-[9px] font-black text-white/70 uppercase">Verification Fee</span>
+                                        <span className="text-xl lg:text-3xl font-black text-white">₹1</span>
+                                    </div>
+                                    <ul className="hidden sm:grid grid-cols-2 lg:grid-cols-1 gap-2 lg:space-y-2 mt-0 lg:mt-4">
+                                        {plan.features.map((f, i) => (
+                                            <li key={i} className="flex items-center text-[9px] lg:text-[10px] font-black text-white tracking-wider">
+                                                <ShieldCheck size={12} className="mr-1.5 text-white/70 shrink-0" /> {f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-4 lg:mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800 hidden lg:block">
+                            <h4 className="text-[10px] font-black text-white tracking-widest mb-2 flex items-center uppercase">
+                                <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
+                            </h4>
+                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed tracking-tighter">Encrypted by Razorpay. Cancel anytime via dashboard.</p>
+                        </div>
+                    </div>
+
+                    {/* Form Side */}
+                    <div className="lg:col-span-8 p-6 sm:p-10 lg:p-14">
+                        <header className="mb-8 lg:mb-10 text-center lg:text-left">
+                            <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-3">
+                                <Zap className="w-3 h-3 text-indigo-400" />
+                                <span className="text-[9px] lg:text-[10px] font-black text-indigo-400 tracking-widest uppercase">30-Day Free Trial</span>
+                            </div>
+                            <h1 className="text-2xl lg:text-4xl font-black text-white tracking-tighter">Create Your Business Account</h1>
                         </header>
 
-                        <form onSubmit={handlePaymentSubmit} className="space-y-6">
-                            {paymentError && <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-2xl text-red-400 text-xs font-bold">{paymentError}</div>}
+                        <form onSubmit={handlePaymentSubmit} className="space-y-5 lg:space-y-6">
+                            {paymentError && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold">{paymentError}</div>}
                             
-                            <div className="grid grid-cols-1 gap-5">
-                                <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+                                <div className="md:col-span-2">
+                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} />
+                                </div>
                                 <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} />
                                 
                                 <div className="relative" ref={dropdownRef}>
-                                    <label className="text-[10px] font-black text-gray-500  tracking-widest mb-2 block">Mobile Number</label>
+                                    <label className="text-[10px] font-black text-gray-500 tracking-widest mb-2 block uppercase">Mobile Number</label>
                                     <div className={`flex bg-gray-950 rounded-2xl border transition-all ${phoneError ? 'border-red-500' : 'border-gray-800 focus-within:border-indigo-500'}`}>
-                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-4 border-r border-gray-800 flex items-center space-x-2 text-base md:text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[90px]">
+                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-3 border-r border-gray-800 flex items-center space-x-1 text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[80px]">
                                             <span>{selectedCountry.flag}</span>
                                             <span>{selectedCountry.code}</span>
                                         </button>
-                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3.5 text-base md:text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
+                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3 text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
                                         <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
@@ -261,10 +301,10 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                             ))}
                                         </div>
                                     )}
-                                    {phoneError && <p className="text-red-500 text-[10px] mt-1 font-bold ">{phoneError}</p>}
+                                    {phoneError && <p className="text-red-500 text-[9px] mt-1 font-bold">{phoneError}</p>}
                                 </div>
 
-                                <div className="relative">
+                                <div className="relative md:col-span-2">
                                     <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={setPassword} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} />
                                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-9 text-gray-500 hover:text-white transition-colors">
                                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -272,53 +312,16 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 </div>
                             </div>
 
-                            <div className="pt-6 border-t border-gray-800">
-                                <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black  tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
-                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Setup & Start Trial</>}
+                            <div className="pt-4 lg:pt-6 border-t border-gray-800">
+                                <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
+                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
                                 </button>
-                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed  tracking-tighter">By proceeding, you authorize a ₹1 verification charge. No other charges during trial.</p>
-                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black  text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors">
-                                    <ArrowLeft size={12} className="mr-1" /> Cancel and Go Back
+                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase">By proceeding, you authorize a ₹1 verification charge.</p>
+                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase">
+                                    <ArrowLeft size={12} className="mr-1" /> Back to Plans
                                 </button>
                             </div>
                         </form>
-                    </div>
-
-                    {/* Summary Side */}
-                    <div className="lg:col-span-5 bg-gray-950/50 p-8 sm:p-12 border-l border-gray-800 order-1 lg:order-2">
-                        <div className={`p-8 rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-2xl`}>
-                            <div className="absolute top-0 right-0 p-6 opacity-20"><ShoppingCart size={80} /></div>
-                            <div className="relative z-10">
-                                <span className="text-[10px] font-black  tracking-[0.2em] bg-white/20 px-3 py-1 rounded-full mb-4 inline-block text-white">{plan.interval}</span>
-                                <h3 className="text-3xl font-black text-white tracking-tighter mb-8">{plan.name}</h3>
-                                
-                                <div className="space-y-6 mb-8">
-                                    <div className="flex justify-between items-end border-b border-white/20 pb-4">
-                                        <span className="text-[10px] font-black  text-white/70">Start Trial Fee</span>
-                                        <span className="text-3xl font-black text-white">₹1</span>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-black  text-white/70">After 30 Days</span>
-                                        <span className="text-2xl font-black text-white">₹{plan.price}</span>
-                                    </div>
-                                </div>
-
-                                <ul className="space-y-3">
-                                    {plan.features.map((f, i) => (
-                                        <li key={i} className="flex items-center text-[10px] font-black text-white  tracking-wider">
-                                            <ShieldCheck size={14} className="mr-2 text-white/70" /> {f}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                        
-                        <div className="mt-8 p-6 bg-gray-900/50 rounded-2xl border border-gray-800">
-                            <h4 className="text-[10px] font-black text-white  tracking-widest mb-2 flex items-center">
-                                <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
-                            </h4>
-                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed  tracking-tighter">Transactions are encrypted and handled by Razorpay. You can cancel your subscription anytime via the dashboard.</p>
-                        </div>
                     </div>
                 </div>
             </section>
@@ -327,8 +330,8 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
 };
 
 const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon }) => (
-    <div className="group">
-        <label htmlFor={id} className="text-[10px] font-black text-gray-500  tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400">{label}</label>
+    <div className="group w-full">
+        <label htmlFor={id} className="text-[10px] font-black text-gray-500 tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400 uppercase">{label}</label>
         <div className="relative">
             {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400">{icon}</div>}
             <input 
@@ -338,10 +341,10 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 onChange={(e) => onChange(e.target.value)} 
                 disabled={disabled}
                 placeholder={placeholder}
-                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3.5 text-base md:text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
+                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3 text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>
-        {error && <p className="text-red-500 text-[10px] mt-1 font-bold  tracking-tight">{error}</p>}
+        {error && <p className="text-red-500 text-[9px] mt-1 font-bold tracking-tight">{error}</p>}
     </div>
 );
 

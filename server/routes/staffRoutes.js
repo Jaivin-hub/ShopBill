@@ -257,5 +257,73 @@ router.delete('/:id', protect, async (req, res) => {
     }
 });
 
+router.put('/:id/role', protect, async (req, res) => {
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can change roles.' });
+    }
+
+    const { role: newRole } = req.body;
+    const staffId = req.params.id;
+
+    // 1. Validation
+    if (!newRole || (newRole !== 'Manager' && newRole !== 'Cashier')) {
+        return res.status(400).json({ error: 'Invalid role. Must be Manager or Cashier.' });
+    }
+
+    try {
+        // 2. Find the staff member
+        const staffMember = await Staff.findOne({ _id: staffId, shopId: req.user.shopId });
+        if (!staffMember) {
+            return res.status(404).json({ error: 'Staff member not found.' });
+        }
+
+        // 3. Skip check if the role isn't actually changing
+        if (staffMember.role === newRole) {
+            return res.json({ message: 'Role updated (no change).', staff: staffMember });
+        }
+
+        // 4. PLAN LIMIT VALIDATION (Logic similar to POST route)
+        const owner = await User.findById(req.user.shopId);
+        const plan = owner.plan || 'BASIC';
+
+        if (plan === 'PRO') {
+            // Check if they already have a staff member with this specific role
+            const roleCount = await Staff.countDocuments({ 
+                shopId: req.user.shopId, 
+                role: newRole 
+            });
+
+            if (roleCount >= 1) {
+                return res.status(403).json({ 
+                    error: `Plan Limit: Your PRO plan only allows one ${newRole}. Upgrade to PREMIUM for more.` 
+                });
+            }
+        }
+        // BASIC plan allows 1 staff of any role, so changing the role of the existing 
+        // 1 staff member doesn't break the count limit. 
+        // PREMIUM is unlimited.
+
+        // 5. Update both Staff and User records
+        const updatedStaff = await Staff.findByIdAndUpdate(
+            staffId,
+            { role: newRole },
+            { new: true, runValidators: true }
+        );
+
+        if (updatedStaff.userId) {
+            await User.findByIdAndUpdate(updatedStaff.userId, { role: newRole });
+        }
+
+        res.json({ 
+            message: `Role for ${updatedStaff.name} updated to ${newRole}.`, 
+            staff: updatedStaff 
+        });
+
+    } catch (error) {
+        console.error('Staff role update error:', error.message);
+        res.status(500).json({ error: 'Failed to update staff role.' });
+    }
+});
+
 
 module.exports = router;

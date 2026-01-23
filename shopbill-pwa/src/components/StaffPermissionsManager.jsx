@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
-    ChevronRight, Power, Info, ShieldAlert 
+    ChevronRight, Power, Info, ShieldAlert, Edit3
 } from 'lucide-react';
 import API from '../config/api';
 
@@ -11,6 +11,83 @@ const ROLE_PERMISSIONS = {
     owner: ['Full Dashboard', 'Billing', 'Inventory', 'Khata', 'Reports', 'Settings', 'Staff Management'],
     Manager: ['Standard Dashboard', 'Billing', 'Inventory Management', 'Khata Management'],
     Cashier: ['Limited Dashboard', 'Billing (Point of Sale)', 'Khata Transaction Logging'],
+};
+
+// --- EditRoleModal ---
+const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmitting, darkMode }) => {
+    const [selectedRole, setSelectedRole] = useState('');
+
+    useEffect(() => {
+        if (staffMember) setSelectedRole(staffMember.role);
+    }, [staffMember]);
+
+    if (!isOpen || !staffMember) return null;
+
+    const modalBg = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300 shadow-2xl';
+    const inputBg = darkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-slate-300 text-black';
+
+    return (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
+            <div className={`${modalBg} w-full max-w-md rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200`}>
+                <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
+                    <div>
+                        <h2 className={`text-lg font-black tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
+                            <Edit3 className="w-5 h-5 mr-3 text-indigo-500" />
+                            Update Tier
+                        </h2>
+                        <p className={`text-[9px] font-black tracking-widest mt-1 uppercase ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Role Modification</p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-rose-500 transition p-2" disabled={isSubmitting}>
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-500`}>
+                            <User className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-black'}`}>{staffMember.name}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">{staffMember.email}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Select New Role</label>
+                        <select
+                            value={selectedRole}
+                            onChange={(e) => setSelectedRole(e.target.value)}
+                            className={`w-full px-4 py-4 border text-sm font-bold rounded-2xl focus:border-indigo-500 outline-none appearance-none cursor-pointer ${inputBg}`}
+                            disabled={isSubmitting}
+                        >
+                            <option value="Cashier">Cashier Tier</option>
+                            <option value="Manager">Management Tier</option>
+                        </select>
+                    </div>
+
+                    <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-slate-50 border-slate-200'}`}>
+                        <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">Tier Permissions:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {ROLE_PERMISSIONS[selectedRole]?.map((perm, idx) => (
+                                <span key={idx} className={`text-[8px] font-black px-2 py-0.5 rounded ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-slate-200 text-slate-700'}`}>
+                                    {perm}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => onUpdateRole(staffMember._id, selectedRole)}
+                        className="w-full py-4 bg-indigo-600 text-white font-black text-xs tracking-widest rounded-2xl hover:bg-indigo-500 transition shadow-lg disabled:opacity-50"
+                        disabled={isSubmitting || selectedRole === staffMember.role}
+                    >
+                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Confirm Role Update'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- AddStaffModal ---
@@ -132,17 +209,19 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode }) 
 const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal, currentUserRole, darkMode }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isAdding, setIsAdding] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedStaff, setSelectedStaff] = useState(null);
 
-    currentUserRole = 'owner'; // Mocking role as requested
-    const hasWriteAccess = currentUserRole === 'owner';
-    const hasReadAccess = currentUserRole === 'owner' || currentUserRole === 'Manager';
+    // Ensure we have write/read access
+    const effectiveRole = currentUserRole || 'owner'; 
+    const hasWriteAccess = effectiveRole === 'owner';
+    const hasReadAccess = effectiveRole === 'owner' || effectiveRole === 'Manager';
 
     const fetchStaff = useCallback(async () => {
-        if (!hasReadAccess) {
+        if (!hasReadAccess || !apiClient) {
             setIsLoading(false);
-            setStaff([]);
             return;
         }
         setIsLoading(true);
@@ -156,11 +235,11 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             setStaff(sortedStaff);
         } catch (error) {
             console.error('Fetch failed:', error);
-            setStaff([]);
+            if (showToast) showToast('Failed to sync directory.', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, hasReadAccess]);
+    }, [apiClient, hasReadAccess, showToast]);
 
     useEffect(() => {
         fetchStaff();
@@ -168,16 +247,33 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
     const handleAddStaff = async (formData, resetForm) => {
         if (!hasWriteAccess) return;
-        setIsAdding(true);
+        setIsProcessing(true);
         try {
             await apiClient.post(API.staff, formData); 
+            if (showToast) showToast('Staff provisioned successfully.', 'success');
             await fetchStaff(); 
             resetForm();
             setIsAddModalOpen(false); 
         } catch (error) {
-            console.error('Add failed:', error);
+            if (showToast) showToast(error.response?.data?.error || 'Add failed.', 'error');
         } finally {
-            setIsAdding(false);
+            setIsProcessing(false);
+        }
+    };
+
+    const handleUpdateRole = async (id, newRole) => {
+        setIsProcessing(true);
+        try {
+            // Using the newly defined staffRoleUpdate endpoint
+            await apiClient.put(API.staffRoleUpdate(id), { role: newRole });
+            if (showToast) showToast('Permissions updated.', 'success');
+            await fetchStaff();
+            setIsEditModalOpen(false);
+            setSelectedStaff(null);
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Update failed.', 'error');
+        } finally {
+            setIsProcessing(false);
         }
     };
     
@@ -187,7 +283,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             await apiClient.put(API.staffToggle(staffMember._id)); 
             await fetchStaff();
         } catch (error) {
-            console.error('Toggle failed:', error);
+            if (showToast) showToast('Failed to toggle status.', 'error');
         }
     };
     
@@ -200,9 +296,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 setConfirmModal(null); 
                 try {
                     await apiClient.delete(API.staffDelete(staffMember._id)); 
+                    if (showToast) showToast('Staff member removed.', 'success');
                     await fetchStaff();
                 } catch (error) {
-                    console.error('Delete failed:', error);
+                    if (showToast) showToast('Removal failed.', 'error');
                 }
             },
             onCancel: () => setConfirmModal(null) 
@@ -231,7 +328,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 Staff <span className="text-indigo-600">Directory</span>
                             </h1>
                             <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                Access control & pemissions management
+                                Access control & permissions management
                             </p>
                         </div>
                     </div>
@@ -257,7 +354,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     <div>
                         <p className={`text-[10px] font-black  tracking-widest ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Security Authorization</p>
                         <p className={`text-xs font-bold ${hasWriteAccess ? (darkMode ? 'text-emerald-400' : 'text-emerald-700') : (darkMode ? 'text-amber-400' : 'text-amber-700')}`}>
-                            {hasWriteAccess ? 'Owner Mode: Full Administrative Control Active' : `Restricted Mode: ${currentUserRole} privileges applied.`}
+                            {hasWriteAccess ? 'Owner Mode: Full Administrative Control Active' : `Restricted Mode: ${effectiveRole} privileges applied.`}
                         </p>
                     </div>
                 </div>
@@ -317,6 +414,17 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                                 <Power className="w-3.5 h-3.5" />
                                                 {s.active ? 'Active' : 'Offline'}
                                             </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedStaff(s);
+                                                    setIsEditModalOpen(true);
+                                                }}
+                                                disabled={isActionDisabled} 
+                                                className={`p-3.5 rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-gray-900 border border-gray-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
+                                            >
+                                                <Edit3 className="w-5 h-5" />
+                                            </button>
                                             
                                             <button
                                                 onClick={() => handleRemoveStaff(s)}
@@ -345,7 +453,19 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onAddStaff={handleAddStaff}
-                isSubmitting={isAdding}
+                isSubmitting={isProcessing}
+                darkMode={darkMode}
+            />
+
+            <EditRoleModal 
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedStaff(null);
+                }}
+                staffMember={selectedStaff}
+                onUpdateRole={handleUpdateRole}
+                isSubmitting={isProcessing}
                 darkMode={darkMode}
             />
         </main>
