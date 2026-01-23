@@ -169,11 +169,12 @@ router.put('/:customerId/credit', protect, async (req, res) => {
 });
 
 // --- SEND REMINDER (WHATSAPP + SMS) ---
+// MAKE SURE THIS IS AT THE TOP OF YOUR FILE:
+// const User = require('../models/User'); 
+
 router.post('/:id/remind', protect, async (req, res) => {
     const customerId = req.params.id;
     const { message } = req.body;
-
-    console.log('--- Start Reminder Process ---');
 
     if (!message || message.trim().length === 0) {
         return res.status(400).json({ error: 'Reminder message cannot be empty.' });
@@ -186,7 +187,7 @@ router.post('/:id/remind', protect, async (req, res) => {
             shopId: req.user.shopId 
         });
 
-        // Use 'User' instead of 'Shop' based on your provided schema
+        // Using 'User' here as your schema defines business details within the User model
         const shop = await User.findById(req.user.shopId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
@@ -197,24 +198,22 @@ router.post('/:id/remind', protect, async (req, res) => {
         const formattedTo = customer.phone.startsWith('+') ? customer.phone : `+${customer.phone}`;
         const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
         const smsFrom = process.env.TWILIO_PHONE_NUMBER;
-
-        // Note: Using shopName because your User schema uses 'shopName' not 'name'
+        
+        // Using 'shopName' from your User schema
         const finalMessage = `From ${shop.shopName || 'Shop'}: ${message}`;
 
-        // 3. Execution (Using the Template SID from your screenshot)
-        console.log('Attempting to send messages...');
+        // 3. Twilio Execution
+        // Using the ContentSid and variables from your screenshot
         const results = await Promise.allSettled([
-            // WhatsApp Channel - Using the Content Template from your screenshot
             client.messages.create({
                 from: waFrom,
                 to: `whatsapp:${formattedTo}`,
-                contentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e', // From your screenshot
+                contentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e', 
                 contentVariables: JSON.stringify({
-                    1: new Date().toLocaleDateString(), // Fills {{1}}
-                    2: new Date().toLocaleTimeString()  // Fills {{2}}
+                    1: new Date().toLocaleDateString(), 
+                    2: new Date().toLocaleTimeString()  
                 })
             }),
-            // SMS Channel - Using free-form text
             client.messages.create({
                 from: smsFrom,
                 to: formattedTo,
@@ -225,28 +224,26 @@ router.post('/:id/remind', protect, async (req, res) => {
         const waStatus = results[0].status === 'fulfilled' ? 'Success' : 'Failed';
         const smsStatus = results[1].status === 'fulfilled' ? 'Success' : 'Failed';
 
-        // 4. Transaction Logging
-        // IMPORTANT: Ensure you have added 'reminder_sent' to your KhataTransactionSchema enum
+        // 4. Khata Logging
+        // REMINDER: Ensure 'reminder_sent' is added to the enum in KhataTransaction.js
         await KhataTransaction.create({
             shopId: req.user.shopId,
             customerId: customer._id,
             amount: 0,
             type: 'reminder_sent', 
-            details: `Reminder: WhatsApp ${waStatus}, SMS ${smsStatus}. Content: ${message}`,
+            details: `Reminder: WhatsApp ${waStatus}, SMS ${smsStatus}`,
         });
 
-        console.log('--- Process Complete ---');
         res.json({ 
             success: true, 
             delivery: { 
                 whatsapp: waStatus, 
-                sms: smsStatus,
-                waDetails: results[0].status === 'rejected' ? results[0].reason.message : 'Sent'
+                sms: smsStatus 
             } 
         });
 
     } catch (error) {
-        console.error('CRITICAL ERROR:', error.message);
+        console.error('REMIND ROUTE ERROR:', error);
         res.status(500).json({ 
             error: 'Internal server error while processing reminder.',
             dev_error: error.message 
