@@ -174,8 +174,6 @@ router.post('/:id/remind', protect, async (req, res) => {
     const { message } = req.body;
 
     console.log('--- Start Reminder Process ---');
-    console.log('Target Customer ID:', customerId);
-    console.log('User Shop ID:', req.user?.shopId);
 
     if (!message || message.trim().length === 0) {
         return res.status(400).json({ error: 'Reminder message cannot be empty.' });
@@ -187,13 +185,12 @@ router.post('/:id/remind', protect, async (req, res) => {
             _id: customerId, 
             shopId: req.user.shopId 
         });
-        console.log('Customer Found:', customer ? customer.name : 'NULL');
 
-        const shop = await Shop.findById(req.user.shopId);
-        console.log('Shop Found:', shop ? shop.name : 'NULL');
+        // Use 'User' instead of 'Shop' based on your provided schema
+        const shop = await User.findById(req.user.shopId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
-        if (!shop) return res.status(404).json({ error: 'Shop profile not found.' });
+        if (!shop) return res.status(404).json({ error: 'Shop/User profile not found.' });
         if (!customer.phone) return res.status(400).json({ error: 'Customer phone missing.' });
 
         // 2. Variable Prep
@@ -201,57 +198,58 @@ router.post('/:id/remind', protect, async (req, res) => {
         const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
         const smsFrom = process.env.TWILIO_PHONE_NUMBER;
 
-        console.log('Sending To:', formattedTo);
-        console.log('SMS From Number:', smsFrom);
+        // Note: Using shopName because your User schema uses 'shopName' not 'name'
+        const finalMessage = `From ${shop.shopName || 'Shop'}: ${message}`;
 
-        // Debug: Check if Twilio client exists
-        if (typeof client === 'undefined') {
-            throw new Error('Twilio "client" is not defined. Check your imports/initialization.');
-        }
-
-        const finalMessage = `From ${shop.name}: ${message}`;
-
-        // 3. Execution
-        console.log('Attempting to send messages via Twilio...');
+        // 3. Execution (Using the Template SID from your screenshot)
+        console.log('Attempting to send messages...');
         const results = await Promise.allSettled([
-            client.messages.create({ from: waFrom, to: `whatsapp:${formattedTo}`, body: finalMessage }),
-            client.messages.create({ from: smsFrom, to: formattedTo, body: finalMessage })
+            // WhatsApp Channel - Using the Content Template from your screenshot
+            client.messages.create({
+                from: waFrom,
+                to: `whatsapp:${formattedTo}`,
+                contentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e', // From your screenshot
+                contentVariables: JSON.stringify({
+                    1: new Date().toLocaleDateString(), // Fills {{1}}
+                    2: new Date().toLocaleTimeString()  // Fills {{2}}
+                })
+            }),
+            // SMS Channel - Using free-form text
+            client.messages.create({
+                from: smsFrom,
+                to: formattedTo,
+                body: finalMessage
+            })
         ]);
 
         const waStatus = results[0].status === 'fulfilled' ? 'Success' : 'Failed';
         const smsStatus = results[1].status === 'fulfilled' ? 'Success' : 'Failed';
 
-        // Log specific Twilio rejections
-        results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-                console.error(`❌ ${index === 0 ? 'WhatsApp' : 'SMS'} rejection:`, result.reason);
-            } else {
-                console.log(`✅ ${index === 0 ? 'WhatsApp' : 'SMS'} sent SID:`, result.value.sid);
-            }
-        });
-
         // 4. Transaction Logging
-        console.log('Creating transaction log...');
+        // IMPORTANT: Ensure you have added 'reminder_sent' to your KhataTransactionSchema enum
         await KhataTransaction.create({
             shopId: req.user.shopId,
             customerId: customer._id,
             amount: 0,
-            type: 'reminder_sent',
-            details: `Reminder sent. WhatsApp: ${waStatus}, SMS: ${smsStatus}`,
+            type: 'reminder_sent', 
+            details: `Reminder: WhatsApp ${waStatus}, SMS ${smsStatus}. Content: ${message}`,
         });
 
         console.log('--- Process Complete ---');
-        res.json({ success: true, delivery: { whatsapp: waStatus, sms: smsStatus } });
+        res.json({ 
+            success: true, 
+            delivery: { 
+                whatsapp: waStatus, 
+                sms: smsStatus,
+                waDetails: results[0].status === 'rejected' ? results[0].reason.message : 'Sent'
+            } 
+        });
 
     } catch (error) {
-        // THIS IS THE MOST IMPORTANT LOG
-        console.error('CRITICAL ERROR IN REMIND ROUTE:');
-        console.error('Message:', error.message);
-        console.error('Stack Trace:', error.stack);
-        
+        console.error('CRITICAL ERROR:', error.message);
         res.status(500).json({ 
             error: 'Internal server error while processing reminder.',
-            dev_error: error.message // Shows the error in Postman for easier debugging
+            dev_error: error.message 
         });
     }
 });
