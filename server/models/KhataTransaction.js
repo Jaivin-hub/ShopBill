@@ -26,7 +26,7 @@ const KhataTransactionSchema = new mongoose.Schema({
     // 'credit_sale' (increase due), 'payment_received' (decrease due), 'initial_due' (starting balance)
     type: { 
         type: String, 
-        enum: ['credit_sale', 'payment_received', 'initial_due'], 
+        enum: ['credit_sale', 'payment_received', 'initial_due', 'reminder_sent'],
         required: true 
     },
     
