@@ -187,22 +187,40 @@ router.post('/:id/remind', protect, async (req, res) => {
             shopId: req.user.shopId 
         });
 
-        // Using 'User' here as your schema defines business details within the User model
+        // Your schema defines business details within the User model
         const shop = await User.findById(req.user.shopId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
         if (!shop) return res.status(404).json({ error: 'Shop/User profile not found.' });
         if (!customer.phone) return res.status(400).json({ error: 'Customer phone missing.' });
 
-        // 2. Variable Prep
-        const formattedTo = customer.phone.startsWith('+') ? customer.phone : `+${customer.phone}`;
+        // 2. Phone Number Formatting (+91 Logic)
+        // Remove spaces, dashes, or parentheses
+        let cleanPhone = customer.phone.trim().replace(/[\s\-\(\)]/g, '');
+
+        let formattedTo;
+        if (cleanPhone.startsWith('+')) {
+            // Already has country code (e.g., +91...)
+            formattedTo = cleanPhone;
+        } else if (cleanPhone.length === 10) {
+            // Standard 10-digit Indian number, add +91
+            formattedTo = `+91${cleanPhone}`;
+        } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+            // Has 91 but no plus sign
+            formattedTo = `+${cleanPhone}`;
+        } else {
+            // Generic fallback: just add a plus if it's missing
+            formattedTo = `+${cleanPhone}`;
+        }
+
+        // 3. Variable Prep
         const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
         const smsFrom = process.env.TWILIO_PHONE_NUMBER;
         
         // Using 'shopName' from your User schema
         const finalMessage = `From ${shop.shopName || 'Shop'}: ${message}`;
 
-        // 3. Twilio Execution
+        // 4. Twilio Execution
         // Using the ContentSid and variables from your screenshot
         const results = await Promise.allSettled([
             client.messages.create({
@@ -210,8 +228,8 @@ router.post('/:id/remind', protect, async (req, res) => {
                 to: `whatsapp:${formattedTo}`,
                 contentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e', 
                 contentVariables: JSON.stringify({
-                    1: new Date().toLocaleDateString(), 
-                    2: new Date().toLocaleTimeString()  
+                    1: new Date().toLocaleDateString('en-IN'), // Variable {{1}}
+                    2: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) // Variable {{2}}
                 })
             }),
             client.messages.create({
@@ -224,7 +242,7 @@ router.post('/:id/remind', protect, async (req, res) => {
         const waStatus = results[0].status === 'fulfilled' ? 'Success' : 'Failed';
         const smsStatus = results[1].status === 'fulfilled' ? 'Success' : 'Failed';
 
-        // 4. Khata Logging
+        // 5. Khata Logging
         // REMINDER: Ensure 'reminder_sent' is added to the enum in KhataTransaction.js
         await KhataTransaction.create({
             shopId: req.user.shopId,
@@ -238,7 +256,8 @@ router.post('/:id/remind', protect, async (req, res) => {
             success: true, 
             delivery: { 
                 whatsapp: waStatus, 
-                sms: smsStatus 
+                sms: smsStatus,
+                recipient: formattedTo 
             } 
         });
 
