@@ -188,7 +188,7 @@ router.post('/:id/remind', protect, async (req, res) => {
         });
 
         // Your schema defines business details within the User model
-        const shop = await User.findById(req.user.shopId);
+        const shop = await Shop.findById(req.user.shopId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
         if (!shop) return res.status(404).json({ error: 'Shop/User profile not found.' });
