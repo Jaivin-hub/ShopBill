@@ -190,37 +190,51 @@ router.post('/:id/remind', protect, async (req, res) => {
         }
         
         if (!shop) {
-            return res.status(404).json({ error: 'Shop profile not found. Please set up your shop details.' });
+            return res.status(404).json({ error: 'Shop profile not found.' });
         }
 
         if (!customer.phone) {
             return res.status(400).json({ error: 'Customer does not have a registered phone number.' });
         }
 
-        // Determine dynamic "from" numbers
-        const waFrom = shop.phone;
-        const smsFrom = shop.phone;
+        // 1. Format the 'To' number: Ensure it has the '+' prefix for Twilio
+        const formattedTo = customer.phone.startsWith('+') ? customer.phone : `+${customer.phone}`;
+
+        // 2. Use Twilio platform numbers from .env
+        // For WhatsApp Sandbox, this is usually 'whatsapp:+14155238886'
+        const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
+        const smsFrom = process.env.TWILIO_PHONE_NUMBER;
+
+        // 3. Optional: Add Shop Name to the message so the customer knows who is messaging
+        const finalMessage = `From ${shop.name}: ${message}`;
 
         // Send both messages simultaneously
         const results = await Promise.allSettled([
             // WhatsApp Channel
             client.messages.create({
-                from: `whatsapp:${waFrom}`,
-                to: `whatsapp:${customer.phone}`,
-                body: message
+                from: waFrom,
+                to: `whatsapp:${formattedTo}`,
+                body: finalMessage
             }),
             // SMS Channel
             client.messages.create({
                 from: smsFrom,
-                to: customer.phone,
-                body: message
+                to: formattedTo,
+                body: finalMessage
             })
         ]);
 
         const waStatus = results[0].status === 'fulfilled' ? 'Success' : 'Failed';
         const smsStatus = results[1].status === 'fulfilled' ? 'Success' : 'Failed';
 
-        // Log the event
+        // Log specific errors to your server console for debugging
+        results.forEach((res, index) => {
+            if (res.status === 'rejected') {
+                console.error(`${index === 0 ? 'WhatsApp' : 'SMS'} Error Detail:`, res.reason.message);
+            }
+        });
+
+        // Log the event in transaction history
         await KhataTransaction.create({
             shopId: req.user.shopId,
             customerId: customer._id,
@@ -231,13 +245,20 @@ router.post('/:id/remind', protect, async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: `Reminder successfully processed for ${customer.name}`,
-            delivery: { whatsapp: waStatus, sms: smsStatus }
+            message: `Reminder processed for ${customer.name}`,
+            delivery: { 
+                whatsapp: waStatus, 
+                sms: smsStatus,
+                details: {
+                    waError: results[0].status === 'rejected' ? results[0].reason.message : null,
+                    smsError: results[1].status === 'rejected' ? results[1].reason.message : null
+                }
+            }
         });
 
     } catch (error) {
         console.error('Customer Reminder POST Error:', error);
-        res.status(500).json({ error: 'Failed to process reminder. Please check Twilio configuration.' });
+        res.status(500).json({ error: 'Internal server error while processing reminder.' });
     }
 });
 
