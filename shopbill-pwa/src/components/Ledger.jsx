@@ -46,8 +46,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
+  
+  // Track sent reminders to provide visual feedback and cooldown
+  const [sentReminders, setSentReminders] = useState({});
 
-  // New states for the Reminder feature
+  // States for the Reminder feature
   const [reminderMessage, setReminderMessage] = useState('');
   const [reminderType, setReminderType] = useState('whatsapp');
 
@@ -55,7 +58,9 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
     try {
       const response = await apiClient.get(API.customers);
       setCustomers(response.data || []);
-    } catch (error) { showToast('Error loading Ledger.', 'error'); }
+    } catch (error) { 
+      if(showToast) showToast('Error loading Ledger.', 'error'); 
+    }
     finally { setLoading(false); }
   }, [apiClient, API.customers, showToast]);
 
@@ -67,11 +72,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   }, [apiClient, API.customers]);
 
   const totalOutstanding = useMemo(() => customers.reduce((sum, c) => sum + (c.outstandingCredit || 0), 0), [customers]);
-  const hasDuesCount = customers.filter(c => c.outstandingCredit > 0).length;
 
   const handleRecordPayment = async () => {
     const amount = parseFloat(paymentAmount);
-    if (amount <= 0 || isNaN(amount)) return showToast('Enter valid amount', 'error');
+    if (amount <= 0 || isNaN(amount)) {
+      if(showToast) showToast('Enter valid amount', 'error');
+      return;
+    }
     setIsProcessing(true);
     try {
       await apiClient.put(`${API.customers}/${selectedCustomer._id}/credit`, {
@@ -79,16 +86,21 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         type: 'payment_received',
         paymentAmount: amount
       });
-      showToast('Payment recorded', 'success');
+      if(showToast) showToast('Payment recorded', 'success');
       await fetchCustomers();
       setActiveModal(null);
-    } catch (e) { showToast('Payment failed', 'error'); }
+    } catch (e) { 
+      if(showToast) showToast('Payment failed', 'error'); 
+    }
     finally { setIsProcessing(false); }
   };
 
   const handleAddCustomer = async (e) => {
     e.preventDefault();
-    if (!newCustomerData.name) return showToast('Name is required', 'error');
+    if (!newCustomerData.name) {
+       if(showToast) showToast('Name is required', 'error');
+       return;
+    }
     setIsProcessing(true);
     try {
       await apiClient.post(API.customers, {
@@ -97,46 +109,50 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         creditLimit: parseFloat(newCustomerData.creditLimit) || 0,
         initialDue: parseFloat(newCustomerData.initialDue) || 0
       });
-      showToast('Customer created', 'success');
+      if(showToast) showToast('Customer created', 'success');
       await fetchCustomers();
       setActiveModal(null);
-    } catch (e) { showToast('Error adding customer', 'error'); }
+    } catch (e) { 
+      if(showToast) showToast('Error adding customer', 'error'); 
+    }
     finally { setIsProcessing(false); }
   };
 
-  // Logic to handle sending the reminder via Backend
   const handleSendReminder = async () => {
-    if (!reminderMessage.trim()) return showToast('Message cannot be empty', 'error');
+    if (!reminderMessage.trim()) return;
     setIsProcessing(true);
     try {
-      await apiClient.post(`${API.customers}/${selectedCustomer._id}/remind`, {
+      const response = await apiClient.post(`${API.customers}/${selectedCustomer._id}/remind`, {
         message: reminderMessage,
-        type: reminderType // 'whatsapp' or 'sms'
+        type: reminderType 
       });
-      showToast(`Reminder sent via ${reminderType.toUpperCase()}`, 'success');
-      setActiveModal(null);
+
+      // Handle the success response and update cooldown state
+      if (response.data && response.data.success) {
+        setSentReminders(prev => ({
+          ...prev,
+          [selectedCustomer._id]: Date.now()
+        }));
+        
+        // Use toast if available, otherwise UI will handle it via sentReminders state
+        if(showToast) showToast(`Reminder sent via ${reminderType.toUpperCase()}`, 'success');
+        
+        // Close modal after a slight delay so user can see completion
+        setTimeout(() => setActiveModal(null), 600);
+      }
     } catch (e) { 
-      showToast('Failed to send reminder', 'error'); 
+      if(showToast) showToast('Failed to send reminder', 'error'); 
+      console.error(e);
     } finally { 
       setIsProcessing(false); 
     }
   };
 
-  // UPDATED: Function to initialize the reminder modal with default text correctly
   const openRemindModal = (customer) => {
-    // 1. Set the customer reference
     setSelectedCustomer(customer);
-    
-    // 2. Set default channel
     setReminderType('whatsapp'); 
-    
-    // 3. Construct the Dynamic Default Message
     const defaultMsg = `Hi ${customer.name}, this is a friendly reminder from our store regarding your outstanding balance of ₹${(customer.outstandingCredit || 0).toLocaleString('en-IN')}. Please settle it at your earliest convenience. Thank you!`;
-    
-    // 4. Set the message state before opening the modal
     setReminderMessage(defaultMsg);
-    
-    // 5. Finally, open the modal
     setActiveModal('remind');
   };
 
@@ -155,7 +171,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
     <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
-      {/* --- STICKY HEADER --- */}
       <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-6 py-4 md:py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
@@ -189,7 +204,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
           </div>
         </div>
 
-        {/* --- EXPANDABLE SEARCH/FILTER --- */}
         {(showSearch || showSort) && (
           <div className="max-w-7xl mx-auto mt-4 animate-in fade-in slide-in-from-top-3">
             {showSearch ? (
@@ -225,40 +239,29 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         )}
       </header>
 
-      {/* --- WORKSPACE --- */}
       <main className="px-4 py-4">
         <div className="max-w-7xl mx-auto space-y-4 pb-32">
-
-          {/* TOP METRICS SECTION */}
           <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
-
             <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-5">
                 <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
                   <AlertCircle size={20} />
                 </div>
-
                 <div>
-                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">
-                    Total Outstanding
-                  </p>
+                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">Total Outstanding</p>
                   <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
                     ₹{totalOutstanding.toLocaleString('en-IN')}
                   </h2>
                 </div>
               </div>
-
               <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                 <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Risk Status</p>
-                <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
-                  MONITORED
-                </span>
+                <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">MONITORED</span>
               </div>
             </div>
           </div>
 
-          {/* ACCOUNTS LIST SECTION */}
           <div className={`rounded-xl border overflow-hidden ${cardBase}`}>
             <div className="px-6 py-5 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
               <div className="flex items-center gap-4">
@@ -283,13 +286,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
                 isProcessing={isProcessing}
                 setActiveModal={setActiveModal}
                 darkMode={darkMode}
+                sentReminders={sentReminders}
               />
             </div>
           </div>
         </div>
       </main>
 
-      {/* MOBILE FAB */}
       <button
         onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
         className="md:hidden fixed bottom-24 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"

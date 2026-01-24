@@ -174,62 +174,53 @@ router.put('/:customerId/credit', protect, async (req, res) => {
 
 router.post('/:id/remind', protect, async (req, res) => {
     const customerId = req.params.id;
-    const { message } = req.body;
+    const { message, type } = req.body; // 'whatsapp' or 'sms' (optional selection)
 
     if (!message || message.trim().length === 0) {
         return res.status(400).json({ error: 'Reminder message cannot be empty.' });
     }
 
     try {
-        // 1. Database Lookups
-        const customer = await Customer.findOne({ 
-            _id: customerId, 
-            shopId: req.user.shopId 
-        });
-
-        // Your schema defines business details within the User model
+        // 1. Lookups
+        const customer = await Customer.findOne({ _id: customerId, shopId: req.user.shopId });
         const shop = await Shop.findById(req.user.shopId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
-        if (!shop) return res.status(404).json({ error: 'Shop/User profile not found.' });
         if (!customer.phone) return res.status(400).json({ error: 'Customer phone missing.' });
 
-        // 2. Phone Number Formatting (+91 Logic)
-        // Remove spaces, dashes, or parentheses
-        let cleanPhone = customer.phone.trim().replace(/[\s\-\(\)]/g, '');
+        // 2. PERSISTENT COOLDOWN CHECK (DB Level)
+        // Check if a reminder was sent in the last 5 minutes
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const recentReminder = await KhataTransaction.findOne({
+            customerId: customer._id,
+            type: 'reminder_sent',
+            createdAt: { $gte: fiveMinutesAgo }
+        });
 
-        let formattedTo;
-        if (cleanPhone.startsWith('+')) {
-            // Already has country code (e.g., +91...)
-            formattedTo = cleanPhone;
-        } else if (cleanPhone.length === 10) {
-            // Standard 10-digit Indian number, add +91
-            formattedTo = `+91${cleanPhone}`;
-        } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
-            // Has 91 but no plus sign
-            formattedTo = `+${cleanPhone}`;
-        } else {
-            // Generic fallback: just add a plus if it's missing
-            formattedTo = `+${cleanPhone}`;
+        if (recentReminder) {
+            return res.status(429).json({ 
+                error: 'Please wait before sending another reminder to this customer.' 
+            });
         }
 
-        // 3. Variable Prep
+        // 3. Phone Formatting
+        let cleanPhone = customer.phone.trim().replace(/[\s\-\(\)]/g, '');
+        let formattedTo = cleanPhone.startsWith('+') ? cleanPhone : 
+                         (cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`);
+
+        // 4. Execution
         const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
         const smsFrom = process.env.TWILIO_PHONE_NUMBER;
-        
-        // Using 'shopName' from your User schema
-        const finalMessage = `From ${shop.shopName || 'Shop'}: ${message}`;
+        const finalMessage = `From ${shop.shopName || 'Our Store'}: ${message}`;
 
-        // 4. Twilio Execution
-        // Using the ContentSid and variables from your screenshot
         const results = await Promise.allSettled([
             client.messages.create({
                 from: waFrom,
                 to: `whatsapp:${formattedTo}`,
                 contentSid: 'HXb5b62575e6e4ff6129ad7c8efe1f983e', 
                 contentVariables: JSON.stringify({
-                    1: new Date().toLocaleDateString('en-IN'), // Variable {{1}}
-                    2: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) // Variable {{2}}
+                    1: new Date().toLocaleDateString('en-IN'),
+                    2: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
                 })
             }),
             client.messages.create({
@@ -239,34 +230,28 @@ router.post('/:id/remind', protect, async (req, res) => {
             })
         ]);
 
-        const waStatus = results[0].status === 'fulfilled' ? 'Success' : 'Failed';
-        const smsStatus = results[1].status === 'fulfilled' ? 'Success' : 'Failed';
+        const waStatus = results[0].status === 'fulfilled' ? 'Sent' : 'Failed';
+        const smsStatus = results[1].status === 'fulfilled' ? 'Sent' : 'Failed';
 
-        // 5. Khata Logging
-        // REMINDER: Ensure 'reminder_sent' is added to the enum in KhataTransaction.js
+        // 5. SAVE TO DATABASE (The "Logging" step)
+        // We record this as a 0-amount transaction in the Ledger
         await KhataTransaction.create({
             shopId: req.user.shopId,
             customerId: customer._id,
-            amount: 0,
+            amount: 0, // Reminders don't change the balance
             type: 'reminder_sent', 
-            details: `Reminder: WhatsApp ${waStatus}, SMS ${smsStatus}`,
+            details: `Reminder Multi-Channel: WhatsApp (${waStatus}), SMS (${smsStatus})`,
+            timestamp: new Date()
         });
 
         res.json({ 
             success: true, 
-            delivery: { 
-                whatsapp: waStatus, 
-                sms: smsStatus,
-                recipient: formattedTo 
-            } 
+            delivery: { whatsapp: waStatus, sms: smsStatus } 
         });
 
     } catch (error) {
         console.error('REMIND ROUTE ERROR:', error);
-        res.status(500).json({ 
-            error: 'Internal server error while processing reminder.',
-            dev_error: error.message 
-        });
+        res.status(500).json({ error: 'System failed to send reminder.' });
     }
 });
 

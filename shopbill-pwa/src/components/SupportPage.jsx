@@ -17,10 +17,10 @@ const SupportPage = ({ onBack, origin }) => {
   const supportContacts = [
     {
       title: "Email Support",
-      detail: "pocketpos.official@gmail.com",
+      detail: "hello@pocketpos.io",
       sub: "Response within 24 hours",
       icon: <Mail className="w-6 h-6 text-indigo-400" />,
-      action: "mailto:pocketpos.official@gmail.com",
+      action: "mailto:hello@pocketpos.io",
       btnText: "Send Email"
     },
     {
