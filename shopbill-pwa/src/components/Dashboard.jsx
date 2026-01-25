@@ -3,12 +3,13 @@ import {
     IndianRupee, CreditCard, Users, Package,
     List, Loader2, TrendingUp, Clock, Activity,
     ShieldCheck, RefreshCw, PlusCircle, ShoppingCart,
-    ChevronRight, Inbox, Sparkles, Box, ArrowRight
+    ChevronRight, Inbox, Sparkles, Box, ArrowRight,
+    Store, MapPin, BarChart3, Settings2
 } from 'lucide-react';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
-const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout }) => {
+const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, activeStore = "Main Outlet" }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
 
     // --- States ---
@@ -26,22 +27,17 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 apiClient.get(API.sales),
             ]);
 
-            // Standard success path
             setInventory(invResponse.data || []);
             setCustomers(custResponse.data || []);
             setSales(salesResponse.data || []);
 
         } catch (error) {
-            // 1. Check if the error is a 403 and has the "halted" status
             const errorData = error.response?.data;
-
             if (error.response?.status === 403 && errorData?.status === 'halted') {
                 showToast(errorData.message || 'Subscription Issue. Logging out...', 'error');
-                onLogout(); // Trigger immediate logout
+                onLogout();
                 return;
             }
-
-            // 2. Fallback for other errors (network issues, 500s, etc.)
             showToast('Could not update data. Please check connection.', 'error');
         } finally {
             setIsLoading(false);
@@ -145,12 +141,19 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight">{welcome.title} <span className="text-indigo-500">Dashboard</span></h1>
-                        <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] ">{welcome.desc}</p>
+                        <h1 className="text-2xl font-black tracking-tight">
+                            {welcome.title} <span className="text-indigo-500">Dashboard</span>
+                        </h1>
+                        <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">
+                            {welcome.desc} • <span className="text-indigo-500 uppercase">{activeStore}</span>
+                        </p>
                     </div>
-                    <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border border-inherit">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-black tracking-widest opacity-60">SYSTEM LIVE</span>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border border-inherit">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[10px] font-black tracking-widest opacity-60">SYSTEM LIVE</span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -164,7 +167,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
-                                        Total Sales Today
+                                        Today's Sales
                                     </p>
                                     <h2 className="text-2xl font-black text-emerald-400">
                                         ₹{today.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -218,7 +221,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
                     {/* INSIGHTS GRID */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* INVENTORY */}
+                        {/* INVENTORY - LEFT AS IS */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
                                 <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
@@ -252,7 +255,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             </div>
                         </div>
 
-                        {/* RECOVERY/CREDIT */}
+                        {/* RECOVERY/CREDIT - LEFT AS IS */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
                                 <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
@@ -284,7 +287,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             </div>
                         </div>
 
-                        {/* ACTIVITY SECTION */}
+                        {/* ACTIVITY SECTION - LEFT AS IS */}
                         <div className={`rounded-3xl border flex flex-col overflow-hidden ${cardBase}`}>
                             <div className="px-6 py-5 border-b border-inherit flex justify-between items-center bg-slate-500/5">
                                 <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
@@ -331,7 +334,6 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                                             ? (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100')
                                                             : (darkMode ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-100')
                                                             }`}>
-                                                            {/* Logic: If not Credit/Mixed, it is Paid. If Credit, it is Due. */}
                                                             {sale.paymentMethod === 'Credit'
                                                                 ? `DUE: ₹${sale.totalAmount.toLocaleString()}`
                                                                 : `PAID: ₹${sale.totalAmount.toLocaleString()}`

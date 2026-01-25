@@ -150,7 +150,7 @@ function Profile({ apiClient, showToast, darkMode }) {
                 </div>
             </header>
 
-            <div className="max-w-5xl mx-auto px-4 py-10 space-y-8 pb-32">
+            <div className="mx-auto px-4 py-10 space-y-8 pb-32">
                 
                 {/* 1. Account Security & Identity */}
                 <section className={`rounded-3xl overflow-hidden border transition-colors ${sectionBg}`}>

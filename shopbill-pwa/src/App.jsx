@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
-  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-// Core Component Imports (Keep these eager as they are small or essential)
+// Core Component Imports
 import API from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
@@ -14,7 +14,7 @@ import SEO from './components/SEO';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
 
-// Lazy Load Heavy Components to improve initial paint time
+// Lazy Load Heavy Components
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const InventoryManager = lazy(() => import('./components/InventoryManager'));
 const BillingPOS = lazy(() => import('./components/BillingPOS'));
@@ -57,7 +57,7 @@ const UpdatePrompt = () => {
 
   return (
     <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-      <div className="w-full max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+      <div className="max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
@@ -108,7 +108,13 @@ const App = () => {
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
+
+  // Multi-Store States
+  const [activeStore, setActiveStore] = useState("Main Outlet");
+  const [isStorePanelOpen, setIsStorePanelOpen] = useState(false);
+  const stores = ["Main Outlet", "Branch - Kochi", "Branch - Aluva"]; // Mock data, replace with API sync later
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -125,6 +131,7 @@ const App = () => {
   }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
+  const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
 
   const unreadCount = useMemo(() =>
     (notifications || []).filter(n => n && (n.isRead === false || n.isRead === undefined)).length
@@ -197,23 +204,16 @@ const App = () => {
 
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
-
-    // Check if the current user/shop has a premium plan
-    // Adjust 'premium' to whatever string or boolean logic your backend uses (e.g., currentUser.isPremium)
-    const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
-
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
       { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      // SCM now only shows if the user is on a premium plan
       ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] }] : []),
       { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
     ];
-    
     return standardNav.filter(item => item.roles.includes(userRole));
-  }, [userRole, currentUser]);
+  }, [userRole, isPremium]);
 
   const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
@@ -226,7 +226,6 @@ const App = () => {
 
   const renderContent = () => {
     if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
-
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
     if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} />;
@@ -254,9 +253,22 @@ const App = () => {
 
     if (!currentUser) {
       return isViewingLogin ?
-        <Login onLogin={handleLoginSuccess} showToast={showToast} setCurrentPage={setCurrentPage} onBackToLanding={() => setIsViewingLogin(false)} /> :
+        <Login 
+          onLogin={handleLoginSuccess} 
+          showToast={showToast} 
+          setCurrentPage={setCurrentPage} 
+          onBackToLanding={() => {
+            setIsViewingLogin(false);
+            setScrollToPricing(true);
+          }}
+          onBackToLandingNormal={() => setIsViewingLogin(false)} 
+        /> :
         <LandingPage
-          onStartApp={() => setIsViewingLogin(true)}
+          onStartApp={() => {
+            setIsViewingLogin(true);
+            setScrollToPricing(false);
+          }}
+          scrollToPricing={scrollToPricing}
           onSelectPlan={(p) => {
             setSelectedPlan(p);
             setCurrentPage('checkout');
@@ -268,7 +280,7 @@ const App = () => {
         />
     }
 
-    const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin };
+    const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin, activeStore };
 
     return (
       <Suspense>
@@ -300,6 +312,17 @@ const App = () => {
 
   return (
     <ApiProvider>
+      <style>{`
+        .sidebar-scroll::-webkit-scrollbar { width: 5px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { 
+          background: ${darkMode ? '#1e1b4b' : '#e2e8f0'}; 
+          border-radius: 10px; 
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { 
+          background: #6366f1; 
+        }
+      `}</style>
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
@@ -317,6 +340,10 @@ const App = () => {
             utilityNavItems={utilityNavItems}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
+            activeStore={activeStore}
+            setActiveStore={setActiveStore}
+            stores={stores}
+            isPremium={isPremium}
           />
         )}
         <div className="flex flex-1 overflow-hidden relative">
@@ -328,6 +355,46 @@ const App = () => {
                 </div>
                 <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
               </div>
+
+              {/* PREMIUM STORE SWITCHER FOR DESKTOP */}
+              {isPremium && (
+                <div className="px-4 mb-4">
+                  <button 
+                    onClick={() => setIsStorePanelOpen(!isStorePanelOpen)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                      darkMode ? 'bg-indigo-600/5 border-indigo-500/20 text-indigo-400' : 'bg-indigo-50 border-indigo-100 text-indigo-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Store size={18} />
+                      <div className="text-left">
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Active Hub</p>
+                        <p className="text-sm font-bold truncate max-w-[100px]">{activeStore}</p>
+                      </div>
+                    </div>
+                    <ChevronDown size={16} className={`transition-transform duration-300 ${isStorePanelOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {isStorePanelOpen && (
+                    <div className="mt-2 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                      {stores.map(store => (
+                        <button
+                          key={store}
+                          onClick={() => { setActiveStore(store); setIsStorePanelOpen(false); }}
+                          className={`w-full flex items-center px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                            activeStore === store 
+                            ? 'bg-indigo-600 text-white shadow-lg' 
+                            : darkMode ? 'hover:bg-gray-900 text-gray-400' : 'hover:bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {store}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto pt-4 sidebar-scroll">
                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Main Menu</p>
                 {navItems.map(item => (
@@ -351,7 +418,23 @@ const App = () => {
                   ))}
                 </div>
               </nav>
-              <div className="p-4"><button onClick={logout} className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"><LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" /><span className="text-sm font-bold">Logout</span></button></div>
+              <div className="p-4 space-y-2 border-t border-inherit">
+                <button 
+                  onClick={() => setDarkMode(!darkMode)} 
+                  className={`w-full flex items-center px-4 py-3 rounded-xl transition-all border border-transparent ${navText}`}
+                >
+                  {darkMode ? <Sun className="w-5 h-5 mr-3 text-amber-400" /> : <Moon className="w-5 h-5 mr-3 text-indigo-600" />}
+                  <span className="text-sm font-bold">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+                
+                <button 
+                  onClick={logout} 
+                  className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"
+                >
+                  <LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" />
+                  <span className="text-sm font-bold">Logout</span>
+                </button>
+              </div>
             </aside>
           )}
           <main className={`flex-1 overflow-y-auto transition-all duration-300 ${containerBg} ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>

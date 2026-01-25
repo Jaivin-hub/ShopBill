@@ -110,7 +110,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
             </form>
 
             <div className="pt-4 border-t border-gray-800/50 text-center">
-                <p className="text-[9px] font-bold text-gray-500  tracking-widest mb-2">New Merchant?</p>
+                <p className="text-[9px] font-bold text-gray-500  tracking-widest mb-2">New User?</p>
                 <button
                     onClick={onBackToLanding}
                     className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px]  tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
@@ -128,7 +128,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
         <section aria-labelledby="reset-heading" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="text-center">
                 <h2 id="reset-heading" className="text-lg font-black text-white  tracking-tighter">
-                    Reset <span className="text-teal-500">Access</span>
+                    Reset Access
                 </h2>
             </div>
 
@@ -178,7 +178,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
     );
 };
 
-const Login = ({ onLogin, onBackToLanding, setCurrentPage }) => {
+const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage }) => {
     const [view, setView] = useState('login');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -285,11 +285,11 @@ const Login = ({ onLogin, onBackToLanding, setCurrentPage }) => {
 
                     <footer className="pb-6 px-6 text-center">
                         <button
-                            onClick={onBackToLanding}
+                            onClick={onBackToLandingNormal}
                             className="inline-flex items-center gap-2 text-[9px] font-black text-gray-600  tracking-widest hover:text-indigo-400 transition-colors"
                             disabled={loading}
                         >
-                            <ArrowLeft className="w-2.5 h-2.5" /> Exit Terminal
+                            <ArrowLeft className="w-2.5 h-2.5" /> Back to Landing
                         </button>
                     </footer>
                 </section>

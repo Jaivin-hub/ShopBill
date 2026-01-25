@@ -221,7 +221,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                 <div className="flex flex-col lg:grid lg:grid-cols-12">
                     
                     {/* Compact Summary Side (Top on Mobile) */}
-                    <div className="lg:col-span-4 bg-gray-900 lg:bg-gray-950/50 p-4 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-gray-800">
+                    <div className="lg:col-span-4 bg-gray-950 sm:bg-gray-900/50 p-4 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-gray-800">
                         <div className={`p-5 lg:p-8 rounded-2xl lg:rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-xl`}>
                             <div className="absolute -top-2 -right-2 p-4 opacity-10 lg:opacity-20 hidden sm:block">
                                 <ShoppingCart size={60} className="lg:w-20 lg:h-20" />

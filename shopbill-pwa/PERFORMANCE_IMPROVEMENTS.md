@@ -98,7 +98,7 @@ const CACHE_DURATION = 30000; // 30 seconds (adjust as needed)
 ### API Base URL
 Create `.env` file:
 ```
-VITE_API_BASE_URL=https://shopbill-3le1.onrender.com/api
+VITE_API_BASE_URL=https://server.pocketpos.io/api
 ```
 
 ### Force Refresh

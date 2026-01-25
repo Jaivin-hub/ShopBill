@@ -10,7 +10,7 @@ const activeRequests = new Map();
 // Create axios instance with default config
 // Note: If API endpoints use full URLs, axios will use them as-is and ignore baseURL
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://shopbill-3le1.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api',
   timeout: 30000, // 30 second timeout (increased for slower connections)
   headers: {
     'Content-Type': 'application/json',

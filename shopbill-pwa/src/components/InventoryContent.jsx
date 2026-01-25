@@ -315,19 +315,19 @@ const InventoryContent = ({
                 <section className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[200] p-4 overflow-y-auto">
                     <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-xl rounded-2xl border overflow-hidden shadow-2xl`}>
                         <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
-                            <h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>{isEditing ? 'Modify' : 'Initialize'} Asset</h2>
+                            <h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>{isEditing ? 'Modify' : 'Add'} Product</h2>
                             <button type="button" onClick={closeFormModal} className="p-2 hover:bg-red-500/10 rounded-xl text-gray-500"><X className="w-5 h-5" /></button>
                         </div>
                         <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-6 ${darkMode ? 'bg-slate-950/20' : 'bg-slate-50/50'}`}>
-                            <div className="md:col-span-2"><InputField label="Asset Description" name="name" type="text" value={formData.name} onChange={handleInputChange} darkMode={darkMode} required /></div>
-                            <InputField label="Unit Valuation (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} darkMode={darkMode} required />
-                            <InputField label="Initial Stock" name="quantity" type="number" value={formData.quantity} onChange={handleInputChange} darkMode={darkMode} required />
+                            <div className="md:col-span-2"><InputField label="Product Name" name="name" type="text" value={formData.name} onChange={handleInputChange} darkMode={darkMode} required /></div>
+                            <InputField label="Price (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} darkMode={darkMode} required />
+                            <InputField label="Stock" name="quantity" type="number" value={formData.quantity} onChange={handleInputChange} darkMode={darkMode} required />
                             <InputField label="Reorder Alert" name="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleInputChange} darkMode={darkMode} />
                             <InputField label="HSN / Barcode Index" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} darkMode={darkMode} />
                         </div>
                         <div className={`p-6 border-t ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-white border-slate-100'}`}>
                             <button type="submit" disabled={loading || !formData.name} className={`w-full py-4 text-white text-[10px] font-black  tracking-[0.2em] rounded-xl transition-all shadow-lg ${isEditing ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
-                                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isEditing ? 'Confirm Modifications' : 'Commit to Database')}
+                                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isEditing ? 'Confirm Modifications' : 'Save to Inventory')}
                             </button>
                         </div>
                     </form>

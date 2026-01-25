@@ -107,7 +107,7 @@ const { data, loading, error, refetch } = useApi(
 ### Environment Variables
 Create `.env` file:
 ```
-VITE_API_BASE_URL=https://shopbill-3le1.onrender.com/api
+VITE_API_BASE_URL=https://server.pocketpos.io/api
 ```
 
 ### Cache Duration

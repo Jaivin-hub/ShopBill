@@ -3,7 +3,9 @@ import {
     User, Lock, Globe, Check, Bell, RefreshCw, Users, LogOut, 
     UploadCloud, CheckCircle, Link, Mail, Crown, LifeBuoy, 
     Gift, ShieldCheck, Activity, Settings as SettingsIcon,
-    ChevronRight, CreditCard, ExternalLink, ShieldAlert
+    ChevronRight, CreditCard, ExternalLink, ShieldAlert,
+    Building2, Store, MapPin, Plus, Edit3, ArrowUpRight,
+    ArrowLeft
 } from 'lucide-react'; 
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
@@ -11,6 +13,7 @@ import StaffPermissionsManager from './StaffPermissionsManager';
 import ChangePasswordForm from './ChangePasswordForm';
 import PlanUpgrade from './PlanUpgrade';
 import API from '../config/api';
+import StoreControl from './StoreControl';
 
 // --- MODAL: Cloud Upload Confirmation ---
 const CloudUploadConfirmationModal = ({ 
@@ -128,6 +131,12 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
+    // Premium Store Data
+    const [stores] = useState([
+        { id: 1, name: "Main Outlet", location: "Downtown", isActive: true },
+        { id: 2, name: "North Branch", location: "Suburbs", isActive: true },
+    ]);
+
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
     const handleStaffPermissionsClick = () => {
         setPageOrigin('settings');
@@ -200,6 +209,15 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                 <div className="p-2">
                     {currentUser?.role?.toLowerCase() === 'owner' && (
                         <>
+                            {/* NEW: Store Control Item */}
+                            <SettingItem 
+                                icon={Building2} 
+                                title="Store Control" 
+                                description="Manage multi-store nodes and branches." 
+                                onClick={() => setCurrentView('storeControl')} 
+                                accentColor="text-indigo-500"
+                                darkMode={darkMode}
+                            />
                             <SettingItem 
                                 icon={CreditCard} 
                                 title="Subscription & Billing" 
@@ -254,14 +272,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             accentColor="text-sky-600" 
                             darkMode={darkMode}
                         />
-                        {/* <SettingItem 
-                            icon={UploadCloud} 
-                            title="Database Mirroring" 
-                            description="Encrypt and sync to cloud storage." 
-                            onClick={() => setCloudSelectionModal(true)}
-                            accentColor="text-indigo-600" 
-                            darkMode={darkMode}
-                        /> */}
                     </div>
                 </section>
 
@@ -297,6 +307,8 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
 
     const renderContent = () => {
         switch (currentView) {
+            case 'storeControl':
+                return <StoreControl darkMode={darkMode} stores={stores} showToast={showToast} />;
             case 'main':
             default:
                 return renderSettingsList();
@@ -307,17 +319,24 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
 
     return (
         <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
-            {/* STICKY HEADER PARTNER */}
-            {currentView === 'main' && (
+            {/* STICKY HEADER */}
             <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
+                        {currentView !== 'main' && (
+                            <button 
+                                onClick={() => setCurrentView('main')}
+                                className={`p-2 rounded-xl transition-all ${darkMode ? 'hover:bg-gray-900 text-gray-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                        )}
                         <div>
-                            <h1 className={`text-2xl font-black tracking-tight  leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
-                                Control <span className="text-indigo-600">Center</span>
+                            <h1 className={`text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
+                                {currentView === 'storeControl' ? 'Store' : 'Control'} <span className="text-indigo-600">{currentView === 'storeControl' ? 'Management' : 'Center'}</span>
                             </h1>
                             <p className={`text-[9px] font-bold  tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
-                                System Governance Active
+                                {currentView === 'storeControl' ? 'ACTIVE NODES: ' + stores.length : 'System Governance Active'}
                             </p>
                         </div>
                     </div>
@@ -330,7 +349,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     )}
                 </div>
             </header>
-            )}
 
             <div className="max-w-7xl mx-auto p-4 md:p-10 pb-32">
                 {renderContent()}

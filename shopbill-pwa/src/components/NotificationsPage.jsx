@@ -130,7 +130,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                                     : 'bg-white border-slate-200 text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 shadow-sm'
                                 }`}
                             >
-                                <Trash2 className="w-3.5 h-3.5" /> Purge Feed
+                                <Trash2 className="w-3.5 h-3.5" /> Clear All
                             </button>
                         )}
                     </div>
@@ -138,7 +138,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
             </header>
 
             {/* --- FEED SECTION --- */}
-            <div className="max-w-5xl mx-auto px-6 py-8 space-y-4 pb-32">
+            <div className="mx-auto px-6 py-8 space-y-4 pb-32">
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
                         const details = getNotificationTypeDetails(notification.type);

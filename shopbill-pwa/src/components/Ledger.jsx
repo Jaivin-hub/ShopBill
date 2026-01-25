@@ -47,6 +47,9 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
   
+  // State for specific error feedback in Add Customer Modal
+  const [addCustomerError, setAddCustomerError] = useState(null);
+  
   // Track sent reminders to provide visual feedback and cooldown
   const [sentReminders, setSentReminders] = useState({});
 
@@ -96,11 +99,14 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   };
 
   const handleAddCustomer = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    setAddCustomerError(null);
+    
     if (!newCustomerData.name) {
        if(showToast) showToast('Name is required', 'error');
        return;
     }
+
     setIsProcessing(true);
     try {
       await apiClient.post(API.customers, {
@@ -109,11 +115,20 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         creditLimit: parseFloat(newCustomerData.creditLimit) || 0,
         initialDue: parseFloat(newCustomerData.initialDue) || 0
       });
+      
       if(showToast) showToast('Customer created', 'success');
       await fetchCustomers();
       setActiveModal(null);
-    } catch (e) { 
-      if(showToast) showToast('Error adding customer', 'error'); 
+      setNewCustomerData(initialNewCustomerState);
+    } catch (err) { 
+      // Handling the 400 response and extracting the message
+      const errorData = err.response?.data;
+      const errorMsg = errorData?.error || 'Error adding customer';
+      
+      setAddCustomerError(errorMsg); // This will show in the modal
+      
+      if(showToast) showToast(errorMsg, 'error'); 
+      console.error("Add Customer Failed:", errorData);
     }
     finally { setIsProcessing(false); }
   };
@@ -127,17 +142,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         type: reminderType 
       });
 
-      // Handle the success response and update cooldown state
       if (response.data && response.data.success) {
         setSentReminders(prev => ({
           ...prev,
           [selectedCustomer._id]: Date.now()
         }));
         
-        // Use toast if available, otherwise UI will handle it via sentReminders state
         if(showToast) showToast(`Reminder sent via ${reminderType.toUpperCase()}`, 'success');
-        
-        // Close modal after a slight delay so user can see completion
         setTimeout(() => setActiveModal(null), 600);
       }
     } catch (e) { 
@@ -158,20 +169,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
 
   const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-  const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
-
-  if (loading) return (
-    <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-      <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-4" />
-      <span className="text-[10px] font-black text-slate-500 tracking-[0.3em]">Syncing Ledger...</span>
-    </div>
-  );
+  const headerBg = darkMode ? 'bg-slate-950/95' : 'bg-white/95';
 
   return (
     <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
       <style>{scrollbarStyles}</style>
 
-      <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-6 py-4 md:py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+      <header className={`sticky top-0 z-[100] w-full isolate backdrop-blur-xl border-b px-6 py-4 md:py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl md:text-2xl font-black tracking-tight flex items-center gap-2">
@@ -191,12 +195,12 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
             </button>
             <button
               onClick={() => { setShowSort(!showSort); setShowSearch(false); }}
-              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
+              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 shadow-sm')}`}
             >
               <Filter size={18} />
             </button>
             <button
-              onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
+              onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
               className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95"
             >
               <UserPlus size={14} className="text-indigo-400" /> New Account
@@ -240,6 +244,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       </header>
 
       <main className="px-4 py-4">
+        {/* Total Outstanding Card */}
         <div className="max-w-7xl mx-auto space-y-4 pb-32">
           <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
@@ -262,6 +267,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
             </div>
           </div>
 
+          {/* Customer Registry Table Container */}
           <div className={`rounded-xl border overflow-hidden ${cardBase}`}>
             <div className="px-6 py-5 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
               <div className="flex items-center gap-4">
@@ -293,13 +299,15 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
         </div>
       </main>
 
+      {/* FAB for Mobile Account Creation */}
       <button
-        onClick={() => { setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
+        onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
         className="md:hidden fixed bottom-24 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
       >
         <UserPlus size={24} />
       </button>
 
+      {/* Modals Rendering */}
       {activeModal === 'payment' && (
         <PaymentModal
           customer={selectedCustomer}
@@ -314,12 +322,16 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       {activeModal === 'add' && (
         <AddCustomerModal
           data={newCustomerData}
-          onChange={(e) => setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value })}
-          onClose={() => setActiveModal(null)}
+          onChange={(e) => {
+            setAddCustomerError(null);
+            setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value });
+          }}
+          onClose={() => { setActiveModal(null); setAddCustomerError(null); }}
           onConfirm={handleAddCustomer}
           isProcessing={isProcessing}
           isValid={!!newCustomerData.name}
           darkMode={darkMode}
+          errorMessage={addCustomerError}
         />
       )}
       {activeModal === 'history' && (

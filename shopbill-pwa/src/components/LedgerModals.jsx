@@ -4,7 +4,7 @@ import {
   History, Info, AlertTriangle, ArrowUp, ArrowDown, 
   DollarSign, Repeat, XCircle, Phone, ShieldAlert, Calendar,
   MessageSquare, Send, Sparkles, RefreshCcw, MessageCircle,
-  BellRing
+  BellRing, AlertCircle
 } from 'lucide-react';
 
 // --- UPDATED: Added reminder_sent to styles ---
@@ -47,7 +47,7 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
   <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-    <section className={`w-full max-sm rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+    <section className={`max-sm rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
       <header className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
         <h2 className={`text-sm font-black  tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           <CreditCard className="w-4 h-4 text-teal-500" /> Collect Payment
@@ -69,7 +69,7 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
         <div className="relative">
             <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black ${darkMode ? 'text-teal-500/50' : 'text-teal-300'}`}>₹</span>
             <input
-              type="number" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
+              type="number"  placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
               className={`w-full py-5 pl-10 pr-4 border rounded-2xl text-3xl font-black text-center outline-none focus:ring-4 transition-all ${darkMode ? 'bg-gray-950 border-teal-500/30 text-teal-400 focus:ring-teal-500/10' : 'bg-white border-teal-200 text-teal-600 focus:ring-teal-600/5'}`}
             />
         </div>
@@ -86,27 +86,50 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
   </div>
 );
 
-export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = {}, isProcessing, isValid, darkMode }) => {
+export const AddCustomerModal = ({ 
+  data, 
+  onChange, 
+  onClose, 
+  onConfirm, 
+  errorMessage, // Received from Ledger.js
+  isProcessing, 
+  isValid, 
+  darkMode 
+}) => {
   if (!data) return null;
 
   return (
     <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-      <form onSubmit={onConfirm} className={`w-full max-md rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 my-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+      <form onSubmit={onConfirm} className={`w-full max-w-md rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 my-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
         <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
-          <h2 className={`text-sm font-black  tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-sm font-black tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
             <UserPlus className="w-4 h-4 text-indigo-500" /> New Account
           </h2>
-          <button type="button" onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}><X className="w-5 h-5" /></button>
+          <button type="button" onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="p-6 space-y-4">
+          {/* --- API ERROR FEEDBACK --- */}
+          {errorMessage && (
+            <div className={`p-4 rounded-xl border flex items-start gap-3 animate-in shake duration-300 ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-100'}`}>
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none">Registration Error</p>
+                <p className={`text-xs font-bold leading-tight ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
+          )}
+
           <InputField 
             label="Customer Full Name" 
             name="name" 
             type="text" 
             value={data.name} 
             onChange={onChange} 
-            error={errors.name} 
             placeholder="John Doe"
             darkMode={darkMode}
             required 
@@ -118,7 +141,6 @@ export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = 
             icon={Phone}
             value={data.phone} 
             onChange={onChange} 
-            error={errors.phone} 
             placeholder="10-digit mobile"
             maxLength="10"
             darkMode={darkMode}
@@ -131,7 +153,6 @@ export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = 
               type="number" 
               value={data.initialDue} 
               onChange={onChange} 
-              error={errors.initialDue} 
               placeholder="0"
               darkMode={darkMode}
             />
@@ -142,7 +163,6 @@ export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = 
               icon={ShieldAlert}
               value={data.creditLimit} 
               onChange={onChange} 
-              error={errors.creditLimit} 
               placeholder="5000"
               darkMode={darkMode}
               required
@@ -153,21 +173,20 @@ export const AddCustomerModal = ({ data, onChange, onClose, onConfirm, errors = 
         <div className={`p-6 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
           <button 
             type="submit" 
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black  tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20" 
+            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20" 
             disabled={isProcessing || !isValid}
           >
             {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
             Create Account
           </button>
           {!isValid && !isProcessing && (
-            <p className={`text-center text-[10px] font-bold mt-4  tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
+            <p className={`text-center text-[10px] font-bold mt-4 tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
           )}
         </div>
       </form>
     </div>
   );
 };
-
 // --- UPDATED: HistoryModal with Reminder Logs ---
 export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode }) => {
     const [history, setHistory] = React.useState([]);
@@ -312,6 +331,20 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
         </div>
     );
 };
+
+const EmptyState = ({ message, darkMode }) => (
+  <div className="h-full flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div className={`p-4 rounded-3xl mb-4 ${darkMode ? 'bg-gray-800/50' : 'bg-slate-50'}`}>
+      <Info className={`w-8 h-8 ${darkMode ? 'text-gray-600' : 'text-slate-300'}`} />
+    </div>
+    <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+      {message}
+    </p>
+    <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-gray-700' : 'text-slate-300'}`}>
+      No activity recorded for this period
+    </p>
+  </div>
+);
 
 // --- UPDATED REMIND MODAL ---
 export const RemindModal = ({ customer, message, setMessage, onClose, onConfirm, isProcessing, darkMode }) => {

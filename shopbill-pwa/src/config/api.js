@@ -1,7 +1,7 @@
 // api.js - API Endpoints Configuration
 
 // Use environment variable if available, otherwise fallback to production
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://shopbill-3le1.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
 
 const API = {
     // New Authentication Endpoints

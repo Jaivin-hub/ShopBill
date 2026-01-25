@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
     CreditCard, Receipt, Package, Users, LineChart, 
     UserCog, Cloud, Truck, ChevronRight, CheckCircle2 
@@ -38,20 +38,22 @@ const content = {
     basicPlan: "Small Shop",
     proPlan: "Growing Business",
     premiumPlan: "Big Enterprise",
-    basicDesc: "Best for single outlets and small teams.",
-    proDesc: "Ideal for multiple outlets and high-growth businesses.",
-    premiumDesc: "Perfect for large businesses with advanced needs.",
-    recommended: "Recommended",
-    selectBasic: "Select Basic",
-    choosePro: "Choose Pro",
-    choosePremium: "Choose Premium",
-    unlimitedTxn: "Unlimited Bills",
-    user2: "2 Users (Owner + Staff)",
-    userUnlimited: "3 Users (Owner + Cashier + Manager)",
+    basicDesc: "Essential tools for single outlets.",
+    proDesc: "Advanced automation for serious growth.",
+    premiumDesc: "The complete solution for multi-store chains.",
+    recommended: "MOST POPULAR",
+    selectBasic: "Start Basic",
+    choosePro: "Upgrade to Pro",
+    choosePremium: "Contact for Enterprise",
+    unlimitedTxn: "Unlimited Billing",
+    user3: "3 Staff Users",
+    userUnlimited: "Unlimited Staff & Managers",
     fullInv: "Standard Inventory",
-    fullInvBulk: "Advanced Stock & Orders",
+    fullInvBulk: "Smart Stock & Auto-PO",
     khataFull: "Full Digital Khata",
-    khataSMS: "Khata + Auto SMS Reminders",
+    khataSMS: "Auto SMS Payment Reminders",
+    multiStore: "Up to 10 Store Locations",
+    prioritySupport: "24/7 Priority Support",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     support: "Help & Support",
@@ -87,8 +89,17 @@ const renderTitle = (fullTitle, gradientWord) => {
     });
 };
 
-const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onViewSupport, onViewAffiliate }) => {
+const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onViewSupport, onViewAffiliate, scrollToPricing }) => {
     const gradientWord = 'Pocket';
+
+    useEffect(() => {
+        if (scrollToPricing) {
+            const pricingSection = document.getElementById('pricing');
+            if (pricingSection) {
+                pricingSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    }, [scrollToPricing]);
 
     return (
         <div className="min-h-screen bg-gray-950 text-gray-300 font-sans selection:bg-indigo-500/30">
@@ -126,7 +137,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
 
             <main>
                 {/* Hero */}
-                <section className="relative py-16 md:py-28 overflow-hidden">
+                <section className="relative py-10 md:py-28 overflow-hidden">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent -z-10" />
                     <div className="max-w-7xl mx-auto px-4 text-center">
                         <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full mb-6">
@@ -172,7 +183,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                     </div>
                 </section>
 
-                {/* Pricing - Redirect Functionality Restored */}
+                {/* Pricing - Using Suggested Strategy */}
                 <section id="pricing" className="py-24">
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="text-center mb-16">
@@ -182,26 +193,26 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <PriceCard 
                                 plan={content.basicPlan} 
-                                price="499" 
+                                price="999" 
                                 desc={content.basicDesc} 
-                                items={[content.unlimitedTxn, content.user2, content.fullInv, content.khataFull]} 
+                                items={[content.unlimitedTxn, content.user3, content.fullInv, content.khataFull]} 
                                 btn={content.selectBasic} 
                                 onSelect={() => onSelectPlan('BASIC')} 
                             />
                             <PriceCard 
                                 plan={content.proPlan} 
-                                price="799" 
+                                price="2199" 
+                                featured={true}
                                 desc={content.proDesc} 
-                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS]} 
+                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management"]} 
                                 btn={content.choosePro} 
                                 onSelect={() => onSelectPlan('PRO')} 
                             />
                             <PriceCard 
                                 plan={content.premiumPlan} 
-                                price="999" 
-                                featured={true} 
+                                price="4999" 
                                 desc={content.premiumDesc} 
-                                items={["All Pro Features", "Unlimited Staff", "Advanced Stock & Orders", "Supply Chain Tools", "Khata + Auto SMS Reminders"]} 
+                                items={["All Pro Features", content.multiStore, "Inventory Syncing", "Employee Audit Logs", content.prioritySupport]} 
                                 btn={content.choosePremium} 
                                 onSelect={() => onSelectPlan('PREMIUM')} 
                             />
@@ -227,11 +238,17 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
 
 const FeatureItem = ({ icon, title, desc, color }) => (
     <div className="feature-card bg-gray-900/50 p-8 rounded-[2rem]">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-${color}-500/10 text-${color}-500`}>
-            {React.cloneElement(icon, { size: 28 })}
+        <div className="flex items-center gap-4 mb-4">
+            <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center bg-${color}-500/10 text-${color}-500`}>
+                {React.cloneElement(icon, { size: 24 })}
+            </div>
+            <h3 className="text-xl font-black text-white tracking-tighter leading-tight">
+                {title}
+            </h3>
         </div>
-        <h3 className="text-xl font-black text-white  tracking-tighter mb-3">{title}</h3>
-        <p className="text-gray-500 font-bold text-sm leading-relaxed">{desc}</p>
+        <p className="text-gray-500 font-bold text-sm leading-relaxed">
+            {desc}
+        </p>
     </div>
 );
 
