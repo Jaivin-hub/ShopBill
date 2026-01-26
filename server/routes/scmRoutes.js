@@ -20,18 +20,18 @@ const handlePurchaseNotifications = async (req, item, quantityPurchased) => {
     if (!item) return;
     const currentQty = Number(item.quantity);
     const reorderLevel = Number(item.reorderLevel) || 5;
-    const shopIdString = item.shopId.toString();
+    const storeIdString = item.storeId.toString();
 
     // 1. Resolve any existing 'Low Stock' alert if quantity is now above threshold
     if (currentQty > reorderLevel) {
         try {
-            await resolveLowStockAlert(req, shopIdString, item._id);
+            await resolveLowStockAlert(req, storeIdString, item._id);
         } catch (err) { console.error("❌ Resolution Error:", err); }
     }
 
     // 2. Send a Success notification for the replenishment
     try {
-        await emitAlert(req, shopIdString, 'success', {
+        await emitAlert(req, storeIdString, 'success', {
             message: `Purchased ${quantityPurchased} units of ${item.name}. (New Stock: ${currentQty})`,
             _id: item._id
         });
@@ -41,7 +41,10 @@ const handlePurchaseNotifications = async (req, item, quantityPurchased) => {
 // --- SUPPLIER ROUTES ---
 router.get('/suppliers', protect, async (req, res) => {
     try {
-        const suppliers = await Supplier.find({ shopId: req.user.shopId }).sort({ createdAt: -1 });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const suppliers = await Supplier.find({ storeId: req.user.storeId }).sort({ createdAt: -1 });
         res.json(suppliers);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch suppliers.' });
@@ -50,9 +53,12 @@ router.get('/suppliers', protect, async (req, res) => {
 
 router.post('/suppliers', protect, async (req, res) => {
     try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
         const supplier = await Supplier.create({
             ...req.body,
-            shopId: req.user.shopId
+            storeId: req.user.storeId
         });
         res.status(201).json(supplier);
     } catch (error) {
@@ -63,7 +69,10 @@ router.post('/suppliers', protect, async (req, res) => {
 // --- PURCHASE / PROCUREMENT ROUTES ---
 router.get('/purchases', protect, async (req, res) => {
     try {
-        const history = await Purchase.find({ shopId: req.user.shopId })
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const history = await Purchase.find({ storeId: req.user.storeId })
             .populate('productId', 'name')
             .populate('supplierId', 'name')
             .sort({ date: -1, createdAt: -1 });
@@ -82,13 +91,16 @@ router.post('/purchases', protect, async (req, res) => {
     session.startTransaction();
 
     try {
+        if (!req.user.storeId) {
+            throw new Error('No active outlet selected. Please select an outlet first.');
+        }
         const { productId, supplierId, quantity, purchasePrice, invoiceNumber, date } = req.body;
-        const shopId = req.user.shopId;
+        const storeId = req.user.storeId;
         const numQty = Number(quantity);
 
         // 1. Create Purchase Record
         const purchase = await Purchase.create([{
-            shopId,
+            storeId,
             productId,
             supplierId,
             quantity: numQty,
@@ -99,7 +111,7 @@ router.post('/purchases', protect, async (req, res) => {
 
         // 2. Increment Inventory Stock
         const updatedItem = await Inventory.findOneAndUpdate(
-            { _id: productId, shopId },
+            { _id: productId, storeId },
             { $inc: { quantity: numQty } },
             { new: true, session }
         );

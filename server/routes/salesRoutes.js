@@ -4,38 +4,22 @@ const Sale = require('../models/Sale');
 const Inventory = require('../models/Inventory'); 
 const Customer = require('../models/Customer');
 const mongoose = require('mongoose');
-// IMPORT the notification utility
-const { emitAlert } = require('./notificationRoutes'); 
+// IMPORT the notification utilities
+const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
-const resolveLowStockAlert = async (req, shopId, itemId) => {
-    const io = req.app.get('socketio');
-    const shopIdStr = shopId.toString();
-
-    try {
-        // 1. Remove the "inventory_low" alerts for this specific item from DB
-        await Notification.deleteMany({
-            shopId: shopIdStr,
-            type: 'inventory_low',
-            'metadata.itemId': itemId
-        });
-
-        // 2. Tell the frontend to remove this item from the notification list
-        if (io) {
-            io.to(shopIdStr).emit('resolve_notification', { itemId });
-            console.log(`🧹 Resolved alerts for item: ${itemId}`);
-        }
-    } catch (error) {
-        console.error("❌ Failed to resolve alerts:", error.message);
-    }
-};
+// Import resolveLowStockAlert from notificationRoutes
+const { resolveLowStockAlert } = require('./notificationRoutes');
 
 // GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
     const { startDate, endDate } = req.query;
-    const filter = { shopId: req.user.shopId };
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+    }
+    const filter = { storeId: req.user.storeId };
     
     if (startDate || endDate) {
         filter.timestamp = {};
@@ -60,7 +44,7 @@ router.get('/:id', protect, async (req, res) => {
     if (!isValidObjectId(saleId)) return res.status(400).json({ error: 'Invalid Sale ID.' });
 
     try {
-        const sale = await Sale.findOne({ _id: saleId, shopId: req.user.shopId })
+        const sale = await Sale.findOne({ _id: saleId, storeId: req.user.storeId })
             .populate('items.itemId')
             .populate('customerId', 'name');
 
@@ -77,13 +61,16 @@ router.post('/', protect, async (req, res) => {
     const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed } = req.body; 
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
-    const shopId = req.user.shopId;
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+    }
+    const storeId = req.user.storeId;
 
     try {
         // --- 1. Stock Check & Validation ---
         if (items && items.length > 0) {
              for (const item of items) {
-                const inventoryItem = await Inventory.findOne({ _id: item.itemId, shopId }); 
+                const inventoryItem = await Inventory.findOne({ _id: item.itemId, storeId }); 
                 if (!inventoryItem) throw new Error(`Inventory item not found.`);
                 
                 // Only block if not forced
@@ -96,7 +83,7 @@ router.post('/', protect, async (req, res) => {
         // --- 2. Customer Credit Limit Check ---
         let targetCustomer = null;
         if (saleCustomerId) {
-            targetCustomer = await Customer.findOne({ _id: saleCustomerId, shopId });
+            targetCustomer = await Customer.findOne({ _id: saleCustomerId, storeId });
             if (saleAmountCredited > 0 && targetCustomer) {
                 const khataDue = targetCustomer.outstandingCredit || 0;
                 const creditLimit = targetCustomer.creditLimit || Infinity;
@@ -117,7 +104,7 @@ router.post('/', protect, async (req, res) => {
             items: items || [], 
             amountPaid,
             amountCredited: saleAmountCredited,
-            shopId,
+            storeId,
         });
 
         // --- 4. Update Inventory ---
@@ -125,7 +112,7 @@ router.post('/', protect, async (req, res) => {
         if (items && items.length > 0) {
              const inventoryUpdates = items.map(item =>
                 Inventory.findOneAndUpdate(
-                    { _id: item.itemId, shopId }, 
+                    { _id: item.itemId, storeId }, 
                     { $inc: { quantity: -item.quantity } }, 
                     { new: true } 
                 )
@@ -136,13 +123,13 @@ router.post('/', protect, async (req, res) => {
         // --- 5. Update Customer Credit & Notify ---
         if (saleAmountCredited > 0 && saleCustomerId) { 
             const updatedCustomer = await Customer.findOneAndUpdate(
-                { _id: saleCustomerId, shopId },
+                { _id: saleCustomerId, storeId },
                 { $inc: { outstandingCredit: saleAmountCredited } },
                 { new: true }
             );
 
             if (updatedCustomer.outstandingCredit >= updatedCustomer.creditLimit) {
-                await emitAlert(req, shopId, 'credit_exceeded', {
+                await emitAlert(req, storeId.toString(), 'credit_exceeded', {
                     _id: updatedCustomer._id,
                     name: updatedCustomer.name,
                     creditLimit: updatedCustomer.creditLimit
@@ -156,13 +143,13 @@ router.post('/', protect, async (req, res) => {
             const reorderLevel = Number(item.reorderLevel) || 5;
 
             if (currentQty <= reorderLevel) {
-                await emitAlert(req, shopId, 'inventory_low', {
+                await emitAlert(req, storeId.toString(), 'inventory_low', {
                     _id: item._id,
                     name: item.name,
                     quantity: currentQty
                 });
             } else {
-                await resolveLowStockAlert(req, shopId, item._id);
+                await resolveLowStockAlert(req, storeId.toString(), item._id);
             }
         }
 

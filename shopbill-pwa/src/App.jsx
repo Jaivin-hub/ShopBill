@@ -13,6 +13,8 @@ import Header from './components/Header';
 import SEO from './components/SEO';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
+import OutletManager from './components/OutletManager';
+import OutletSelector from './components/OutletSelector';
 
 // Lazy Load Heavy Components
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -111,10 +113,12 @@ const App = () => {
   const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
 
-  // Multi-Store States
-  const [activeStore, setActiveStore] = useState("Main Outlet");
-  const [isStorePanelOpen, setIsStorePanelOpen] = useState(false);
-  const stores = ["Main Outlet", "Branch - Kochi", "Branch - Aluva"]; // Mock data, replace with API sync later
+  // Outlet/Store Management States
+  const [currentOutlet, setCurrentOutlet] = useState(null);
+  const [currentOutletId, setCurrentOutletId] = useState(() => {
+    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return user?.activeStoreId || null;
+  });
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -142,15 +146,15 @@ const App = () => {
   const handleViewAllInventory = useCallback(() => setCurrentPage('inventory'), []);
 
   const fetchNotificationHistory = useCallback(async () => {
-    if (!currentUser?.shopId) return;
+    if (!currentUser) return;
     try {
       const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
       if (response.data && response.data.alerts) setNotifications(response.data.alerts);
     } catch (error) { console.error("Error fetching notifications:", error); }
-  }, [currentUser, API.notificationalert]);
+  }, [currentUser]);
 
   useEffect(() => {
-    if (!currentUser?.shopId) return;
+    if (!currentUser) return;
     fetchNotificationHistory();
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
       auth: { token: localStorage.getItem('userToken') },
@@ -159,7 +163,12 @@ const App = () => {
       reconnection: true
     });
     const socket = socketRef.current;
-    socket.on('connect', () => socket.emit('join_shop', String(currentUser.shopId)));
+    socket.on('connect', () => {
+      // For premium users with outlets, join the current outlet room
+      // For others, use a fallback identifier
+      const roomId = currentOutletId || currentUser._id || 'default';
+      socket.emit('join_shop', String(roomId));
+    });
     socket.on('new_notification', (newAlert) => {
       setNotifications(prev => {
         if (prev.some(n => n._id === newAlert._id)) return prev;
@@ -168,7 +177,7 @@ const App = () => {
       showToast(newAlert.message, 'info');
     });
     return () => { if (socket) socket.disconnect(); };
-  }, [currentUser?.shopId, fetchNotificationHistory, showToast]);
+  }, [currentUser, currentOutletId, fetchNotificationHistory, showToast]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
@@ -185,8 +194,21 @@ const App = () => {
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
+    setCurrentOutletId(normalizedUser.activeStoreId || null);
     setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
   }, []);
+
+  const handleOutletSwitch = useCallback((outlet) => {
+    if (outlet) {
+      setCurrentOutlet(outlet);
+      setCurrentOutletId(outlet._id);
+      // Update currentUser in localStorage
+      const updatedUser = { ...currentUser, activeStoreId: outlet._id };
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      showToast(`Switched to ${outlet.name}`, 'success');
+    }
+  }, [currentUser, showToast]);
 
   const handleRegistrationComplete = useCallback(() => {
     setCurrentPage('dashboard');
@@ -280,7 +302,22 @@ const App = () => {
         />
     }
 
-    const commonProps = { darkMode, currentUser, userRole, showToast, apiClient, API, onLogout: logout, notifications, setNotifications, setCurrentPage, unreadCount, setPageOrigin, activeStore };
+    const commonProps = { 
+      darkMode, 
+      currentUser, 
+      userRole, 
+      showToast, 
+      apiClient, 
+      API, 
+      onLogout: logout, 
+      notifications, 
+      setNotifications, 
+      setCurrentPage, 
+      unreadCount, 
+      setPageOrigin, 
+      currentOutlet,
+      currentOutletId
+    };
 
     return (
       <Suspense>
@@ -297,6 +334,7 @@ const App = () => {
             case 'profile': return <Profile {...commonProps} />;
             case 'superadmin_users': return <UserManagement {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig {...commonProps} />;
+            case 'outlets': return <OutletManager {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
             case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
             default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
@@ -340,10 +378,11 @@ const App = () => {
             utilityNavItems={utilityNavItems}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
-            activeStore={activeStore}
-            setActiveStore={setActiveStore}
-            stores={stores}
-            isPremium={isPremium}
+            currentUser={currentUser}
+            currentOutlet={currentOutlet}
+            currentOutletId={currentOutletId}
+            onOutletSwitch={handleOutletSwitch}
+            showToast={showToast}
           />
         )}
         <div className="flex flex-1 overflow-hidden relative">
@@ -358,6 +397,29 @@ const App = () => {
 
               {/* PREMIUM STORE SWITCHER FOR DESKTOP */}
               {isPremium && (
+                <div className="px-4 mb-4">
+                  <OutletSelector
+                    apiClient={apiClient}
+                    currentUser={currentUser}
+                    currentOutletId={currentOutletId}
+                    onOutletSwitch={handleOutletSwitch}
+                    showToast={showToast}
+                  />
+                  <button
+                    onClick={() => setCurrentPage('outlets')}
+                    className={`w-full mt-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      currentPage === 'outlets'
+                        ? 'bg-indigo-600 text-white'
+                        : darkMode
+                        ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Manage Outlets
+                  </button>
+                </div>
+              )}
+              {isPremium && false && (
                 <div className="px-4 mb-4">
                   <button 
                     onClick={() => setIsStorePanelOpen(!isStorePanelOpen)}

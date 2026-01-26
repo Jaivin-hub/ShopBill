@@ -65,14 +65,17 @@ router.get('/summary', protect, async (req, res) => {
         const dateFilter = getSalesDateFilter(req);
         
         // SCOPED QUERY: Add shopId to dateFilter for sales
-        const salesFilter = { ...dateFilter, shopId: req.user.shopId };
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const salesFilter = { ...dateFilter, storeId: req.user.storeId };
         
         // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS (all scoped)
         const [filteredSales, customers, inventoryItems, allTimeSales] = await Promise.all([
             Sale.find(salesFilter),
-            Customer.find({ shopId: req.user.shopId }), // Scoped
-            Inventory.find({ shopId: req.user.shopId }), // Scoped
-            Sale.find({ shopId: req.user.shopId }), // Scoped for all-time stats
+            Customer.find({ storeId: req.user.storeId }), // Scoped
+            Inventory.find({ storeId: req.user.storeId }), // Scoped
+            Sale.find({ storeId: req.user.storeId }), // Scoped for all-time stats
         ]);
         
         // Create a quick lookup map for current inventory names and prices
@@ -159,7 +162,7 @@ router.get('/chart-data', protect, async (req, res) => {
 
         const matchStage = { $match: { 
             ...dateFilter, 
-            shopId: req.user.shopId 
+            storeId: req.user.storeId 
         } }; 
 
         const chartData = await Sale.aggregate([

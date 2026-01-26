@@ -14,7 +14,10 @@ const router = express.Router();
 // --- GET ALL CUSTOMERS ---
 router.get('/', protect, async (req, res) => {
     try {
-        const customers = await Customer.find({ shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const customers = await Customer.find({ storeId: req.user.storeId });
         res.json(customers);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch customers.' });
@@ -32,7 +35,7 @@ router.get('/:id/history', protect, async (req, res) => {
     try {
         const transactions = await KhataTransaction.find({
             customerId: customerId,
-            shopId: req.user.shopId
+            storeId: req.user.storeId
         }).sort({ timestamp: -1 });
 
         res.json(transactions);
@@ -65,7 +68,7 @@ router.post('/', protect, async (req, res) => {
     if (trimmedPhone) {
         const existingCustomer = await Customer.findOne({ 
             phone: trimmedPhone, 
-            shopId: req.user.shopId
+            storeId: req.user.storeId
         });
 
         if (existingCustomer) {
@@ -83,14 +86,14 @@ router.post('/', protect, async (req, res) => {
             phone: trimmedPhone, 
             creditLimit: parsedCreditLimit, 
             outstandingCredit: parsedInitialDue, 
-            shopId: req.user.shopId,
+            storeId: req.user.storeId,
         };
         
         const customer = await Customer.create(newCustomerData);
 
         if (parsedInitialDue > 0) {
             await KhataTransaction.create({
-                shopId: req.user.shopId,
+                storeId: req.user.storeId,
                 customerId: customer._id,
                 amount: parsedInitialDue,
                 type: 'initial_due',
@@ -127,7 +130,7 @@ router.put('/:customerId/credit', protect, async (req, res) => {
 
     try {
         let updatedCustomer = await Customer.findOneAndUpdate(
-            { _id: customerId, shopId: req.user.shopId },
+            { _id: customerId, storeId: req.user.storeId },
             { $inc: { outstandingCredit: amountChange } },
             { new: true } 
         );
@@ -137,7 +140,7 @@ router.put('/:customerId/credit', protect, async (req, res) => {
         }
         
         await KhataTransaction.create({
-            shopId: req.user.shopId,
+            storeId: req.user.storeId,
             customerId: updatedCustomer._id,
             amount: paymentAmount || Math.abs(amountChange),
             type: type || 'payment_received',
@@ -146,7 +149,7 @@ router.put('/:customerId/credit', protect, async (req, res) => {
 
         if (updatedCustomer.outstandingCredit < 0) {
              updatedCustomer = await Customer.findOneAndUpdate(
-                { _id: customerId, shopId: req.user.shopId }, 
+                { _id: customerId, storeId: req.user.storeId }, 
                 { outstandingCredit: 0 }, 
                 { new: true }
             );
@@ -182,8 +185,9 @@ router.post('/:id/remind', protect, async (req, res) => {
 
     try {
         // 1. Lookups
-        const customer = await Customer.findOne({ _id: customerId, shopId: req.user.shopId });
-        const shop = await Shop.findById(req.user.shopId);
+        const customer = await Customer.findOne({ _id: customerId, storeId: req.user.storeId });
+        const Store = require('../models/Store');
+        const store = await Store.findById(req.user.storeId);
 
         if (!customer) return res.status(404).json({ error: 'Customer not found.' });
         if (!customer.phone) return res.status(400).json({ error: 'Customer phone missing.' });
@@ -211,7 +215,7 @@ router.post('/:id/remind', protect, async (req, res) => {
         // 4. Execution
         const waFrom = `whatsapp:${process.env.TWILIO_WA_NUMBER || '+14155238886'}`;
         const smsFrom = process.env.TWILIO_PHONE_NUMBER;
-        const finalMessage = `From ${shop.shopName || 'Our Store'}: ${message}`;
+        const finalMessage = `From ${store?.name || 'Our Store'}: ${message}`;
 
         const results = await Promise.allSettled([
             client.messages.create({
@@ -236,7 +240,7 @@ router.post('/:id/remind', protect, async (req, res) => {
         // 5. SAVE TO DATABASE (The "Logging" step)
         // We record this as a 0-amount transaction in the Ledger
         await KhataTransaction.create({
-            shopId: req.user.shopId,
+            storeId: req.user.storeId,
             customerId: customer._id,
             amount: 0, // Reminders don't change the balance
             type: 'reminder_sent', 

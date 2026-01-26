@@ -26,6 +26,13 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Add outlet/store context header for all users with activeStoreId
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const activeStoreId = currentUser?.activeStoreId;
+    if (activeStoreId) {
+      config.headers['x-store-id'] = activeStoreId;
+    }
+
     // Generate cache key
     const cacheKey = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}:${JSON.stringify(config.data || {})}`;
     

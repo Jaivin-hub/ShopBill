@@ -3,6 +3,7 @@ import {
     Smartphone, User, Bell, Settings, Sun, Moon, 
     CreditCard, LayoutGrid, Store, Plus, ChevronRight 
 } from 'lucide-react';
+import OutletSelector from './OutletSelector';
 
 const Header = ({
     companyName,
@@ -15,13 +16,15 @@ const Header = ({
     onLogout,
     apiClient,
     API,
-    activeStore = "Main Outlet",
-    setActiveStore,
-    stores = ["Main Outlet", "Branch - Kochi", "Branch - Aluva"],
-    isPremium = true
+    currentUser,
+    currentOutlet,
+    currentOutletId,
+    onOutletSwitch,
+    showToast
 }) => {
     const [showStoreHub, setShowStoreHub] = useState(false);
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
+    const isPremium = currentUser?.plan === 'PREMIUM';
 
     const headerBg = darkMode ? 'bg-slate-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
@@ -53,18 +56,32 @@ const Header = ({
                         <h1 className={`text-lg font-bold tracking-tight truncate leading-tight ${logoText}`}>
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
-                        <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">{activeStore}</p>
+                        {isPremium && currentOutlet && (
+                            <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
+                                {currentOutlet.name}
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex space-x-2 items-center">
                     {isPremium && (
-                        <button
-                            onClick={() => setShowStoreHub(!showStoreHub)}
-                            className={getButtonClasses('store-hub', showStoreHub)}
-                        >
-                            <LayoutGrid className="w-5 h-5" />
-                        </button>
+                        <>
+                            <OutletSelector
+                                apiClient={apiClient}
+                                currentUser={currentUser}
+                                currentOutletId={currentOutletId}
+                                onOutletSwitch={onOutletSwitch}
+                                showToast={showToast}
+                            />
+                            <button
+                                onClick={() => { setCurrentPage('outlets'); setShowStoreHub(false); }}
+                                className={getButtonClasses('outlets', currentPage === 'outlets')}
+                                aria-label="Manage outlets"
+                            >
+                                <LayoutGrid className="w-5 h-5" aria-hidden="true" />
+                            </button>
+                        </>
                     )}
 
                     <button onClick={() => setDarkMode(!darkMode)} className={getButtonClasses('theme-toggle')}>
@@ -90,57 +107,6 @@ const Header = ({
                 </div>
             </header>
 
-            {/* Expansion Panel - Increased z-index to 105 */}
-            {isPremium && showStoreHub && (
-                <div className={`fixed top-[73px] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-[10px] font-black tracking-widest opacity-50 uppercase">Select Active Branch</span>
-                        <button 
-                            onClick={() => { setCurrentPage('stores'); setShowStoreHub(false); }}
-                            className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"
-                        >
-                            MANAGE ALL <ChevronRight size={12} />
-                        </button>
-                    </div>
-                    
-                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
-                        {stores.map((store) => (
-                            <button
-                                key={store}
-                                onClick={() => {
-                                    setActiveStore(store);
-                                    setShowStoreHub(false);
-                                }}
-                                className={`flex-shrink-0 snap-start px-4 py-3 rounded-2xl border transition-all flex items-center gap-3 ${
-                                    activeStore === store 
-                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' 
-                                    : (darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-600')
-                                }`}
-                            >
-                                <Store size={14} />
-                                <span className="text-xs font-black whitespace-nowrap">{store}</span>
-                            </button>
-                        ))}
-                        <button 
-                            onClick={() => { setCurrentPage('stores'); setShowStoreHub(false); }}
-                            className={`flex-shrink-0 snap-start px-4 py-3 rounded-2xl border border-dashed flex items-center gap-3 ${
-                                darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'
-                            }`}
-                        >
-                            <Plus size={14} />
-                            <span className="text-xs font-black whitespace-nowrap">Add New</span>
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Backdrop - z-index 100 */}
-            {showStoreHub && (
-                <div 
-                    className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[2px]" 
-                    onClick={() => setShowStoreHub(false)}
-                />
-            )}
 
             <style jsx="true">{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }

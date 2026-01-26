@@ -5,15 +5,14 @@ const Schema = mongoose.Schema;
 const allowedRoles = ['owner', 'Manager', 'Cashier']; 
 
 const StaffSchema = new Schema({
-    // Link to the shop this staff member belongs to (CRITICAL for multi-tenancy)
-    // Ref points to the Shop collection/model.
-    shopId: {
+    // UPDATED: Renamed from shopId to storeId for consistency
+    // Points to the specific Store/Branch they work at.
+    storeId: {
         type: Schema.Types.ObjectId,
         required: true,
-        ref: 'Shop' 
+        ref: 'Store' // Ensure this matches your Store model name
     },
     // The user's ID from the main 'User' collection (for login credentials)
-    // Links to the User collection/model.
     userId: {
         type: Schema.Types.ObjectId,
         required: true, 
@@ -30,12 +29,11 @@ const StaffSchema = new Schema({
     email: {
         type: String,
         required: [true, 'Email is required.'],
-        // Set to false here, but uniqueness is enforced by the compound index below.
         unique: false, 
         lowercase: true,
         match: [/.+\@.+\..+/, 'Please fill a valid email address']
     },
-    // Role for permissions (owner, Manager, Cashier)
+    // Role for permissions
     role: {
         type: String,
         required: true,
@@ -52,10 +50,10 @@ const StaffSchema = new Schema({
         type: Date,
         default: Date.now
     },
-});
+}, { timestamps: true }); // Added timestamps for better auditing
 
-// ✅ Compound index: This is the correct way to ensure an email is unique 
-// only within the context of a single shop (shopId).
-StaffSchema.index({ shopId: 1, email: 1 }, { unique: true });
+// ✅ Compound index: Ensures an email is unique within a specific store.
+// UPDATED: Changed from shopId to storeId
+StaffSchema.index({ storeId: 1, email: 1 }, { unique: true });
 
 module.exports = mongoose.model('Staff', StaffSchema);

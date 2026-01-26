@@ -56,7 +56,13 @@ const API = {
     verifySubscription: API_BASE_URL + '/payment/verify-subscription', // POST (Verifies the mandate setup signature)
     cancelSubscription: API_BASE_URL + '/payment/cancel-subscription', // POST (Cancels the active subscription)
     upgradePlan: API_BASE_URL + '/payment/upgrade-plan', // POST (Cancels old, creates new mandate)
-    verifyPlanChange: API_BASE_URL + '/payment/verify-plan-change' // POST (Verifies new mandate and updates user)
+    verifyPlanChange: API_BASE_URL + '/payment/verify-plan-change', // POST (Verifies new mandate and updates user)
+    // ------------------------------------------
+    
+    // Outlet Management Routes (Premium users only)
+    outlets: API_BASE_URL + '/outlets', // GET (List all outlets), POST (Create outlet)
+    outletDetails: (id) => `${API_BASE_URL}/outlets/${id}`, // GET (Get outlet), PUT (Update outlet), DELETE (Delete outlet)
+    switchOutlet: (id) => `${API_BASE_URL}/outlets/${id}/switch`, // PUT (Switch active outlet)
     // ------------------------------------------
 }
 

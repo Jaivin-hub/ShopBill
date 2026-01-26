@@ -6,15 +6,18 @@ const mongoose = require('mongoose');
  */
 const KhataTransactionSchema = new mongoose.Schema({
     // Security and Scoping
-    shopId: { 
+    // UPDATED: Changed from shopId (ref User) to storeId (ref Store)
+    storeId: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
-        required: true 
+        ref: 'Store', 
+        required: true,
+        index: true 
     },
     customerId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Customer', 
-        required: true 
+        required: true,
+        index: true 
     },
     
     // Transaction Details
@@ -47,5 +50,8 @@ const KhataTransactionSchema = new mongoose.Schema({
 }, { 
     timestamps: true 
 });
+
+// Added a compound index to speed up loading a specific customer's history within a store
+KhataTransactionSchema.index({ storeId: 1, customerId: 1, timestamp: -1 });
 
 module.exports = mongoose.model('KhataTransaction', KhataTransactionSchema);

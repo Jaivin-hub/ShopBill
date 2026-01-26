@@ -216,7 +216,18 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                 <div className="p-2">
                     {currentUser?.role?.toLowerCase() === 'owner' && (
                         <>
-                            {/* NEW: Store Control Item */}
+                            {/* NEW: Outlet Management Item (Premium only) */}
+                            {currentUser?.plan === 'PREMIUM' && (
+                                <SettingItem 
+                                    icon={Store} 
+                                    title="Outlet Management" 
+                                    description="Manage multiple store locations." 
+                                    onClick={() => { setPageOrigin('settings'); setCurrentPage('outlets'); }} 
+                                    accentColor="text-indigo-500"
+                                    darkMode={darkMode}
+                                />
+                            )}
+                            {/* Legacy Store Control (if needed) */}
                             <SettingItem 
                                 icon={Building2} 
                                 title="Store Control" 

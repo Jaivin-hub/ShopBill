@@ -9,13 +9,14 @@ const router = express.Router();
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
  * UPDATED: Ensures readBy is initialized as an empty array.
  */
-const emitAlert = async (req, shopId, type, data) => {
+const emitAlert = async (req, storeId, type, data) => {
     const io = req.app.get('socketio');
     let title = '';
     let category = 'Info';
     let message = '';
     let metadata = {};
-    const shopIdStr = shopId.toString();
+    const storeIdStr = storeId.toString();
+    const ownerId = req.user.role === 'owner' ? req.user._id : (req.user.ownerId || req.user._id);
 
     switch (type) {
         case 'inventory_low':
@@ -44,7 +45,8 @@ const emitAlert = async (req, shopId, type, data) => {
 
     try {
         const newNotification = await Notification.create({
-            shopId: shopIdStr,
+            storeId: storeIdStr,
+            ownerId: ownerId,
             type,
             category,
             title,
@@ -56,7 +58,7 @@ const emitAlert = async (req, shopId, type, data) => {
 
         if (io) {
             // For real-time, we tell the client it is NOT read (false)
-            io.to(shopIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
+            io.to(storeIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
         }
         return newNotification;
     } catch (error) {
@@ -68,19 +70,19 @@ const emitAlert = async (req, shopId, type, data) => {
  * NEW UTILITY: resolveLowStockAlert
  * Call this when stock is re-added to remove old warnings automatically.
  */
-const resolveLowStockAlert = async (req, shopId, itemId) => {
+const resolveLowStockAlert = async (req, storeId, itemId) => {
     const io = req.app.get('socketio');
-    const shopIdStr = shopId.toString();
+    const storeIdStr = storeId.toString();
 
     try {
         await Notification.deleteMany({
-            shopId: shopIdStr,
+            storeId: storeIdStr,
             type: 'inventory_low',
             'metadata.itemId': itemId
         });
 
         if (io) {
-            io.to(shopIdStr).emit('resolve_notification', { itemId });
+            io.to(storeIdStr).emit('resolve_notification', { itemId });
             console.log(`🧹 Resolved alerts for item: ${itemId}`);
         }
     } catch (error) {
@@ -96,7 +98,14 @@ const resolveLowStockAlert = async (req, shopId, itemId) => {
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
-        const notifications = await Notification.find({ shopId: req.user.shopId })
+        if (!req.user.storeId) {
+            return res.json({ count: 0, alerts: [] });
+        }
+        // For owners, get notifications from all their stores. For staff, only current store.
+        const filter = req.user.role === 'owner' 
+            ? { ownerId: req.user._id }
+            : { storeId: req.user.storeId };
+        const notifications = await Notification.find(filter)
             .sort({ createdAt: -1 })
             .limit(30);
 
@@ -126,11 +135,11 @@ router.get('/alerts', protect, async (req, res) => {
  */
 router.put('/read-all', protect, async (req, res) => {
     try {
+        const filter = req.user.role === 'owner' 
+            ? { ownerId: req.user._id, readBy: { $ne: req.user._id } }
+            : { storeId: req.user.storeId, readBy: { $ne: req.user._id } };
         const result = await Notification.updateMany(
-            { 
-                shopId: req.user.shopId, 
-                readBy: { $ne: req.user._id } // Filter notifications where this user ID is NOT present
-            },
+            filter,
             { $addToSet: { readBy: req.user._id } } // Add the user ID to the array
         );
         res.json({ message: 'Success', updatedCount: result.modifiedCount });

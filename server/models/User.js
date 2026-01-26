@@ -9,17 +9,18 @@ const UserSchema = new mongoose.Schema({
 
     role: { type: String, enum: ['superadmin', 'owner', 'Manager', 'Cashier'], required: true },
 
-    shopId: {
+    // NEW: Reference to the store the user is currently managing/working in.
+    // This is vital for Staff (Managers/Cashiers) who are restricted to one store.
+    activeStoreId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+        ref: 'Store',
+        default: null
     },
 
     // --- Profile & Business Identity Fields ---
     shopName: {
         type: String,
-        required: function () { return this.role === 'owner'; },
-        // Unique index only applied if the value exists to prevent null collisions
+        required: false, 
         sparse: true, 
         trim: true
     },
@@ -33,24 +34,24 @@ const UserSchema = new mongoose.Schema({
         type: String, 
         trim: true, 
         default: '' 
-    }, // GST / EIN / Business Tax ID
+    }, 
 
     address: { 
         type: String, 
         trim: true, 
         default: '' 
-    }, // Full Business Address for Invoices
+    }, 
 
     currency: { 
         type: String, 
         default: 'INR', 
         uppercase: true 
-    }, // Default Currency Setting
+    }, 
 
     timezone: { 
         type: String, 
         default: 'Asia/Kolkata' 
-    }, // Business Timezone Setting
+    }, 
 
     isActive: {
         type: Boolean,
@@ -62,7 +63,6 @@ const UserSchema = new mongoose.Schema({
 
     plan: { type: String, enum: ['BASIC', 'PRO', 'PREMIUM'], default: null },
 
-    // transactionId holds the current ACTIVE Razorpay Subscription ID
     transactionId: String,
 
     planEndDate: { type: Date, default: null },

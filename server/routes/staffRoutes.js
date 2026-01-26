@@ -24,8 +24,11 @@ router.get('/', protect, async (req, res) => {
     }
 
     try {
-        // Find all staff belonging to the user's shop
-        const staffList = await Staff.find({ shopId: req.user.shopId }).sort({ role: -1, name: 1 });
+        // Find all staff belonging to the user's stores
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffList = await Staff.find({ storeId: req.user.storeId }).sort({ role: -1, name: 1 });
         res.json(staffList);
     } catch (error) {
         console.error('Staff GET all error:', error.message);
@@ -60,8 +63,11 @@ router.post('/', protect, async (req, res) => {
     try {
         // --- 0. PLAN LIMIT VALIDATION ---
         // Fetch owner details to get the latest plan info
-        const owner = await User.findById(req.user.shopId);
-        const currentStaffCount = await Staff.countDocuments({ shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const owner = await User.findById(req.user.id);
+        const currentStaffCount = await Staff.countDocuments({ storeId: req.user.storeId });
 
         const plan = owner.plan || 'BASIC'; // Fallback to BASIC if null
 
@@ -81,7 +87,7 @@ router.post('/', protect, async (req, res) => {
             }
             
             // Optional: Strict check if you want exactly one of each for PRO
-            const existingRoleCount = await Staff.countDocuments({ shopId: req.user.shopId, role: role });
+            const existingRoleCount = await Staff.countDocuments({ storeId: req.user.storeId, role: role });
             if (existingRoleCount >= 1) {
                 return res.status(403).json({ 
                     error: `Plan Limit Reached: The PRO plan allows only one ${role}.` 
@@ -102,15 +108,15 @@ router.post('/', protect, async (req, res) => {
         const newUser = await User.create({
             email,
             phone: phone || null,
-            shopId: req.user.shopId,
             role, 
-            shopName: `staff-temp-${req.user.shopId}-${email}`,
-            isActive: true
+            shopName: `staff-temp-${req.user.storeId}-${email}`,
+            isActive: true,
+            activeStoreId: req.user.storeId
         });
 
         // --- 3. Create the Staff record ---
         const newStaff = await Staff.create({
-            shopId: req.user.shopId,
+            storeId: req.user.storeId,
             userId: newUser._id,
             name,
             email,
@@ -176,7 +182,10 @@ router.put('/:id/toggle', protect, async (req, res) => {
     const staffId = req.params.id;
 
     try {
-        const staffMember = await Staff.findOne({ _id: staffId, shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         
         if (!staffMember) {
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
@@ -230,7 +239,10 @@ router.delete('/:id', protect, async (req, res) => {
     const staffId = req.params.id;
 
     try {
-        const staffMember = await Staff.findOne({ _id: staffId, shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         
         if (!staffMember) {
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
@@ -272,7 +284,10 @@ router.put('/:id/role', protect, async (req, res) => {
 
     try {
         // 2. Find the staff member
-        const staffMember = await Staff.findOne({ _id: staffId, shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         if (!staffMember) {
             return res.status(404).json({ error: 'Staff member not found.' });
         }
@@ -283,13 +298,13 @@ router.put('/:id/role', protect, async (req, res) => {
         }
 
         // 4. PLAN LIMIT VALIDATION (Logic similar to POST route)
-        const owner = await User.findById(req.user.shopId);
+        const owner = await User.findById(req.user.id);
         const plan = owner.plan || 'BASIC';
 
         if (plan === 'PRO') {
             // Check if they already have a staff member with this specific role
             const roleCount = await Staff.countDocuments({ 
-                shopId: req.user.shopId, 
+                storeId: req.user.storeId, 
                 role: newRole 
             });
 

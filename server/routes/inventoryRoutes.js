@@ -15,12 +15,12 @@ const checkAndNotifyLowStock = async (req, item) => {
 
     const currentQty = Number(item.quantity);
     const reorderLevel = Number(item.reorderLevel) || 5;
-    const shopIdString = item.shopId.toString();
+    const storeIdString = item.storeId.toString();
 
     if (currentQty <= reorderLevel) {
         // --- CASE 1: STOCK IS LOW ---
         try {
-            await emitAlert(req, shopIdString, 'inventory_low', {
+            await emitAlert(req, storeIdString, 'inventory_low', {
                 _id: item._id,
                 name: item.name,
                 quantity: currentQty
@@ -33,12 +33,12 @@ const checkAndNotifyLowStock = async (req, item) => {
         // --- CASE 2: STOCK IS REPLENISHED (GOOD) ---
         try {
             // 1. Remove any existing "Low Stock" notifications for this specific item
-            await resolveLowStockAlert(req, shopIdString, item._id);
+            await resolveLowStockAlert(req, storeIdString, item._id);
 
             // 2. (Optional) Only send a "Success" notification if this was an update or bulk add
             // We don't want to spam "Success" during every single sale interaction
             if (req.method === 'PUT' || req.originalUrl.includes('/bulk')) {
-                await emitAlert(req, shopIdString, 'success', {
+                await emitAlert(req, storeIdString, 'success', {
                     message: `Stock replenished for ${item.name} (Now: ${currentQty})`,
                     _id: item._id
                 });
@@ -52,7 +52,10 @@ const checkAndNotifyLowStock = async (req, item) => {
 // 1. Get Inventory (Scoped to Shop)
 router.get('/', protect, async (req, res) => {
     try {
-        const inventory = await Inventory.find({ shopId: req.user.shopId });
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const inventory = await Inventory.find({ storeId: req.user.storeId });
         res.json(inventory);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch inventory.' });
@@ -64,7 +67,7 @@ router.post('/', protect, async (req, res) => {
     try {
         const item = await Inventory.create({ 
             ...req.body, 
-            shopId: req.user.shopId 
+            storeId: req.user.storeId 
         });
         await checkAndNotifyLowStock(req, item);
         res.json({ message: 'Item added successfully', item });
@@ -77,7 +80,7 @@ router.post('/', protect, async (req, res) => {
 router.delete('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await Inventory.findOneAndDelete({ _id: id, shopId: req.user.shopId });
+        const result = await Inventory.findOneAndDelete({ _id: id, storeId: req.user.storeId });
         if (result) res.json({ message: `Item deleted.` });
         else res.status(404).json({ error: 'Item not found.' });
     } catch (error) {
@@ -90,7 +93,7 @@ router.put('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
         const updatedItem = await Inventory.findOneAndUpdate(
-            { _id: id, shopId: req.user.shopId }, 
+            { _id: id, storeId: req.user.storeId }, 
             { $set: req.body }, 
             { new: true, runValidators: true } 
         );
@@ -110,7 +113,7 @@ router.put('/:id', protect, async (req, res) => {
 // 5. POST Bulk Upload
 router.post('/bulk', protect, async (req, res) => {
     const items = req.body; 
-    const shopId = req.user.shopId;
+    const storeId = req.user.storeId;
 
     if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: 'Expected an array.' });
@@ -119,7 +122,7 @@ router.post('/bulk', protect, async (req, res) => {
     try {
         const cleanedItems = items.map(item => ({
             ...item,
-            shopId: shopId,
+            storeId: storeId,
             name: item.name ? String(item.name).trim() : undefined,
             price: parseFloat(item.price) || 0,
             quantity: parseInt(item.quantity) || 0,

@@ -126,9 +126,6 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       const errorMsg = errorData?.error || 'Error adding customer';
       
       setAddCustomerError(errorMsg); // This will show in the modal
-      
-      if(showToast) showToast(errorMsg, 'error'); 
-      console.error("Add Customer Failed:", errorData);
     }
     finally { setIsProcessing(false); }
   };
