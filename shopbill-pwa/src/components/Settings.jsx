@@ -121,7 +121,14 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
 );
 
 function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode }) { 
-    const [currentView, setCurrentView] = useState('main'); 
+    const [currentView, setCurrentView] = useState(() => {
+        const target = localStorage.getItem('settings_target_view');
+        if (target) {
+            localStorage.removeItem('settings_target_view'); // Clear it so it doesn't persist
+            return target;
+        }
+        return 'main';
+    }); 
     const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
     const [confirmModal, setConfirmModal] = useState(null); 
     const [cloudUploadStatus, setCloudUploadStatus] = useState('idle');

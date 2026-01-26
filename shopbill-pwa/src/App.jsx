@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
-  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
@@ -376,20 +376,41 @@ const App = () => {
                   </button>
                   
                   {isStorePanelOpen && (
-                    <div className="mt-2 space-y-1 animate-in slide-in-from-top-2 duration-200">
-                      {stores.map(store => (
-                        <button
-                          key={store}
-                          onClick={() => { setActiveStore(store); setIsStorePanelOpen(false); }}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                            activeStore === store 
-                            ? 'bg-indigo-600 text-white shadow-lg' 
-                            : darkMode ? 'hover:bg-gray-900 text-gray-400' : 'hover:bg-slate-100 text-slate-500'
-                          }`}
+                    <div className={`mt-2 p-1.5 rounded-2xl border animate-in slide-in-from-top-2 duration-200 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl'}`}>
+                      <p className={`text-[9px] font-black px-3 py-2 uppercase tracking-[0.2em] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>Select Outlet</p>
+                      <div className="space-y-1">
+                        {stores.map(store => (
+                          <button
+                            key={store}
+                            onClick={() => { setActiveStore(store); setIsStorePanelOpen(false); }}
+                            className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                              activeStore === store 
+                              ? 'bg-indigo-600 text-white shadow-lg' 
+                              : darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-50 text-slate-500'
+                            }`}
+                          >
+                            <Store size={14} className="mr-2 opacity-70" />
+                            {store}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className={`mt-2 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                        <button 
+                          onClick={() => { setCurrentPage('settings'); localStorage.setItem('settings_target_view', 'storeControl'); setIsStorePanelOpen(false); }}
+                          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-black transition-all ${darkMode ? 'text-indigo-400 hover:bg-slate-800' : 'text-indigo-600 hover:bg-indigo-50'}`}
                         >
-                          {store}
+                          <Settings2 size={14} className="mr-2" />
+                          MANAGE ALL
                         </button>
-                      ))}
+                        <button 
+                          onClick={() => { showToast('Redirecting to Store Setup...', 'info'); setIsStorePanelOpen(false); }}
+                          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-black transition-all ${darkMode ? 'text-emerald-400 hover:bg-slate-800' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                        >
+                          <PlusCircle size={14} className="mr-2" />
+                          ADD NEW STORE
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
