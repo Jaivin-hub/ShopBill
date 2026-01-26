@@ -10,9 +10,6 @@ const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
-// Import resolveLowStockAlert from notificationRoutes
-const { resolveLowStockAlert } = require('./notificationRoutes');
-
 // GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
     const { startDate, endDate } = req.query;
