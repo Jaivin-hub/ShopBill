@@ -84,33 +84,51 @@ router.post('/create-subscription', async (req, res) => {
 
 
 router.post('/verify-subscription', async (req, res) => {
-
     const {
         razorpay_payment_id,
         razorpay_signature,
         razorpay_subscription_id,
     } = req.body;
 
+    // 1. Debugging: Log incoming data to verify what the frontend is sending
+    console.log("--- New Verification Request ---");
+    console.log("Payment ID:", razorpay_payment_id);
+    console.log("Subscription ID:", razorpay_subscription_id);
+    console.log("Received Signature:", razorpay_signature);
+
     if (!razorpay_payment_id || !razorpay_signature || !razorpay_subscription_id) {
         return res.status(400).json({ success: false, error: 'Missing required payment verification data.' });
     }
 
     try {
-        const body = razorpay_payment_id + '|' + razorpay_subscription_id;
+        // 2. Construct the body string
+        // Order: Payment ID | Subscription ID
+        const generated_signature_body = `${razorpay_payment_id}|${razorpay_subscription_id}`;
+        
+        // 3. Generate Expected Signature
+        // Ensure RAZORPAY_KEY_SECRET is the one paired with your Key ID
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-            .update(body.toString())
+            .update(generated_signature_body)
             .digest('hex');
 
+        console.log("Generated Body String:", generated_signature_body);
+        console.log("Expected Signature:", expectedSignature);
+
+        // 4. Compare
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
-            const refundAmount = 100;
+            console.log("✅ Signature Match: Success");
+
+            // Optional: You mentioned not hardcoding. Ensure refundAmount is consistent with your setup.
+            const refundAmount = 100; // 100 paise = ₹1.00
             const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
             const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
 
             try {
-                const refundResponse = await axios.post(
+                // Initiating the refund for the authorization amount (₹1)
+                await axios.post(
                     `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/refunds`,
                     { amount: refundAmount },
                     { auth: { username: razorpayKeyId, password: razorpayKeySecret } }
@@ -118,16 +136,19 @@ router.post('/verify-subscription', async (req, res) => {
                 console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
 
             } catch (refundError) {
-                console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
+                // Log the actual error message from Razorpay API for refund failures
+                console.error(`[REFUND FAILED]`, refundError.response ? refundError.response.data : refundError.message);
             }
-            res.json({
+
+            return res.json({
                 success: true,
                 message: 'Subscription mandate verified and refund initiated.',
-                transactionId: razorpay_subscription_id, // Return the subscription ID for signup
+                transactionId: razorpay_subscription_id,
             });
 
         } else {
-            res.status(400).json({
+            console.error("❌ Signature Mismatch!");
+            return res.status(400).json({
                 success: false,
                 error: 'Subscription mandate verification failed. Signature mismatch.',
             });
@@ -135,7 +156,7 @@ router.post('/verify-subscription', async (req, res) => {
 
     } catch (error) {
         console.error('Razorpay Subscription Verification Error:', error);
-        res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
+        return res.status(500).json({ success: false, error: 'Server error during subscription verification.' });
     }
 });
 
