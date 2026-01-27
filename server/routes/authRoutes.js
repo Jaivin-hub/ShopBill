@@ -122,15 +122,9 @@ router.post('/signup', async (req, res) => {
     // UPDATED: Destructure shopName, plan, and transactionId
     const { email, password, phone, plan, transactionId, shopName } = req.body;
 
-    // TEMPORARY: Payment bypassed for testing - transactionId is now optional
-    // ORIGINAL REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
-    // if (!email || !password || !plan || !transactionId || !shopName) {
-    //     return res.status(400).json({ error: 'Email, password, shop name, plan, and transaction ID are required for owner signup.' });
-    // }
-    
-    // TEMPORARY: Allow signup without payment for testing
-    if (!email || !password || !plan || !shopName) {
-        return res.status(400).json({ error: 'Email, password, shop name, and plan are required for owner signup.' });
+    // REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
+    if (!email || !password || !plan || !transactionId || !shopName) {
+        return res.status(400).json({ error: 'Email, password, shop name, plan, and transaction ID are required for owner signup.' });
     }
 
     try {
@@ -159,12 +153,10 @@ router.post('/signup', async (req, res) => {
             // Temporary shopId, will be replaced by _id immediately after creation
             shopId: new mongoose.Types.ObjectId(),
             plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
-            // TEMPORARY: Payment bypassed - transactionId is optional for testing
-            // ORIGINAL: transactionId: transactionId, // Save the subscription ID
-            transactionId: transactionId || `TEST_${Date.now()}`, // Temporary test transaction ID
+            transactionId: transactionId, // Save the subscription ID
             shopName: shopName,
             planEndDate: trialEndDate, // 🔥 INITIALIZE THE END DATE
-            subscriptionStatus: 'authenticated', // TEMPORARY: Set to authenticated without payment verification
+            subscriptionStatus: 'authenticated',
         });
 
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.

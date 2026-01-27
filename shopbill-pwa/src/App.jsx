@@ -180,6 +180,7 @@ const App = () => {
   }, [currentUser, currentOutletId, fetchNotificationHistory, showToast]);
 
   const logout = useCallback(() => {
+    // Manual logout function - still works for user-initiated logout
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     setCurrentUser(null);

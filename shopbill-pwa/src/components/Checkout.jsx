@@ -153,12 +153,6 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
         if (!password || password.length < 8) return setPasswordError('Password must be 8+ characters.');
 
         setIsProcessing(true);
-        
-        // ====================================================================
-        // TEMPORARY: PAYMENT BYPASSED FOR TESTING - ALL PAYMENT CODE COMMENTED
-        // ====================================================================
-        // ORIGINAL RAZORPAY PAYMENT FLOW (COMMENTED BUT NOT REMOVED):
-        /*
         try {
             const razorpayLoad = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!razorpayLoad) throw new Error('Razorpay failed to load.');
@@ -203,27 +197,6 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
             setPaymentError(error.response?.data?.error || "Connection failed.");
             setIsProcessing(false);
         }
-        */
-        
-        // TEMPORARY: Direct signup without payment (for testing only)
-        try {
-            await apiClient.post(API.signup, {
-                email: email.toLowerCase().trim(), 
-                password, 
-                phone, 
-                plan: planKey || 'BASIC',
-                // transactionId: undefined, // No payment verification
-                shopName
-            });
-            setPaymentSuccess(true);
-            setTimeout(() => {
-                showToast('Account created successfully! Please login.', 'success');
-                window.location.reload(); 
-            }, 3000);
-        } catch (error) {
-            setPaymentError(error.response?.data?.error || "Account creation failed.");
-            setIsProcessing(false);
-        }
     }, [plan, planKey, email, phone, password, shopName, showToast]);
 
     if (paymentSuccess) return (
@@ -266,14 +239,9 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 </div>
                                 
                                 <div className="flex lg:flex-col items-center lg:items-start justify-between border-t border-white/20 pt-4 lg:space-y-4">
-                                    {/* TEMPORARY: Payment bypassed - commented out verification fee display */}
-                                    {/* <div className="flex flex-col lg:w-full">
+                                    <div className="flex flex-col lg:w-full">
                                         <span className="text-[9px] font-black text-white/70 uppercase">Verification Fee</span>
                                         <span className="text-xl lg:text-3xl font-black text-white">₹1</span>
-                                    </div> */}
-                                    <div className="flex flex-col lg:w-full">
-                                        <span className="text-[9px] font-black text-white/70 uppercase">Testing Mode</span>
-                                        <span className="text-xl lg:text-3xl font-black text-white">Free</span>
                                     </div>
                                     <ul className="hidden sm:grid grid-cols-2 lg:grid-cols-1 gap-2 lg:space-y-2 mt-0 lg:mt-4">
                                         {plan.features.map((f, i) => (
@@ -286,18 +254,11 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                             </div>
                         </div>
                         
-                        {/* TEMPORARY: Payment bypassed - commented out secure payment notice */}
-                        {/* <div className="mt-4 lg:mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800 hidden lg:block">
+                        <div className="mt-4 lg:mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800 hidden lg:block">
                             <h4 className="text-[10px] font-black text-white tracking-widest mb-2 flex items-center uppercase">
                                 <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
                             </h4>
                             <p className="text-[10px] font-bold text-gray-500 leading-relaxed tracking-tighter">Encrypted by Razorpay. Cancel anytime via dashboard.</p>
-                        </div> */}
-                        <div className="mt-4 lg:mt-8 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30 hidden lg:block">
-                            <h4 className="text-[10px] font-black text-yellow-400 tracking-widest mb-2 flex items-center uppercase">
-                                <AlertTriangle className="w-3 h-3 mr-1 text-yellow-400" /> Testing Mode
-                            </h4>
-                            <p className="text-[10px] font-bold text-yellow-500/70 leading-relaxed tracking-tighter">Payment bypassed for testing. All payment code is preserved and commented.</p>
                         </div>
                     </div>
 
@@ -353,11 +314,9 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
 
                             <div className="pt-4 lg:pt-6 border-t border-gray-800">
                                 <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
-                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Create Account (Testing Mode)</>}
+                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
                                 </button>
-                                {/* TEMPORARY: Payment bypassed for testing */}
-                                {/* <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase">By proceeding, you authorize a ₹1 verification charge.</p> */}
-                                <p className="text-[9px] text-yellow-500 text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase">⚠️ Testing Mode: Payment Bypassed</p>
+                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase">By proceeding, you authorize a ₹1 verification charge.</p>
                                 <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase">
                                     <ArrowLeft size={12} className="mr-1" /> Back to Plans
                                 </button>
