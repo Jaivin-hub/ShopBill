@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Plus, Edit, Trash2, X, Save, Loader, AlertCircle, CheckCircle, Building } from 'lucide-react';
+import { 
+    Store, Plus, MapPin, Phone, 
+    MoreVertical, Power, Edit3, Trash2, 
+    ArrowUpRight, Building2, ShieldCheck,
+    Loader2, X, Save, Mail, Globe, 
+    Receipt, AlertCircle
+} from 'lucide-react';
 import API from '../config/api';
 
 const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId }) => {
     const [outlets, setOutlets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOutlet, setEditingOutlet] = useState(null);
     const [formData, setFormData] = useState({
@@ -13,14 +20,16 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         address: '',
         phone: '',
         email: '',
-        settings: {
-            receiptFooter: 'Thank you for shopping!'
-        }
+        settings: { receiptFooter: 'Thank you for shopping!' }
     });
     const [errors, setErrors] = useState({});
 
-    // Check if user has PREMIUM plan
     const isPremium = currentUser?.plan === 'PREMIUM';
+
+    // Styling logic
+    const cardBase = 'bg-slate-900 border-slate-800 shadow-xl';
+    const inputBase = 'bg-slate-800 border-slate-700 text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all';
+    const subText = 'text-slate-400';
 
     useEffect(() => {
         if (isPremium && currentUser) {
@@ -38,8 +47,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 setOutlets(response.data.data || []);
             }
         } catch (error) {
-            console.error('Failed to fetch outlets:', error);
-            showToast('Failed to load outlets.', 'error');
+            showToast('Failed to load store locations.', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -54,21 +62,13 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 address: outlet.address || '',
                 phone: outlet.phone || '',
                 email: outlet.email || '',
-                settings: outlet.settings || {
-                    receiptFooter: 'Thank you for shopping!'
-                }
+                settings: outlet.settings || { receiptFooter: 'Thank you for shopping!' }
             });
         } else {
             setEditingOutlet(null);
             setFormData({
-                name: '',
-                taxId: '',
-                address: '',
-                phone: '',
-                email: '',
-                settings: {
-                    receiptFooter: 'Thank you for shopping!'
-                }
+                name: '', taxId: '', address: '', phone: '', email: '',
+                settings: { receiptFooter: 'Thank you for shopping!' }
             });
         }
         setErrors({});
@@ -78,358 +78,285 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingOutlet(null);
-        setFormData({
-            name: '',
-            taxId: '',
-            address: '',
-            phone: '',
-            email: '',
-            settings: {
-                lowStockThreshold: 5,
-                receiptFooter: 'Thank you for shopping!'
-            }
-        });
-        setErrors({});
-    };
-
-    const validateForm = () => {
-        const newErrors = {};
-        if (!formData.name.trim()) {
-            newErrors.name = 'Outlet name is required.';
-        }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!validateForm()) return;
+        if (!formData.name.trim()) return showToast('Outlet name is required', 'error');
 
+        setIsSubmitting(true);
         try {
-            if (editingOutlet) {
-                // Update existing outlet
-                const response = await apiClient.put(API.outletDetails(editingOutlet._id), formData);
-                if (response.data.success) {
-                    showToast('Outlet updated successfully!', 'success');
-                    await fetchOutlets();
-                    handleCloseModal();
-                }
-            } else {
-                // Create new outlet
-                const response = await apiClient.post(API.outlets, formData);
-                if (response.data.success) {
-                    showToast('Outlet created successfully!', 'success');
-                    await fetchOutlets();
-                    handleCloseModal();
-                }
-            }
-        } catch (error) {
-            console.error('Outlet save error:', error);
-            const errorMessage = error.response?.data?.error || 'Failed to save outlet.';
-            showToast(errorMessage, 'error');
-        }
-    };
+            const apiCall = editingOutlet 
+                ? apiClient.put(API.outletDetails(editingOutlet._id), formData)
+                : apiClient.post(API.outlets, formData);
 
-    const handleDelete = async (outletId) => {
-        if (!window.confirm('Are you sure you want to deactivate this outlet? This action can be reversed later.')) {
-            return;
-        }
-
-        try {
-            const response = await apiClient.delete(API.outletDetails(outletId));
+            const response = await apiCall;
             if (response.data.success) {
-                showToast('Outlet deactivated successfully.', 'success');
-                await fetchOutlets();
+                showToast(`Store ${editingOutlet ? 'updated' : 'created'} successfully!`, 'success');
+                fetchOutlets();
+                handleCloseModal();
             }
         } catch (error) {
-            console.error('Outlet delete error:', error);
-            showToast('Failed to deactivate outlet.', 'error');
+            showToast(error.response?.data?.error || 'Save failed.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleSwitchOutlet = async (outletId) => {
+        setIsSubmitting(true);
         try {
             const response = await apiClient.put(API.switchOutlet(outletId));
             if (response.data.success) {
-                showToast('Outlet switched successfully!', 'success');
-                if (onOutletSwitch) {
-                    onOutletSwitch(response.data.data.outlet);
-                }
-                await fetchOutlets();
+                showToast(`Switched to ${response.data.data.outlet.name}`, 'success');
+                if (onOutletSwitch) onOutletSwitch(response.data.data.outlet);
+                fetchOutlets();
             }
         } catch (error) {
-            console.error('Switch outlet error:', error);
             showToast('Failed to switch outlet.', 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (outletId) => {
+        if (!window.confirm('Deactivate this branch?')) return;
+        try {
+            await apiClient.delete(API.outletDetails(outletId));
+            showToast('Branch deactivated', 'success');
+            fetchOutlets();
+        } catch (error) {
+            showToast('Action failed', 'error');
         }
     };
 
     if (!isPremium) {
         return (
-            <div className="p-4 md:p-8 bg-gray-950 text-white">
-                <div className="max-w-2xl mx-auto bg-gray-800 rounded-xl p-8 border border-gray-700 text-center">
-                    <Building className="w-16 h-16 mx-auto mb-4 text-indigo-400" />
-                    <h2 className="text-2xl font-bold mb-4">Multiple Outlets Feature</h2>
-                    <p className="text-gray-400 mb-6">
-                        The multiple outlets feature is only available for PREMIUM plan users. 
-                        Upgrade your plan to manage multiple store locations from a single account.
-                    </p>
-                    <button
-                        onClick={() => window.location.href = '/plan-upgrade'}
-                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-                    >
-                        Upgrade to Premium
-                    </button>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-12 text-center">
+                <div className="p-6 rounded-full bg-indigo-500/10 mb-6">
+                    <Building2 className="w-16 h-16 text-indigo-500" />
                 </div>
+                <h2 className="text-2xl font-black mb-3 uppercase tracking-tight">Enterprise Multi-Store Access</h2>
+                <p className="max-w-md mb-8 text-slate-400 text-sm leading-relaxed">
+                    Manage up to 10 locations, sync inventory, and track global sales with our Premium Plan.
+                </p>
+                <button onClick={() => window.location.href = '/plan-upgrade'} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-2xl font-black text-xs tracking-widest text-white shadow-xl shadow-indigo-600/20 transition-all active:scale-95">
+                    UPGRADE TO PREMIUM
+                </button>
             </div>
         );
     }
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-950">
-                <Loader className="w-10 h-10 animate-spin text-indigo-400" />
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+                <p className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase">Syncing Store Network...</p>
             </div>
         );
     }
 
     return (
-        <main className="p-4 md:p-8 bg-gray-950 text-white min-h-screen" itemScope itemType="https://schema.org/ItemList">
-            <header className="mb-6" itemProp="headline">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
-                            <Store className="w-8 h-8 text-indigo-400" aria-hidden="true" />
-                            Outlet Management
-                        </h1>
-                        <p className="text-gray-400 mt-2" itemProp="description">
-                            Manage multiple store locations. Switch between outlets to view and manage outlet-specific data.
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-                        aria-label="Create new outlet"
-                    >
-                        <Plus className="w-5 h-5" aria-hidden="true" />
-                        Add Outlet
-                    </button>
+        <main className="p-4 md:p-8 min-h-screen bg-transparent text-white">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+                        <Store className="w-8 h-8 text-indigo-500" />
+                        STORE NETWORK
+                    </h1>
+                    <p className="text-slate-500 text-xs font-bold mt-1 tracking-wide uppercase opacity-70">
+                        Managing {outlets.length} active branches across your enterprise
+                    </p>
                 </div>
+                <button
+                    onClick={() => handleOpenModal()}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+                >
+                    <Plus size={18} /> ADD NEW BRANCH
+                </button>
             </header>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="Outlet list">
-                {outlets.length === 0 ? (
-                    <div className="col-span-full text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-                        <Store className="w-12 h-12 mx-auto mb-4 text-gray-600" />
-                        <p className="text-gray-400 mb-4">No outlets found.</p>
-                        <button
-                            onClick={() => handleOpenModal()}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-                        >
-                            Create Your First Outlet
-                        </button>
-                    </div>
-                ) : (
-                    outlets.map((outlet) => (
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {outlets.map((outlet) => {
+                    const isActive = currentOutletId === outlet._id;
+                    return (
                         <article
                             key={outlet._id}
-                            className={`bg-gray-800 rounded-xl p-6 border-2 transition-all ${
-                                currentOutletId === outlet._id
-                                    ? 'border-indigo-500 shadow-lg shadow-indigo-500/20'
-                                    : 'border-gray-700 hover:border-gray-600'
+                            className={`group relative p-6 rounded-[2.5rem] border transition-all duration-300 ${cardBase} ${
+                                isActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
                             }`}
-                            itemScope
-                            itemType="https://schema.org/Store"
                         >
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <h3 className="text-xl font-bold text-white mb-1" itemProp="name">
-                                        {outlet.name}
-                                    </h3>
-                                    {currentOutletId === outlet._id && (
-                                        <span className="inline-block px-2 py-1 text-xs font-bold bg-indigo-600 text-white rounded-full">
-                                            Active
-                                        </span>
-                                    )}
+                            <div className="flex justify-between items-start mb-6">
+                                <div className={`p-4 rounded-3xl ${isActive ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-indigo-400'}`}>
+                                    <Store size={24} />
                                 </div>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleOpenModal(outlet)}
-                                        className="p-2 text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition-colors"
-                                        aria-label={`Edit outlet ${outlet.name}`}
-                                    >
-                                        <Edit className="w-4 h-4" aria-hidden="true" />
+                                    <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                                        <Edit3 size={16} />
                                     </button>
-                                    {currentOutletId !== outlet._id && (
-                                        <button
-                                            onClick={() => handleDelete(outlet._id)}
-                                            className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                                            aria-label={`Delete outlet ${outlet.name}`}
-                                        >
-                                            <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                    {!isActive && (
+                                        <button onClick={() => handleDelete(outlet._id)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all">
+                                            <Trash2 size={16} />
                                         </button>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="space-y-2 text-sm text-gray-400 mb-4">
-                                {outlet.address && (
-                                    <p className="flex items-center gap-2">
-                                        <span className="w-4 h-4">📍</span>
-                                        <span itemProp="address">{outlet.address}</span>
-                                    </p>
-                                )}
-                                {outlet.phone && (
-                                    <p className="flex items-center gap-2">
-                                        <span className="w-4 h-4">📞</span>
-                                        <span itemProp="telephone">{outlet.phone}</span>
-                                    </p>
-                                )}
-                                {outlet.email && (
-                                    <p className="flex items-center gap-2">
-                                        <span className="w-4 h-4">✉️</span>
-                                        <span itemProp="email">{outlet.email}</span>
-                                    </p>
-                                )}
-                                {outlet.taxId && (
-                                    <p className="flex items-center gap-2">
-                                        <span className="w-4 h-4">🏢</span>
-                                        <span>GST: {outlet.taxId}</span>
-                                    </p>
-                                )}
+                            <div className="mb-6">
+                                <h3 className="text-xl font-black tracking-tight mb-2 truncate">{outlet.name}</h3>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                                        <MapPin size={14} className="text-indigo-500" />
+                                        <span className="truncate">{outlet.address || 'Address not listed'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                                        <Phone size={14} className="text-indigo-500" />
+                                        <span>{outlet.phone || 'No contact phone'}</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            {currentOutletId !== outlet._id && (
-                                <button
-                                    onClick={() => handleSwitchOutlet(outlet._id)}
-                                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-                                >
-                                    Switch to This Outlet
-                                </button>
-                            )}
+                            <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
+                                {isActive ? (
+                                    <div className="flex items-center gap-2 text-emerald-500">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-[10px] font-black tracking-widest uppercase">Currently Active</span>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => handleSwitchOutlet(outlet._id)}
+                                        disabled={isSubmitting}
+                                        className="w-full py-3 bg-slate-800 hover:bg-indigo-600 text-white text-[10px] font-black tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 uppercase"
+                                    >
+                                        {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
+                                        Switch To Hub
+                                    </button>
+                                )}
+                            </div>
                         </article>
-                    ))
-                )}
+                    );
+                })}
             </section>
 
-            {/* Create/Edit Modal */}
+            {/* UPGRADED MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="outlet-modal-title">
-                    <section className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
-                        <header className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-800 z-10">
-                            <h2 id="outlet-modal-title" className="text-2xl font-bold text-white">
-                                {editingOutlet ? 'Edit Outlet' : 'Create New Outlet'}
-                            </h2>
-                            <button
-                                onClick={handleCloseModal}
-                                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                                aria-label="Close modal"
-                            >
-                                <X className="w-5 h-5" aria-hidden="true" />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+                    <section className={`w-full max-w-2xl rounded-[3rem] border overflow-hidden animate-in fade-in zoom-in duration-300 ${cardBase}`}>
+                        <header className="p-8 border-b border-slate-800 flex items-center justify-between bg-indigo-600/5">
+                            <div>
+                                <h2 className="text-2xl font-black tracking-tight uppercase">
+                                    {editingOutlet ? 'Configure Branch' : 'New Branch Setup'}
+                                </h2>
+                                <p className="text-[10px] font-black text-indigo-500 tracking-widest mt-1 uppercase">Store Identity & Logistics</p>
+                            </div>
+                            <button onClick={handleCloseModal} className="p-3 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+                                <X size={24} />
                             </button>
                         </header>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
-                                    Outlet Name <span className="text-red-400">*</span>
-                                </label>
-                                <input
-                                    id="name"
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className={`w-full px-4 py-2 bg-gray-700 border rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${
-                                        errors.name ? 'border-red-500' : 'border-gray-600'
-                                    }`}
-                                    required
-                                />
-                                {errors.name && <p className="mt-1 text-sm text-red-400">{errors.name}</p>}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1">
-                                        Phone
-                                    </label>
-                                    <input
-                                        id="phone"
-                                        type="tel"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                                    />
+                        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">BRANCH NAME *</label>
+                                    <div className="relative">
+                                        <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                        <input
+                                            required
+                                            type="text"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            placeholder="e.g. Mumbai North Hub"
+                                        />
+                                    </div>
                                 </div>
-
-                                <div>
-                                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
-                                        Email
-                                    </label>
-                                    <input
-                                        id="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                                    />
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">TAX ID / GSTIN</label>
+                                    <div className="relative">
+                                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                        <input
+                                            type="text"
+                                            value={formData.taxId}
+                                            onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            placeholder="27AAAC..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <label htmlFor="address" className="block text-sm font-medium text-gray-300 mb-1">
-                                    Address
-                                </label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">CONTACT PHONE</label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                        <input
+                                            type="tel"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            placeholder="+91 00000 00000"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">BUSINESS EMAIL</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            placeholder="branch@business.com"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">PHYSICAL ADDRESS</label>
                                 <textarea
-                                    id="address"
+                                    rows="2"
                                     value={formData.address}
                                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                    rows="3"
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition resize-none"
+                                    className={`w-full px-5 py-3.5 rounded-2xl border resize-none ${inputBase}`}
+                                    placeholder="Complete street address, city, state..."
                                 />
                             </div>
 
-                            <div>
-                                <label htmlFor="taxId" className="block text-sm font-medium text-gray-300 mb-1">
-                                    Tax ID / GSTIN
-                                </label>
-                                <input
-                                    id="taxId"
-                                    type="text"
-                                    value={formData.taxId}
-                                    onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                                />
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">RECEIPT FOOTER NOTE</label>
+                                <div className="relative">
+                                    <Receipt className="absolute left-4 top-4 text-slate-500" size={16} />
+                                    <input
+                                        type="text"
+                                        value={formData.settings.receiptFooter}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            settings: { ...formData.settings, receiptFooter: e.target.value }
+                                        })}
+                                        className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                        placeholder="Visit again!"
+                                    />
+                                </div>
                             </div>
 
-                            <div>
-                                <label htmlFor="receiptFooter" className="block text-sm font-medium text-gray-300 mb-1">
-                                    Receipt Footer
-                                </label>
-                                <input
-                                    id="receiptFooter"
-                                    type="text"
-                                    value={formData.settings.receiptFooter}
-                                    onChange={(e) => setFormData({
-                                        ...formData,
-                                        settings: { ...formData.settings, receiptFooter: e.target.value }
-                                    })}
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
+                            <div className="flex gap-4 pt-4">
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="px-6 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                                    className="flex-1 py-4 text-[10px] font-black tracking-[0.2em] text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-all uppercase"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+                                    disabled={isSubmitting}
+                                    className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-3 uppercase"
                                 >
-                                    <Save className="w-4 h-4" aria-hidden="true" />
-                                    {editingOutlet ? 'Update Outlet' : 'Create Outlet'}
+                                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+                                    {editingOutlet ? 'Update Logistics' : 'Deploy Branch'}
                                 </button>
                             </div>
                         </form>
@@ -441,4 +368,3 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 };
 
 export default OutletManager;
-
