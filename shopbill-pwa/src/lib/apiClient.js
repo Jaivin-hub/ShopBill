@@ -169,7 +169,7 @@ apiClient.interceptors.response.use(
 
     // Handle 401 - Unauthorized
     if (error.response?.status === 401) {
-      localStorage.removeItem('userToken');
+      // localStorage.removeItem('userToken');
       localStorage.removeItem('currentUser');
       window.location.href = '/';
     }

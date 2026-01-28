@@ -181,13 +181,13 @@ const App = () => {
 
   const logout = useCallback(() => {
     // Manual logout function - still works for user-initiated logout
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setNotifications([]);
-    setCurrentPage('dashboard');
-    setIsViewingLogin(false);
-    showToast('Logged out successfully.', 'info');
+    // localStorage.removeItem('userToken');
+    // localStorage.removeItem('currentUser');
+    // setCurrentUser(null);
+    // setNotifications([]);
+    // setCurrentPage('dashboard');
+    // setIsViewingLogin(false);
+    // showToast('Logged out successfully.', 'info');
   }, [showToast]);
 
   const handleLoginSuccess = useCallback((user, token) => {
