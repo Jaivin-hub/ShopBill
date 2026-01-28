@@ -8,6 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const protect = async (req, res, next) => {
     let token;
 
+    // Check for token in headers
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         const parts = req.headers.authorization.split(' ');
         if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
@@ -16,16 +17,19 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
+        console.error('DEBUG: [401] Token missing in request headers');
         return res.status(401).json({ error: 'Not authorized, token missing or badly formatted.' });
     }
 
     try {
+        // Verify JWT - If this fails, it jumps straight to the catch block
         const decoded = jwt.verify(token, JWT_SECRET);
         
         // Fetch the user
         const user = await User.findById(decoded.id).select('-password');
         
         if (!user) {
+            console.error(`DEBUG: [401] Token valid for ID ${decoded.id}, but User not found in DB.`);
             return res.status(401).json({ error: 'Not authorized, user not found' });
         }
 
@@ -37,41 +41,31 @@ const protect = async (req, res, next) => {
             let ownerAccount;
 
             if (user.role === 'owner') {
-                // If user is owner, they are their own ownerAccount
                 ownerAccount = user;
             } else {
-                /**
-                 * ⭐ STAFF LOGIC UPDATE:
-                 * Since we removed shopId from User, we find the store the staff belongs to,
-                 * then we find the owner of that store to check subscription status.
-                 */
+                // STAFF LOGIC
                 const staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
                 
                 if (!staffRecord || !staffRecord.storeId) {
+                    console.error(`DEBUG: [403] Staff user ${user._id} has no linked store record.`);
                     return res.status(403).json({ error: 'Staff member is not assigned to any store.' });
                 }
 
-                // Find the owner of this specific store
                 ownerAccount = await User.findById(staffRecord.storeId.ownerId);
-
-                /**
-                 * Attach the storeId to req.user. This is critical so your 
-                 * controllers know which shop the staff is currently working in.
-                 */
                 user.activeStoreId = staffRecord.storeId._id;
             }
 
             if (!ownerAccount) {
+                console.error(`DEBUG: [404] Could not find owner account for user ${user._id}`);
                 return res.status(404).json({ error: 'Business owner account not found.' });
             }
 
-            /**
-             * Only block access if the status is explicitly terminal or halted.
-             */
+            // Subscription blocking logic
             const blockedStatuses = ['halted', 'cancelled', 'expired'];
             const currentStatus = ownerAccount.subscriptionStatus;
 
             if (blockedStatuses.includes(currentStatus)) {
+                console.error(`DEBUG: [403] Access denied for ${user._id} due to owner status: ${currentStatus}`);
                 return res.status(403).json({ 
                     error: 'Subscription Issue', 
                     message: currentStatus === 'halted' 
@@ -82,42 +76,33 @@ const protect = async (req, res, next) => {
                 });
             }
 
-            // Block if the owner's account is manually deactivated by Superadmin
             if (ownerAccount.isActive === false) {
+                console.error(`DEBUG: [403] Access denied: Owner account ${ownerAccount._id} is inactive.`);
                 return res.status(403).json({ error: 'Account deactivated. Please contact support.' });
             }
         }
-        // ---------------------------------------------------------------------
 
-        /**
-         * OUTLET CONTEXT HANDLING FOR OWNERS:
-         * For owners with PREMIUM plan, they can have multiple outlets.
-         * We check for x-store-id header or use their activeStoreId.
-         * If no outlet is specified and they have outlets, use the first active one.
-         * For non-PREMIUM owners, create a default store if it doesn't exist.
-         */
+        // ---------------------------------------------------------------------
+        // OUTLET CONTEXT HANDLING FOR OWNERS
+        // ---------------------------------------------------------------------
         if (user.role === 'owner') {
             let storeId = null;
 
-            // Check if storeId is provided in headers (for outlet switching)
             if (req.headers['x-store-id']) {
                 storeId = req.headers['x-store-id'];
-                // Verify the outlet belongs to this owner
                 const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
                 if (store) {
                     user.activeStoreId = storeId;
-                    // Update user's activeStoreId in database
                     await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
                 } else {
+                    console.error(`DEBUG: [403] Owner ${user._id} attempted access to invalid/unowned store: ${storeId}`);
                     return res.status(403).json({ error: 'Invalid outlet or outlet does not belong to you.' });
                 }
             } else if (user.activeStoreId) {
-                // Use saved activeStoreId
                 const store = await Store.findOne({ _id: user.activeStoreId, ownerId: user._id, isActive: true });
                 if (store) {
                     storeId = user.activeStoreId;
                 } else {
-                    // Active store no longer exists or is inactive, find another one
                     const firstStore = await Store.findOne({ ownerId: user._id, isActive: true }).sort({ createdAt: 1 });
                     if (firstStore) {
                         storeId = firstStore._id;
@@ -126,18 +111,14 @@ const protect = async (req, res, next) => {
                     }
                 }
             } else {
-                // No active store set, find or create one
                 if (user.plan === 'PREMIUM') {
-                    // For PREMIUM users, find first active outlet
                     const firstStore = await Store.findOne({ ownerId: user._id, isActive: true }).sort({ createdAt: 1 });
                     if (firstStore) {
                         storeId = firstStore._id;
                         user.activeStoreId = storeId;
                         await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
                     }
-                    // If no outlets exist, storeId remains null (user needs to create one)
                 } else {
-                    // For non-PREMIUM users, create a default store if it doesn't exist
                     let defaultStore = await Store.findOne({ ownerId: user._id, name: 'Main Store' });
                     if (!defaultStore) {
                         defaultStore = await Store.create({
@@ -152,27 +133,26 @@ const protect = async (req, res, next) => {
                     }
                     storeId = defaultStore._id;
                     user.activeStoreId = storeId;
-                    if (!user.activeStoreId) {
-                        await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
-                    }
+                    await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
                 }
             }
 
-            // Attach storeId to req.user for use in routes
+            req.user = user;
             req.user.storeId = storeId;
             req.user.activeStoreId = storeId;
         } else if (user.role !== 'superadmin') {
-            // For staff, storeId is already set from activeStoreId above
+            req.user = user;
             req.user.storeId = user.activeStoreId;
+        } else {
+            req.user = user;
         }
 
-        req.user = user;
         req.user.id = user._id; 
-
         next();
 
     } catch (error) {
-        console.error('Auth Error:', error.message);
+        // Identify exactly why JWT failed
+        console.error('🔥 CRITICAL AUTH ERROR:', error.name, '-', error.message);
         
         const errorMessage = error.name === 'TokenExpiredError' 
             ? 'Not authorized, token expired. Please log in again.' 
