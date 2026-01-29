@@ -186,7 +186,7 @@ const CustomerList = ({
             {processedCustomers.length > 0 ? (
                 processedCustomers.map(renderCustomerCard)
             ) : (
-                <div className={`col-span-full py-24 text-center rounded-[2rem] border-2 border-dashed transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`col-span-full py-24 text-center rounded-2xl border-2 border-dashed transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                     <div className={`inline-flex p-6 rounded-2xl mb-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
                         <Search className={`w-12 h-12 ${darkMode ? 'text-slate-800' : 'text-slate-200'}`} />
                     </div>

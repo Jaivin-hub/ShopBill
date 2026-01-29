@@ -117,9 +117,12 @@ router.get('/summary', protect, async (req, res) => {
 
         const averageBillValue = billsRaised > 0 ? revenue / billsRaised : 0;
         
+        // Get limit from query params, default to 5 for backward compatibility
+        const limit = parseInt(req.query.topItemsLimit) || 5;
+        
         const topItems = Array.from(itemVolumeMap.values())
             .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5);
+            .slice(0, limit);
             
         const totalCreditOutstanding = customers.reduce((sum, cust) => sum + (cust.outstandingCredit || 0), 0);
         

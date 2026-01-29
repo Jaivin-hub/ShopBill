@@ -64,6 +64,14 @@ const API = {
     outletDetails: (id) => `${API_BASE_URL}/outlets/${id}`, // GET (Get outlet), PUT (Update outlet), DELETE (Delete outlet)
     switchOutlet: (id) => `${API_BASE_URL}/outlets/${id}/switch`, // PUT (Switch active outlet)
     // ------------------------------------------
+    
+    // 💬 Chat System Routes (PRO/PREMIUM users only)
+    chatList: API_BASE_URL + '/chat/chats', // GET (List all chats)
+    chatUsers: API_BASE_URL + '/chat/users', // GET (Get available users to chat with)
+    createChat: API_BASE_URL + '/chat/create', // POST (Create new chat)
+    chatMessages: (chatId) => `${API_BASE_URL}/chat/${chatId}/messages`, // GET (Get messages for a chat)
+    sendMessage: (chatId) => `${API_BASE_URL}/chat/${chatId}/message`, // POST (Send a message)
+    // ------------------------------------------
 }
 
 export default API;

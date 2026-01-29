@@ -4,12 +4,12 @@ import {
     List, Loader2, TrendingUp, Clock, Activity,
     ShieldCheck, RefreshCw, PlusCircle, ShoppingCart,
     ChevronRight, Inbox, Sparkles, Box, ArrowRight,
-    Store, MapPin, BarChart3, Settings2
+    Store, MapPin, BarChart3, Settings2, Truck
 } from 'lucide-react';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
-const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, activeStore = "Main Outlet" }) => {
+const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
 
     // --- States ---
@@ -145,7 +145,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             {welcome.title} <span className="text-indigo-500">Dashboard</span>
                         </h1>
                         <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">
-                            {welcome.desc} • <span className="text-indigo-500 uppercase">{activeStore}</span>
+                            {welcome.desc}
                         </p>
                     </div>
                     
@@ -206,6 +206,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing' },
                             { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory' },
                             { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata' },
+                            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity' },
+                            ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
+                                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm' }]
+                                : []
+                            ),
                             { label: 'Refresh', icon: RefreshCw, color: 'bg-slate-600', action: fetchDashboardData }
                         ].map((btn, i) => (
                             <button

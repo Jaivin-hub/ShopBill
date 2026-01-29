@@ -163,7 +163,12 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                                 {isCredit ? 'Payment Pending' : 'Fully Paid'}
                             </span>
                             {isCredit && (
-                                <span className="text-[10px] font-bold text-rose-500">Balance: ₹{sale.amountCredited.toLocaleString()}</span>
+                                <div className="flex flex-col items-end gap-0.5">
+                                    {sale.amountPaid > 0 && (
+                                        <span className="text-[10px] font-bold text-emerald-600">Paid: ₹{sale.amountPaid.toLocaleString()}</span>
+                                    )}
+                                    <span className="text-[10px] font-bold text-rose-500">Balance: ₹{sale.amountCredited.toLocaleString()}</span>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -383,7 +388,13 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                                             ₹{sale.totalAmount.toLocaleString()}
                                         </p>
                                         <span className={`text-[8px] font-black tracking-widest ${sale.amountCredited > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                            {sale.amountCredited > 0 ? `DUE: ₹${sale.amountCredited}` : 'CLEARED'}
+                                            {sale.amountCredited > 0 
+                                                ? (sale.amountPaid > 0 
+                                                    ? `₹${sale.amountPaid.toLocaleString()} paid, ₹${sale.amountCredited.toLocaleString()} balance`
+                                                    : `DUE: ₹${sale.amountCredited.toLocaleString()}`
+                                                )
+                                                : 'CLEARED'
+                                            }
                                         </span>
                                     </div>
                                     <ArrowRight className={`w-4 h-4 transition-all ${darkMode ? 'text-gray-700 group-hover:text-indigo-400' : 'text-slate-300 group-hover:text-indigo-600'} group-hover:translate-x-0.5 group-hover:-translate-y-0.5`} />

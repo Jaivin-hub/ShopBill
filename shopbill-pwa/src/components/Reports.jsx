@@ -56,6 +56,8 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [purchases, setPurchases] = useState([]);
+    const [showAllBestSellers, setShowAllBestSellers] = useState(false);
+    const [allBestSellers, setAllBestSellers] = useState([]);
 
     // Theme Variables
     const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
@@ -69,17 +71,19 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
         const queryParams = { ...(startDate && { startDate }), ...(endDate && { endDate }) };
 
         try {
-            const [summaryResponse, chartResponse, suppliersRes, purchasesRes] = await Promise.all([
+            const [summaryResponse, chartResponse, suppliersRes, purchasesRes, allBestSellersRes] = await Promise.all([
                 apiClient.get(API.reportsSummary, { params: queryParams }),
                 apiClient.get(API.reportsChartData, { params: { ...queryParams, viewType: viewType } }),
                 apiClient.get(API.scmSuppliers).catch(() => ({ data: [] })),
-                apiClient.get(API.scmPurchases).catch(() => ({ data: [] }))
+                apiClient.get(API.scmPurchases).catch(() => ({ data: [] })),
+                apiClient.get(API.reportsSummary, { params: { ...queryParams, topItemsLimit: 100 } }) // Fetch all best sellers
             ]);
 
             setSummaryData(summaryResponse.data);
             setChartData(chartResponse.data);
             setSuppliers(suppliersRes.data);
             setPurchases(purchasesRes.data);
+            setAllBestSellers(allBestSellersRes.data.topItems || []);
         } catch (error) {
             showToast({ message: "Failed to sync report data.", type: 'error' });
         } finally {
@@ -295,17 +299,39 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                     <div className="flex flex-col gap-6">
                         {/* TOP ITEMS */}
                         <div className={`${cardBase} rounded-xl p-6`}>
-                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
-                                <TrendingUp className="w-4 h-4 text-sky-500" />
-                                Best Sellers
-                            </h3>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
+                                    <TrendingUp className="w-4 h-4 text-sky-500" />
+                                    Best Sellers
+                                </h3>
+                                {allBestSellers.length > 5 && (
+                                    <button
+                                        onClick={() => setShowAllBestSellers(!showAllBestSellers)}
+                                        className={`text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg transition-all ${
+                                            darkMode 
+                                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
+                                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                        }`}
+                                    >
+                                        {showAllBestSellers ? 'Show Less' : `View All (${allBestSellers.length})`}
+                                    </button>
+                                )}
+                            </div>
                             <div className="space-y-2">
-                                {data.topItems.map((item, idx) => (
+                                {(showAllBestSellers ? allBestSellers : data.topItems).map((item, idx) => (
                                     <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}>
-                                        <span className={`text-xs font-bold  truncate pr-4 ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
-                                        <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit</span>
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <span className={`text-[10px] font-bold text-slate-500 w-4 shrink-0`}>#{idx + 1}</span>
+                                            <span className={`text-xs font-bold  truncate ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
+                                        </div>
+                                        <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit{item.quantity !== 1 ? 's' : ''}</span>
                                     </div>
                                 ))}
+                                {showAllBestSellers && allBestSellers.length === 0 && (
+                                    <div className={`text-center py-6 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+                                        <p className="text-[11px] font-medium text-gray-400">No products found</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

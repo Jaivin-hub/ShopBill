@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
-  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2, MessageCircle
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
@@ -41,6 +41,7 @@ const SupplyChainManagement = lazy(() => import('./components/SupplyChainManagem
 const PlanUpgrade = lazy(() => import('./components/PlanUpgrade'));
 const StaffPermissionsManager = lazy(() => import('./components/StaffPermissionsManager'));
 const ChangePasswordForm = lazy(() => import('./components/ChangePasswordForm'));
+const Chat = lazy(() => import('./components/Chat'));
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -51,15 +52,37 @@ const UpdatePrompt = () => {
       setUpdateHandler(() => e.detail.updateHandler);
       setShow(true);
     };
+
+    const checkUpdate = async () => {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          registration.update();
+        }
+      }
+    };
+
     window.addEventListener('pwa-update-available', onUpdate);
-    return () => window.removeEventListener('pwa-update-available', onUpdate);
+    checkUpdate();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkUpdate();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pwa-update-available', onUpdate);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   if (!show) return null;
 
   return (
     <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-      <div className="max-sm bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+      <div className="max-w-sm w-full bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
@@ -67,7 +90,13 @@ const UpdatePrompt = () => {
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
           <button
-            onClick={() => updateHandler && updateHandler(true)}
+            onClick={() => {
+              if (updateHandler) {
+                updateHandler(true);
+              } else {
+                window.location.reload(true);
+              }
+            }}
             className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
             Update & Reload Now
@@ -112,12 +141,15 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
+  const outletRestoredRef = useRef(false);
 
-  // Outlet/Store Management States
   const [currentOutlet, setCurrentOutlet] = useState(null);
+  const [outlets, setOutlets] = useState([]);
   const [currentOutletId, setCurrentOutletId] = useState(() => {
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    return user?.activeStoreId || null;
+    // Check for last selected outlet in localStorage first, then fallback to user's activeStoreId
+    const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
+    return lastSelectedOutletId || user?.activeStoreId || null;
   });
 
   const [darkMode, setDarkMode] = useState(() => {
@@ -153,6 +185,108 @@ const App = () => {
     } catch (error) { console.error("Error fetching notifications:", error); }
   }, [currentUser]);
 
+  // Fetch outlets on page load for premium users
+  const fetchOutlets = useCallback(async () => {
+    if (!currentUser || !isPremium) {
+      setOutlets([]);
+      outletRestoredRef.current = false;
+      return;
+    }
+    try {
+      const response = await apiClient.get(API.outlets);
+      if (response.data?.success) {
+        const outletsList = response.data.data || [];
+        setOutlets(outletsList);
+        
+        // Restore last selected outlet only on initial load (first time)
+        if (!outletRestoredRef.current) {
+          outletRestoredRef.current = true;
+          const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
+          const currentActiveId = currentUser.activeStoreId;
+          
+          // Determine which outlet to use: lastSelected > activeStoreId > first outlet
+          let targetOutletId = lastSelectedOutletId || currentActiveId;
+          let targetOutlet = outletsList.find(o => o._id === targetOutletId);
+          
+          // If target outlet not found, use first available
+          if (!targetOutlet && outletsList.length > 0) {
+            targetOutlet = outletsList[0];
+            targetOutletId = targetOutlet._id;
+          }
+          
+          if (targetOutlet) {
+            // Only switch if different from current user's activeStoreId
+            if (targetOutletId !== currentActiveId) {
+              try {
+                const switchResponse = await apiClient.put(API.switchOutlet(targetOutletId));
+                if (switchResponse.data?.success) {
+                  setCurrentOutlet(switchResponse.data.data.outlet);
+                  setCurrentOutletId(targetOutletId);
+                  const updatedUser = { ...currentUser, activeStoreId: targetOutletId };
+                  localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+                  setCurrentUser(updatedUser);
+                  localStorage.setItem('lastSelectedOutletId', targetOutletId);
+                }
+              } catch (error) {
+                console.error('Failed to restore last outlet:', error);
+                // Fallback: just set the outlet without switching on server
+                setCurrentOutlet(targetOutlet);
+                setCurrentOutletId(targetOutletId);
+                localStorage.setItem('lastSelectedOutletId', targetOutletId);
+              }
+            } else {
+              // Already on the correct outlet, just set the outlet object
+              setCurrentOutlet(targetOutlet);
+              setCurrentOutletId(targetOutletId);
+              localStorage.setItem('lastSelectedOutletId', targetOutletId);
+            }
+          }
+        } else {
+          // After initial load, just update currentOutlet if it's missing
+          if (!currentOutlet && currentOutletId) {
+            const activeOutlet = outletsList.find(o => o._id === currentOutletId);
+            if (activeOutlet) setCurrentOutlet(activeOutlet);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching outlets:', error);
+    }
+  }, [currentUser, isPremium, apiClient, currentOutlet, currentOutletId]);
+
+  // Fetch outlets when user is loaded and is premium
+  useEffect(() => {
+    if (currentUser && isPremium) {
+      fetchOutlets();
+    } else {
+      setOutlets([]);
+      outletRestoredRef.current = false;
+    }
+  }, [currentUser, isPremium, fetchOutlets]);
+
+  // Scroll to top when page/component changes or outlet switches
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      // Scroll window to top
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      
+      // Also scroll the main content area (the scrollable container)
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      
+      // Also check for any other scrollable containers within main
+      const scrollableContainers = document.querySelectorAll('main [class*="overflow"], main [class*="scroll"]');
+      scrollableContainers.forEach(container => {
+        if (container.scrollTop > 0) {
+          container.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      });
+    });
+  }, [currentPage, currentOutletId]);
+
   useEffect(() => {
     if (!currentUser) return;
     fetchNotificationHistory();
@@ -164,8 +298,6 @@ const App = () => {
     });
     const socket = socketRef.current;
     socket.on('connect', () => {
-      // For premium users with outlets, join the current outlet room
-      // For others, use a fallback identifier
       const roomId = currentOutletId || currentUser._id || 'default';
       socket.emit('join_shop', String(roomId));
     });
@@ -180,22 +312,26 @@ const App = () => {
   }, [currentUser, currentOutletId, fetchNotificationHistory, showToast]);
 
   const logout = useCallback(() => {
-    // Manual logout function - still works for user-initiated logout
-    // localStorage.removeItem('userToken');
-    // localStorage.removeItem('currentUser');
-    // setCurrentUser(null);
-    // setNotifications([]);
-    // setCurrentPage('dashboard');
-    // setIsViewingLogin(false);
-    // showToast('Logged out successfully.', 'info');
-  }, [showToast]);
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    setCurrentOutletId(null);
+    setCurrentOutlet(null);
+    setOutlets([]);
+    setNotifications([]);
+    setCurrentPage('dashboard');
+    setIsViewingLogin(false);
+    outletRestoredRef.current = false;
+  }, []);
 
   const handleLoginSuccess = useCallback((user, token) => {
     const normalizedUser = { ...user, role: user.role.toLowerCase() };
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
-    setCurrentOutletId(normalizedUser.activeStoreId || null);
+    // Check for last selected outlet first, then fallback to user's activeStoreId
+    const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
+    setCurrentOutletId(lastSelectedOutletId || normalizedUser.activeStoreId || null);
     setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
   }, []);
 
@@ -203,13 +339,13 @@ const App = () => {
     if (outlet) {
       setCurrentOutlet(outlet);
       setCurrentOutletId(outlet._id);
-      // Update currentUser in localStorage
       const updatedUser = { ...currentUser, activeStoreId: outlet._id };
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      // Save last selected outlet ID for restoration on next page load
+      localStorage.setItem('lastSelectedOutletId', outlet._id);
       setCurrentUser(updatedUser);
-      showToast(`Switched to ${outlet.name}`, 'success');
     }
-  }, [currentUser, showToast]);
+  }, [currentUser]);
 
   const handleRegistrationComplete = useCallback(() => {
     setCurrentPage('dashboard');
@@ -227,6 +363,8 @@ const App = () => {
 
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
@@ -234,9 +372,10 @@ const App = () => {
       { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
       ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] }] : []),
       { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
+      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] }] : []),
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
-  }, [userRole, isPremium]);
+  }, [userRole, isPremium, currentUser]);
 
   const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
@@ -304,6 +443,9 @@ const App = () => {
     }
 
     const commonProps = { 
+      // Key forces a complete re-mount of any page when the outlet changes
+      // This automatically recalls all useEffect/API calls in the sub-components
+      key: `${currentPage}-${currentOutletId}`,
       darkMode, 
       currentUser, 
       userRole, 
@@ -321,7 +463,7 @@ const App = () => {
     };
 
     return (
-      <Suspense>
+      <Suspense fallback={null}>
         {(() => {
           switch (currentPage) {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
@@ -337,6 +479,7 @@ const App = () => {
             case 'superadmin_systems': return <SystemConfig {...commonProps} />;
             case 'outlets': return <OutletManager {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
             case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+            case 'chat': return <Chat {...commonProps} currentOutletId={currentOutletId} outlets={outlets} />;
             default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
@@ -396,7 +539,6 @@ const App = () => {
                 <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
               </div>
 
-              {/* PREMIUM STORE SWITCHER FOR DESKTOP */}
               {isPremium && (
                 <div className="px-4 mb-4">
                   <OutletSelector
@@ -418,64 +560,6 @@ const App = () => {
                   >
                     Manage Outlets
                   </button>
-                </div>
-              )}
-              {isPremium && false && (
-                <div className="px-4 mb-4">
-                  <button 
-                    onClick={() => setIsStorePanelOpen(!isStorePanelOpen)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
-                      darkMode ? 'bg-indigo-600/5 border-indigo-500/20 text-indigo-400' : 'bg-indigo-50 border-indigo-100 text-indigo-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Store size={18} />
-                      <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Active Hub</p>
-                        <p className="text-sm font-bold truncate max-w-[100px]">{activeStore}</p>
-                      </div>
-                    </div>
-                    <ChevronDown size={16} className={`transition-transform duration-300 ${isStorePanelOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {isStorePanelOpen && (
-                    <div className={`mt-2 p-1.5 rounded-2xl border animate-in slide-in-from-top-2 duration-200 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl'}`}>
-                      <p className={`text-[9px] font-black px-3 py-2 uppercase tracking-[0.2em] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>Select Outlet</p>
-                      <div className="space-y-1">
-                        {stores.map(store => (
-                          <button
-                            key={store}
-                            onClick={() => { setActiveStore(store); setIsStorePanelOpen(false); }}
-                            className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                              activeStore === store 
-                              ? 'bg-indigo-600 text-white shadow-lg' 
-                              : darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-50 text-slate-500'
-                            }`}
-                          >
-                            <Store size={14} className="mr-2 opacity-70" />
-                            {store}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      <div className={`mt-2 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                        <button 
-                          onClick={() => { setCurrentPage('settings'); localStorage.setItem('settings_target_view', 'storeControl'); setIsStorePanelOpen(false); }}
-                          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-black transition-all ${darkMode ? 'text-indigo-400 hover:bg-slate-800' : 'text-indigo-600 hover:bg-indigo-50'}`}
-                        >
-                          <Settings2 size={14} className="mr-2" />
-                          MANAGE ALL
-                        </button>
-                        <button 
-                          onClick={() => { showToast('Redirecting to Store Setup...', 'info'); setIsStorePanelOpen(false); }}
-                          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-black transition-all ${darkMode ? 'text-emerald-400 hover:bg-slate-800' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                        >
-                          <PlusCircle size={14} className="mr-2" />
-                          ADD NEW STORE
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 

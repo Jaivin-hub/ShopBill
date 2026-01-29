@@ -22,6 +22,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const webhookRouter = require('./routes/webhookRouter');
 const scmRoutes = require('./routes/scmRoutes');
 const outletRoutes = require('./routes/outletRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,6 +64,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/webhooks', webhookRouter);
 app.use('/api/scm', scmRoutes);
 app.use('/api/outlets', outletRoutes);
+app.use('/api/chat', chatRoutes);
 
 // --- SOCKET.IO LOGIC ---
 
@@ -83,11 +85,33 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
     console.log(`🔌 Client connected: ${socket.id}`);
 
+    // Join user-specific room for chat notifications
+    if (socket.user && socket.user.id) {
+        socket.join(`user_${socket.user.id}`);
+        console.log(`👤 Socket ${socket.id} joined user room: user_${socket.user.id}`);
+    }
+
     socket.on('join_shop', (shopId) => {
         if (shopId) {
             const roomName = String(shopId); // Ensure string
             socket.join(roomName);
             console.log(`🏠 Socket ${socket.id} joined Room: ${roomName}`);
+        }
+    });
+
+    // Join chat room for real-time messaging
+    socket.on('join_chat', (chatId) => {
+        if (chatId) {
+            socket.join(`chat_${chatId}`);
+            console.log(`💬 Socket ${socket.id} joined Chat: chat_${chatId}`);
+        }
+    });
+
+    // Leave chat room
+    socket.on('leave_chat', (chatId) => {
+        if (chatId) {
+            socket.leave(`chat_${chatId}`);
+            console.log(`💬 Socket ${socket.id} left Chat: chat_${chatId}`);
         }
     });
 

@@ -131,24 +131,70 @@ const InputField = ({ label, darkMode, ...props }) => (
 
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, darkMode }) => {
     const isLowStock = item.quantity <= (item.reorderLevel || 5);
-    const cardBg = darkMode ? (isLowStock ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-900 border-slate-800') : (isLowStock ? 'bg-red-50 border-red-100' : 'bg-white border-slate-200 shadow-sm');
+    const cardBg = darkMode 
+        ? (isLowStock ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900/80 border-slate-800/50 hover:border-indigo-500/30') 
+        : (isLowStock ? 'bg-red-50/80 border-red-200' : 'bg-white border-slate-200 shadow-sm hover:border-indigo-300');
+    
     return (
-        <article className={`p-5 rounded-2xl border transition-all ${cardBg}`}>
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex-1 pr-2">
-                    <div className="flex items-center gap-2">
-                        <h4 className={`text-xs font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.name}</h4>
-                        {isLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse" />}
+        <article className={`group p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${cardBg}`}>
+            <div className="flex items-center justify-between gap-3">
+                {/* Left: Product Info */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`p-2 rounded-lg flex-shrink-0 ${isLowStock ? 'bg-red-500/10' : 'bg-indigo-500/10'}`}>
+                        <Package className={`w-4 h-4 ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`} />
                     </div>
-                    <p className={`text-[9px] font-bold tracking-wider mt-1 flex items-center gap-1 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}><Hash className="w-2.5 h-2.5" /> {item.hsn || '---'}</p>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <h4 className={`text-sm font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {item.name}
+                            </h4>
+                            {isLowStock && <Bell className="w-3.5 h-3.5 text-red-500 animate-pulse flex-shrink-0" />}
+                        </div>
+                        {item.hsn && (
+                            <p className={`text-[9px] font-bold tracking-wider flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                <Hash className="w-3 h-3" /> {item.hsn}
+                            </p>
+                        )}
+                    </div>
                 </div>
-                <div className="text-right"><span className="text-sm font-black text-emerald-500 tabular-nums">₹{item.price?.toLocaleString()}</span></div>
-            </div>
-            <div className={`flex justify-between items-center ${darkMode ? 'bg-slate-950 border-slate-800/50' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border`}>
-                <div><p className={`text-[8px] font-black  tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Level</p><p className={`text-xs font-black ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>{item.quantity} Units</p></div>
-                <div className="flex gap-2">
-                    <button onClick={() => handleEditClick(item)} className={`p-2.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} rounded-xl text-indigo-500 hover:bg-indigo-600 hover:text-white transition-all active:scale-90`}><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => handleDeleteClick(item._id || item.id, item.name)} disabled={loading} className={`p-2.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} rounded-xl text-red-500 hover:bg-red-600 hover:text-white transition-all active:scale-90`}><Trash2 className="w-4 h-4" /></button>
+
+                {/* Center: Stats */}
+                <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="text-center">
+                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                        <p className={`text-base font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
+                            {item.quantity}
+                        </p>
+                    </div>
+                    <div className="text-center">
+                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                        <p className={`text-base font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                            {item.reorderLevel || 5}
+                        </p>
+                    </div>
+                    <div className="text-center">
+                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                        <p className="text-base font-black text-emerald-500 tabular-nums">₹{item.price?.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex gap-1.5 flex-shrink-0">
+                    <button 
+                        onClick={() => handleEditClick(item)} 
+                        className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-indigo-600' : 'bg-slate-100 hover:bg-indigo-600'} rounded-lg text-indigo-500 hover:text-white transition-all active:scale-90`}
+                        title="Edit"
+                    >
+                        <Edit className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => handleDeleteClick(item._id || item.id, item.name)} 
+                        disabled={loading} 
+                        className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-red-600' : 'bg-slate-100 hover:bg-red-600'} rounded-lg text-red-500 hover:text-white transition-all active:scale-90`}
+                        title="Delete"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
         </article>
@@ -262,48 +308,39 @@ const InventoryContent = ({
             {/* Removed overflow-y-auto so the main page body handles scrolling */}
             <main className="flex-1">
                 <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
-                    <div className="hidden lg:block rounded-2xl border overflow-hidden shadow-sm overflow-x-auto" style={{ backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.4)' : 'white', borderColor: darkMode ? '#1e293b' : '#e2e8f0' }}>
-                        <div className={`px-6 py-5 ${darkMode ? 'bg-slate-900 border-b border-slate-800' : 'bg-slate-50 border-b border-slate-100'} flex items-center gap-2`}>
-                            <Layers className="w-4 h-4 text-indigo-500" /><h2 className={`text-[10px] font-black  tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Master Registry • {inventory.length} Assets Found</h2>
+                    {/* Desktop & Tablet: Enhanced Card Grid Layout */}
+                    <section className="hidden md:block pb-6">
+                        <div className={`mb-6 flex items-center justify-between ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'} px-6 py-4 rounded-2xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <div className="flex items-center gap-3">
+                                <Layers className="w-5 h-5 text-indigo-500" />
+                                <h2 className={`text-[11px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                    Master Registry
+                                </h2>
+                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+                                    {inventory.length} {inventory.length === 1 ? 'Asset' : 'Assets'}
+                                </span>
+                            </div>
                         </div>
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className={`${darkMode ? 'bg-slate-950 border-b border-slate-800' : 'bg-white border-b border-slate-100'}`}>
-                                    <th className="px-6 py-4 text-[9px] font-black text-slate-500  tracking-widest">Asset Details</th>
-                                    <th className="px-6 py-4 text-[9px] font-black text-slate-500  tracking-widest text-center">Stock Level</th>
-                                    <th className="px-6 py-4 text-[9px] font-black text-slate-500  tracking-widest text-center">Unit Valuation</th>
-                                    <th className="px-6 py-4 text-[9px] font-black text-slate-500  tracking-widest text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className={`divide-y ${darkMode ? 'divide-slate-800/50' : 'divide-slate-100'}`}>
-                                {inventory.map(item => {
-                                    const isLowStock = item.quantity <= (item.reorderLevel || 5);
-                                    return (
-                                        <tr key={item._id || item.id} className={`group transition-colors ${isLowStock ? 'bg-red-500/[0.03]' : (darkMode ? 'hover:bg-white/[0.01]' : 'hover:bg-slate-50')}`}>
-                                            <td className="px-6 py-5">
-                                                <div className={`font-black text-xs tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.name}{isLowStock && <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] font-black rounded ">Alert</span>}</div>
-                                                <div className={`text-[9px] font-bold mt-1 tracking-wider flex items-center gap-1.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}><Hash className="w-3 h-3" /> {item.hsn || '---'}</div>
-                                            </td>
-                                            <td className="px-6 py-5 text-center"><span className={`text-sm font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>{item.quantity}</span></td>
-                                            <td className="px-6 py-5 text-center"><span className="text-sm font-black text-emerald-500 tabular-nums">₹{item.price?.toLocaleString()}</span></td>
-                                            <td className="px-6 py-5 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button onClick={() => handleEditClick(item)} className={`p-2.5 ${darkMode ? 'bg-slate-800 border-slate-700 text-indigo-400' : 'bg-slate-100 border-slate-200 text-indigo-600'} border rounded-xl transition-all active:scale-90`}><Edit className="w-4 h-4" /></button>
-                                                    <button onClick={() => handleDeleteClick(item._id || item.id, item.name)} disabled={loading} className={`p-2.5 ${darkMode ? 'bg-slate-800 border-slate-700 text-red-400' : 'bg-slate-100 border-slate-200 text-red-600'} border rounded-xl transition-all active:scale-90`}><Trash2 className="w-4 h-4" /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} />)}
+                            {inventory.length === 0 && (
+                                <div className={`col-span-full text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
+                                    <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest">No Records Found</p>
+                                </div>
+                            )}
+                        </div>
+                    </section>
 
-                    <section className="lg:hidden pb-20">
+                    {/* Mobile: Compact Card Layout */}
+                    <section className="md:hidden pb-20">
                         <div className="grid grid-cols-1 gap-4">
                             {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} />)}
                             {inventory.length === 0 && (
-                                <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}><Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" /><p className="text-[10px] font-black text-slate-500  tracking-widest">No Records Found</p></div>
+                                <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
+                                    <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
+                                    <p className="text-[10px] font-black text-slate-500 tracking-widest">No Records Found</p>
+                                </div>
                             )}
                         </div>
                     </section>
@@ -313,21 +350,155 @@ const InventoryContent = ({
             {/* --- MODALS --- */}
             {isFormModalOpen && (
                 <section className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[200] p-4 overflow-y-auto">
-                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-xl rounded-2xl border overflow-hidden shadow-2xl`}>
-                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
-                            <h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>{isEditing ? 'Modify' : 'Add'} Product</h2>
-                            <button type="button" onClick={closeFormModal} className="p-2 hover:bg-red-500/10 rounded-xl text-gray-500"><X className="w-5 h-5" /></button>
+                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-2xl rounded-2xl border overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200`}>
+                        {/* Header */}
+                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-xl ${isEditing ? 'bg-indigo-500/10' : 'bg-emerald-500/10'}`}>
+                                    <Package className={`w-5 h-5 ${isEditing ? 'text-indigo-500' : 'text-emerald-500'}`} />
+                                </div>
+                                <div>
+                                    <h2 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                        {isEditing ? 'Edit Product' : 'Add New Product'}
+                                    </h2>
+                                    <p className={`text-[10px] font-bold tracking-wider mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        {isEditing ? 'Update product information' : 'Add a new item to your inventory'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" onClick={closeFormModal} className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                        <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-6 ${darkMode ? 'bg-slate-950/20' : 'bg-slate-50/50'}`}>
-                            <div className="md:col-span-2"><InputField label="Product Name" name="name" type="text" value={formData.name} onChange={handleInputChange} darkMode={darkMode} required /></div>
-                            <InputField label="Price (₹)" name="price" type="number" value={formData.price} onChange={handleInputChange} darkMode={darkMode} required />
-                            <InputField label="Stock" name="quantity" type="number" value={formData.quantity} onChange={handleInputChange} darkMode={darkMode} required />
-                            <InputField label="Reorder Alert" name="reorderLevel" type="number" value={formData.reorderLevel} onChange={handleInputChange} darkMode={darkMode} />
-                            <InputField label="HSN / Barcode Index" name="hsn" type="text" value={formData.hsn} onChange={handleInputChange} darkMode={darkMode} />
+
+                        {/* Form Fields */}
+                        <div className="p-6 space-y-6">
+                            {/* Product Name */}
+                            <div className="space-y-2">
+                                <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    <span>Product Name</span>
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    name="name"
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter product name (e.g., Samsung Galaxy S23)"
+                                    required
+                                    className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                />
+                            </div>
+
+                            {/* Price and Stock */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        <span>Price per Unit</span>
+                                        <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>₹</span>
+                                        <input
+                                            name="price"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={formData.price}
+                                            onChange={handleInputChange}
+                                            placeholder="0.00"
+                                            required
+                                            className={`no-zoom-input w-full pl-8 pr-4 py-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                        />
+                                    </div>
+                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Selling price for one unit</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        <span>Current Stock</span>
+                                        <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        name="quantity"
+                                        type="number"
+                                        min="0"
+                                        value={formData.quantity}
+                                        onChange={handleInputChange}
+                                        placeholder="0"
+                                        required
+                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                    />
+                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Available quantity in stock</p>
+                                </div>
+                            </div>
+
+                            {/* Reorder Level and HSN */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        <span>Low Stock Alert</span>
+                                    </label>
+                                    <input
+                                        name="reorderLevel"
+                                        type="number"
+                                        min="0"
+                                        value={formData.reorderLevel}
+                                        onChange={handleInputChange}
+                                        placeholder="5"
+                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                    />
+                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Alert when stock reaches this level</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        <Hash className="w-3.5 h-3.5" />
+                                        <span>HSN Code / Barcode</span>
+                                    </label>
+                                    <input
+                                        name="hsn"
+                                        type="text"
+                                        value={formData.hsn}
+                                        onChange={handleInputChange}
+                                        placeholder="Optional - Enter HSN or barcode"
+                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                    />
+                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>For tax and inventory tracking</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className={`p-6 border-t ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-white border-slate-100'}`}>
-                            <button type="submit" disabled={loading || !formData.name} className={`w-full py-4 text-white text-[10px] font-black  tracking-[0.2em] rounded-xl transition-all shadow-lg ${isEditing ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
-                                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isEditing ? 'Confirm Modifications' : 'Save to Inventory')}
+
+                        {/* Footer Actions */}
+                        <div className={`p-6 border-t ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
+                            <button
+                                type="button"
+                                onClick={closeFormModal}
+                                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                                    darkMode
+                                        ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading || !formData.name}
+                                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    isEditing
+                                        ? 'bg-indigo-600 hover:bg-indigo-500'
+                                        : 'bg-emerald-600 hover:bg-emerald-500'
+                                }`}
+                            >
+                                {loading ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {isEditing ? 'Updating...' : 'Saving...'}
+                                    </span>
+                                ) : (
+                                    isEditing ? 'Update Product' : 'Add to Inventory'
+                                )}
                             </button>
                         </div>
                     </form>
