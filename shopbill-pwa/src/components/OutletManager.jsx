@@ -160,8 +160,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         <main className="p-4 md:p-8 min-h-screen bg-transparent text-white">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                        <Store className="w-8 h-8 text-indigo-500" />
+                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
                         STORE NETWORK
                     </h1>
                     <p className="text-slate-500 text-xs font-bold mt-1 tracking-wide uppercase opacity-70">

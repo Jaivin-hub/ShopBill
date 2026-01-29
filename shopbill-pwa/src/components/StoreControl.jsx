@@ -173,7 +173,7 @@ const StoreControl = ({
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="font-black text-lg tracking-tight uppercase">Store Network</h2>
+                {/* <h2 className="font-black text-lg tracking-tight uppercase">Store Network</h2> */}
                 <button 
                     onClick={() => handleOpenModal()}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-black text-xs tracking-widest transition-all shadow-lg shadow-indigo-600/20"

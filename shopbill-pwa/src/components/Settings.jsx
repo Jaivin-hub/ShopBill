@@ -229,14 +229,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             )}
                             {/* Legacy Store Control (if needed) */}
                             <SettingItem 
-                                icon={Building2} 
-                                title="Store Control" 
-                                description="Manage multi-store nodes and branches." 
-                                onClick={() => setCurrentView('storeControl')} 
-                                accentColor="text-indigo-500"
-                                darkMode={darkMode}
-                            />
-                            <SettingItem 
                                 icon={CreditCard} 
                                 title="Subscription & Billing" 
                                 description="Manage enterprise plan and invoices." 
