@@ -26,6 +26,13 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Don't set Content-Type for FormData (let browser set it with boundary)
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    } else {
+      delete config.headers['Content-Type'];
+    }
+
     // Add outlet/store context header for all users with activeStoreId
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     const activeStoreId = currentUser?.activeStoreId;

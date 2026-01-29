@@ -1,11 +1,42 @@
 // routes/chatRoutes.js
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const Chat = require('../models/Chat');
 const User = require('../models/User');
 const Store = require('../models/Store');
 const Staff = require('../models/Staff');
 const router = express.Router();
+
+// Configure multer for audio file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../uploads/audio');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `voice-${uniqueSuffix}${path.extname(file.originalname)}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/m4a'];
+        if (allowedMimes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only audio files are allowed.'), false);
+        }
+    }
+});
 
 // Helper: Check if user has required plan
 const checkPlan = (user, requiredPlan) => {
@@ -201,16 +232,17 @@ router.post('/create', protect, async (req, res) => {
 
 /**
  * @route POST /api/chat/:chatId/message
- * @desc Send a message to a chat
+ * @desc Send a message to a chat (text or voice)
  * @access Private (PRO/PREMIUM)
  */
-router.post('/:chatId/message', protect, async (req, res) => {
+router.post('/:chatId/message', protect, upload.single('audio'), async (req, res) => {
     try {
         const { chatId } = req.params;
-        const { content } = req.body;
+        const { content, audioDuration, messageType } = req.body;
 
-        if (!content || !content.trim()) {
-            return res.status(400).json({ error: 'Message content is required' });
+        // Validate: must have either content or audio file
+        if (!content?.trim() && !req.file) {
+            return res.status(400).json({ error: 'Message content or audio file is required' });
         }
 
         const user = await User.findById(req.user.id);
@@ -228,14 +260,42 @@ router.post('/:chatId/message', protect, async (req, res) => {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Create message
+        // Get store name for the sender
+        let senderStoreName = null;
+        if (user.role === 'Manager' || user.role === 'Cashier') {
+            // For staff, get their assigned store
+            const staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
+            if (staffRecord && staffRecord.storeId) {
+                senderStoreName = staffRecord.storeId.name;
+            }
+        } else if (user.role === 'owner') {
+            // For owner, check if chat is for a specific outlet or all outlets
+            if (chat.outletId) {
+                // Specific outlet chat - get the outlet name
+                const outlet = await Store.findById(chat.outletId);
+                if (outlet) {
+                    senderStoreName = outlet.name;
+                }
+            }
+            // If outletId is null, it's an "all outlets" chat, so don't show store name
+        }
+
+        // Build message object
         const message = {
             senderId: req.user.id,
             senderName: user.name || user.email,
             senderRole: user.role,
-            content: content.trim(),
+            senderStoreName: senderStoreName,
+            content: content?.trim() || '',
+            messageType: messageType || (req.file ? 'audio' : 'text'),
             timestamp: new Date()
         };
+
+        // Handle audio file
+        if (req.file) {
+            message.audioUrl = `/uploads/audio/${req.file.filename}`;
+            message.audioDuration = audioDuration ? parseFloat(audioDuration) : null;
+        }
 
         // Add message to chat
         chat.messages.push(message);
@@ -276,6 +336,14 @@ router.post('/:chatId/message', protect, async (req, res) => {
         res.json({ success: true, data: populatedMessage });
     } catch (error) {
         console.error('Send Message Error:', error);
+        // Clean up uploaded file if there was an error
+        if (req.file) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (unlinkError) {
+                console.error('Failed to delete uploaded file:', unlinkError);
+            }
+        }
         res.status(500).json({ error: 'Failed to send message' });
     }
 });

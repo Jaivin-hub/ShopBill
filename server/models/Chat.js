@@ -9,7 +9,11 @@ const MessageSchema = new mongoose.Schema({
     },
     senderName: { type: String, required: true },
     senderRole: { type: String, required: true },
-    content: { type: String, required: true, trim: true },
+    senderStoreName: { type: String, default: null }, // Store name for staff members or when owner sends from specific outlet
+    content: { type: String, required: false, trim: true, default: '' }, // Made optional for voice messages
+    audioUrl: { type: String, default: null }, // URL to audio file for voice messages
+    audioDuration: { type: Number, default: null }, // Duration in seconds
+    messageType: { type: String, enum: ['text', 'audio'], default: 'text' },
     timestamp: { type: Date, default: Date.now }
 }, { _id: true });
 

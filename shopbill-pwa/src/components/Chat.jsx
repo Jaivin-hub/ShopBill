@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     MessageCircle, Send, Plus, Users, User, Search, X, Loader2,
-    Store, Hash, ChevronRight, MoreVertical, Image as ImageIcon, Paperclip
+    Store, Hash, ChevronRight, MoreVertical, Image as ImageIcon, Paperclip, ArrowLeft,
+    Mic, Square, Play, Pause
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import API from '../config/api';
@@ -35,15 +36,25 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [staffList, setStaffList] = useState([]);
     const [isLoadingStaff, setIsLoadingStaff] = useState(false);
     
+    // Voice recording state
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [audioBlob, setAudioBlob] = useState(null);
+    const [audioUrl, setAudioUrl] = useState(null);
+    const [mediaRecorder, setMediaRecorder] = useState(null);
+    const [playingAudioId, setPlayingAudioId] = useState(null);
+    
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
+    const recordingTimerRef = useRef(null);
+    const audioRefs = useRef({});
 
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
     const isPremium = currentUser?.plan?.toUpperCase() === 'PREMIUM';
     const hasChatAccess = isPro || isPremium;
 
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-900';
+    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
 
@@ -224,6 +235,138 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // Format time (seconds to MM:SS)
+    const formatRecordingTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Start voice recording
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            
+            const chunks = [];
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+            
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                setAudioBlob(blob);
+                const url = URL.createObjectURL(blob);
+                setAudioUrl(url);
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            recorder.start();
+            setMediaRecorder(recorder);
+            setIsRecording(true);
+            setRecordingTime(0);
+            
+            // Start timer
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            showToast('Microphone access denied', 'error');
+        }
+    };
+
+    // Stop voice recording
+    const stopRecording = () => {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            setIsRecording(false);
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current);
+                recordingTimerRef.current = null;
+            }
+        }
+    };
+
+    // Cancel recording
+    const cancelRecording = () => {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+            if (mediaRecorder.stream) {
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+        }
+        setIsRecording(false);
+        setRecordingTime(0);
+        setAudioBlob(null);
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            setAudioUrl(null);
+        }
+        if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+    };
+
+    // Send voice message
+    const sendVoiceMessage = async () => {
+        if (!audioBlob || !selectedChat) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'voice-message.webm');
+            formData.append('messageType', 'audio');
+            formData.append('audioDuration', recordingTime.toString());
+            formData.append('content', '');
+
+            const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (response.data.success) {
+                setMessages(prev => [...prev, response.data.data]);
+                scrollToBottom();
+                fetchChats();
+                // Cleanup
+                cancelRecording();
+            }
+        } catch (error) {
+            console.error('Failed to send voice message:', error);
+            showToast('Failed to send voice message', 'error');
+        }
+    };
+
+    // Play/pause audio
+    const toggleAudio = (messageId, audioUrl) => {
+        const audio = audioRefs.current[messageId];
+        if (!audio) return;
+
+        if (playingAudioId === messageId) {
+            audio.pause();
+            setPlayingAudioId(null);
+        } else {
+            // Stop any currently playing audio
+            if (playingAudioId) {
+                const currentAudio = audioRefs.current[playingAudioId];
+                if (currentAudio) currentAudio.pause();
+            }
+            audio.play();
+            setPlayingAudioId(messageId);
+        }
+    };
+
+    // Handle audio ended
+    useEffect(() => {
+        Object.values(audioRefs.current).forEach(audio => {
+            if (audio) {
+                audio.onended = () => setPlayingAudioId(null);
+            }
+        });
+    }, [messages]);
+
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!messageInput.trim() || !selectedChat) return;
@@ -356,11 +499,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     }
 
     return (
-        <div className={`min-h-screen flex ${themeBase} transition-colors duration-200`}>
+        <div className={`flex flex-col md:flex-row ${themeBase} transition-colors duration-200 min-h-[calc(100vh-10rem)] md:min-h-full`}>
             {/* Chat List Sidebar */}
-            <div className={`w-full ${selectedChat ? 'md:w-80' : 'md:w-96'} ${selectedChat ? 'border-r' : ''} ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} flex flex-col`}>
+            <div className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} flex-col h-[calc(100vh-10rem)] md:h-full overflow-hidden`}>
                 {/* Header */}
-                <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
+                <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between shrink-0`}>
                     <div className="flex items-center gap-2">
                         <MessageCircle className="w-5 h-5 text-indigo-500" />
                         <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>Messages</h2>
@@ -393,8 +536,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     </div>
                 </div>
 
-                        {/* Search */}
-                <div className="p-3 border-b border-inherit">
+                {/* Search */}
+                <div className="p-3 border-b border-inherit shrink-0">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input
@@ -402,13 +545,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             placeholder={showStaffList ? "Search staff..." : "Search chats..."}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className={`w-full pl-10 pr-4 py-2 ${inputBase} border rounded-xl text-sm focus:outline-none focus:border-indigo-500`}
+                            className={`w-full pl-10 pr-4 py-2.5 ${inputBase} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                         />
                     </div>
                 </div>
 
                 {/* Content: Staff List or Chat List */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                     {showStaffList ? (
                         // All Staff List
                         <div>
@@ -564,13 +707,20 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             </div>
 
             {/* Chat View */}
-            <div className={`${selectedChat ? 'flex-1' : 'hidden md:flex flex-1'} flex flex-col ${!selectedChat ? (darkMode ? 'bg-slate-950' : 'bg-slate-50') : ''}`}>
+            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col ${darkMode ? 'bg-slate-950' : 'bg-slate-50'} h-[calc(100vh-10rem)] md:h-full overflow-hidden`}>
                 {selectedChat ? (
                     <>
                         {/* Chat Header */}
-                        <div className={`p-4 border-b ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} flex items-center justify-between`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        <div className={`p-4 border-b ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} flex items-center justify-between shrink-0`}>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                {/* Back Button (Mobile Only) */}
+                                <button
+                                    onClick={() => setSelectedChat(null)}
+                                    className="md:hidden p-2 -ml-2 hover:bg-slate-800/50 rounded-lg transition-colors shrink-0"
+                                >
+                                    <ArrowLeft className="w-5 h-5 text-slate-400" />
+                                </button>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                                     selectedChat.type === 'group' 
                                         ? 'bg-indigo-500/10 text-indigo-500' 
                                         : 'bg-slate-200 text-slate-600'
@@ -581,8 +731,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                         <User className="w-5 h-5" />
                                     )}
                                 </div>
-                                <div>
-                                    <h3 className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`text-base font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                         {getChatDisplayName(selectedChat)}
                                     </h3>
                                     {selectedChat.type === 'group' && (
@@ -597,7 +747,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         {/* Messages */}
                         <div 
                             ref={chatContainerRef}
-                            className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
+                            className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar min-h-0"
                         >
                             {isLoadingMessages ? (
                                 <div className="flex items-center justify-center py-12">
@@ -612,24 +762,83 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             ) : (
                                 messages.map((msg, idx) => {
                                     const isOwn = msg.senderId?._id === currentUser._id || msg.senderId === currentUser._id;
+                                    const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
+                                    const audioSrc = msg.audioUrl ? (msg.audioUrl.startsWith('http') ? msg.audioUrl : `${import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api'}${msg.audioUrl}`) : null;
+                                    
                                     return (
                                         <div
                                             key={msg._id || idx}
-                                            className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                                            className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}
                                         >
-                                            <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
+                                            <div className={`flex flex-col max-w-[80%] md:max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
                                                 {!isOwn && (
-                                                    <p className={`text-xs font-bold mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                        {msg.senderName}
-                                                    </p>
+                                                    <div className="mb-1 px-1">
+                                                        <p className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                            {msg.senderName}
+                                                        </p>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                                {msg.senderRole === 'owner' ? 'Owner' : msg.senderRole === 'Manager' ? 'Manager' : msg.senderRole === 'Cashier' ? 'Cashier' : msg.senderRole}
+                                                            </span>
+                                                            {msg.senderStoreName && (
+                                                                <>
+                                                                    <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>•</span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Store className="w-2.5 h-2.5 text-slate-400" />
+                                                                        <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                                            {msg.senderStoreName}
+                                                                        </span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 )}
-                                                <div className={`p-3 rounded-2xl ${
+                                                <div className={`px-4 py-2.5 rounded-2xl shadow-sm ${
                                                     isOwn
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'
+                                                        ? 'bg-indigo-600 text-white rounded-br-md'
+                                                        : darkMode ? 'bg-slate-800 text-white rounded-bl-md' : 'bg-white text-slate-900 border border-slate-200 rounded-bl-md'
                                                 }`}>
-                                                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                                                    <p className={`text-[10px] mt-1 ${isOwn ? 'text-indigo-100' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                    {isVoiceMessage && audioSrc ? (
+                                                        <div className="flex items-center gap-3 min-w-[200px]">
+                                                            <button
+                                                                onClick={() => toggleAudio(msg._id, audioSrc)}
+                                                                className={`p-2.5 rounded-full transition-all ${
+                                                                    isOwn 
+                                                                        ? 'bg-indigo-700 hover:bg-indigo-800' 
+                                                                        : darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200'
+                                                                }`}
+                                                            >
+                                                                {playingAudioId === msg._id ? (
+                                                                    <Pause className="w-4 h-4" />
+                                                                ) : (
+                                                                    <Play className="w-4 h-4" />
+                                                                )}
+                                                            </button>
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <Mic className="w-3.5 h-3.5 opacity-70" />
+                                                                    <span className="text-xs font-bold">
+                                                                        {msg.audioDuration ? formatRecordingTime(Math.floor(msg.audioDuration)) : 'Voice'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className={`w-full h-1.5 rounded-full ${isOwn ? 'bg-indigo-500/30' : darkMode ? 'bg-slate-600' : 'bg-slate-200'}`}>
+                                                                    <div className={`h-full ${isOwn ? 'bg-indigo-200' : 'bg-slate-400'} rounded-full transition-all`} style={{ width: playingAudioId === msg._id ? '100%' : '0%' }} />
+                                                                </div>
+                                                            </div>
+                                                            <audio
+                                                                ref={el => {
+                                                                    if (el) audioRefs.current[msg._id] = el;
+                                                                }}
+                                                                src={audioSrc}
+                                                                preload="metadata"
+                                                                onEnded={() => setPlayingAudioId(null)}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                                                    )}
+                                                    <p className={`text-[10px] mt-1.5 ${isOwn ? 'text-indigo-100' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                                         {new Date(msg.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                                     </p>
                                                 </div>
@@ -642,24 +851,84 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         </div>
 
                         {/* Message Input */}
-                        <form onSubmit={handleSendMessage} className={`p-4 border-t ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    value={messageInput}
-                                    onChange={(e) => setMessageInput(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className={`flex-1 ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500`}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!messageInput.trim()}
-                                    className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <Send className="w-5 h-5" />
-                                </button>
+                        {audioUrl && !isRecording ? (
+                            // Recording preview
+                            <div className={`px-4 py-2 mb-2 md:mb-0 border-t ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} shrink-0`}>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex-1 flex items-center gap-2 p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                        <Mic className="w-4 h-4 text-indigo-500" />
+                                        <div className="flex-1">
+                                            <p className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                                {formatRecordingTime(recordingTime)}
+                                            </p>
+                                            <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Voice recording ready</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={sendVoiceMessage}
+                                        className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 shrink-0"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={cancelRecording}
+                                        className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all shrink-0"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
-                        </form>
+                        ) : isRecording ? (
+                            // Recording in progress
+                            <div className={`px-4 py-2 mb-2 md:mb-0 border-t ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} shrink-0`}>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="flex-1 flex items-center gap-2 p-2 rounded-xl bg-red-500/10 border-2 border-red-500/30">
+                                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                                        <div className="flex-1">
+                                            <p className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                                Recording... {formatRecordingTime(recordingTime)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={stopRecording}
+                                        className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all shadow-lg shadow-red-600/20 shrink-0"
+                                    >
+                                        <Square className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            // Normal text input
+                            <form onSubmit={handleSendMessage} className={`px-4 py-2 mb-2 md:mb-0 border-t ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} shrink-0`}>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={startRecording}
+                                        className={`p-2 rounded-xl transition-all shrink-0 ${
+                                            darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                        title="Record voice message"
+                                    >
+                                        <Mic className="w-4 h-4" />
+                                    </button>
+                                    <input
+                                        type="text"
+                                        value={messageInput}
+                                        onChange={(e) => setMessageInput(e.target.value)}
+                                        placeholder="Type a message..."
+                                        className={`flex-1 ${inputBase} px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!messageInput.trim()}
+                                        className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/20 shrink-0"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </form>
+                        )}
                     </>
                 ) : (
                     <div className="flex-1 flex items-center justify-center p-8">
