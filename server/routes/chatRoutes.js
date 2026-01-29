@@ -310,36 +310,56 @@ router.get('/users', protect, async (req, res) => {
                     : await Store.find({ ownerId: user._id, isActive: true });
                 
                 const storeIds = stores.map(s => s._id);
+                
+                // Find all active staff in these stores
                 const staffList = await Staff.find({ 
                     storeId: { $in: storeIds },
-                    isActive: true 
+                    active: true 
                 }).populate('userId', 'name email role profileImageUrl').populate('storeId', 'name');
 
-                users = staffList.map(s => ({
-                    _id: s.userId._id,
-                    name: s.userId.name || s.userId.email,
-                    email: s.userId.email,
-                    role: s.userId.role,
-                    profileImageUrl: s.userId.profileImageUrl,
-                    outletId: s.storeId?._id,
-                    outletName: s.storeId?.name
-                }));
+                console.log(`[Chat] Found ${staffList.length} staff for owner ${user._id} in ${storeIds.length} stores`);
+
+                users = staffList.map(s => {
+                    if (!s.userId) {
+                        console.warn(`[Chat] Staff ${s._id} has no userId populated`);
+                        return null;
+                    }
+                    return {
+                        _id: s.userId._id,
+                        name: s.name || s.userId.name || s.email || s.userId.email,
+                        email: s.email || s.userId.email,
+                        role: s.role || s.userId.role,
+                        profileImageUrl: s.userId.profileImageUrl,
+                        outletId: s.storeId?._id,
+                        outletName: s.storeId?.name
+                    };
+                }).filter(u => u !== null);
             } else {
                 // PRO: Get all staff (managers and cashiers) from all stores
                 const stores = await Store.find({ ownerId: user._id, isActive: true });
                 const storeIds = stores.map(s => s._id);
                 const staffList = await Staff.find({ 
                     storeId: { $in: storeIds },
-                    isActive: true 
-                }).populate('userId', 'name email role profileImageUrl');
+                    active: true 
+                }).populate('userId', 'name email role profileImageUrl').populate('storeId', 'name');
 
-                users = staffList.map(s => ({
-                    _id: s.userId._id,
-                    name: s.userId.name || s.userId.email,
-                    email: s.userId.email,
-                    role: s.userId.role,
-                    profileImageUrl: s.userId.profileImageUrl
-                }));
+                console.log(`[Chat] Found ${staffList.length} staff for PRO owner ${user._id} in ${storeIds.length} stores`);
+
+                users = staffList.map(s => {
+                    if (!s.userId) {
+                        console.warn(`[Chat] Staff ${s._id} has no userId populated`);
+                        return null;
+                    }
+                    return {
+                        _id: s.userId._id,
+                        name: s.name || s.userId.name || s.email || s.userId.email,
+                        email: s.email || s.userId.email,
+                        role: s.role || s.userId.role,
+                        profileImageUrl: s.userId.profileImageUrl,
+                        outletId: s.storeId?._id,
+                        outletName: s.storeId?.name
+                    };
+                }).filter(u => u !== null);
             }
         } else if (user.role === 'Manager') {
             // Manager can chat with owner and other staff in same outlet
@@ -360,15 +380,17 @@ router.get('/users', protect, async (req, res) => {
                 const otherStaff = await Staff.find({ 
                     storeId: staff.storeId._id,
                     userId: { $ne: user._id },
-                    isActive: true
-                }).populate('userId', 'name email role profileImageUrl');
+                    active: true
+                }).populate('userId', 'name email role profileImageUrl').populate('storeId', 'name');
 
                 users.push(...otherStaff.map(s => ({
                     _id: s.userId._id,
-                    name: s.userId.name || s.userId.email,
-                    email: s.userId.email,
-                    role: s.userId.role,
-                    profileImageUrl: s.userId.profileImageUrl
+                    name: s.name || s.userId.name || s.email || s.userId.email,
+                    email: s.email || s.userId.email,
+                    role: s.role,
+                    profileImageUrl: s.userId.profileImageUrl,
+                    outletId: s.storeId?._id,
+                    outletName: s.storeId?.name
                 })));
             }
         } else if (user.role === 'Cashier') {
@@ -390,15 +412,17 @@ router.get('/users', protect, async (req, res) => {
                 const managers = await Staff.find({ 
                     storeId: staff.storeId._id,
                     role: 'Manager',
-                    isActive: true
-                }).populate('userId', 'name email role profileImageUrl');
+                    active: true
+                }).populate('userId', 'name email role profileImageUrl').populate('storeId', 'name');
 
                 users.push(...managers.map(s => ({
                     _id: s.userId._id,
-                    name: s.userId.name || s.userId.email,
-                    email: s.userId.email,
-                    role: s.userId.role,
-                    profileImageUrl: s.userId.profileImageUrl
+                    name: s.name || s.userId.name || s.email || s.userId.email,
+                    email: s.email || s.userId.email,
+                    role: s.role,
+                    profileImageUrl: s.userId.profileImageUrl,
+                    outletId: s.storeId?._id,
+                    outletName: s.storeId?.name
                 })));
             }
         }
