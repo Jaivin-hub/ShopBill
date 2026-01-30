@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Store, ChevronDown, Check, Loader, AlertCircle } from 'lucide-react';
 import API from '../config/api';
 
@@ -7,6 +7,7 @@ const OutletSelector = ({ apiClient, currentUser, currentOutletId, onOutletSwitc
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [currentOutlet, setCurrentOutlet] = useState(null);
+    const fetchingRef = useRef(false);
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -16,9 +17,14 @@ const OutletSelector = ({ apiClient, currentUser, currentOutletId, onOutletSwitc
         } else {
             setIsLoading(false);
         }
-    }, [isPremium, currentUser, currentOutletId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isPremium, currentUser]); // Removed currentOutletId to prevent duplicate fetches
 
     const fetchOutlets = async () => {
+        // Prevent duplicate requests using ref
+        if (fetchingRef.current) return;
+        
+        fetchingRef.current = true;
         setIsLoading(true);
         try {
             const response = await apiClient.get(API.outlets);
@@ -31,12 +37,17 @@ const OutletSelector = ({ apiClient, currentUser, currentOutletId, onOutletSwitc
                 setCurrentOutlet(active);
             }
         } catch (error) {
+            // Ignore cancellation errors (expected behavior for duplicate request prevention)
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return; // Silently ignore cancelled requests
+            }
             console.error('Failed to fetch outlets:', error);
             if (showToast) {
                 showToast('Failed to load outlets.', 'error');
             }
         } finally {
             setIsLoading(false);
+            fetchingRef.current = false;
         }
     };
 
@@ -48,12 +59,20 @@ const OutletSelector = ({ apiClient, currentUser, currentOutletId, onOutletSwitc
                     onOutletSwitch(response.data.data.outlet);
                 }
                 setIsOpen(false);
-                await fetchOutlets();
+                // Update current outlet immediately without refetching (prevents duplicate request)
+                const updatedOutlet = response.data.data.outlet;
+                setCurrentOutlet(updatedOutlet);
+                // Update outlets list with the new active outlet
+                setOutlets(prev => prev.map(o => ({ ...o, isActive: o._id === outletId })));
                 if (showToast) {
                     showToast('Outlet switched successfully!', 'success');
                 }
             }
         } catch (error) {
+            // Ignore cancellation errors (expected behavior for duplicate request prevention)
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return;
+            }
             console.error('Switch outlet error:', error);
             if (showToast) {
                 showToast('Failed to switch outlet.', 'error');

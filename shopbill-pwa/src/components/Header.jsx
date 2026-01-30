@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    User, Bell, Settings, Sun, Moon, 
+    User, Bell, Sun, Moon, 
     CreditCard, LayoutGrid, Store, Plus, ChevronRight,
     Loader2
 } from 'lucide-react';
@@ -141,10 +141,6 @@ const Header = ({
                                 {unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                         )}
-                    </button>
-
-                    <button onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} className={getButtonClasses('settings')}>
-                        <Settings className="w-5 h-5" />
                     </button>
 
                     <button onClick={() => { setCurrentPage('profile'); setShowStoreHub(false); }} className={getButtonClasses('profile')}>

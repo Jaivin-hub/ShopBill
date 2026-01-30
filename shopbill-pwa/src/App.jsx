@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
-  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2, MessageCircle
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2, MessageCircle, MoreHorizontal
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
@@ -134,7 +134,7 @@ const UpdatePrompt = () => {
 
 const UTILITY_NAV_ITEMS_CONFIG = [
   { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
+  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 },
   { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
@@ -175,6 +175,8 @@ const App = () => {
     const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
     return lastSelectedOutletId || user?.activeStoreId || null;
   });
+  const [isChatSelected, setIsChatSelected] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -247,6 +249,10 @@ const App = () => {
                   localStorage.setItem('lastSelectedOutletId', targetOutletId);
                 }
               } catch (error) {
+                // Ignore cancellation errors
+                if (error.cancelled || error.message?.includes('cancelled')) {
+                  return;
+                }
                 console.error('Failed to restore last outlet:', error);
                 setCurrentOutlet(targetOutlet);
                 setCurrentOutletId(targetOutletId);
@@ -266,6 +272,10 @@ const App = () => {
         }
       }
     } catch (error) {
+      // Ignore cancellation errors (expected behavior for duplicate request prevention)
+      if (error.cancelled || error.message?.includes('cancelled')) {
+        return;
+      }
       console.error('Error fetching outlets:', error);
     }
   }, [currentUser, isPremium, currentOutlet, currentOutletId]);
@@ -372,16 +382,27 @@ const App = () => {
     const userPlan = currentUser?.plan?.toUpperCase();
     const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
-      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] },
-      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER] }] : []),
-      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER] },
-      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] }] : []),
+      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
+      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 1 },
+      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 1 },
+      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
+      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 }] : []),
+      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER], priority: 2 },
+      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 }] : []),
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole, isPremium, currentUser]);
+
+  // Split nav items into primary (footer) and secondary (more menu)
+  const { primaryNavItems, secondaryNavItems } = useMemo(() => {
+    const filtered = navItems.filter(item => item.roles.includes(userRole));
+    // Primary items: Dashboard, Billing, Ledger, Inventory (max 4)
+    const primary = filtered.filter(item => item.priority === 1).slice(0, 4);
+    // Secondary items: Everything else (Reports, Supply Chain, Messages, etc.)
+    const primaryIds = primary.map(item => item.id);
+    const secondary = filtered.filter(item => !primaryIds.includes(item.id));
+    return { primaryNavItems: primary, secondaryNavItems: secondary };
+  }, [navItems, userRole]);
 
   const utilityNavItems = useMemo(() =>
     UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
@@ -449,7 +470,6 @@ const App = () => {
     }
 
     const commonProps = { 
-      key: `${currentPage}-${currentOutletId}`,
       darkMode, 
       currentUser, 
       userRole, 
@@ -463,28 +483,31 @@ const App = () => {
       unreadCount, 
       setPageOrigin, 
       currentOutlet,
-      currentOutletId
+      currentOutletId,
+      onOutletSwitch: handleOutletSwitch
     };
+
+    const componentKey = `${currentPage}-${currentOutletId}`;
 
     return (
       <Suspense fallback={null}>
         {(() => {
           switch (currentPage) {
-            case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard {...commonProps} /> : <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
-            case 'billing': return <BillingPOS {...commonProps} />;
-            case 'khata': return <Ledger {...commonProps} />;
-            case 'inventory': return <InventoryManager {...commonProps} />;
-            case 'scm': return <SupplyChainManagement {...commonProps} />;
-            case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport {...commonProps} /> : <Reports {...commonProps} />;
-            case 'notifications': return <NotificationsPage {...commonProps} />;
-            case 'settings': return <SettingsPage {...commonProps} />;
-            case 'profile': return <Profile {...commonProps} />;
-            case 'superadmin_users': return <UserManagement {...commonProps} />;
-            case 'superadmin_systems': return <SystemConfig {...commonProps} />;
-            case 'outlets': return <OutletManager {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
-            case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-            case 'chat': return <Chat {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} />;
-            default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+            case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+            case 'billing': return <BillingPOS key={componentKey} {...commonProps} />;
+            case 'khata': return <Ledger key={componentKey} {...commonProps} />;
+            case 'inventory': return <InventoryManager key={componentKey} {...commonProps} />;
+            case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
+            case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
+            case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
+            case 'settings': return <SettingsPage key={componentKey} {...commonProps} />;
+            case 'profile': return <Profile key={componentKey} {...commonProps} />;
+            case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
+            case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
+            case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
+            case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} />;
+            default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
       </Suspense>
@@ -492,7 +515,6 @@ const App = () => {
   };
 
   const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
-  const [isChatSelected, setIsChatSelected] = useState(false);
   
   // Reset chat selection state when leaving chat page
   useEffect(() => {
@@ -625,14 +647,83 @@ const App = () => {
           </main>
         </div>
         {showAppUI && !isChatSelected && (
-          <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
-            {navItems.map(item => (
-              <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
-                {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}><item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} /></div>
-              </button>
-            ))}
-          </nav>
+          <>
+            <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-2 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
+              {!showMoreMenu && primaryNavItems.map(item => (
+                <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
+                  {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
+                  <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}><item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} /></div>
+                </button>
+              ))}
+              {secondaryNavItems.length > 0 && (
+                <button 
+                  onClick={() => setShowMoreMenu(!showMoreMenu)} 
+                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative ${showMoreMenu ? 'flex-1' : 'flex-1'} ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                >
+                  {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
+                  <div className={`p-1.5 rounded-xl transition-all ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
+                    <MoreHorizontal className={`w-7 h-7 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+                  </div>
+                </button>
+              )}
+            </nav>
+
+            {/* More Menu Modal */}
+            {showMoreMenu && (
+              <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                <div 
+                  className={`fixed bottom-[72px] left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[calc(100vh-144px)] overflow-y-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className={`text-sm font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>More Options</h3>
+                      <button onClick={() => setShowMoreMenu(false)} className="p-2 hover:bg-gray-800 rounded-xl transition-colors">
+                        <X className="w-5 h-5 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="px-2 pt-2 pb-4 pb-safe">
+                    {secondaryNavItems.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setCurrentPage(item.id);
+                          setShowMoreMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
+                          currentPage === item.id
+                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-sm font-bold">{item.name}</span>
+                      </button>
+                    ))}
+                    {utilityNavItems.filter(item => item.id === 'settings').map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setCurrentPage(item.id);
+                          setShowMoreMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
+                          currentPage === item.id
+                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-sm font-bold">{item.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </ApiProvider>

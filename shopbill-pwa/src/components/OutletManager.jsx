@@ -9,7 +9,7 @@ import {
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 
-const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId }) => {
+const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode }) => {
     const [outlets, setOutlets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,9 +29,9 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const isPremium = currentUser?.plan === 'PREMIUM';
 
     // Styling logic
-    const cardBase = 'bg-slate-900 border-slate-800 shadow-xl';
-    const inputBase = 'bg-slate-800 border-slate-700 text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all';
-    const subText = 'text-slate-400';
+    const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
+    const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
 
     useEffect(() => {
         if (isPremium && currentUser) {
@@ -39,7 +39,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         } else {
             setIsLoading(false);
         }
-    }, [isPremium, currentUser]);
+    }, [isPremium, currentUser, currentOutletId]);
 
     const fetchOutlets = async () => {
         setIsLoading(true);
@@ -149,7 +149,8 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             if (response.data.success) {
                 showToast(`Switched to ${response.data.data.outlet.name}`, 'success');
                 if (onOutletSwitch) onOutletSwitch(response.data.data.outlet);
-                fetchOutlets();
+                // Refetch outlets to update the list and show which outlet is now active
+                await fetchOutlets();
             }
         } catch (error) {
             showToast('Failed to switch outlet.', 'error');
@@ -278,60 +279,58 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
             {/* UPGRADED MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-                    <section className={`w-full max-w-2xl rounded-[3rem] border overflow-hidden animate-in fade-in zoom-in duration-300 ${cardBase}`}>
-                        <header className="p-8 border-b border-slate-800 flex items-center justify-between bg-indigo-600/5">
-                            <div>
-                                <h2 className="text-2xl font-black tracking-tight uppercase">
-                                    {editingOutlet ? 'Configure Branch' : 'New Branch Setup'}
-                                </h2>
-                                <p className="text-[10px] font-black text-indigo-500 tracking-widest mt-1 uppercase">Store Identity & Logistics</p>
-                            </div>
-                            <button onClick={handleCloseModal} className="p-3 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
-                                <X size={24} />
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+                    <div className={`${cardBase} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl`}>
+                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
+                            <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {editingOutlet ? 'Configure Branch' : 'New Branch'}
+                            </h3>
+                            <button
+                                onClick={handleCloseModal}
+                                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500"
+                            >
+                                <X className="w-5 h-5" />
                             </button>
-                        </header>
+                        </div>
 
-                        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">BRANCH NAME *</label>
-                                    <div className="relative">
-                                        <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                                        <input
-                                            required
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => {
-                                                setFormData({ ...formData, name: e.target.value });
-                                                if (validationErrors.name) setValidationErrors(prev => ({ ...prev, name: null }));
-                                            }}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.name ? 'border-red-500' : ''}`}
-                                            placeholder="e.g. Mumbai North Hub"
-                                        />
-                                        {validationErrors.name && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.name}</p>}
-                                    </div>
+                        <form onSubmit={handleSubmit}>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Branch Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, name: e.target.value });
+                                            if (validationErrors.name) setValidationErrors(prev => ({ ...prev, name: null }));
+                                        }}
+                                        placeholder="e.g. Mumbai North Hub"
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${validationErrors.name ? 'border-red-500' : ''}`}
+                                    />
+                                    {validationErrors.name && <p className="text-[10px] text-red-500 font-bold mt-1">{validationErrors.name}</p>}
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">TAX ID / GSTIN</label>
-                                    <div className="relative">
-                                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                                        <input
-                                            type="text"
-                                            value={formData.taxId}
-                                            onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
-                                            placeholder="27AAAC..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">CONTACT PHONE</label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Tax ID / GSTIN
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.taxId}
+                                        onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                                        placeholder="Optional"
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Phone
+                                        </label>
                                         <input
                                             type="tel"
                                             maxLength="10"
@@ -341,16 +340,15 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                                 setFormData({ ...formData, phone: value });
                                                 if (validationErrors.phone) setValidationErrors(prev => ({ ...prev, phone: null }));
                                             }}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.phone ? 'border-red-500' : ''}`}
                                             placeholder="10-digit mobile"
+                                            className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${validationErrors.phone ? 'border-red-500' : ''}`}
                                         />
-                                        {validationErrors.phone && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.phone}</p>}
+                                        {validationErrors.phone && <p className="text-[10px] text-red-500 font-bold mt-1">{validationErrors.phone}</p>}
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">BUSINESS EMAIL</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Email
+                                        </label>
                                         <input
                                             type="email"
                                             value={formData.email}
@@ -358,29 +356,30 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                                 setFormData({ ...formData, email: e.target.value });
                                                 if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: null }));
                                             }}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.email ? 'border-red-500' : ''}`}
                                             placeholder="branch@business.com"
+                                            className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${validationErrors.email ? 'border-red-500' : ''}`}
                                         />
-                                        {validationErrors.email && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.email}</p>}
+                                        {validationErrors.email && <p className="text-[10px] text-red-500 font-bold mt-1">{validationErrors.email}</p>}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">PHYSICAL ADDRESS</label>
-                                <textarea
-                                    rows="2"
-                                    value={formData.address}
-                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                    className={`w-full px-5 py-3.5 rounded-2xl border resize-none ${inputBase}`}
-                                    placeholder="Complete street address, city, state..."
-                                />
-                            </div>
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Address
+                                    </label>
+                                    <textarea
+                                        rows="2"
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                        placeholder="Complete street address, city, state..."
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none`}
+                                    />
+                                </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black tracking-widest text-slate-500 ml-1">RECEIPT FOOTER NOTE</label>
-                                <div className="relative">
-                                    <Receipt className="absolute left-4 top-4 text-slate-500" size={16} />
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Receipt Footer Note
+                                    </label>
                                     <input
                                         type="text"
                                         value={formData.settings.receiptFooter}
@@ -388,31 +387,39 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                             ...formData,
                                             settings: { ...formData.settings, receiptFooter: e.target.value }
                                         })}
-                                        className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
                                         placeholder="Visit again!"
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex gap-4 pt-4">
+                            <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3`}>
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="flex-1 py-4 text-[10px] font-black tracking-[0.2em] text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-all uppercase"
+                                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                        darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                    }`}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-3 uppercase"
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
-                                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
-                                    {editingOutlet ? 'Update Logistics' : 'Deploy Branch'}
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            {editingOutlet ? 'Updating...' : 'Creating...'}
+                                        </>
+                                    ) : (
+                                        editingOutlet ? 'Update Branch' : 'Create Branch'
+                                    )}
                                 </button>
                             </div>
                         </form>
-                    </section>
+                    </div>
                 </div>
             )}
         </main>

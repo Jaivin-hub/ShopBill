@@ -120,7 +120,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
     </div>
 );
 
-function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode }) { 
+function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, currentUser, currentOutletId, onOutletSwitch }) { 
     const [currentView, setCurrentView] = useState(() => {
         const target = localStorage.getItem('settings_target_view');
         if (target) {
@@ -135,7 +135,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const [cloudSelectionModal, setCloudSelectionModal] = useState(null); 
 
     const [isCloudConnected, setIsCloudConnected] = useState(true); 
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
 
     // Premium Store Data
@@ -318,7 +317,14 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const renderContent = () => {
         switch (currentView) {
             case 'storeControl':
-                return <StoreControl darkMode={darkMode} stores={stores} showToast={showToast} />;
+                return <StoreControl 
+                    darkMode={darkMode} 
+                    apiClient={apiClient}
+                    showToast={showToast} 
+                    currentUser={currentUser}
+                    onOutletSwitch={onOutletSwitch}
+                    currentOutletId={currentOutletId}
+                />;
             case 'main':
             default:
                 return renderSettingsList();

@@ -728,7 +728,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         <ScannerModal isOpen={isScannerModalOpen} onClose={() => setIsScannerModalOpen(false)} onScanSuccess={handleScanSuccess} inventory={inventory} darkMode={darkMode} />
       </div>
 
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{__html: `
         input, select, textarea {
           font-size: 16px !important;
           touch-action: manipulation;
@@ -756,7 +756,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           filter: ${darkMode ? 'invert(1)' : 'none'}; 
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
+      `}} />
     </div>
   );
 };

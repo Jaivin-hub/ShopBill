@@ -36,7 +36,7 @@ const StoreControl = ({
 
     // Styling logic
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-    const inputBase = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900';
+    const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
 
     // --- API OPERATIONS ---
@@ -79,6 +79,8 @@ const StoreControl = ({
             if (response.data.success) {
                 showToast(`Switched to ${response.data.data.outlet.name}`, 'success');
                 if (onOutletSwitch) onOutletSwitch(response.data.data.outlet);
+                // Refetch stores to update the list and show which store is now active
+                await fetchStores();
             }
         } catch (error) {
             showToast('Failed to switch outlet.', 'error');
@@ -277,42 +279,113 @@ const StoreControl = ({
 
             {/* CREATE/EDIT MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                    <div className={`w-full max-w-xl rounded-[2.5rem] border overflow-hidden shadow-2xl ${cardBase}`}>
-                        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-indigo-600/5">
-                            <h2 className="font-black text-xl tracking-tight uppercase">{editingStore ? 'Edit Branch' : 'New Branch'}</h2>
-                            <button onClick={handleCloseModal} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+                    <div className={`${cardBase} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl`}>
+                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
+                            <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {editingStore ? 'Edit Branch' : 'New Branch'}
+                            </h3>
+                            <button
+                                onClick={handleCloseModal}
+                                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-8 space-y-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest opacity-50 ml-1">BRANCH NAME</label>
-                                    <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className={`w-full px-5 py-3 rounded-2xl border outline-none focus:ring-2 ring-indigo-500/20 transition-all ${inputBase}`} placeholder="e.g. Downtown Hub" />
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Branch Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                        placeholder="e.g. Downtown Hub"
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest opacity-50 ml-1">TAX ID / GSTIN</label>
-                                    <input type="text" value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} className={`w-full px-5 py-3 rounded-2xl border outline-none focus:ring-2 ring-indigo-500/20 transition-all ${inputBase}`} placeholder="Optional" />
+
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Tax ID / GSTIN
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.taxId}
+                                        onChange={(e) => setFormData({...formData, taxId: e.target.value})}
+                                        placeholder="Optional"
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        Address
+                                    </label>
+                                    <textarea
+                                        rows="2"
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                                        placeholder="Full location address..."
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none`}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Phone
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                            placeholder="+91 ..."
+                                            className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Email
+                                        </label>
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                            placeholder="store@business.com"
+                                            className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black tracking-widest opacity-50 ml-1">ADDRESS</label>
-                                <textarea rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className={`w-full px-5 py-3 rounded-2xl border outline-none focus:ring-2 ring-indigo-500/20 transition-all resize-none ${inputBase}`} placeholder="Full location address..." />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest opacity-50 ml-1">PHONE</label>
-                                    <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className={`w-full px-5 py-3 rounded-2xl border outline-none focus:ring-2 ring-indigo-500/20 transition-all ${inputBase}`} placeholder="+91 ..." />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black tracking-widest opacity-50 ml-1">EMAIL</label>
-                                    <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className={`w-full px-5 py-3 rounded-2xl border outline-none focus:ring-2 ring-indigo-500/20 transition-all ${inputBase}`} placeholder="store@business.com" />
-                                </div>
-                            </div>
-                            <div className="pt-6 flex gap-3">
-                                <button type="button" onClick={handleCloseModal} className="flex-1 py-4 rounded-2xl font-black text-[10px] tracking-widest border border-slate-800 hover:bg-slate-800 transition-all">CANCEL</button>
-                                <button type="submit" disabled={isSubmitting} className="flex-[2] py-4 rounded-2xl font-black text-[10px] tracking-widest bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
-                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                                    {editingStore ? 'UPDATE BRANCH' : 'CREATE BRANCH'}
+
+                            <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3`}>
+                                <button
+                                    type="button"
+                                    onClick={handleCloseModal}
+                                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                        darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                    }`}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            {editingStore ? 'Updating...' : 'Creating...'}
+                                        </>
+                                    ) : (
+                                        editingStore ? 'Update Branch' : 'Create Branch'
+                                    )}
                                 </button>
                             </div>
                         </form>
