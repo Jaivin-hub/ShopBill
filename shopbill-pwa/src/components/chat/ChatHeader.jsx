@@ -24,8 +24,8 @@ const ChatHeader = ({
     const isGroup = selectedChat?.type === 'group' || selectedChat?.isDefault;
     const displayName = getChatDisplayName(selectedChat);
 
-    // Deep Industrial Theme Colors
-    const deepBg = '#030712';
+    // Theme Colors
+    const drawerBg = darkMode ? 'bg-slate-950' : 'bg-white';
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
     return (
@@ -39,19 +39,23 @@ const ChatHeader = ({
                 >
                     <button
                         onClick={(e) => { e.stopPropagation(); onBack(); }}
-                        className="md:hidden p-2 -ml-2 hover:bg-slate-800 rounded-full transition-colors"
+                        className={`md:hidden p-2 -ml-2 rounded-full transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
                     >
-                        <ArrowLeft className="w-5 h-5 text-slate-400" />
+                        <ArrowLeft className={`w-5 h-5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`} />
                     </button>
 
                     <div className="relative">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all group-hover:border-indigo-500/50 ${
-                            isGroup ? 'bg-indigo-600/10 text-indigo-500 border-indigo-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'
+                            isGroup 
+                                ? 'bg-indigo-600/10 text-indigo-500 border-indigo-500/20' 
+                                : darkMode 
+                                    ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                    : 'bg-slate-100 text-slate-600 border-slate-300'
                         }`}>
                             {isGroup ? <Users size={18} /> : <User size={18} />}
                         </div>
                         {/* Status Glow */}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#030712] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 ${darkMode ? 'border-slate-950' : 'border-white'} rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
@@ -68,12 +72,12 @@ const ChatHeader = ({
                 </div>
                 
                 <div className="flex items-center gap-1">
-                    <button className="hidden md:flex p-2 text-slate-500 hover:text-white transition-colors">
+                    <button className={`hidden md:flex p-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-600 hover:text-indigo-600'}`}>
                         <Bell size={18} />
                     </button>
                     <button 
                         onClick={() => setShowInfo(true)}
-                        className="p-2 text-slate-500 hover:text-white transition-colors"
+                        className={`p-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-600 hover:text-indigo-600'}`}
                     >
                         <MoreVertical size={18} />
                     </button>
@@ -86,58 +90,57 @@ const ChatHeader = ({
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowInfo(false)} />
                     
                     <div 
-                        className="relative w-full md:w-[400px] h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 border-l border-slate-800/50"
-                        style={{ backgroundColor: deepBg }}
+                        className={`relative w-full md:w-[400px] h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 border-l ${darkMode ? 'border-slate-800/50' : 'border-slate-200'} ${drawerBg}`}
                     >
                         {/* Drawer Header */}
-                        <div className={`p-5 flex items-center gap-4 border-b ${borderStyle} bg-slate-900/20`}>
-                            <button onClick={() => setShowInfo(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-all">
-                                <X size={20} className="text-slate-500" />
+                        <div className={`p-5 flex items-center gap-4 border-b ${borderStyle} ${darkMode ? 'bg-slate-900/20' : 'bg-slate-50'}`}>
+                            <button onClick={() => setShowInfo(false)} className={`p-2 rounded-xl transition-all ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}>
+                                <X size={20} className={darkMode ? 'text-slate-500' : 'text-slate-600'} />
                             </button>
-                            <span className="text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
+                            <span className={`text-[10px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                 {isGroup ? 'Group Information' : 'Chat Information'}
                             </span>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
                             {/* Profile Hero Section */}
-                            <div className="flex flex-col items-center p-10 text-center border-b border-slate-800/40">
+                            <div className={`flex flex-col items-center p-10 text-center border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
                                 <div className="relative group mb-6">
-                                    <div className="w-32 h-32 rounded-[2.5rem] flex items-center justify-center border border-slate-800 bg-slate-900/50 shadow-2xl group-hover:border-indigo-500/50 transition-all duration-500">
-                                        {isGroup ? <Users size={48} className="text-indigo-500" /> : <User size={48} className="text-slate-500" />}
+                                    <div className={`w-32 h-32 rounded-[2.5rem] flex items-center justify-center border shadow-2xl group-hover:border-indigo-500/50 transition-all duration-500 ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+                                        {isGroup ? <Users size={48} className="text-indigo-500" /> : <User size={48} className={darkMode ? 'text-slate-500' : 'text-slate-600'} />}
                                     </div>
-                                    <button className="absolute bottom-0 right-0 p-2.5 bg-indigo-600 rounded-2xl border-4 border-[#030712] text-white hover:scale-110 transition-transform shadow-lg shadow-indigo-600/30">
+                                    <button className={`absolute bottom-0 right-0 p-2.5 bg-indigo-600 rounded-2xl border-4 ${darkMode ? 'border-slate-950' : 'border-white'} text-white hover:scale-110 transition-transform shadow-lg shadow-indigo-600/30`}>
                                         <Camera size={16} />
                                     </button>
                                 </div>
-                                <h2 className="text-2xl font-black tracking-tight text-white mb-1 uppercase">{displayName}</h2>
-                                <p className="text-[9px] font-black tracking-[0.2em] text-slate-600 uppercase">
+                                <h2 className={`text-2xl font-black tracking-tight mb-1 uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>{displayName}</h2>
+                                <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
                                     COMMS ID: {selectedChat?._id?.slice(-8).toUpperCase() || 'SYS-NULL'}
                                 </p>
                             </div>
 
                             {/* Privacy Notice */}
-                            <div className="px-6 py-4 flex items-start gap-4 bg-indigo-500/5 border-b border-slate-800/40">
+                            <div className={`px-6 py-4 flex items-start gap-4 bg-indigo-500/5 border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
                                 <Lock size={16} className="text-indigo-500 mt-1 shrink-0" />
                                 <div>
                                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">Transmission Encrypted</p>
-                                    <p className="text-[10px] text-slate-500 font-medium leading-tight">All packets sent in this session are restricted to your merchant network.</p>
+                                    <p className={`text-[10px] font-medium leading-tight ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>All packets sent in this session are restricted to your merchant network.</p>
                                 </div>
                             </div>
 
                             {/* Actions Area - Only show for groups */}
                             {isGroup && (
-                                <div className="p-4 grid grid-cols-2 gap-3 border-b border-slate-800/40">
+                                <div className={`p-4 grid grid-cols-2 gap-3 border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
                                     <button 
                                         onClick={() => { setShowInfo(false); onAddMember?.(); }}
-                                        className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group"
+                                        className={`flex flex-col items-center gap-2 p-4 rounded-2xl border hover:border-indigo-500/50 transition-all group ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'}`}
                                     >
                                         <UserPlus size={20} className="text-indigo-500 group-hover:scale-110 transition-transform" />
-                                        <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Add Staff</span>
+                                        <span className={`text-[8px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Add Staff</span>
                                     </button>
-                                    <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group">
-                                        <Bell size={20} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
-                                        <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Mute Node</span>
+                                    <button className={`flex flex-col items-center gap-2 p-4 rounded-2xl border hover:border-indigo-500/50 transition-all group ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                        <Bell size={20} className={`${darkMode ? 'text-slate-600 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'} transition-colors`} />
+                                        <span className={`text-[8px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Mute Node</span>
                                     </button>
                                 </div>
                             )}
@@ -175,28 +178,28 @@ const ChatHeader = ({
                                                             onQuickMessage?.(memberId);
                                                         }
                                                     }}
-                                                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border border-transparent ${isGroup ? 'hover:border-slate-800/50 hover:bg-white/[0.02] transition-all group cursor-pointer' : 'cursor-default'}`}
+                                                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border border-transparent ${isGroup ? darkMode ? 'hover:border-slate-800/50 hover:bg-white/[0.02]' : 'hover:border-slate-300 hover:bg-slate-50' : ''} transition-all group ${isGroup ? 'cursor-pointer' : 'cursor-default'}`}
                                                 >
-                                                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 group-hover:-rotate-3 transition-transform">
-                                                        <User size={18} className="text-slate-600 group-hover:text-indigo-400" />
+                                                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 group-hover:-rotate-3 transition-transform ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                                        <User size={18} className={darkMode ? 'text-slate-600 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'} />
                                                     </div>
                                                     <div className="flex-1 min-w-0 text-left">
                                                         <div className="flex items-center gap-2">
-                                                            <p className="text-[13px] font-black text-slate-200 truncate uppercase">
+                                                            <p className={`text-[13px] font-black truncate uppercase ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
                                                                 {member.name || member.email || 'Unknown'}
                                                             </p>
                                                             {member.role === 'owner' && <ShieldCheck size={12} className="text-amber-500" />}
                                                         </div>
                                                         {member.email && (
                                                             <div className="flex items-center gap-2 opacity-50">
-                                                                <p className="text-[10px] font-bold text-slate-400 truncate">
+                                                                <p className={`text-[10px] font-bold truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                                     {member.email}
                                                                 </p>
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-2 opacity-50 mt-0.5">
                                                             <Store size={10} className="text-indigo-500" />
-                                                            <p className="text-[9px] font-black uppercase tracking-tighter truncate">
+                                                            <p className={`text-[9px] font-black uppercase tracking-tighter truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                                 {member.outletName || 'HQ'} • {member.role || 'Personnel'}
                                                             </p>
                                                         </div>

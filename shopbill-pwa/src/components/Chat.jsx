@@ -10,8 +10,8 @@ import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
 
 const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange }) => {
-    // Styling Vars matching Dashboard architecture - Using Industrial Black #030712
-    const themeBase = darkMode ? 'bg-[#030712] text-slate-100' : 'bg-slate-50 text-slate-900';
+    // Styling Vars matching Dashboard architecture
+    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
     // Safety check
     if (!currentUser) {
@@ -466,8 +466,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     if (!hasChatAccess) return (
         <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-            <ShieldCheck className="w-12 h-12 text-slate-700 mb-4 opacity-20" />
-            <h2 className="text-xl font-black tracking-tighter uppercase">Access Restricted</h2>
+            <ShieldCheck className={`w-12 h-12 mb-4 opacity-20 ${darkMode ? 'text-slate-400' : 'text-slate-700'}`} />
+            <h2 className={`text-xl font-black tracking-tighter uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>Access Restricted</h2>
             <p className="text-xs font-bold text-indigo-500/60 uppercase tracking-widest mt-1">Upgrade to PRO or PREMIUM</p>
         </div>
     );

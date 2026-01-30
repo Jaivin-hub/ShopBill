@@ -15,10 +15,10 @@ const ChatInput = ({
     formatRecordingTime,
     darkMode
 }) => {
-    // Industrial Deep Black Theme
+    // Theme Colors
     const bgColor = darkMode ? 'bg-slate-900/90' : 'bg-white/95';
     const borderColor = darkMode ? 'border-slate-800' : 'border-slate-200';
-    const inputBg = darkMode ? 'bg-black' : 'bg-slate-50';
+    const inputBg = darkMode ? 'bg-slate-950' : 'bg-white';
 
     const ActionButton = ({ onClick, icon: Icon, color = "indigo" }) => (
         <button
@@ -47,7 +47,7 @@ const ChatInput = ({
                     </div>
                     <button 
                         onClick={onCancelRecording}
-                        className="text-[10px] font-black uppercase text-slate-500 px-2 hover:text-red-500 transition-colors"
+                        className={`text-[10px] font-black uppercase px-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-red-500' : 'text-slate-600 hover:text-red-600'}`}
                     >
                         Cancel
                     </button>
@@ -62,7 +62,7 @@ const ChatInput = ({
                             VOICE NOTE READY ({formatRecordingTime(recordingTime)})
                         </span>
                     </div>
-                    <button onClick={onCancelRecording} className="p-2 text-slate-500 hover:text-red-500 transition-colors">
+                    <button onClick={onCancelRecording} className={`p-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-red-500' : 'text-slate-600 hover:text-red-600'}`}>
                         <X size={18} />
                     </button>
                     <ActionButton onClick={onSendVoiceMessage} icon={Send} />
@@ -85,7 +85,7 @@ const ChatInput = ({
                         value={messageInput}
                         onChange={(e) => onMessageChange(e.target.value)}
                         placeholder="Transmission..."
-                        className={`flex-1 ${inputBg} border-none rounded-2xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-600 transition-all`}
+                        className={`flex-1 ${inputBg} ${darkMode ? 'text-white' : 'text-slate-900'} border-none rounded-2xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'} transition-all`}
                     />
 
                     {messageInput.trim() ? (

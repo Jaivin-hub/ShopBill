@@ -17,7 +17,7 @@ const ChatMessages = ({
         return (
             <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-3" />
-                <p className="text-[10px] font-black text-slate-600 tracking-[0.3em] uppercase">Decrypting Comms...</p>
+                <p className={`text-[10px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Decrypting Comms...</p>
             </div>
         );
     }
@@ -26,11 +26,11 @@ const ChatMessages = ({
         return (
             <div className="flex flex-col items-center justify-center py-20 opacity-30">
                 <div className="relative mb-4">
-                    <MessageCircle className="w-12 h-12 text-slate-500" />
+                    <MessageCircle className={`w-12 h-12 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                     <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20" />
                 </div>
-                <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">Frequency Clear</p>
-                <p className="text-[9px] font-bold text-slate-600 mt-1 uppercase">Awaiting transmission...</p>
+                <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Frequency Clear</p>
+                <p className={`text-[9px] font-bold mt-1 uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Awaiting transmission...</p>
             </div>
         );
     }

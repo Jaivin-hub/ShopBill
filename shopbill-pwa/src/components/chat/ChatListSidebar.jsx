@@ -23,14 +23,13 @@ const ChatListSidebar = ({
 }) => {
     const [viewMode, setViewMode] = useState('chats');
 
-    // --- Deep Industrial Theme Vars ---
-    const deepBg = '#030712';
+    // --- Theme Vars ---
+    const sidebarBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
     const activeTab = 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]';
 
     return (
         <div 
-            className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full overflow-hidden transition-all duration-300`}
-            style={{ backgroundColor: deepBg }}
+            className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full overflow-hidden transition-all duration-300 ${sidebarBg}`}
         >
             
             {/* Sticky Header Area */}
@@ -52,12 +51,12 @@ const ChatListSidebar = ({
                     </button>
                 </div>
 
-                {/* Industrial Toggle */}
-                <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-black border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                {/* Toggle */}
+                <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                     <button
                         onClick={() => setViewMode('chats')}
                         className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black tracking-[0.2em] transition-all ${
-                            viewMode === 'chats' ? activeTab : `text-slate-500 hover:text-slate-300`
+                            viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
                         }`}
                     >
                         <LayoutGrid size={12} />
@@ -66,7 +65,7 @@ const ChatListSidebar = ({
                     <button
                         onClick={() => setViewMode('users')}
                         className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black tracking-[0.2em] transition-all ${
-                            viewMode === 'users' ? activeTab : `text-slate-500 hover:text-slate-300`
+                            viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
                         }`}
                     >
                         <UserSquare2 size={12} />
@@ -75,16 +74,16 @@ const ChatListSidebar = ({
                 </div>
             </div>
 
-            {/* Search - Glassmorphism style */}
-            <div className="px-4 py-4 border-b border-slate-800/40 bg-indigo-500/[0.02]">
+            {/* Search */}
+            <div className={`px-4 py-4 border-b ${darkMode ? 'border-slate-800/40 bg-indigo-500/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
                 <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 group-focus-within:text-indigo-500 transition-colors" />
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
                     <input
                         type="text"
                         placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-3 bg-black border ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-xl text-[11px] font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all placeholder:text-slate-700`}
+                        className={`w-full pl-10 pr-4 py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
                     />
                 </div>
             </div>
@@ -142,13 +141,13 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
                 <button
                     key={staff._id}
                     onClick={() => onQuickMessage(staff._id)}
-                    className="w-full px-5 py-4 text-left transition-all border-l-2 border-transparent hover:border-slate-700 hover:bg-white/[0.02] flex items-center gap-4 group"
+                    className={`w-full px-5 py-4 text-left transition-all border-l-2 border-transparent flex items-center gap-4 group ${darkMode ? 'hover:border-slate-700 hover:bg-white/[0.02]' : 'hover:border-slate-300 hover:bg-slate-100'}`}
                 >
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 group-hover:border-indigo-500/30 transition-all group-hover:-rotate-3">
-                        <User className="w-5 h-5 text-slate-500 group-hover:text-indigo-400" />
+                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 group-hover:border-indigo-500/30 transition-all group-hover:-rotate-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                        <User className={`w-5 h-5 ${darkMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-black truncate text-slate-200 uppercase tracking-tight group-hover:text-white transition-colors">
+                        <p className={`text-[13px] font-black truncate uppercase tracking-tight transition-colors ${darkMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-indigo-600'}`}>
                             {staff.name || staff.email}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -156,7 +155,7 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
                                 {staff.role}
                             </span>
                             {staff.outletName && (
-                                <span className="text-[8px] font-bold text-slate-600 truncate uppercase">
+                                <span className={`text-[8px] font-bold truncate uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
                                     • {staff.outletName}
                                 </span>
                             )}
@@ -174,7 +173,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
         return (
             <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-3" />
-                <p className="text-[9px] font-black text-slate-600 tracking-[0.3em] uppercase">Fetching Frequencies...</p>
+                <p className={`text-[9px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Fetching Frequencies...</p>
             </div>
         );
     }
@@ -206,7 +205,9 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                             className={`w-full px-5 py-4 flex items-center gap-4 transition-all duration-200 border-l-2 relative group
                                 ${isSelected 
                                     ? 'bg-indigo-600/10 border-indigo-500 shadow-[inset_10px_0_20px_-10px_rgba(79,70,229,0.2)]' 
-                                    : 'border-transparent hover:bg-white/[0.02] hover:border-slate-700'
+                                    : darkMode 
+                                        ? 'border-transparent hover:bg-white/[0.02] hover:border-slate-700'
+                                        : 'border-transparent hover:bg-slate-100 hover:border-slate-300'
                                 }`}
                         >
                             {/* Avatar Section */}
@@ -214,13 +215,15 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-300 ${
                                     isSelected 
                                         ? 'bg-indigo-600 border-indigo-400 text-white rotate-3 shadow-lg shadow-indigo-600/20' 
-                                        : 'bg-slate-900 border-slate-800 text-slate-500 group-hover:border-slate-600 group-hover:-rotate-3'
+                                        : darkMode
+                                            ? 'bg-slate-900 border-slate-800 text-slate-500 group-hover:border-slate-600 group-hover:-rotate-3'
+                                            : 'bg-slate-100 border-slate-200 text-slate-600 group-hover:border-indigo-300 group-hover:-rotate-3'
                                 }`}>
                                     <Users size={18} strokeWidth={isSelected ? 2.5 : 2} />
                                 </div>
                                 {/* Status Badge Overlay */}
                                 {isVerified && (
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#030712] rounded-full flex items-center justify-center">
+                                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-slate-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                         <ShieldCheck size={10} className="text-indigo-500" />
                                     </div>
                                 )}
@@ -230,13 +233,21 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                             <div className="flex-1 min-w-0 text-left">
                                 <div className="flex justify-between items-baseline mb-0.5">
                                     <h3 className={`text-[13px] font-black truncate tracking-wide uppercase transition-colors ${
-                                        isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                                        isSelected 
+                                            ? 'text-white' 
+                                            : darkMode 
+                                                ? 'text-slate-300 group-hover:text-white'
+                                                : 'text-slate-700 group-hover:text-indigo-600'
                                     }`}>
                                         {getChatDisplayName(chat)}
                                     </h3>
                                     {lastMsg && (
                                         <span className={`text-[9px] font-bold tracking-tighter shrink-0 ${
-                                            isSelected ? 'text-indigo-400' : 'text-slate-600'
+                                            isSelected 
+                                                ? 'text-indigo-400' 
+                                                : darkMode 
+                                                    ? 'text-slate-500' 
+                                                    : 'text-slate-600'
                                         }`}>
                                             {formatTime(lastMsg.timestamp)}
                                         </span>
@@ -245,7 +256,11 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
 
                                 <div className="flex items-center justify-between gap-2">
                                     <p className={`text-[11px] truncate font-medium leading-tight ${
-                                        isSelected ? 'text-indigo-200/70' : 'text-slate-500 group-hover:text-slate-400'
+                                        isSelected 
+                                            ? 'text-indigo-200/70' 
+                                            : darkMode 
+                                                ? 'text-slate-500 group-hover:text-slate-400'
+                                                : 'text-slate-600 group-hover:text-slate-700'
                                     }`}>
                                         {lastMsg ? (
                                             <>
@@ -262,7 +277,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                     {/* Action/Meta Indicators */}
                                     <div className="flex items-center gap-2">
                                         {chat.outletId?.name && !isSelected && (
-                                            <span className="text-[7px] font-black text-slate-700 border border-slate-800 px-1 rounded uppercase tracking-tighter">
+                                            <span className={`text-[7px] font-black px-1 rounded uppercase tracking-tighter ${darkMode ? 'text-slate-400 border-slate-700' : 'text-slate-600 border-slate-300'} border`}>
                                                 {chat.outletId.name.split(' ')[0]}
                                             </span>
                                         )}
@@ -280,7 +295,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
             {sortedChats.length > 0 && (
                 <div className="p-8 flex flex-col items-center opacity-10">
                     <div className="w-px h-8 bg-gradient-to-b from-indigo-500 to-transparent mb-2" />
-                    <span className="text-[8px] font-black tracking-[0.5em] text-white uppercase">Link End</span>
+                    <span className={`text-[8px] font-black tracking-[0.5em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Link End</span>
                 </div>
             )}
         </div>
