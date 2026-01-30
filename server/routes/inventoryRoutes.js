@@ -9,42 +9,77 @@ const router = express.Router();
 /**
  * HELPER: checkAndNotifyLowStock
  * Handles both alerting for low stock AND resolving alerts when stock is replenished.
+ * Now supports variants - checks each variant's stock level.
  */
 const checkAndNotifyLowStock = async (req, item) => {
     if (!item) return;
 
-    const currentQty = Number(item.quantity);
-    const reorderLevel = Number(item.reorderLevel) || 5;
     const storeIdString = item.storeId.toString();
+    
+    // Check if product has variants
+    if (item.variants && item.variants.length > 0) {
+        // Check each variant for low stock
+        for (const variant of item.variants) {
+            const variantQty = Number(variant.quantity) || 0;
+            const variantReorderLevel = variant.reorderLevel !== null && variant.reorderLevel !== undefined 
+                ? Number(variant.reorderLevel) 
+                : Number(item.reorderLevel) || 5;
 
-    if (currentQty <= reorderLevel) {
-        // --- CASE 1: STOCK IS LOW ---
-        try {
-            await emitAlert(req, storeIdString, 'inventory_low', {
-                _id: item._id,
-                name: item.name,
-                quantity: currentQty
-            });
-            console.log(`📡 [Low Stock Alert] ${item.name}: ${currentQty}`);
-        } catch (err) {
-            console.error("❌ Error triggering alert:", err);
+            if (variantQty <= variantReorderLevel) {
+                try {
+                    await emitAlert(req, storeIdString, 'inventory_low', {
+                        _id: item._id,
+                        name: `${item.name} - ${variant.label}`,
+                        quantity: variantQty,
+                        variantId: variant._id
+                    });
+                    console.log(`📡 [Low Stock Alert] ${item.name} - ${variant.label}: ${variantQty}`);
+                } catch (err) {
+                    console.error("❌ Error triggering alert:", err);
+                }
+            } else {
+                // Resolve alert if stock is replenished
+                try {
+                    await resolveLowStockAlert(req, storeIdString, item._id);
+                } catch (err) {
+                    console.error("❌ Error resolving notification:", err);
+                }
+            }
         }
     } else {
-        // --- CASE 2: STOCK IS REPLENISHED (GOOD) ---
-        try {
-            // 1. Remove any existing "Low Stock" notifications for this specific item
-            await resolveLowStockAlert(req, storeIdString, item._id);
+        // Original logic for products without variants
+        const currentQty = Number(item.quantity) || 0;
+        const reorderLevel = Number(item.reorderLevel) || 5;
 
-            // 2. (Optional) Only send a "Success" notification if this was an update or bulk add
-            // We don't want to spam "Success" during every single sale interaction
-            if (req.method === 'PUT' || req.originalUrl.includes('/bulk')) {
-                await emitAlert(req, storeIdString, 'success', {
-                    message: `Stock replenished for ${item.name} (Now: ${currentQty})`,
-                    _id: item._id
+        if (currentQty <= reorderLevel) {
+            // --- CASE 1: STOCK IS LOW ---
+            try {
+                await emitAlert(req, storeIdString, 'inventory_low', {
+                    _id: item._id,
+                    name: item.name,
+                    quantity: currentQty
                 });
+                console.log(`📡 [Low Stock Alert] ${item.name}: ${currentQty}`);
+            } catch (err) {
+                console.error("❌ Error triggering alert:", err);
             }
-        } catch (err) {
-            console.error("❌ Error resolving notification:", err);
+        } else {
+            // --- CASE 2: STOCK IS REPLENISHED (GOOD) ---
+            try {
+                // 1. Remove any existing "Low Stock" notifications for this specific item
+                await resolveLowStockAlert(req, storeIdString, item._id);
+
+                // 2. (Optional) Only send a "Success" notification if this was an update or bulk add
+                // We don't want to spam "Success" during every single sale interaction
+                if (req.method === 'PUT' || req.originalUrl.includes('/bulk')) {
+                    await emitAlert(req, storeIdString, 'success', {
+                        message: `Stock replenished for ${item.name} (Now: ${currentQty})`,
+                        _id: item._id
+                    });
+                }
+            } catch (err) {
+                console.error("❌ Error resolving notification:", err);
+            }
         }
     }
 };

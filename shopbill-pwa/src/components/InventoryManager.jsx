@@ -14,7 +14,8 @@ const initialItemState = {
     price: '',
     quantity: '',
     reorderLevel: 5,
-    hsn: ''
+    hsn: '',
+    variants: [] // Array of variant objects: { label, price, quantity, reorderLevel, hsn, sku }
 };
 
 
@@ -101,7 +102,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             price: item.price || 0,
             quantity: item.quantity || 0,
             reorderLevel: item.reorderLevel || 5,
-            hsn: item.hsn || ''
+            hsn: item.hsn || '',
+            variants: item.variants || [] // Load variants if they exist
         });
         setIsFormModalOpen(true);
     };

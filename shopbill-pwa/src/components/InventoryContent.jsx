@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
     Package, Plus, AlertTriangle, Edit, Trash2, X, Search, 
-    ListOrdered, Loader2, ScanLine, Upload, Hash, Layers, Bell, Info 
+    ListOrdered, Loader2, ScanLine, Upload, Hash, Layers, Bell, Info, 
+    ChevronDown, ChevronUp, Settings2
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
 
@@ -207,6 +208,8 @@ const InventoryContent = ({
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const sortDropdownRef = useRef(null);
+    const [hasVariants, setHasVariants] = useState(false);
+    const [editingVariantIndex, setEditingVariantIndex] = useState(null);
 
     const themeBase = darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-900';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
@@ -240,6 +243,59 @@ const InventoryContent = ({
         closeScannerModal();
         openAddModal();
         setFormData(prev => ({ ...prev, ...data, hsn: data.hsn || code || '', price: data.price || 0, quantity: data.quantity || 0 }));
+    };
+
+    // Variant management functions
+    useEffect(() => {
+        if (formData.variants && formData.variants.length > 0) {
+            setHasVariants(true);
+        } else {
+            setHasVariants(false);
+        }
+    }, [formData.variants]);
+
+    const addVariant = () => {
+        const newVariant = {
+            label: '',
+            price: 0,
+            quantity: 0,
+            reorderLevel: formData.reorderLevel || 5,
+            hsn: formData.hsn || '',
+            sku: ''
+        };
+        setFormData(prev => ({
+            ...prev,
+            variants: [...(prev.variants || []), newVariant]
+        }));
+        setEditingVariantIndex((formData.variants || []).length);
+    };
+
+    const updateVariant = (index, field, value) => {
+        setFormData(prev => {
+            const variants = [...(prev.variants || [])];
+            variants[index] = { ...variants[index], [field]: value };
+            return { ...prev, variants };
+        });
+    };
+
+    const removeVariant = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            variants: (prev.variants || []).filter((_, i) => i !== index)
+        }));
+        if (editingVariantIndex === index) setEditingVariantIndex(null);
+    };
+
+    const toggleVariants = () => {
+        if (hasVariants) {
+            // Disable variants - clear them
+            setFormData(prev => ({ ...prev, variants: [] }));
+            setHasVariants(false);
+        } else {
+            // Enable variants - add one empty variant
+            setHasVariants(true);
+            addVariant();
+        }
     };
 
     return (
@@ -349,160 +405,288 @@ const InventoryContent = ({
 
             {/* --- MODALS --- */}
             {isFormModalOpen && (
-                <section className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[200] p-4 overflow-y-auto">
-                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-2xl rounded-2xl border overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200`}>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4 overflow-x-hidden" onClick={(e) => e.target === e.currentTarget && closeFormModal()}>
+                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl flex flex-col max-h-[90vh] transform transition-all`} onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${isEditing ? 'bg-indigo-500/10' : 'bg-emerald-500/10'}`}>
-                                    <Package className={`w-5 h-5 ${isEditing ? 'text-indigo-500' : 'text-emerald-500'}`} />
-                                </div>
-                                <div>
-                                    <h2 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                        {isEditing ? 'Edit Product' : 'Add New Product'}
-                                    </h2>
-                                    <p className={`text-[10px] font-bold tracking-wider mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        {isEditing ? 'Update product information' : 'Add a new item to your inventory'}
-                                    </p>
-                                </div>
-                            </div>
-                            <button type="button" onClick={closeFormModal} className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors">
+                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0 overflow-x-hidden`}>
+                            <h3 className={`text-lg font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {isEditing ? 'Edit Product' : 'Add New Product'}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeFormModal}
+                                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500"
+                            >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        {/* Form Fields */}
-                        <div className="p-6 space-y-6">
+                        {/* Form Fields - Scrollable */}
+                        <div className="p-6 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar flex-1 min-h-0 overscroll-contain">
                             {/* Product Name */}
-                            <div className="space-y-2">
-                                <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                    <span>Product Name</span>
-                                    <span className="text-red-500">*</span>
+                            <div>
+                                <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    Product Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     name="name"
                                     type="text"
                                     value={formData.name}
                                     onChange={handleInputChange}
-                                    placeholder="Enter product name (e.g., Samsung Galaxy S23)"
+                                    placeholder="Enter product name"
                                     required
-                                    className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                    className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                 />
                             </div>
 
-                            {/* Price and Stock */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        <span>Price per Unit</span>
-                                        <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>₹</span>
-                                        <input
-                                            name="price"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={formData.price}
-                                            onChange={handleInputChange}
-                                            placeholder="0.00"
-                                            required
-                                            className={`no-zoom-input w-full pl-8 pr-4 py-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
-                                        />
+                            {/* Variants Toggle */}
+                            <div>
+                                <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    Product Variants
+                                </label>
+                                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Settings2 className={`w-5 h-5 ${hasVariants ? 'text-indigo-500' : 'text-slate-500'}`} />
+                                            <div>
+                                                <p className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                    Enable Variants
+                                                </p>
+                                                <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                    Different sizes, prices, or options
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={toggleVariants}
+                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${hasVariants ? 'bg-indigo-600' : 'bg-slate-400'}`}
+                                        >
+                                            <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out ${hasVariants ? 'translate-x-6' : 'translate-x-0'}`} />
+                                        </button>
                                     </div>
-                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Selling price for one unit</p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        <span>Current Stock</span>
-                                        <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        name="quantity"
-                                        type="number"
-                                        min="0"
-                                        value={formData.quantity}
-                                        onChange={handleInputChange}
-                                        placeholder="0"
-                                        required
-                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
-                                    />
-                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Available quantity in stock</p>
                                 </div>
                             </div>
 
-                            {/* Reorder Level and HSN */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        <span>Low Stock Alert</span>
-                                    </label>
-                                    <input
-                                        name="reorderLevel"
-                                        type="number"
-                                        min="0"
-                                        value={formData.reorderLevel}
-                                        onChange={handleInputChange}
-                                        placeholder="5"
-                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
-                                    />
-                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Alert when stock reaches this level</p>
-                                </div>
+                            {/* Price and Stock - Only show if no variants */}
+                            {!hasVariants && (
+                                <>
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Price per Unit <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>₹</span>
+                                            <input
+                                                name="price"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={formData.price}
+                                                onChange={handleInputChange}
+                                                placeholder="0.00"
+                                                required
+                                                className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} pl-8 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        <Hash className="w-3.5 h-3.5" />
-                                        <span>HSN Code / Barcode</span>
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Current Stock <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            name="quantity"
+                                            type="number"
+                                            min="0"
+                                            value={formData.quantity}
+                                            onChange={handleInputChange}
+                                            placeholder="0"
+                                            required
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Variants Management */}
+                            {hasVariants && (
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Variants
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={addVariant}
+                                            className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-500 transition-colors flex items-center gap-1"
+                                        >
+                                            <Plus className="w-3 h-3" /> Add Variant
+                                        </button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {(formData.variants || []).map((variant, index) => (
+                                            <div key={`variant-${index}-${variant.label || ''}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                        Variant {index + 1}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeVariant(index)}
+                                                        className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                            Label (e.g., 500ml, 1L) *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={variant.label}
+                                                            onChange={(e) => updateVariant(index, 'label', e.target.value)}
+                                                            placeholder="500ml"
+                                                            required
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                            Price (₹) *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={variant.price}
+                                                            onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
+                                                            placeholder="0.00"
+                                                            required
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                            Current Stock *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={variant.quantity}
+                                                            onChange={(e) => updateVariant(index, 'quantity', parseInt(e.target.value) || 0)}
+                                                            placeholder="0"
+                                                            required
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                            Low Stock Alert
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={variant.reorderLevel || ''}
+                                                            onChange={(e) => updateVariant(index, 'reorderLevel', e.target.value ? parseInt(e.target.value) : null)}
+                                                            placeholder={formData.reorderLevel || '5'}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {(!formData.variants || formData.variants.length === 0) && (
+                                            <div className={`text-center py-8 border-2 border-dashed rounded-xl ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                                <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No variants added. Click "Add Variant" to create one.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Reorder Level and HSN - Only show when no variants (each variant has its own reorder level) */}
+                            {!hasVariants && (
+                                <>
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            Low Stock Alert
+                                        </label>
+                                        <input
+                                            name="reorderLevel"
+                                            type="number"
+                                            min="0"
+                                            value={formData.reorderLevel}
+                                            onChange={handleInputChange}
+                                            placeholder="5"
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                            HSN Code / Barcode
+                                        </label>
+                                        <input
+                                            name="hsn"
+                                            type="text"
+                                            value={formData.hsn}
+                                            onChange={handleInputChange}
+                                            placeholder="Optional"
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* HSN Code - Show as optional default when variants enabled (can be overridden per variant) */}
+                            {hasVariants && (
+                                <div>
+                                    <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        HSN Code / Barcode <span className="text-[10px] text-slate-500 font-normal">(Optional default for all variants)</span>
                                     </label>
                                     <input
                                         name="hsn"
                                         type="text"
                                         value={formData.hsn}
                                         onChange={handleInputChange}
-                                        placeholder="Optional - Enter HSN or barcode"
-                                        className={`no-zoom-input w-full p-4 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                                        placeholder="Optional - Can be set per variant"
+                                        className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                     />
-                                    <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>For tax and inventory tracking</p>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Footer Actions */}
-                        <div className={`p-6 border-t ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
+                        <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3 shrink-0 overflow-x-hidden`}>
                             <button
                                 type="button"
                                 onClick={closeFormModal}
-                                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition-all ${
-                                    darkMode
-                                        ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                    darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
                                 }`}
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                disabled={loading || !formData.name}
-                                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                                    isEditing
-                                        ? 'bg-indigo-600 hover:bg-indigo-500'
-                                        : 'bg-emerald-600 hover:bg-emerald-500'
-                                }`}
+                                disabled={loading || !formData.name || (hasVariants && (!formData.variants || formData.variants.length === 0))}
+                                className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {loading ? (
-                                    <span className="flex items-center justify-center gap-2">
+                                    <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         {isEditing ? 'Updating...' : 'Saving...'}
-                                    </span>
+                                    </>
                                 ) : (
-                                    isEditing ? 'Update Product' : 'Add to Inventory'
+                                    isEditing ? 'Update Product' : 'Add Product'
                                 )}
                             </button>
                         </div>
                     </form>
-                </section>
+                </div>
             )}
 
             {isConfirmModalOpen && (

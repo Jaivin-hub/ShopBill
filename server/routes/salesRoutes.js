@@ -70,9 +70,29 @@ router.post('/', protect, async (req, res) => {
                 const inventoryItem = await Inventory.findOne({ _id: item.itemId, storeId }); 
                 if (!inventoryItem) throw new Error(`Inventory item not found.`);
                 
-                // Only block if not forced
-                if (inventoryItem.quantity < item.quantity && !forceProceed) {
-                    throw new Error(`Not enough stock for ${inventoryItem.name}.`);
+                // Check if this is a variant sale
+                if (item.variantId && inventoryItem.variants && inventoryItem.variants.length > 0) {
+                    // Find the specific variant
+                    const variant = inventoryItem.variants.id(item.variantId);
+                    if (!variant) {
+                        throw new Error(`Variant not found for ${inventoryItem.name}.`);
+                    }
+                    
+                    // Check variant stock
+                    if (variant.quantity < item.quantity && !forceProceed) {
+                        throw new Error(`Not enough stock for ${inventoryItem.name} - ${variant.label}. Available: ${variant.quantity}`);
+                    }
+                } else {
+                    // Regular product (no variant)
+                    if (!inventoryItem.variants || inventoryItem.variants.length === 0) {
+                        // Only block if not forced
+                        if (inventoryItem.quantity < item.quantity && !forceProceed) {
+                            throw new Error(`Not enough stock for ${inventoryItem.name}.`);
+                        }
+                    } else {
+                        // Product has variants but no variantId provided
+                        throw new Error(`${inventoryItem.name} has variants. Please select a variant.`);
+                    }
                 }
             }
         }
