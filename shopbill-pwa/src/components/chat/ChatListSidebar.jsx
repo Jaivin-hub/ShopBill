@@ -33,12 +33,16 @@ const ChatListSidebar = ({
             style={{ backgroundColor: deepBg }}
         >
             
-            {/* Header Area */}
-            <div className={`p-6 border-b ${darkMode ? 'border-slate-800/60 bg-slate-900/20' : 'bg-white'} shrink-0`}>
+            {/* Sticky Header Area */}
+            <div className={`sticky top-0 z-50 p-6 border-b ${darkMode ? 'border-slate-800/60 bg-slate-900/20 backdrop-blur-xl' : 'bg-white/95 backdrop-blur-xl'} shrink-0`}>
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-[10px] font-black tracking-[0.3em] text-indigo-500 uppercase mb-1">Network</h2>
-                        <h1 className="text-xl font-black tracking-tight text-white uppercase">Comms</h1>
+                        <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Network <span className="text-indigo-500">Comms</span>
+                        </h1>
+                        <p className={`text-[9px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Real-time team communication and coordination.
+                        </p>
                     </div>
                     <button
                         onClick={onNewGroupClick}

@@ -73,6 +73,78 @@ router.get('/chats', protect, async (req, res) => {
             });
         }
 
+        // Auto-create default groups for owners if they don't exist
+        if (user.role === 'owner') {
+            const stores = await Store.find({ ownerId: user._id, isActive: true });
+            const storeIds = stores.map(s => s._id);
+            const allStaff = await Staff.find({ 
+                storeId: { $in: storeIds }, 
+                active: true 
+            }).populate('userId', '_id');
+            
+            const allStaffUserIds = allStaff
+                .map(s => s.userId?._id)
+                .filter(id => id && id.toString() !== user._id.toString());
+
+            // 1. Create "All Outlet Staffs" group if it doesn't exist
+            const defaultGroupName = 'All Outlet Staffs';
+            let allOutletsGroup = await Chat.findOne({ 
+                name: defaultGroupName, 
+                type: 'group',
+                createdBy: user._id,
+                isDefault: true,
+                outletId: null
+            });
+
+            if (!allOutletsGroup) {
+                allOutletsGroup = await Chat.create({
+                    type: 'group',
+                    name: defaultGroupName,
+                    isGroupChat: true,
+                    participants: [user._id, ...allStaffUserIds],
+                    createdBy: user._id,
+                    isDefault: true,
+                    outletId: null, // All outlets group
+                    requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
+                });
+            }
+
+            // 2. Create individual store groups for each outlet
+            for (const store of stores) {
+                const storeGroupName = `${store.name} Group`;
+                let storeGroup = await Chat.findOne({ 
+                    name: storeGroupName, 
+                    type: 'group',
+                    createdBy: user._id,
+                    isDefault: true,
+                    outletId: store._id
+                });
+
+                if (!storeGroup) {
+                    // Get staff for this specific outlet
+                    const storeStaff = await Staff.find({ 
+                        storeId: store._id, 
+                        active: true 
+                    }).populate('userId', '_id');
+                    
+                    const storeStaffUserIds = storeStaff
+                        .map(s => s.userId?._id)
+                        .filter(id => id && id.toString() !== user._id.toString());
+
+                    storeGroup = await Chat.create({
+                        type: 'group',
+                        name: storeGroupName,
+                        isGroupChat: true,
+                        participants: [user._id, ...storeStaffUserIds],
+                        createdBy: user._id,
+                        isDefault: true,
+                        outletId: store._id, // Specific outlet group
+                        requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
+                    });
+                }
+            }
+        }
+
         // Find all chats where user is a participant
         const chats = await Chat.find({ participants: req.user.id })
             .populate('participants', 'name email role profileImageUrl')

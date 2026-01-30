@@ -45,19 +45,28 @@ const Chat = lazy(() => import('./components/Chat'));
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
-  const [updateHandler, setUpdateHandler] = useState(null);
+  const [registration, setRegistration] = useState(null);
 
   useEffect(() => {
+    // 1. Prevent showing if we just updated in this session
+    if (sessionStorage.getItem('pwa_updated_this_session')) return;
+
     const onUpdate = (e) => {
-      setUpdateHandler(() => e.detail.updateHandler);
+      // The event detail should contain the service worker registration
+      setRegistration(e.detail?.registration || null);
       setShow(true);
     };
 
     const checkUpdate = async () => {
       if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
-          registration.update();
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          reg.update();
+          // If there is already a waiting worker, show prompt
+          if (reg.waiting) {
+            setRegistration(reg);
+            setShow(true);
+          }
         }
       }
     };
@@ -78,6 +87,28 @@ const UpdatePrompt = () => {
     };
   }, []);
 
+  const handleUpdate = () => {
+    if (registration && registration.waiting) {
+      // 2. Tell the waiting worker to skipWaiting
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      
+      // 3. Mark as updated to prevent immediate re-prompt
+      sessionStorage.setItem('pwa_updated_this_session', 'true');
+      
+      // 4. Reload after the new worker takes control
+      registration.waiting.addEventListener('statechange', (e) => {
+        if (e.target.state === 'activated') {
+          window.location.reload();
+        }
+      });
+      
+      // Fallback reload if statechange doesn't fire fast enough
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      window.location.reload();
+    }
+  };
+
   if (!show) return null;
 
   return (
@@ -90,13 +121,7 @@ const UpdatePrompt = () => {
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
           <button
-            onClick={() => {
-              if (updateHandler) {
-                updateHandler(true);
-              } else {
-                window.location.reload(true);
-              }
-            }}
+            onClick={handleUpdate}
             className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
           >
             Update & Reload Now
@@ -147,7 +172,6 @@ const App = () => {
   const [outlets, setOutlets] = useState([]);
   const [currentOutletId, setCurrentOutletId] = useState(() => {
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    // Check for last selected outlet in localStorage first, then fallback to user's activeStoreId
     const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
     return lastSelectedOutletId || user?.activeStoreId || null;
   });
@@ -185,7 +209,6 @@ const App = () => {
     } catch (error) { console.error("Error fetching notifications:", error); }
   }, [currentUser]);
 
-  // Fetch outlets on page load for premium users
   const fetchOutlets = useCallback(async () => {
     if (!currentUser || !isPremium) {
       setOutlets([]);
@@ -198,24 +221,20 @@ const App = () => {
         const outletsList = response.data.data || [];
         setOutlets(outletsList);
         
-        // Restore last selected outlet only on initial load (first time)
         if (!outletRestoredRef.current) {
           outletRestoredRef.current = true;
           const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
           const currentActiveId = currentUser.activeStoreId;
           
-          // Determine which outlet to use: lastSelected > activeStoreId > first outlet
           let targetOutletId = lastSelectedOutletId || currentActiveId;
           let targetOutlet = outletsList.find(o => o._id === targetOutletId);
           
-          // If target outlet not found, use first available
           if (!targetOutlet && outletsList.length > 0) {
             targetOutlet = outletsList[0];
             targetOutletId = targetOutlet._id;
           }
           
           if (targetOutlet) {
-            // Only switch if different from current user's activeStoreId
             if (targetOutletId !== currentActiveId) {
               try {
                 const switchResponse = await apiClient.put(API.switchOutlet(targetOutletId));
@@ -229,20 +248,17 @@ const App = () => {
                 }
               } catch (error) {
                 console.error('Failed to restore last outlet:', error);
-                // Fallback: just set the outlet without switching on server
                 setCurrentOutlet(targetOutlet);
                 setCurrentOutletId(targetOutletId);
                 localStorage.setItem('lastSelectedOutletId', targetOutletId);
               }
             } else {
-              // Already on the correct outlet, just set the outlet object
               setCurrentOutlet(targetOutlet);
               setCurrentOutletId(targetOutletId);
               localStorage.setItem('lastSelectedOutletId', targetOutletId);
             }
           }
         } else {
-          // After initial load, just update currentOutlet if it's missing
           if (!currentOutlet && currentOutletId) {
             const activeOutlet = outletsList.find(o => o._id === currentOutletId);
             if (activeOutlet) setCurrentOutlet(activeOutlet);
@@ -252,9 +268,8 @@ const App = () => {
     } catch (error) {
       console.error('Error fetching outlets:', error);
     }
-  }, [currentUser, isPremium, apiClient, currentOutlet, currentOutletId]);
+  }, [currentUser, isPremium, currentOutlet, currentOutletId]);
 
-  // Fetch outlets when user is loaded and is premium
   useEffect(() => {
     if (currentUser && isPremium) {
       fetchOutlets();
@@ -264,20 +279,13 @@ const App = () => {
     }
   }, [currentUser, isPremium, fetchOutlets]);
 
-  // Scroll to top when page/component changes or outlet switches
   useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
-      // Scroll window to top
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      
-      // Also scroll the main content area (the scrollable container)
       const mainElement = document.querySelector('main');
       if (mainElement) {
         mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }
-      
-      // Also check for any other scrollable containers within main
       const scrollableContainers = document.querySelectorAll('main [class*="overflow"], main [class*="scroll"]');
       scrollableContainers.forEach(container => {
         if (container.scrollTop > 0) {
@@ -329,7 +337,6 @@ const App = () => {
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
-    // Check for last selected outlet first, then fallback to user's activeStoreId
     const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
     setCurrentOutletId(lastSelectedOutletId || normalizedUser.activeStoreId || null);
     setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
@@ -341,7 +348,6 @@ const App = () => {
       setCurrentOutletId(outlet._id);
       const updatedUser = { ...currentUser, activeStoreId: outlet._id };
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      // Save last selected outlet ID for restoration on next page load
       localStorage.setItem('lastSelectedOutletId', outlet._id);
       setCurrentUser(updatedUser);
     }
@@ -443,8 +449,6 @@ const App = () => {
     }
 
     const commonProps = { 
-      // Key forces a complete re-mount of any page when the outlet changes
-      // This automatically recalls all useEffect/API calls in the sub-components
       key: `${currentPage}-${currentOutletId}`,
       darkMode, 
       currentUser, 
@@ -479,7 +483,7 @@ const App = () => {
             case 'superadmin_systems': return <SystemConfig {...commonProps} />;
             case 'outlets': return <OutletManager {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
             case 'salesActivity': return <SalesActivityPage {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-            case 'chat': return <Chat {...commonProps} currentOutletId={currentOutletId} outlets={outlets} />;
+            case 'chat': return <Chat {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} />;
             default: return <Dashboard {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
@@ -488,6 +492,15 @@ const App = () => {
   };
 
   const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
+  const [isChatSelected, setIsChatSelected] = useState(false);
+  
+  // Reset chat selection state when leaving chat page
+  useEffect(() => {
+    if (currentPage !== 'chat') {
+      setIsChatSelected(false);
+    }
+  }, [currentPage]);
+  
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
@@ -508,7 +521,7 @@ const App = () => {
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
-        {showAppUI && (
+        {showAppUI && !isChatSelected && (
           <Header 
             companyName="Pocket POS" 
             userRole={userRole.toUpperCase()} 
@@ -605,13 +618,13 @@ const App = () => {
               </div>
             </aside>
           )}
-          <main className={`flex-1 overflow-y-auto transition-all duration-300 ${containerBg} ${showAppUI ? 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6' : 'w-full'}`}>
-            <div className="max-w-7xl mx-auto min-h-full px-0 md:px-6">
+          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto') : 'w-full overflow-y-auto'}`}>
+            <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : 'max-w-7xl mx-auto min-h-full'} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
               {renderContent()}
             </div>
           </main>
         </div>
-        {showAppUI && (
+        {showAppUI && !isChatSelected && (
           <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-4 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
             {navItems.map(item => (
               <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center py-2 px-1 transition-all relative ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>

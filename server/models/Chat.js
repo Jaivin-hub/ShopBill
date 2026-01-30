@@ -68,6 +68,18 @@ const ChatSchema = new mongoose.Schema({
         type: String,
         enum: ['PRO', 'PREMIUM'],
         required: true
+    },
+    
+    // Flag for default groups (e.g., "All Outlet Staffs")
+    isDefault: {
+        type: Boolean,
+        default: false
+    },
+    
+    // For backward compatibility: isGroupChat flag
+    isGroupChat: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 

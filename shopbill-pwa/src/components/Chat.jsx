@@ -9,7 +9,7 @@ import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
 
-const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [] }) => {
+const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange }) => {
     // Styling Vars matching Dashboard architecture - Using Industrial Black #030712
     const themeBase = darkMode ? 'bg-[#030712] text-slate-100' : 'bg-slate-50 text-slate-900';
     
@@ -27,6 +27,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [messages, setMessages] = useState([]);
+    
+    // Notify parent when chat selection changes (to hide/show main header)
+    useEffect(() => {
+        if (onChatSelectionChange) {
+            onChatSelectionChange(!!selectedChat);
+        }
+    }, [selectedChat, onChatSelectionChange]);
     const [messageInput, setMessageInput] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -75,9 +82,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         socketRef.current.on('new_message', (data) => {
             if (data.chatId === selectedChat?._id) {
                 setMessages(prev => {
-                    const existingIndex = prev.findIndex(m => m._id === data.message._id);
-                    if (existingIndex >= 0) return prev;
-                    return [...prev, data.message];
+                    // Remove any optimistic messages with same content
+                    const withoutOptimistic = prev.filter(m => !m.isOptimistic || m._id !== `temp-${Date.now()}`);
+                    const existingIndex = withoutOptimistic.findIndex(m => m._id === data.message._id);
+                    if (existingIndex >= 0) return withoutOptimistic;
+                    return [...withoutOptimistic, data.message];
                 });
                 setTimeout(() => scrollToBottom(), 50);
             }
@@ -121,32 +130,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         fetchStaff();
     }, [hasChatAccess, apiClient, API]);
 
-    // Handle Default Groups
-    useEffect(() => {
-        if (isLoading || isLoadingStaff || !currentUser || !hasChatAccess) return;
-        const commonChatId = `common-staff-all`;
-        if (!chats.find(c => c._id === commonChatId)) {
-            const defaultGroups = [
-                {
-                    _id: commonChatId,
-                    name: 'All Outlet Staffs',
-                    type: 'group',
-                    participants: staffList,
-                    isDefault: true,
-                    description: 'Global transmission channel'
-                },
-                ...outlets.map(outlet => ({
-                    _id: `store-group-${outlet._id}`,
-                    name: `${outlet.name} Group`,
-                    type: 'group',
-                    outletId: outlet,
-                    participants: staffList.filter(s => s.outletId === outlet._id),
-                    isDefault: true
-                }))
-            ];
-            setChats(prev => [...defaultGroups, ...prev.filter(c => !c.isDefault)]);
-        }
-    }, [isLoading, isLoadingStaff, outlets, staffList, currentUser, hasChatAccess]);
+    // Note: Default "All Outlet Staffs" group is automatically created by the server for owners
+    // Store-specific groups are no longer created
 
     useEffect(() => { if (hasChatAccess) fetchChats(); }, [hasChatAccess, fetchChats]);
 
@@ -158,8 +143,28 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
     }, [selectedChat, fetchMessages]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        if (messages.length > 0 && selectedChat) {
+            const timer = setTimeout(() => scrollToBottom(), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [messages.length, selectedChat?._id]);
+
+    const scrollToBottom = (instant = false) => {
+        setTimeout(() => {
+            if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ 
+                    behavior: instant ? 'auto' : 'smooth',
+                    block: 'end'
+                });
+            } else if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTo({
+                    top: chatContainerRef.current.scrollHeight,
+                    behavior: instant ? 'auto' : 'smooth'
+                });
+            }
+        }, 100);
     };
 
     const formatRecordingTime = (seconds) => {
@@ -219,14 +224,47 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         formData.append('audio', audioBlob, 'voice.webm');
         formData.append('messageType', 'audio');
         formData.append('audioDuration', recordingTime.toString());
+        
+        // Optimistic update - add voice message immediately
+        const tempMessageId = `temp-voice-${Date.now()}`;
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const optimisticMessage = {
+            _id: tempMessageId,
+            senderId: currentUser._id || currentUser.id,
+            senderName: currentUser.name || currentUser.email,
+            senderRole: currentUser.role,
+            content: '',
+            messageType: 'audio',
+            audioUrl: audioUrl,
+            audioDuration: recordingTime,
+            timestamp: new Date(),
+            isOptimistic: true
+        };
+        
+        setMessages(prev => [...prev, optimisticMessage]);
+        cancelRecording();
+        scrollToBottom(true); // Instant scroll for optimistic update
+        
         try {
             const response = await apiClient.post(API.sendMessage(selectedChat._id), formData);
             if (response.data.success) {
-                setMessages(prev => [...prev, response.data.data]);
-                cancelRecording();
+                // Replace optimistic message with real one
+                setMessages(prev => {
+                    const filtered = prev.filter(m => m._id !== tempMessageId);
+                    // Check if message already exists (from socket)
+                    const exists = filtered.some(m => m._id === response.data.data._id);
+                    if (!exists) {
+                        return [...filtered, response.data.data];
+                    }
+                    return filtered;
+                });
                 scrollToBottom();
             }
-        } catch (error) { showToast('Upload failed', 'error'); }
+        } catch (error) { 
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+            showToast('Upload failed', 'error'); 
+        }
     };
 
     const handleSendMessage = async (e) => {
@@ -234,13 +272,44 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         if (!messageInput.trim() || !selectedChat) return;
         const content = messageInput.trim();
         setMessageInput('');
+        
+        // Optimistic update - add message immediately
+        const tempMessageId = `temp-${Date.now()}`;
+        const optimisticMessage = {
+            _id: tempMessageId,
+            senderId: currentUser._id || currentUser.id,
+            senderName: currentUser.name || currentUser.email,
+            senderRole: currentUser.role,
+            content: content,
+            messageType: 'text',
+            timestamp: new Date(),
+            isOptimistic: true
+        };
+        
+        setMessages(prev => [...prev, optimisticMessage]);
+        scrollToBottom(true); // Instant scroll for optimistic update
+        
         try {
             const response = await apiClient.post(API.sendMessage(selectedChat._id), { content });
             if (response.data.success) {
-                setMessages(prev => [...prev, response.data.data]);
+                // Replace optimistic message with real one
+                setMessages(prev => {
+                    const filtered = prev.filter(m => m._id !== tempMessageId);
+                    // Check if message already exists (from socket)
+                    const exists = filtered.some(m => m._id === response.data.data._id);
+                    if (!exists) {
+                        return [...filtered, response.data.data];
+                    }
+                    return filtered;
+                });
                 scrollToBottom();
             }
-        } catch (error) { showToast('Send failed', 'error'); setMessageInput(content); }
+        } catch (error) { 
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+            showToast('Send failed', 'error'); 
+            setMessageInput(content); 
+        }
     };
 
     const toggleAudio = (messageId) => {
@@ -271,7 +340,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     );
 
     return (
-        <div className={`flex flex-col md:flex-row ${themeBase} h-full relative overflow-hidden`}>
+        <div className={`flex flex-col md:flex-row ${themeBase} w-full h-full overflow-hidden`}>
             {/* Sidebar remains standard */}
             <ChatListSidebar
                 chats={chats}
@@ -291,18 +360,31 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             />
 
             {/* Main Chat Interface */}
-            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col h-full relative`}>
+            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full overflow-hidden`}>
+                {!selectedChat && (
+                    <div className={`sticky top-0 z-50 p-6 border-b ${darkMode ? 'border-slate-800 bg-slate-950/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'} shrink-0`}>
+                        <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Network <span className="text-indigo-500">Comms</span>
+                        </h1>
+                        <p className={`text-[9px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Real-time team communication and coordination.
+                        </p>
+                    </div>
+                )}
                 {selectedChat ? (
-                    <>
-                        <ChatHeader
-                            selectedChat={selectedChat}
-                            onBack={() => setSelectedChat(null)}
-                            getChatDisplayName={getChatDisplayName}
-                            darkMode={darkMode}
-                        />
+                    <div className="flex flex-col h-full overflow-hidden">
+                        {/* Fixed Header */}
+                        <div className="shrink-0 z-50">
+                            <ChatHeader
+                                selectedChat={selectedChat}
+                                onBack={() => setSelectedChat(null)}
+                                getChatDisplayName={getChatDisplayName}
+                                darkMode={darkMode}
+                            />
+                        </div>
 
-                        {/* Increased Bottom Padding to clear the floating footer input */}
-                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar pb-36 md:pb-28">
+                        {/* Messages area - scrollable */}
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar min-h-0">
                             <ChatMessages
                                 messages={messages}
                                 isLoadingMessages={isLoadingMessages}
@@ -316,26 +398,24 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             />
                         </div>
 
-                        {/* FOOTER POSITIONING: Fixed for mobile, Absolute for desktop */}
-                        <div className="fixed md:absolute bottom-[76px] md:bottom-6 left-0 right-0 z-[45] md:z-10 px-3 md:px-6 pointer-events-none">
-                            <div className="max-w-4xl mx-auto w-full pointer-events-auto">
-                                <ChatInput
-                                    messageInput={messageInput}
-                                    onMessageChange={setMessageInput}
-                                    onSendMessage={handleSendMessage}
-                                    isRecording={isRecording}
-                                    recordingTime={recordingTime}
-                                    audioUrl={audioUrl}
-                                    onStartRecording={startRecording}
-                                    onStopRecording={stopRecording}
-                                    onSendVoiceMessage={sendVoiceMessage}
-                                    onCancelRecording={cancelRecording}
-                                    formatRecordingTime={formatRecordingTime}
-                                    darkMode={darkMode}
-                                />
-                            </div>
+                        {/* Fixed Input section - Footer position */}
+                        <div className={`shrink-0 z-50 ${darkMode ? 'bg-slate-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                            <ChatInput
+                                messageInput={messageInput}
+                                onMessageChange={setMessageInput}
+                                onSendMessage={handleSendMessage}
+                                isRecording={isRecording}
+                                recordingTime={recordingTime}
+                                audioUrl={audioUrl}
+                                onStartRecording={startRecording}
+                                onStopRecording={stopRecording}
+                                onSendVoiceMessage={sendVoiceMessage}
+                                onCancelRecording={cancelRecording}
+                                formatRecordingTime={formatRecordingTime}
+                                darkMode={darkMode}
+                            />
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <EmptyChatView
                         chats={chats}

@@ -24,10 +24,10 @@ const ChatHeader = ({
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
     return (
-        /* STICKY CONTAINER: Ensures the header stays at the top of the chat view */
-        <div className="sticky top-0 z-40 w-full shrink-0" style={{ backgroundColor: `${deepBg}cc` }}>
+        /* HEADER: Will be sticky via parent container */
+        <div className={`w-full ${darkMode ? 'bg-slate-950' : 'bg-white'} border-b ${borderStyle} shadow-sm`}>
             {/* --- NAV BAR --- */}
-            <div className={`p-3 md:p-4 border-b ${borderStyle} flex items-center justify-between backdrop-blur-xl`}>
+            <div className={`p-3 md:p-4 flex items-center justify-between`}>
                 <div 
                     className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer group"
                     onClick={() => setShowInfo(true)}

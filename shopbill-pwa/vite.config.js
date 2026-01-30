@@ -22,7 +22,6 @@ export default defineConfig({
         enabled: true,
         type: 'module', 
       },
-      // ... (rest of PWA configuration remains the same)
       manifest: {
         name: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software',
         short_name: 'Pocket POS',
@@ -50,10 +49,42 @@ export default defineConfig({
       },
       
       workbox: {
+        // Force the new service worker to activate immediately
+        skipWaiting: true,
+        clientsClaim: true,
+        
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],
         
         runtimeCaching: [
-          // ... (rest of workbox configuration remains the same)
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gstatic-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+          // Add any other specific runtime caching rules here if needed
         ],
       },
     }),
