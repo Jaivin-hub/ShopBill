@@ -5,6 +5,7 @@ import {
   Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
 
 const DATE_FILTERS = [
   { id: '24h', label: ['24', 'Hrs'], days: 1 },
@@ -47,6 +48,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '', gstin: '' });
   const [productForm, setProductForm] = useState({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
+  const [supplierErrors, setSupplierErrors] = useState({});
+  const [productErrors, setProductErrors] = useState({});
 
   useEffect(() => {
     if (selectedFilter === 'custom' && (!customStartDate || !customEndDate)) {
@@ -139,11 +142,40 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   const handleAddSupplier = async (e) => {
     e.preventDefault();
+    
+    // Validate supplier form
+    const errors = {};
+    const nameError = validateName(supplierForm.name, 'Vendor name');
+    if (nameError) errors.name = nameError;
+    
+    const phoneError = validatePhoneNumber(supplierForm.phone);
+    if (phoneError) errors.phone = phoneError;
+    
+    // Email is optional, but if provided, validate it
+    if (supplierForm.email && supplierForm.email.trim()) {
+      const emailError = validateEmail(supplierForm.email);
+      if (emailError) errors.email = emailError;
+    }
+    
+    // GSTIN is optional, but if provided, validate it
+    if (supplierForm.gstin && supplierForm.gstin.trim()) {
+      const gstinError = validateGSTIN(supplierForm.gstin);
+      if (gstinError) errors.gstin = gstinError;
+    }
+    
+    setSupplierErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      showToast("Please fix validation errors", "error");
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await apiClient.post(API.scmSuppliers, supplierForm);
       showToast("Vendor added", "success");
       setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
+      setSupplierErrors({});
       setIsSupplierModalOpen(false);
       fetchSCMData();
     } catch (error) { showToast("Error adding vendor", "error"); } finally { setIsLoading(false); }

@@ -50,10 +50,21 @@ const SalesChart = ({ data, viewType, yAxisKey }) => {
     const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
     
     const processedData = useMemo(() => {
-        return data.map(d => ({
-            ...d,
-            label: getChartLabel(viewType, d[viewType]),
-        }));
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            return [];
+        }
+        
+        return data.map(d => {
+            // The server returns data with keys like 'Day', 'Week', or 'Month'
+            // Match the viewType to the correct key
+            const dateKey = viewType; // 'Day', 'Week', or 'Month'
+            const dateValue = d[dateKey] || d._id || '';
+            
+            return {
+                ...d,
+                label: getChartLabel(viewType, dateValue),
+            };
+        });
     }, [data, viewType]);
 
     const primaryConfig = CHART_CONFIG[yAxisKey] || CHART_CONFIG.revenue;

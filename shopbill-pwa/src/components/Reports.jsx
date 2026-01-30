@@ -80,12 +80,16 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
             ]);
 
             setSummaryData(summaryResponse.data);
-            setChartData(chartResponse.data);
+            // Ensure chartData is an array
+            const chartDataArray = Array.isArray(chartResponse.data) ? chartResponse.data : [];
+            setChartData(chartDataArray);
             setSuppliers(suppliersRes.data);
             setPurchases(purchasesRes.data);
             setAllBestSellers(allBestSellersRes.data.topItems || []);
         } catch (error) {
+            console.error('Failed to fetch report data:', error);
             showToast({ message: "Failed to sync report data.", type: 'error' });
+            setChartData([]); // Set empty array on error
         } finally {
             setIsLoading(false);
         }

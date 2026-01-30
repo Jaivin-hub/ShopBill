@@ -11,9 +11,14 @@ const ChatHeader = ({
     getChatDisplayName,
     onQuickMessage,
     onAddMember,
-    darkMode
+    darkMode,
+    showInfo: externalShowInfo,
+    onShowInfoChange,
+    currentUser
 }) => {
-    const [showInfo, setShowInfo] = useState(false);
+    const [internalShowInfo, setInternalShowInfo] = useState(false);
+    const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
+    const setShowInfo = onShowInfoChange || setInternalShowInfo;
 
     const participants = selectedChat?.participants || [];
     const isGroup = selectedChat?.type === 'group' || selectedChat?.isDefault;
@@ -89,7 +94,9 @@ const ChatHeader = ({
                             <button onClick={() => setShowInfo(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-all">
                                 <X size={20} className="text-slate-500" />
                             </button>
-                            <span className="text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">Node Information</span>
+                            <span className="text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
+                                {isGroup ? 'Group Information' : 'Chat Information'}
+                            </span>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
@@ -118,55 +125,88 @@ const ChatHeader = ({
                                 </div>
                             </div>
 
-                            {/* Actions Area */}
-                            <div className="p-4 grid grid-cols-2 gap-3 border-b border-slate-800/40">
-                                <button 
-                                    onClick={() => { setShowInfo(false); onAddMember?.(); }}
-                                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group"
-                                >
-                                    <UserPlus size={20} className="text-indigo-500 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Add Staff</span>
-                                </button>
-                                <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group">
-                                    <Bell size={20} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
-                                    <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Mute Node</span>
-                                </button>
-                            </div>
+                            {/* Actions Area - Only show for groups */}
+                            {isGroup && (
+                                <div className="p-4 grid grid-cols-2 gap-3 border-b border-slate-800/40">
+                                    <button 
+                                        onClick={() => { setShowInfo(false); onAddMember?.(); }}
+                                        className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group"
+                                    >
+                                        <UserPlus size={20} className="text-indigo-500 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Add Staff</span>
+                                    </button>
+                                    <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900/20 border border-slate-800 hover:border-indigo-500/50 transition-all group">
+                                        <Bell size={20} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
+                                        <span className="text-[8px] font-black tracking-widest uppercase text-slate-500">Mute Node</span>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Members List */}
                             <div className="p-6">
                                 <p className="text-[10px] font-black tracking-[0.3em] text-indigo-500 uppercase mb-6">
-                                    Active Directory ({participants.length})
+                                    {isGroup ? `Active Directory (${participants.length})` : 'Contact Information'}
                                 </p>
 
                                 <div className="space-y-1">
-                                    {participants.map((member) => (
-                                        <button
-                                            key={member._id}
-                                            onClick={() => {
-                                                setShowInfo(false);
-                                                onQuickMessage(member._id);
-                                            }}
-                                            className="w-full flex items-center gap-4 p-3 rounded-2xl border border-transparent hover:border-slate-800/50 hover:bg-white/[0.02] transition-all group"
-                                        >
-                                            <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 group-hover:-rotate-3 transition-transform">
-                                                <User size={18} className="text-slate-600 group-hover:text-indigo-400" />
-                                            </div>
-                                            <div className="flex-1 min-w-0 text-left">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-[13px] font-black text-slate-200 truncate uppercase">{member.name || member.email}</p>
-                                                    {member.role === 'owner' && <ShieldCheck size={12} className="text-amber-500" />}
-                                                </div>
-                                                <div className="flex items-center gap-2 opacity-50">
-                                                    <Store size={10} className="text-indigo-500" />
-                                                    <p className="text-[9px] font-black uppercase tracking-tighter truncate">
-                                                        {member.outletName || 'HQ'} • {member.role || 'Personnel'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <MessageSquare size={14} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </button>
-                                    ))}
+                                    {participants
+                                        .filter(member => {
+                                            // For direct chats, filter out current user
+                                            if (!isGroup) {
+                                                const memberId = typeof member === 'object' && member !== null 
+                                                    ? (member._id || member.id || member) 
+                                                    : member;
+                                                const currentUserId = currentUser?._id || currentUser?.id;
+                                                return memberId && currentUserId && memberId.toString() !== currentUserId.toString();
+                                            }
+                                            // For groups, show all participants
+                                            return true;
+                                        })
+                                        .map((member) => {
+                                            const memberId = typeof member === 'object' && member !== null 
+                                                ? (member._id || member.id || member) 
+                                                : member;
+                                            return (
+                                                <button
+                                                    key={memberId}
+                                                    onClick={() => {
+                                                        if (isGroup) {
+                                                            setShowInfo(false);
+                                                            onQuickMessage?.(memberId);
+                                                        }
+                                                    }}
+                                                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border border-transparent ${isGroup ? 'hover:border-slate-800/50 hover:bg-white/[0.02] transition-all group cursor-pointer' : 'cursor-default'}`}
+                                                >
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 group-hover:-rotate-3 transition-transform">
+                                                        <User size={18} className="text-slate-600 group-hover:text-indigo-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 text-left">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-[13px] font-black text-slate-200 truncate uppercase">
+                                                                {member.name || member.email || 'Unknown'}
+                                                            </p>
+                                                            {member.role === 'owner' && <ShieldCheck size={12} className="text-amber-500" />}
+                                                        </div>
+                                                        {member.email && (
+                                                            <div className="flex items-center gap-2 opacity-50">
+                                                                <p className="text-[10px] font-bold text-slate-400 truncate">
+                                                                    {member.email}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-2 opacity-50 mt-0.5">
+                                                            <Store size={10} className="text-indigo-500" />
+                                                            <p className="text-[9px] font-black uppercase tracking-tighter truncate">
+                                                                {member.outletName || 'HQ'} • {member.role || 'Personnel'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    {isGroup && (
+                                                        <MessageSquare size={14} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
                                 </div>
                             </div>
                         </div>

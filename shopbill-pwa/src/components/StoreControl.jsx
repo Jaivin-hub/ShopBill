@@ -6,6 +6,7 @@ import {
     Loader2, X, Save, Mail, FileText
 } from 'lucide-react';
 import API from '../config/api';
+import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 
 const StoreControl = ({ 
     darkMode, 
@@ -88,6 +89,41 @@ const StoreControl = ({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validate all fields
+        const errors = {};
+        const nameError = validateShopName(formData.name);
+        if (nameError) errors.name = nameError;
+        
+        // Phone is optional, but if provided, validate it
+        if (formData.phone && formData.phone.trim()) {
+            const phoneError = validatePhoneNumber(formData.phone);
+            if (phoneError) errors.phone = phoneError;
+        }
+        
+        // Email is optional, but if provided, validate it
+        if (formData.email && formData.email.trim()) {
+            const emailError = validateEmail(formData.email);
+            if (emailError) errors.email = emailError;
+        }
+        
+        // Tax ID is optional, but if provided, validate it
+        if (formData.taxId && formData.taxId.trim()) {
+            const taxIdError = validateTaxId(formData.taxId);
+            if (taxIdError) errors.taxId = taxIdError;
+        }
+        
+        // Address is optional, but if provided, validate it
+        if (formData.address && formData.address.trim()) {
+            const addressError = validateAddress(formData.address);
+            if (addressError) errors.address = addressError;
+        }
+        
+        if (Object.keys(errors).length > 0) {
+            showToast('Please fix validation errors', 'error');
+            return;
+        }
+        
         setIsSubmitting(true);
         try {
             const apiCall = editingStore 

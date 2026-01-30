@@ -101,7 +101,32 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode }) 
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.name || !formData.email) return;
+        
+        // Validate fields
+        const errors = {};
+        if (!formData.name || !formData.name.trim()) {
+            errors.name = 'Name is required.';
+        } else if (formData.name.trim().length < 2) {
+            errors.name = 'Name must be at least 2 characters.';
+        }
+        
+        if (!formData.email || !formData.email.trim()) {
+            errors.email = 'Email is required.';
+        } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const trimmedEmail = formData.email.trim().toLowerCase();
+            if (/\s/.test(trimmedEmail)) {
+                errors.email = 'Email cannot contain spaces.';
+            } else if (!emailRegex.test(trimmedEmail)) {
+                errors.email = 'Please enter a valid email address.';
+            }
+        }
+        
+        if (Object.keys(errors).length > 0) {
+            // Show errors (you can add error state if needed)
+            return;
+        }
+        
         onAddStaff(formData, () => setFormData({ name: '', email: '', role: 'Cashier' }));
     };
 

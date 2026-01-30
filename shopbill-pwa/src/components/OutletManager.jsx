@@ -7,6 +7,7 @@ import {
     Receipt, AlertCircle
 } from 'lucide-react';
 import API from '../config/api';
+import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 
 const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId }) => {
     const [outlets, setOutlets] = useState([]);
@@ -23,6 +24,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         settings: { receiptFooter: 'Thank you for shopping!' }
     });
     const [errors, setErrors] = useState({});
+    const [validationErrors, setValidationErrors] = useState({});
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -72,6 +74,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             });
         }
         setErrors({});
+        setValidationErrors({});
         setIsModalOpen(true);
     };
 
@@ -82,7 +85,42 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.name.trim()) return showToast('Outlet name is required', 'error');
+        
+        // Validate all fields
+        const errors = {};
+        const nameError = validateShopName(formData.name);
+        if (nameError) errors.name = nameError;
+        
+        // Phone is optional, but if provided, validate it
+        if (formData.phone && formData.phone.trim()) {
+            const phoneError = validatePhoneNumber(formData.phone);
+            if (phoneError) errors.phone = phoneError;
+        }
+        
+        // Email is optional, but if provided, validate it
+        if (formData.email && formData.email.trim()) {
+            const emailError = validateEmail(formData.email);
+            if (emailError) errors.email = emailError;
+        }
+        
+        // Tax ID is optional, but if provided, validate it
+        if (formData.taxId && formData.taxId.trim()) {
+            const taxIdError = validateTaxId(formData.taxId);
+            if (taxIdError) errors.taxId = taxIdError;
+        }
+        
+        // Address is optional, but if provided, validate it
+        if (formData.address && formData.address.trim()) {
+            const addressError = validateAddress(formData.address);
+            if (addressError) errors.address = addressError;
+        }
+        
+        setValidationErrors(errors);
+        
+        if (Object.keys(errors).length > 0) {
+            showToast('Please fix validation errors', 'error');
+            return;
+        }
 
         setIsSubmitting(true);
         try {
@@ -95,6 +133,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 showToast(`Store ${editingOutlet ? 'updated' : 'created'} successfully!`, 'success');
                 fetchOutlets();
                 handleCloseModal();
+                setValidationErrors({});
             }
         } catch (error) {
             showToast(error.response?.data?.error || 'Save failed.', 'error');
@@ -263,10 +302,14 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                             required
                                             type="text"
                                             value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, name: e.target.value });
+                                                if (validationErrors.name) setValidationErrors(prev => ({ ...prev, name: null }));
+                                            }}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.name ? 'border-red-500' : ''}`}
                                             placeholder="e.g. Mumbai North Hub"
                                         />
+                                        {validationErrors.name && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.name}</p>}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -291,11 +334,17 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                                         <input
                                             type="tel"
+                                            maxLength="10"
                                             value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
-                                            placeholder="+91 00000 00000"
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                setFormData({ ...formData, phone: value });
+                                                if (validationErrors.phone) setValidationErrors(prev => ({ ...prev, phone: null }));
+                                            }}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.phone ? 'border-red-500' : ''}`}
+                                            placeholder="10-digit mobile"
                                         />
+                                        {validationErrors.phone && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.phone}</p>}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -305,10 +354,14 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         <input
                                             type="email"
                                             value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase}`}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, email: e.target.value });
+                                                if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: null }));
+                                            }}
+                                            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border ${inputBase} ${validationErrors.email ? 'border-red-500' : ''}`}
                                             placeholder="branch@business.com"
                                         />
+                                        {validationErrors.email && <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors.email}</p>}
                                     </div>
                                 </div>
                             </div>

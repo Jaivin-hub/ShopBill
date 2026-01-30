@@ -10,15 +10,13 @@ const NewChatModal = ({
     onChatNameChange,
     selectedUsers,
     onUserToggle,
-    selectedOutlet,
-    onOutletChange,
     availableUsers,
     searchTerm,
     onSearchChange,
-    outlets,
-    isPremium,
     onCreateChat,
-    darkMode
+    darkMode,
+    setSelectedUsers,
+    isCreatingChat = false
 }) => {
     if (!show) return null;
 
@@ -38,7 +36,9 @@ const NewChatModal = ({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
             <div className={`${cardBase} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl`}>
                 <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
-                    <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Chat</h3>
+                    <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {newChatType === 'group' ? 'Create Custom Group' : 'New Direct Chat'}
+                    </h3>
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500"
@@ -65,36 +65,86 @@ const NewChatModal = ({
                         </div>
                     )}
 
-                    {/* Outlet Selection (Premium only) */}
-                    {isPremium && (
+                    {/* Quick Selection Buttons (Groups only) */}
+                    {newChatType === 'group' && (
                         <div>
                             <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                Outlet (Optional - leave empty for all outlets)
+                                Quick Select
                             </label>
-                            <select
-                                value={selectedOutlet || ''}
-                                onChange={(e) => onOutletChange(e.target.value || null)}
-                                className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
-                            >
-                                <option value="">All Outlets</option>
-                                {outlets.map(outlet => (
-                                    <option key={outlet._id} value={outlet._id}>{outlet.name}</option>
-                                ))}
-                            </select>
-                            {newChatType === 'group' && !selectedOutlet && isPremium && (
-                                <p className="text-[10px] text-indigo-500 mt-2">
-                                    All staff from all your outlets will be added to this group.
-                                </p>
-                            )}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (setSelectedUsers) {
+                                            const allManagers = availableUsers.filter(u => u.role === 'Manager').map(u => u._id);
+                                            setSelectedUsers(prev => {
+                                                // Check if all managers are already selected
+                                                const allManagersSelected = allManagers.every(managerId => prev.includes(managerId));
+                                                if (allManagersSelected) {
+                                                    // Deselect all managers
+                                                    return prev.filter(id => !allManagers.includes(id));
+                                                } else {
+                                                    // Select all managers (add to existing)
+                                                    return [...new Set([...prev, ...allManagers])];
+                                                }
+                                            });
+                                        }
+                                    }}
+                                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                                        (() => {
+                                            const allManagers = availableUsers.filter(u => u.role === 'Manager').map(u => u._id);
+                                            const allSelected = allManagers.length > 0 && allManagers.every(id => selectedUsers.includes(id));
+                                            return allSelected
+                                                ? 'bg-indigo-600 text-white border border-indigo-500'
+                                                : darkMode 
+                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500' 
+                                                    : 'bg-slate-100 border border-slate-200 text-slate-700 hover:border-indigo-500';
+                                        })()
+                                    }`}
+                                >
+                                    All Managers
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (setSelectedUsers) {
+                                            const allCashiers = availableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
+                                            setSelectedUsers(prev => {
+                                                // Check if all cashiers are already selected
+                                                const allCashiersSelected = allCashiers.every(cashierId => prev.includes(cashierId));
+                                                if (allCashiersSelected) {
+                                                    // Deselect all cashiers
+                                                    return prev.filter(id => !allCashiers.includes(id));
+                                                } else {
+                                                    // Select all cashiers (add to existing)
+                                                    return [...new Set([...prev, ...allCashiers])];
+                                                }
+                                            });
+                                        }
+                                    }}
+                                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                                        (() => {
+                                            const allCashiers = availableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
+                                            const allSelected = allCashiers.length > 0 && allCashiers.every(id => selectedUsers.includes(id));
+                                            return allSelected
+                                                ? 'bg-indigo-600 text-white border border-indigo-500'
+                                                : darkMode 
+                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500' 
+                                                    : 'bg-slate-100 border border-slate-200 text-slate-700 hover:border-indigo-500';
+                                        })()
+                                    }`}
+                                >
+                                    All Cashiers
+                                </button>
+                            </div>
                         </div>
                     )}
 
                     {/* User Selection */}
-                    {!(newChatType === 'group' && !selectedOutlet && isPremium) && (
-                        <div>
-                            <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                {newChatType === 'direct' ? 'Select Person' : 'Select Participants'}
-                            </label>
+                    <div>
+                        <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {newChatType === 'direct' ? 'Select Person' : 'Select Staff Members *'}
+                        </label>
                             <div className="relative mb-2">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                 <input
@@ -106,43 +156,55 @@ const NewChatModal = ({
                                 />
                             </div>
                             <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2">
-                                {filteredUsers.map(user => {
-                                    const isSelected = selectedUsers.includes(user._id);
-                                    return (
-                                        <button
-                                            key={user._id}
-                                            type="button"
-                                            onClick={() => onUserToggle(user._id, newChatType === 'direct')}
-                                            className={`w-full p-3 rounded-xl text-left transition-all border ${
-                                                isSelected
-                                                    ? 'bg-indigo-500/10 border-indigo-500'
-                                                    : darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
-                                                    <User className="w-4 h-4 text-slate-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                                        {user.name || user.email}
-                                                    </p>
-                                                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                        {user.role} {user.outletName && `• ${user.outletName}`}
-                                                    </p>
-                                                </div>
-                                                {isSelected && (
-                                                    <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center">
-                                                        <X className="w-3 h-3 text-white" />
+                                {filteredUsers.length === 0 ? (
+                                    <div className={`p-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        <p className="text-sm">No staff members found</p>
+                                    </div>
+                                ) : (
+                                    filteredUsers.map(user => {
+                                        const isSelected = selectedUsers.includes(user._id);
+                                        return (
+                                            <button
+                                                key={user._id}
+                                                type="button"
+                                                onClick={() => onUserToggle(user._id, newChatType === 'direct')}
+                                                className={`w-full p-3 rounded-xl text-left transition-all border ${
+                                                    isSelected
+                                                        ? 'bg-indigo-500/10 border-indigo-500'
+                                                        : darkMode ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                        isSelected ? 'bg-indigo-600' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                                                    }`}>
+                                                        <User className={`w-4 h-4 ${isSelected ? 'text-white' : darkMode ? 'text-slate-400' : 'text-slate-600'}`} />
                                                     </div>
-                                                )}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                                                    <div className="flex-1">
+                                                        <p className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                                            {user.name || user.email}
+                                                        </p>
+                                                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                            {user.role} {user.outletName && `• ${user.outletName}`}
+                                                        </p>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center">
+                                                            <X className="w-3 h-3 text-white" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })
+                                )}
                             </div>
+                            {newChatType === 'group' && selectedUsers.length > 0 && (
+                                <p className="text-[10px] text-indigo-500 mt-2">
+                                    {selectedUsers.length} selected
+                                </p>
+                            )}
                         </div>
-                    )}
                 </div>
 
                 <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3`}>
@@ -158,10 +220,21 @@ const NewChatModal = ({
                     <button
                         type="button"
                         onClick={onCreateChat}
-                        disabled={newChatType === 'group' && !newChatName.trim()}
-                        className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={
+                            isCreatingChat ||
+                            (newChatType === 'group' && (!newChatName.trim() || selectedUsers.length === 0)) ||
+                            (newChatType === 'direct' && selectedUsers.length !== 1)
+                        }
+                        className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {newChatType === 'group' ? 'Create Group' : 'Create Chat'}
+                        {isCreatingChat ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            newChatType === 'group' ? 'Create Custom Group' : 'Create Chat'
+                        )}
                     </button>
                 </div>
             </div>

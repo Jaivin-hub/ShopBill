@@ -11,6 +11,7 @@ import {
   HistoryModal, 
   RemindModal 
 } from './LedgerModals';
+import { validateName, validatePhoneNumber, validateCreditLimit, validatePositiveNumber } from '../utils/validation';
 
 const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar { width: 4px; }
@@ -49,6 +50,9 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   
   // State for specific error feedback in Add Customer Modal
   const [addCustomerError, setAddCustomerError] = useState(null);
+  
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState({});
   
   // Track sent reminders to provide visual feedback and cooldown
   const [sentReminders, setSentReminders] = useState({});
@@ -102,9 +106,25 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
     if (e) e.preventDefault();
     setAddCustomerError(null);
     
-    if (!newCustomerData.name) {
-       if(showToast) showToast('Name is required', 'error');
-       return;
+    // Validate all fields
+    const errors = {};
+    const nameError = validateName(newCustomerData.name, 'Customer name');
+    if (nameError) errors.name = nameError;
+    
+    const phoneError = validatePhoneNumber(newCustomerData.phone);
+    if (phoneError) errors.phone = phoneError;
+    
+    const creditLimitError = validateCreditLimit(newCustomerData.creditLimit);
+    if (creditLimitError) errors.creditLimit = creditLimitError;
+    
+    const initialDueError = validatePositiveNumber(newCustomerData.initialDue, 'Initial due');
+    if (initialDueError) errors.initialDue = initialDueError;
+    
+    setValidationErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      if(showToast) showToast('Please fix validation errors', 'error');
+      return;
     }
 
     setIsProcessing(true);
@@ -120,6 +140,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
       await fetchCustomers();
       setActiveModal(null);
       setNewCustomerData(initialNewCustomerState);
+      setValidationErrors({});
     } catch (err) { 
       // Handling the 400 response and extracting the message
       const errorData = err.response?.data;
@@ -197,7 +218,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
               <Filter size={18} />
             </button>
             <button
-              onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
+              onClick={() => { setAddCustomerError(null); setValidationErrors({}); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
               className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95"
             >
               <UserPlus size={14} className="text-indigo-400" /> New Account

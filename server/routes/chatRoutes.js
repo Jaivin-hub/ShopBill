@@ -152,19 +152,44 @@ router.get('/chats', protect, async (req, res) => {
             .populate('createdBy', 'name')
             .sort({ lastMessageAt: -1 });
 
-        // Only send last message for preview, not all messages
-        const chatsWithPreview = chats.map(chat => {
+        // Enrich participants with Staff model data (name, outletName)
+        const enrichedChats = await Promise.all(chats.map(async (chat) => {
             const chatObj = chat.toObject();
+            const enrichedParticipants = await Promise.all(chatObj.participants.map(async (participant) => {
+                // Check if this participant is a staff member
+                const staffRecord = await Staff.findOne({ userId: participant._id, active: true })
+                    .populate('storeId', 'name');
+                
+                if (staffRecord) {
+                    // Use Staff name if available, fallback to User name
+                    return {
+                        ...participant,
+                        name: staffRecord.name || participant.name || participant.email,
+                        email: staffRecord.email || participant.email,
+                        role: staffRecord.role || participant.role,
+                        outletId: staffRecord.storeId?._id,
+                        outletName: staffRecord.storeId?.name
+                    };
+                }
+                // For owners or non-staff, return as is
+                return {
+                    ...participant,
+                    name: participant.name || participant.email
+                };
+            }));
+
             const lastMessage = chat.messages && chat.messages.length > 0 
                 ? chat.messages[chat.messages.length - 1] 
                 : null;
+            
             return {
                 ...chatObj,
+                participants: enrichedParticipants,
                 messages: lastMessage ? [lastMessage] : []
             };
-        });
+        }));
 
-        res.json({ success: true, data: chatsWithPreview });
+        res.json({ success: true, data: enrichedChats });
     } catch (error) {
         console.error('Get Chats Error:', error);
         res.status(500).json({ error: 'Failed to fetch chats' });

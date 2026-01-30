@@ -4,6 +4,7 @@ import {
     Edit, Shield, Loader, Info, Save, X, Activity, Globe
 } from 'lucide-react';
 import API from '../config/api';
+import { validatePhoneNumber, validateEmail, validateShopName, validateTaxId, validateAddress } from '../utils/validation';
 
 // --- HELPER COMPONENT ---
 const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '', onChange, isEditing, darkMode }) => (
@@ -16,9 +17,20 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
                 type={name.includes('phone') ? 'tel' : name.includes('email') ? 'email' : 'text'} 
                 name={name}
                 value={value || ''}
-                onChange={onChange}
+                onChange={(e) => {
+                    onChange(e);
+                    // Clear error for this field when user starts typing
+                    if (validationErrors && validationErrors[name]) {
+                        setValidationErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors[name];
+                            return newErrors;
+                        });
+                    }
+                }}
                 placeholder={placeholder}
                 readOnly={readOnly || !isEditing}
+                maxLength={name.includes('phone') ? 10 : undefined}
                 /* MOBILE ZOOM FIX: text-[16px] md:text-xs prevents auto-zoom on mobile */
                 className={`w-full p-4 rounded-xl transition-all text-[16px] md:text-xs font-bold outline-none border tabular-nums
                     ${readOnly || !isEditing 
@@ -26,8 +38,12 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
                         : (darkMode ? 'border-gray-700 bg-gray-950 text-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-2xl shadow-indigo-500/5' 
                                    : 'border-slate-300 bg-white text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-lg shadow-indigo-500/5')
                     }
+                    ${validationErrors && validationErrors[name] ? 'border-red-500 ring-2 ring-red-500/10' : ''}
                 `}
             />
+            {validationErrors && validationErrors[name] && (
+                <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors[name]}</p>
+            )}
             {!readOnly && isEditing && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
                     <Edit className="w-3.5 h-3.5 text-indigo-400" />
@@ -50,6 +66,7 @@ function Profile({ apiClient, showToast, darkMode }) {
 
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [validationErrors, setValidationErrors] = useState({});
 
     const fetchProfileData = useCallback(async () => {
         setIsLoading(true);
@@ -69,6 +86,40 @@ function Profile({ apiClient, showToast, darkMode }) {
     }, [fetchProfileData]);
 
     const handleSave = async () => {
+        // Validate all fields
+        const errors = {};
+        
+        // Phone is optional, but if provided, validate it
+        if (profile.phone && profile.phone.trim()) {
+            const phoneError = validatePhoneNumber(profile.phone);
+            if (phoneError) errors.phone = phoneError;
+        }
+        
+        // Shop name is optional, but if provided, validate it
+        if (profile.shopName && profile.shopName.trim()) {
+            const shopNameError = validateShopName(profile.shopName);
+            if (shopNameError) errors.shopName = shopNameError;
+        }
+        
+        // Tax ID is optional, but if provided, validate it
+        if (profile.taxId && profile.taxId.trim()) {
+            const taxIdError = validateTaxId(profile.taxId);
+            if (taxIdError) errors.taxId = taxIdError;
+        }
+        
+        // Address is optional, but if provided, validate it
+        if (profile.address && profile.address.trim()) {
+            const addressError = validateAddress(profile.address);
+            if (addressError) errors.address = addressError;
+        }
+        
+        setValidationErrors(errors);
+        
+        if (Object.keys(errors).length > 0) {
+            showToast('Please fix validation errors', 'error');
+            return;
+        }
+        
         try {
             showToast('Syncing changes...', 'info');
             const response = await apiClient.put(API.profile, profile);
@@ -79,6 +130,7 @@ function Profile({ apiClient, showToast, darkMode }) {
             localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
 
             setIsEditing(false);
+            setValidationErrors({});
             showToast('Identity updated successfully', 'success');
         } catch (error) {
             const errMsg = error.response?.data?.error || 'Update failed.';
@@ -171,16 +223,20 @@ function Profile({ apiClient, showToast, darkMode }) {
                             onChange={handleChange}
                             isEditing={isEditing}
                             darkMode={darkMode}
+                            validationErrors={validationErrors}
+                            setValidationErrors={setValidationErrors}
                         />
                         <ProfileInputField 
                             label="Verified Communication Line" 
                             name="phone" 
                             value={profile.phone} 
                             icon={Phone} 
-                            placeholder="+91 00000 00000"
+                            placeholder="10-digit mobile"
                             onChange={handleChange}
                             isEditing={isEditing}
                             darkMode={darkMode}
+                            validationErrors={validationErrors}
+                            setValidationErrors={setValidationErrors}
                         />
                     </div>
                 </section>

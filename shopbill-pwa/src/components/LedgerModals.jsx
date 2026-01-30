@@ -92,6 +92,7 @@ export const AddCustomerModal = ({
   onClose, 
   onConfirm, 
   errorMessage, // Received from Ledger.js
+  validationErrors = {}, // Field-specific validation errors
   isProcessing, 
   isValid, 
   darkMode 
@@ -131,6 +132,7 @@ export const AddCustomerModal = ({
             value={data.name} 
             onChange={onChange} 
             placeholder="John Doe"
+            error={validationErrors.name}
             darkMode={darkMode}
             required 
           />
@@ -143,6 +145,7 @@ export const AddCustomerModal = ({
             onChange={onChange} 
             placeholder="10-digit mobile"
             maxLength="10"
+            error={validationErrors.phone}
             darkMode={darkMode}
             required
           />
@@ -154,6 +157,7 @@ export const AddCustomerModal = ({
               value={data.initialDue} 
               onChange={onChange} 
               placeholder="0"
+              error={validationErrors.initialDue}
               darkMode={darkMode}
             />
             <InputField 
@@ -164,6 +168,7 @@ export const AddCustomerModal = ({
               value={data.creditLimit} 
               onChange={onChange} 
               placeholder="5000"
+              error={validationErrors.creditLimit}
               darkMode={darkMode}
               required
             />

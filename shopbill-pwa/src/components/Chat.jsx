@@ -42,10 +42,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [newChatType, setNewChatType] = useState('group');
     const [newChatName, setNewChatName] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
-    const [selectedOutlet, setSelectedOutlet] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [staffList, setStaffList] = useState([]);
     const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+    const [isCreatingChat, setIsCreatingChat] = useState(false);
     
     // Voice recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -54,6 +54,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [audioUrl, setAudioUrl] = useState(null);
     const [mediaRecorder, setMediaRecorder] = useState(null);
     const [playingAudioId, setPlayingAudioId] = useState(null);
+    const [showInfo, setShowInfo] = useState(false);
     
     // Refs
     const socketRef = useRef(null);
@@ -136,7 +137,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     useEffect(() => { if (hasChatAccess) fetchChats(); }, [hasChatAccess, fetchChats]);
 
     useEffect(() => {
-        if (selectedChat && !selectedChat.isDefault) {
+        if (selectedChat) {
+            // Fetch messages for all chats (groups, direct chats, default groups)
             fetchMessages(selectedChat._id);
         } else {
             setMessages([]);
@@ -327,8 +329,139 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     const getChatDisplayName = (chat) => {
         if (chat.name) return chat.name;
-        const other = chat.participants?.find(p => (p._id || p) !== currentUser._id);
+        // For direct chats, find the other participant (not current user)
+        const other = chat.participants?.find(p => {
+            const participantId = typeof p === 'object' && p !== null ? (p._id || p.id || p) : p;
+            const currentUserId = currentUser?._id || currentUser?.id;
+            return participantId && currentUserId && participantId.toString() !== currentUserId.toString();
+        });
         return other?.name || other?.email || 'Unknown';
+    };
+
+    const handleCreateChat = async () => {
+        if (newChatType === 'group' && (!newChatName.trim() || selectedUsers.length === 0)) {
+            showToast('Please provide a group name and select at least one staff member', 'error');
+            return;
+        }
+        if (newChatType === 'direct' && selectedUsers.length !== 1) {
+            showToast('Please select exactly one person for direct chat', 'error');
+            return;
+        }
+
+        setIsCreatingChat(true);
+        try {
+            const response = await apiClient.post(API.createChat, {
+                type: newChatType,
+                name: newChatType === 'group' ? newChatName.trim() : null,
+                participantIds: selectedUsers,
+                outletId: null // Custom groups are cross-outlet by default
+            });
+
+            if (response.data?.success) {
+                const newChat = response.data.data;
+                // Refresh chats list
+                await fetchChats();
+                // Find the newly created chat
+                const refreshedChats = await apiClient.get(API.chatList);
+                if (refreshedChats.data?.success) {
+                    const updatedChats = refreshedChats.data.data || [];
+                    setChats(updatedChats);
+                    const createdChat = updatedChats.find(c => c._id === newChat._id) || newChat;
+                    setSelectedChat(createdChat);
+                    fetchMessages(createdChat._id);
+                } else {
+                    setChats(prev => {
+                        const exists = prev.some(c => c._id === newChat._id);
+                        if (exists) return prev;
+                        return [newChat, ...prev];
+                    });
+                    setSelectedChat(newChat);
+                    fetchMessages(newChat._id);
+                }
+                
+                // Reset form
+                setNewChatName('');
+                setSelectedUsers([]);
+                setSearchTerm('');
+                setShowNewChatModal(false);
+                showToast(newChatType === 'group' ? 'Custom group created successfully' : 'Chat created successfully', 'success');
+            }
+        } catch (error) {
+            console.error('Failed to create chat:', error);
+            showToast(error.response?.data?.error || 'Failed to create chat', 'error');
+        } finally {
+            setIsCreatingChat(false);
+        }
+    };
+
+    const handleQuickMessage = async (userId) => {
+        if (!userId || !currentUser) {
+            console.error('Missing userId or currentUser:', { userId, currentUser });
+            return;
+        }
+        
+        try {
+            // Check if a direct chat already exists with this user
+            const existingChat = chats.find(chat => {
+                if (chat.type !== 'direct') return false;
+                const participantIds = chat.participants?.map(p => {
+                    // Handle both populated and non-populated participants
+                    if (typeof p === 'object' && p !== null) {
+                        return (p._id || p.id || p).toString();
+                    }
+                    return p.toString();
+                }) || [];
+                const currentUserId = (currentUser._id || currentUser.id).toString();
+                const targetUserId = userId.toString();
+                return participantIds.includes(currentUserId) && 
+                       participantIds.includes(targetUserId) &&
+                       participantIds.length === 2;
+            });
+
+            if (existingChat) {
+                // Chat exists, just select it and fetch messages
+                setSelectedChat(existingChat);
+                fetchMessages(existingChat._id);
+                return;
+            }
+
+            // Create a new direct chat
+            showToast('Creating chat...', 'info');
+            const response = await apiClient.post(API.createChat, {
+                type: 'direct',
+                participantIds: [userId]
+            });
+
+            if (response.data?.success) {
+                const newChat = response.data.data;
+                // Refresh chats list to get the latest data
+                await fetchChats();
+                // Find the newly created chat in the refreshed list
+                const refreshedChats = await apiClient.get(API.chatList);
+                if (refreshedChats.data?.success) {
+                    const updatedChats = refreshedChats.data.data || [];
+                    setChats(updatedChats);
+                    // Find and select the new chat
+                    const createdChat = updatedChats.find(c => c._id === newChat._id) || newChat;
+                    setSelectedChat(createdChat);
+                    // Fetch messages for the new chat
+                    fetchMessages(createdChat._id);
+                } else {
+                    // Fallback: use the response data
+                    setChats(prev => {
+                        const exists = prev.some(c => c._id === newChat._id);
+                        if (exists) return prev;
+                        return [newChat, ...prev];
+                    });
+                    setSelectedChat(newChat);
+                    fetchMessages(newChat._id);
+                }
+                showToast('Chat created', 'success');
+            }
+        } catch (error) {
+            console.error('Failed to create/open chat:', error);
+            showToast(error.response?.data?.error || 'Failed to create chat', 'error');
+        }
     };
 
     if (!hasChatAccess) return (
@@ -348,7 +481,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 onSelectChat={setSelectedChat}
                 staffList={staffList}
                 onNewGroupClick={() => { setShowNewChatModal(true); setNewChatType('group'); }}
-                onQuickMessage={(id) => { /* Quick Message Logic */ }}
+                onQuickMessage={handleQuickMessage}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 isLoading={isLoading}
@@ -380,6 +513,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 onBack={() => setSelectedChat(null)}
                                 getChatDisplayName={getChatDisplayName}
                                 darkMode={darkMode}
+                                showInfo={showInfo}
+                                onShowInfoChange={setShowInfo}
+                                currentUser={currentUser}
                             />
                         </div>
 
@@ -398,23 +534,25 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             />
                         </div>
 
-                        {/* Fixed Input section - Footer position */}
-                        <div className={`shrink-0 z-50 ${darkMode ? 'bg-slate-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
-                            <ChatInput
-                                messageInput={messageInput}
-                                onMessageChange={setMessageInput}
-                                onSendMessage={handleSendMessage}
-                                isRecording={isRecording}
-                                recordingTime={recordingTime}
-                                audioUrl={audioUrl}
-                                onStartRecording={startRecording}
-                                onStopRecording={stopRecording}
-                                onSendVoiceMessage={sendVoiceMessage}
-                                onCancelRecording={cancelRecording}
-                                formatRecordingTime={formatRecordingTime}
-                                darkMode={darkMode}
-                            />
-                        </div>
+                        {/* Fixed Input section - Footer position (hidden when info page is open) */}
+                        {!showInfo && (
+                            <div className={`shrink-0 z-50 ${darkMode ? 'bg-slate-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                                <ChatInput
+                                    messageInput={messageInput}
+                                    onMessageChange={setMessageInput}
+                                    onSendMessage={handleSendMessage}
+                                    isRecording={isRecording}
+                                    recordingTime={recordingTime}
+                                    audioUrl={audioUrl}
+                                    onStartRecording={startRecording}
+                                    onStopRecording={stopRecording}
+                                    onSendVoiceMessage={sendVoiceMessage}
+                                    onCancelRecording={cancelRecording}
+                                    formatRecordingTime={formatRecordingTime}
+                                    darkMode={darkMode}
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <EmptyChatView
@@ -427,22 +565,25 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
             <NewChatModal
                 show={showNewChatModal}
-                onClose={() => setShowNewChatModal(false)}
+                onClose={() => {
+                    setShowNewChatModal(false);
+                    setNewChatName('');
+                    setSelectedUsers([]);
+                    setSearchTerm('');
+                }}
                 newChatType={newChatType}
                 onChatTypeChange={setNewChatType}
                 newChatName={newChatName}
                 onChatNameChange={setNewChatName}
                 selectedUsers={selectedUsers}
                 onUserToggle={(id) => setSelectedUsers(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
-                selectedOutlet={selectedOutlet}
-                onOutletChange={setSelectedOutlet}
                 availableUsers={staffList}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
-                outlets={outlets}
-                isPremium={isPremium}
-                onCreateChat={() => { /* Create logic */ }}
+                onCreateChat={handleCreateChat}
                 darkMode={darkMode}
+                setSelectedUsers={setSelectedUsers}
+                isCreatingChat={isCreatingChat}
             />
 
             <style dangerouslySetInnerHTML={{

@@ -32,24 +32,26 @@ const getSalesDateFilter = (req) => {
 
 // --- HELPER 2: Chart Aggregation Logic (NEW/UPDATED) ---
 const getChartAggregation = (viewType) => {
-    const defaultAggregation = { $dayOfYear: "$timestamp" };
-    const defaultLabel = "Day";
-    const defaultSortKey = "timestamp";
-
-    switch (viewType) {
+    // Normalize viewType to handle both lowercase and capitalized inputs
+    const normalized = (viewType || '').toLowerCase();
+    
+    switch (normalized) {
+        case 'month':
         case 'monthly':
             return { 
                 id: { $month: "$timestamp" }, // Group by month number
                 label: "Month", 
                 sortKey: "_id" // Sort by the month number
             };
+        case 'week':
         case 'weekly':
             return { 
                 id: { $week: "$timestamp" }, // Group by week number
                 label: "Week", 
                 sortKey: "_id" // Sort by the week number
             };
-        case 'daily': // Fallthrough or explicit
+        case 'day':
+        case 'daily':
         default:
             return { 
                 id: { $dayOfYear: "$timestamp" }, // Group by day of year
@@ -155,13 +157,24 @@ router.get('/chart-data', protect, async (req, res) => {
         const dateFilter = getSalesDateFilter(req);
         const { viewType } = req.query; 
         
-        // We still call this to get the labelName (e.g., 'Day')
+        // Normalize viewType to handle both lowercase and capitalized inputs
+        const normalizedViewType = (viewType || '').toLowerCase();
+        
+        // Get the label name (e.g., 'Day', 'Week', 'Month')
         const { label: labelName } = getChartAggregation(viewType);
 
-        // Define the date format based on viewType
+        // Define the date format based on normalized viewType
         let dateFormat = "%Y-%m-%d"; // Default for 'Day'
-        if (viewType === 'Month') dateFormat = "%Y-%m";
-        if (viewType === 'Week') dateFormat = "%Y-W%U";
+        if (normalizedViewType === 'month' || normalizedViewType === 'monthly') {
+            dateFormat = "%Y-%m";
+        } else if (normalizedViewType === 'week' || normalizedViewType === 'weekly') {
+            dateFormat = "%Y-W%U";
+        }
+
+        // Check if storeId is available
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
 
         const matchStage = { $match: { 
             ...dateFilter, 
