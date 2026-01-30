@@ -95,6 +95,11 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
 
     const handleEditClick = (item) => {
         setIsEditing(true);
+        // Ensure variants have unique IDs for stable keys
+        const variantsWithIds = (item.variants || []).map((v, idx) => ({
+            ...v,
+            _id: v._id || `variant-${item._id}-${idx}-${Date.now()}`
+        }));
         setFormData({
             _id: item._id,
             id: item.id,
@@ -103,7 +108,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
             quantity: item.quantity || 0,
             reorderLevel: item.reorderLevel || 5,
             hsn: item.hsn || '',
-            variants: item.variants || [] // Load variants if they exist
+            variants: variantsWithIds
         });
         setIsFormModalOpen(true);
     };
@@ -140,11 +145,35 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         setIsProcessing(true);
         try {
             const { _id, id, ...dataToSend } = formData;
+            
+            // Clean variants: remove _id (only used for React keys) and clean empty values
+            if (dataToSend.variants && dataToSend.variants.length > 0) {
+                dataToSend.variants = dataToSend.variants.map(v => {
+                    const cleaned = { ...v };
+                    delete cleaned._id; // Remove React key _id
+                    // Ensure numeric fields are numbers, not strings
+                    cleaned.price = typeof cleaned.price === 'string' ? parseFloat(cleaned.price) || 0 : (cleaned.price || 0);
+                    cleaned.quantity = typeof cleaned.quantity === 'string' ? parseInt(cleaned.quantity) || 0 : (cleaned.quantity || 0);
+                    cleaned.reorderLevel = cleaned.reorderLevel !== null && cleaned.reorderLevel !== undefined 
+                        ? (typeof cleaned.reorderLevel === 'string' ? parseInt(cleaned.reorderLevel) : cleaned.reorderLevel)
+                        : null;
+                    return cleaned;
+                });
+                // Set price and quantity to null when variants exist
+                dataToSend.price = dataToSend.price === '' || dataToSend.price === null ? null : (parseFloat(dataToSend.price) || null);
+                dataToSend.quantity = dataToSend.quantity === '' || dataToSend.quantity === null ? null : (parseInt(dataToSend.quantity) || null);
+            } else {
+                // Ensure price and quantity are numbers when no variants
+                dataToSend.price = parseFloat(dataToSend.price) || 0;
+                dataToSend.quantity = parseInt(dataToSend.quantity) || 0;
+            }
+            
             await apiClient.post(API.inventory, dataToSend);
             showToast(`Catalog Entry Created: ${formData.name}`, 'success');
             await fetchInventory(true);
             closeFormModal();
         } catch (error) {
+            console.error('Add item error:', error.response?.data || error);
             showToast(error.response?.data?.error || 'Add operation failed.', 'error');
         } finally {
             setIsProcessing(false);
@@ -156,11 +185,35 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
         const itemId = formData._id || formData.id;
         try {
             const { _id, id, ...dataToSend } = formData;
+            
+            // Clean variants: remove _id (only used for React keys) and clean empty values
+            if (dataToSend.variants && dataToSend.variants.length > 0) {
+                dataToSend.variants = dataToSend.variants.map(v => {
+                    const cleaned = { ...v };
+                    delete cleaned._id; // Remove React key _id
+                    // Ensure numeric fields are numbers, not strings
+                    cleaned.price = typeof cleaned.price === 'string' ? parseFloat(cleaned.price) || 0 : (cleaned.price || 0);
+                    cleaned.quantity = typeof cleaned.quantity === 'string' ? parseInt(cleaned.quantity) || 0 : (cleaned.quantity || 0);
+                    cleaned.reorderLevel = cleaned.reorderLevel !== null && cleaned.reorderLevel !== undefined 
+                        ? (typeof cleaned.reorderLevel === 'string' ? parseInt(cleaned.reorderLevel) : cleaned.reorderLevel)
+                        : null;
+                    return cleaned;
+                });
+                // Set price and quantity to null when variants exist
+                dataToSend.price = dataToSend.price === '' || dataToSend.price === null ? null : (parseFloat(dataToSend.price) || null);
+                dataToSend.quantity = dataToSend.quantity === '' || dataToSend.quantity === null ? null : (parseInt(dataToSend.quantity) || null);
+            } else {
+                // Ensure price and quantity are numbers when no variants
+                dataToSend.price = parseFloat(dataToSend.price) || 0;
+                dataToSend.quantity = parseInt(dataToSend.quantity) || 0;
+            }
+            
             await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
             showToast(`Entry Reconfigured: ${formData.name}`, 'success');
             await fetchInventory(true);
             closeFormModal();
         } catch (error) {
+            console.error('Update item error:', error.response?.data || error);
             showToast(error.response?.data?.error || 'Update failed.', 'error');
         } finally {
             setIsProcessing(false);

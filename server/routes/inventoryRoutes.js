@@ -100,14 +100,45 @@ router.get('/', protect, async (req, res) => {
 // 2. POST New Inventory Item
 router.post('/', protect, async (req, res) => {
     try {
+        // Clean the request body
+        const cleanedData = { ...req.body };
+        
+        // Remove _id from variants (frontend React keys)
+        if (cleanedData.variants && Array.isArray(cleanedData.variants)) {
+            cleanedData.variants = cleanedData.variants.map(v => {
+                const cleaned = { ...v };
+                delete cleaned._id; // Remove React key _id
+                return cleaned;
+            });
+        }
+        
+        // Convert empty strings to null/undefined for price and quantity when variants exist
+        if (cleanedData.variants && cleanedData.variants.length > 0) {
+            if (cleanedData.price === '' || cleanedData.price === null || cleanedData.price === undefined) {
+                cleanedData.price = undefined; // Let schema default handle it
+            } else {
+                cleanedData.price = parseFloat(cleanedData.price) || undefined;
+            }
+            if (cleanedData.quantity === '' || cleanedData.quantity === null || cleanedData.quantity === undefined) {
+                cleanedData.quantity = undefined; // Let schema default handle it
+            } else {
+                cleanedData.quantity = parseInt(cleanedData.quantity) || undefined;
+            }
+        } else {
+            // Ensure price and quantity are numbers when no variants
+            cleanedData.price = parseFloat(cleanedData.price) || 0;
+            cleanedData.quantity = parseInt(cleanedData.quantity) || 0;
+        }
+        
         const item = await Inventory.create({ 
-            ...req.body, 
+            ...cleanedData, 
             storeId: req.user.storeId 
         });
         await checkAndNotifyLowStock(req, item);
         res.json({ message: 'Item added successfully', item });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to add item.' });
+        console.error('Add inventory item error:', error);
+        res.status(500).json({ error: error.message || 'Failed to add item.' });
     }
 });
 
@@ -127,9 +158,43 @@ router.delete('/:id', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
+        // Clean the request body
+        const cleanedData = { ...req.body };
+        
+        // Remove _id from variants (frontend React keys)
+        if (cleanedData.variants && Array.isArray(cleanedData.variants)) {
+            cleanedData.variants = cleanedData.variants.map(v => {
+                const cleaned = { ...v };
+                delete cleaned._id; // Remove React key _id
+                return cleaned;
+            });
+        }
+        
+        // Convert empty strings to null/undefined for price and quantity when variants exist
+        if (cleanedData.variants && cleanedData.variants.length > 0) {
+            if (cleanedData.price === '' || cleanedData.price === null || cleanedData.price === undefined) {
+                cleanedData.price = undefined; // Let schema default handle it
+            } else {
+                cleanedData.price = parseFloat(cleanedData.price) || undefined;
+            }
+            if (cleanedData.quantity === '' || cleanedData.quantity === null || cleanedData.quantity === undefined) {
+                cleanedData.quantity = undefined; // Let schema default handle it
+            } else {
+                cleanedData.quantity = parseInt(cleanedData.quantity) || undefined;
+            }
+        } else {
+            // Ensure price and quantity are numbers when no variants
+            if (cleanedData.price !== undefined) {
+                cleanedData.price = parseFloat(cleanedData.price) || 0;
+            }
+            if (cleanedData.quantity !== undefined) {
+                cleanedData.quantity = parseInt(cleanedData.quantity) || 0;
+            }
+        }
+        
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: id, storeId: req.user.storeId }, 
-            { $set: req.body }, 
+            { $set: cleanedData }, 
             { new: true, runValidators: true } 
         );
 
@@ -141,7 +206,8 @@ router.put('/:id', protect, async (req, res) => {
             res.status(404).json({ error: 'Item not found.' });
         }
     } catch (error) {
-        res.status(500).json({ error: 'Failed to update.' });
+        console.error('Update inventory item error:', error);
+        res.status(500).json({ error: error.message || 'Failed to update.' });
     }
 });
 

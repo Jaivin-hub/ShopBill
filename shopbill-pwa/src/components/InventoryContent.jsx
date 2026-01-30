@@ -256,6 +256,7 @@ const InventoryContent = ({
 
     const addVariant = () => {
         const newVariant = {
+            _id: `variant-${Date.now()}-${Math.random()}`, // Unique ID for stable key
             label: '',
             price: 0,
             quantity: 0,
@@ -526,7 +527,7 @@ const InventoryContent = ({
                                     </div>
                                     <div className="space-y-3">
                                         {(formData.variants || []).map((variant, index) => (
-                                            <div key={`variant-${index}-${variant.label || ''}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                            <div key={variant._id || `variant-${index}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                                 <div className="flex items-center justify-between mb-3">
                                                     <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                         Variant {index + 1}
@@ -558,14 +559,20 @@ const InventoryContent = ({
                                                             Price (₹) *
                                                         </label>
                                                         <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={variant.price}
-                                                            onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={variant.price === 0 ? '' : variant.price}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val === '' || val === '0') {
+                                                                    updateVariant(index, 'price', 0);
+                                                                } else if (/^\d*\.?\d*$/.test(val)) {
+                                                                    updateVariant(index, 'price', parseFloat(val) || 0);
+                                                                }
+                                                            }}
                                                             placeholder="0.00"
                                                             required
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                     <div>
@@ -573,13 +580,20 @@ const InventoryContent = ({
                                                             Current Stock *
                                                         </label>
                                                         <input
-                                                            type="number"
-                                                            min="0"
-                                                            value={variant.quantity}
-                                                            onChange={(e) => updateVariant(index, 'quantity', parseInt(e.target.value) || 0)}
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            value={variant.quantity === 0 ? '' : variant.quantity}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val === '' || val === '0') {
+                                                                    updateVariant(index, 'quantity', 0);
+                                                                } else if (/^\d+$/.test(val)) {
+                                                                    updateVariant(index, 'quantity', parseInt(val) || 0);
+                                                                }
+                                                            }}
                                                             placeholder="0"
                                                             required
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                     <div>
@@ -587,12 +601,19 @@ const InventoryContent = ({
                                                             Low Stock Alert
                                                         </label>
                                                         <input
-                                                            type="number"
-                                                            min="0"
+                                                            type="text"
+                                                            inputMode="numeric"
                                                             value={variant.reorderLevel || ''}
-                                                            onChange={(e) => updateVariant(index, 'reorderLevel', e.target.value ? parseInt(e.target.value) : null)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val === '') {
+                                                                    updateVariant(index, 'reorderLevel', null);
+                                                                } else if (/^\d+$/.test(val)) {
+                                                                    updateVariant(index, 'reorderLevel', parseInt(val));
+                                                                }
+                                                            }}
                                                             placeholder={formData.reorderLevel || '5'}
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                 </div>
