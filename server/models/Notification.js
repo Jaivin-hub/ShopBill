@@ -37,7 +37,8 @@ const NotificationSchema = new mongoose.Schema({
 
     metadata: { 
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', index: true },
-        customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true }
+        customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true },
+        variantId: { type: mongoose.Schema.Types.ObjectId, default: null }
     },
     createdAt: { 
         type: Date, 

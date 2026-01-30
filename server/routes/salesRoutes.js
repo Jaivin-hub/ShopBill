@@ -189,17 +189,42 @@ router.post('/', protect, async (req, res) => {
 
         // --- 6. REAL-TIME STOCK LOGIC ---
         for (const item of updatedInventoryDocs) {
-            const currentQty = Number(item.quantity);
-            const reorderLevel = Number(item.reorderLevel) || 5;
+            // Check if product has variants
+            if (item.variants && item.variants.length > 0) {
+                // Check each variant for low stock
+                for (const variant of item.variants) {
+                    const variantQty = Number(variant.quantity) || 0;
+                    const variantReorderLevel = variant.reorderLevel !== null && variant.reorderLevel !== undefined 
+                        ? Number(variant.reorderLevel) 
+                        : Number(item.reorderLevel) || 5;
 
-            if (currentQty <= reorderLevel) {
-                await emitAlert(req, storeId.toString(), 'inventory_low', {
-                    _id: item._id,
-                    name: item.name,
-                    quantity: currentQty
-                });
+                    if (variantQty <= variantReorderLevel) {
+                        await emitAlert(req, storeId.toString(), 'inventory_low', {
+                            _id: item._id,
+                            name: `${item.name} (${variant.label})`,
+                            quantity: variantQty,
+                            variantId: variant._id
+                        });
+                        console.log(`📡 [Low Stock Alert] ${item.name} - ${variant.label}: ${variantQty}`);
+                    } else {
+                        // Resolve alert if variant stock is replenished
+                        await resolveLowStockAlert(req, storeId.toString(), item._id, variant._id);
+                    }
+                }
             } else {
-                await resolveLowStockAlert(req, storeId.toString(), item._id);
+                // Original logic for products without variants
+                const currentQty = Number(item.quantity) || 0;
+                const reorderLevel = Number(item.reorderLevel) || 5;
+
+                if (currentQty <= reorderLevel) {
+                    await emitAlert(req, storeId.toString(), 'inventory_low', {
+                        _id: item._id,
+                        name: item.name,
+                        quantity: currentQty
+                    });
+                } else {
+                    await resolveLowStockAlert(req, storeId.toString(), item._id);
+                }
             }
         }
 

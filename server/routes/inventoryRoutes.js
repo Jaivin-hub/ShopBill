@@ -38,9 +38,9 @@ const checkAndNotifyLowStock = async (req, item) => {
                     console.error("❌ Error triggering alert:", err);
                 }
             } else {
-                // Resolve alert if stock is replenished
+                // Resolve alert if variant stock is replenished
                 try {
-                    await resolveLowStockAlert(req, storeIdString, item._id);
+                    await resolveLowStockAlert(req, storeIdString, item._id, variant._id);
                 } catch (err) {
                     console.error("❌ Error resolving notification:", err);
                 }

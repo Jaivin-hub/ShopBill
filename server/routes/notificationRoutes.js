@@ -23,7 +23,10 @@ const emitAlert = async (req, storeId, type, data) => {
             title = 'Low Stock Alert';
             category = 'Critical';
             message = `Low stock alert: ${data.name} (${data.quantity} remaining)`;
-            metadata = { itemId: data._id };
+            metadata = { 
+                itemId: data._id,
+                variantId: data.variantId || null
+            };
             break;
         case 'credit_exceeded':
             title = 'Credit Limit Exceeded';
@@ -69,21 +72,32 @@ const emitAlert = async (req, storeId, type, data) => {
 /**
  * NEW UTILITY: resolveLowStockAlert
  * Call this when stock is re-added to remove old warnings automatically.
+ * @param {Object} req - Express request object
+ * @param {String} storeId - Store ID
+ * @param {String} itemId - Item ID
+ * @param {String} variantId - Optional variant ID for variant-specific resolution
  */
-const resolveLowStockAlert = async (req, storeId, itemId) => {
+const resolveLowStockAlert = async (req, storeId, itemId, variantId = null) => {
     const io = req.app.get('socketio');
     const storeIdStr = storeId.toString();
 
     try {
-        await Notification.deleteMany({
+        const query = {
             storeId: storeIdStr,
             type: 'inventory_low',
             'metadata.itemId': itemId
-        });
+        };
+        
+        // If variantId is provided, only resolve alerts for that specific variant
+        if (variantId) {
+            query['metadata.variantId'] = variantId;
+        }
+
+        await Notification.deleteMany(query);
 
         if (io) {
-            io.to(storeIdStr).emit('resolve_notification', { itemId });
-            console.log(`🧹 Resolved alerts for item: ${itemId}`);
+            io.to(storeIdStr).emit('resolve_notification', { itemId, variantId });
+            console.log(`🧹 Resolved alerts for item: ${itemId}${variantId ? ` (variant: ${variantId})` : ''}`);
         }
     } catch (error) {
         console.error("❌ Failed to resolve alerts:", error.message);

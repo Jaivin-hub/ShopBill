@@ -216,22 +216,26 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                     </div>
                     
                     {/* Stats Row: Compact Grid */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className={`grid gap-2 ${hasVariants ? 'grid-cols-3' : 'grid-cols-3'}`}>
                         <div className="text-center p-2 rounded-lg bg-slate-950/30">
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                             <p className={`text-sm font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                 {totalQuantity}
                             </p>
                         </div>
-                        {!hasVariants && (
-                            <div className="text-center p-2 rounded-lg bg-slate-950/30">
-                                <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                            <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                            {hasVariants ? (
+                                <p className={`text-[10px] font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    Varies
+                                </p>
+                            ) : (
                                 <p className={`text-sm font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                     {item.reorderLevel || 5}
                                 </p>
-                            </div>
-                        )}
-                        <div className={`text-center p-2 rounded-lg bg-slate-950/30 ${!hasVariants ? '' : 'col-span-2'}`}>
+                            )}
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                             {hasVariants && priceRange ? (
                                 <p className="text-sm font-black text-emerald-500 tabular-nums">
@@ -284,14 +288,18 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                                 {totalQuantity}
                             </p>
                         </div>
-                        {!hasVariants && (
-                            <div className="text-center">
-                                <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                        <div className="text-center">
+                            <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                            {hasVariants ? (
+                                <p className={`text-xs font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    Varies
+                                </p>
+                            ) : (
                                 <p className={`text-base font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                     {item.reorderLevel || 5}
                                 </p>
-                            </div>
-                        )}
+                            )}
+                        </div>
                         <div className="text-center">
                             <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                             {hasVariants && priceRange ? (
@@ -361,11 +369,17 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                                                 {variantIsLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-3 gap-2">
                                             <div className="text-center p-1.5 rounded bg-slate-950/30">
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                                                 <p className={`text-xs font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                                     {variant.quantity || 0}
+                                                </p>
+                                            </div>
+                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                                <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                                                <p className={`text-xs font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                    {variantReorderLevel}
                                                 </p>
                                             </div>
                                             <div className="text-center p-1.5 rounded bg-slate-950/30">
@@ -390,6 +404,12 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                                                 <p className={`text-[8px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                                                 <p className={`text-sm font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                                     {variant.quantity || 0}
+                                                </p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className={`text-[8px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                                                <p className={`text-sm font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                    {variantReorderLevel}
                                                 </p>
                                             </div>
                                             <div className="text-center">
