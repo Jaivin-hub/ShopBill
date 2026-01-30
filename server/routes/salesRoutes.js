@@ -127,13 +127,46 @@ router.post('/', protect, async (req, res) => {
         // --- 4. Update Inventory ---
         let updatedInventoryDocs = [];
         if (items && items.length > 0) {
-             const inventoryUpdates = items.map(item =>
-                Inventory.findOneAndUpdate(
-                    { _id: item.itemId, storeId }, 
-                    { $inc: { quantity: -item.quantity } }, 
-                    { new: true } 
-                )
-            );
+             const inventoryUpdates = items.map(async (item) => {
+                const inventoryItem = await Inventory.findOne({ _id: item.itemId, storeId });
+                if (!inventoryItem) {
+                    throw new Error(`Inventory item not found for ${item.name}`);
+                }
+
+                if (item.variantId) {
+                    // Update specific variant quantity
+                    const variant = inventoryItem.variants.id(item.variantId);
+                    if (!variant) {
+                        throw new Error(`Variant not found for ${inventoryItem.name}`);
+                    }
+                    
+                    // Use arrayFilters to update the specific variant
+                    return Inventory.findOneAndUpdate(
+                        { _id: item.itemId, storeId },
+                        { $inc: { 'variants.$[elem].quantity': -item.quantity } },
+                        { 
+                            arrayFilters: [{ 'elem._id': item.variantId }],
+                            new: true 
+                        }
+                    );
+                } else {
+                    // Update base quantity (only if product doesn't have variants)
+                    if (inventoryItem.variants && inventoryItem.variants.length > 0) {
+                        throw new Error(`${inventoryItem.name} has variants but no variant was selected.`);
+                    }
+                    
+                    // Only update if quantity is not null
+                    if (inventoryItem.quantity === null || inventoryItem.quantity === undefined) {
+                        throw new Error(`Cannot update quantity for ${inventoryItem.name}: quantity is null.`);
+                    }
+                    
+                    return Inventory.findOneAndUpdate(
+                        { _id: item.itemId, storeId },
+                        { $inc: { quantity: -item.quantity } },
+                        { new: true }
+                    );
+                }
+            });
             updatedInventoryDocs = await Promise.all(inventoryUpdates);
         }
 

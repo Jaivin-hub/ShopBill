@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 
@@ -13,6 +13,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastAddedId, setLastAddedId] = useState(null);
+  const [variantSelectorItem, setVariantSelectorItem] = useState(null);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -38,7 +39,14 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
 
   const filteredInventory = useMemo(() => {
     const term = (scannedBarcode || searchTerm).toLowerCase().trim();
-    const inStockItems = inventory.filter(item => item.quantity > 0);
+    // Filter items that have stock (either base quantity or variant quantities)
+    const inStockItems = inventory.filter(item => {
+      if (item.variants && item.variants.length > 0) {
+        // Check if any variant has stock
+        return item.variants.some(v => (v.quantity || 0) > 0);
+      }
+      return (item.quantity || 0) > 0;
+    });
     if (!term) return inStockItems.sort((a, b) => a.name.localeCompare(b.name));
     return inStockItems.filter(item =>
       item.name.toLowerCase().includes(term) || 
@@ -49,40 +57,115 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
 
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id)], [customers]);
 
-  const addItemToCart = useCallback((itemToAdd) => {
+  const addItemToCart = useCallback((itemToAdd, variant = null) => {
+    // If item has variants and no variant is selected, show variant selector
+    if (itemToAdd.variants && itemToAdd.variants.length > 0 && !variant) {
+      setVariantSelectorItem(itemToAdd);
+      return;
+    }
+
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item._id === itemToAdd._id);
+      const cartItemId = variant ? `${itemToAdd._id}_${variant._id}` : itemToAdd._id;
+      const existingItem = prevCart.find(item => {
+        const itemId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+        return itemId === cartItemId;
+      });
+
       if (existingItem) {
         const inventoryItem = inventory.find(i => i._id === itemToAdd._id);
-        if (existingItem.quantity + 1 > inventoryItem?.quantity) {
+        let availableStock;
+        
+        if (variant) {
+          const variantInInventory = inventoryItem?.variants?.find(v => v._id.toString() === variant._id.toString());
+          availableStock = variantInInventory?.quantity || 0;
+        } else {
+          availableStock = inventoryItem?.quantity || 0;
+        }
+
+        if (existingItem.quantity + 1 > availableStock) {
           showToast(`Stock limit reached.`, 'error');
           return prevCart;
         }
-        return prevCart.map(item => item._id === itemToAdd._id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prevCart.map(item => {
+          const itemId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+          return itemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item;
+        });
       }
-      return [...prevCart, { ...itemToAdd, quantity: 1 }];
+
+      // Add new item to cart
+      const cartItem = variant 
+        ? {
+            _id: itemToAdd._id,
+            name: `${itemToAdd.name} (${variant.label})`,
+            price: variant.price,
+            quantity: 1,
+            variantId: variant._id,
+            variantLabel: variant.label
+          }
+        : { ...itemToAdd, quantity: 1 };
+
+      return [...prevCart, cartItem];
     });
     
     setLastAddedId(itemToAdd._id);
     setTimeout(() => setLastAddedId(null), 500);
+    setVariantSelectorItem(null);
   }, [inventory, showToast]);
 
-  const updateCartQuantity = useCallback((itemId, amount) => {
+  const updateCartQuantity = useCallback((itemId, amount, variantId = null) => {
     setCart(prevCart => {
-      const item = prevCart.find(i => i._id === itemId);
+      const cartItemId = variantId ? `${itemId}_${variantId}` : itemId;
+      const item = prevCart.find(i => {
+        const iId = i.variantId ? `${i._id}_${i.variantId}` : i._id;
+        return iId === cartItemId;
+      });
+      
+      if (!item) return prevCart;
+      
       const inventoryItem = inventory.find(i => i._id === itemId);
-      if (!item || !inventoryItem) return prevCart;
-      const newQuantity = item.quantity + amount;
-      if (amount > 0 && newQuantity > inventoryItem.quantity) {
-          showToast('Stock limit reached', 'error');
-          return prevCart;
+      if (!inventoryItem) return prevCart;
+
+      let availableStock;
+      if (variantId) {
+        const variant = inventoryItem.variants?.find(v => v._id.toString() === variantId.toString());
+        availableStock = variant?.quantity || 0;
+      } else {
+        availableStock = inventoryItem.quantity || 0;
       }
-      return newQuantity <= 0 ? prevCart.filter(i => i._id !== itemId) : prevCart.map(i => i._id === itemId ? { ...i, quantity: newQuantity } : i);
+
+      const newQuantity = item.quantity + amount;
+      if (amount > 0 && newQuantity > availableStock) {
+        showToast('Stock limit reached', 'error');
+        return prevCart;
+      }
+      
+      const iId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+      return newQuantity <= 0 
+        ? prevCart.filter(i => {
+            const checkId = i.variantId ? `${i._id}_${i.variantId}` : i._id;
+            return checkId !== cartItemId;
+          })
+        : prevCart.map(i => {
+            const checkId = i.variantId ? `${i._id}_${i.variantId}` : i._id;
+            return checkId === cartItemId ? { ...i, quantity: newQuantity } : i;
+          });
     });
   }, [inventory, showToast]);
 
-  const removeItemFromCart = useCallback((itemId) => {
-    setCart(prevCart => prevCart.filter(item => item._id !== itemId));
+  const removeItemFromCart = useCallback((itemId, variantId = null) => {
+    setCart(prevCart => {
+      if (variantId) {
+        const cartItemId = `${itemId}_${variantId}`;
+        return prevCart.filter(item => {
+          const iId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+          return iId !== cartItemId;
+        });
+      }
+      return prevCart.filter(item => {
+        // Only remove if it doesn't have a variant (to avoid removing variant items)
+        return item._id === itemId && !item.variantId;
+      });
+    });
   }, []);
 
   const handleCancelTransaction = () => {
@@ -115,7 +198,9 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         itemId: item._id, 
         name: item.name, 
         quantity: item.quantity, 
-        price: item.price 
+        price: item.price,
+        variantId: item.variantId || null,
+        variantLabel: item.variantLabel || null
       })),
       // Ensure these are numbers
       amountPaid: parseFloat(amountPaid) || 0,
@@ -217,21 +302,44 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               
               <div className="product-grid-scroll custom-scroll pr-2">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-                    {filteredInventory.map(item => (
-                    <button
-                        key={item._id}
-                        onClick={() => addItemToCart(item)}
-                        className={`p-3 rounded-xl border transition-all text-left active:scale-95 group relative overflow-hidden ${cardBase} hover:border-indigo-500/50 ${lastAddedId === item._id ? 'border-indigo-500 ring-2 ring-indigo-500/20' : ''}`}
-                    >
-                        <div className="relative z-10">
-                            <p className="text-[9px] font-black truncate mb-1 leading-tight group-hover:text-indigo-500">{item.name}</p>
-                            <p className="text-xs font-black text-emerald-500 tracking-tighter">₹{item.price}</p>
-                        </div>
-                        <div className={`absolute bottom-1 right-1 text-[8px] font-black px-1 rounded ${darkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
-                            {item.quantity}
-                        </div>
-                    </button>
-                    ))}
+                    {filteredInventory.map(item => {
+                      const hasVariants = item.variants && item.variants.length > 0;
+                      const totalStock = hasVariants 
+                        ? item.variants.reduce((sum, v) => sum + (v.quantity || 0), 0)
+                        : (item.quantity || 0);
+                      const priceDisplay = hasVariants
+                        ? (() => {
+                            const prices = item.variants.map(v => v.price).filter(p => p !== undefined && p !== null);
+                            if (prices.length === 0) return 'N/A';
+                            const minPrice = Math.min(...prices);
+                            const maxPrice = Math.max(...prices);
+                            return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice}-${maxPrice}`;
+                          })()
+                        : `₹${item.price || 0}`;
+
+                      return (
+                        <button
+                          key={item._id}
+                          onClick={() => addItemToCart(item)}
+                          className={`p-3 rounded-xl border transition-all text-left active:scale-95 group relative overflow-hidden ${cardBase} hover:border-indigo-500/50 ${lastAddedId === item._id ? 'border-indigo-500 ring-2 ring-indigo-500/20' : ''}`}
+                        >
+                          <div className="relative z-10">
+                            <div className="flex items-center gap-1 mb-1">
+                              <p className="text-[9px] font-black truncate leading-tight group-hover:text-indigo-500">{item.name}</p>
+                              {hasVariants && (
+                                <span className={`text-[6px] font-black px-1 py-0.5 rounded flex-shrink-0 ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+                                  {item.variants.length}V
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-black text-emerald-500 tracking-tighter">{priceDisplay}</p>
+                          </div>
+                          <div className={`absolute bottom-1 right-1 text-[8px] font-black px-1 rounded ${darkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                            {totalStock}
+                          </div>
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
             </section>
@@ -243,27 +351,30 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               </div>
 
               <div className="space-y-2">
-                  {[...cart].reverse().map(item => (
-                  <div key={item._id} className={`rounded-2xl border p-4 flex items-center justify-between transition-all hover:bg-indigo-500/[0.02] ${cardBase}`}>
-                      <div className="flex-1 truncate pr-4">
-                        <p className="text-xs font-black truncate mb-0.5">{item.name}</p>
-                        <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 md:gap-8">
-                        <div className={`flex items-center rounded-xl border p-1 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                            <button onClick={() => updateCartQuantity(item._id, -1)} className="p-1.5 text-slate-500 hover:text-rose-500 transition-colors"><Minus className="w-3.5 h-3.5" /></button>
-                            <span className="w-8 text-center text-xs font-black text-indigo-500">{item.quantity}</span>
-                            <button onClick={() => updateCartQuantity(item._id, 1)} className="p-1.5 text-slate-500 hover:text-emerald-500 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
+                  {[...cart].reverse().map(item => {
+                    const cartItemId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+                    return (
+                      <div key={cartItemId} className={`rounded-2xl border p-3 md:p-4 flex items-center justify-between transition-all hover:bg-indigo-500/[0.02] ${cardBase}`}>
+                        <div className="flex-1 truncate pr-2 md:pr-4 min-w-0">
+                          <p className="text-xs font-black truncate mb-0.5">{item.name}</p>
+                          <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
                         </div>
                         
-                        <div className="text-right min-w-[90px]">
+                        <div className="flex items-center gap-2 md:gap-4 md:gap-8 flex-shrink-0">
+                          <div className={`flex items-center rounded-xl border p-1 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                            <button onClick={() => updateCartQuantity(item._id, -1, item.variantId)} className="p-1.5 text-slate-500 hover:text-rose-500 transition-colors"><Minus className="w-3.5 h-3.5" /></button>
+                            <span className="w-8 text-center text-xs font-black text-indigo-500">{item.quantity}</span>
+                            <button onClick={() => updateCartQuantity(item._id, 1, item.variantId)} className="p-1.5 text-slate-500 hover:text-emerald-500 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
+                          </div>
+                          
+                          <div className="text-right min-w-[70px] md:min-w-[90px]">
                             <p className="text-sm font-black text-emerald-500">₹{(item.quantity * item.price).toLocaleString()}</p>
-                            <button onClick={() => removeItemFromCart(item._id)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 tracking-widest">Remove</button>
+                            <button onClick={() => removeItemFromCart(item._id, item.variantId)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 tracking-widest">Remove</button>
+                          </div>
                         </div>
                       </div>
-                  </div>
-                  ))}
+                    );
+                  })}
                   
                   {cart.length === 0 && (
                     <div className={`text-center py-20 border-2 border-dashed rounded-3xl transition-colors ${darkMode ? 'border-slate-900 bg-slate-900/20' : 'border-slate-100 bg-white/50'}`}>
@@ -355,6 +466,73 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         onScanNotFound={() => setIsCameraScannerOpen(false)}
         onScanError={() => setIsCameraScannerOpen(false)}
       />
+
+      {/* Variant Selector Modal */}
+      {variantSelectorItem && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setVariantSelectorItem(null)}>
+          <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm`} />
+          <div 
+            className={`relative w-full max-w-md ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
+              <div className="flex-1 min-w-0">
+                <h3 className={`text-base md:text-lg font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Select Variant
+                </h3>
+                <p className={`text-xs font-bold mt-1 truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {variantSelectorItem.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setVariantSelectorItem(null)}
+                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-all flex-shrink-0 ml-2"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+              <div className="space-y-2">
+                {variantSelectorItem.variants
+                  .filter(v => (v.quantity || 0) > 0)
+                  .map((variant) => (
+                    <button
+                      key={variant._id}
+                      onClick={() => addItemToCart(variantSelectorItem, variant)}
+                      className={`w-full p-3 md:p-4 rounded-xl border text-left transition-all active:scale-95 hover:border-indigo-500/50 ${
+                        darkMode 
+                          ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs md:text-sm font-black mb-1 truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            {variant.label}
+                          </p>
+                          <div className="flex items-center gap-3 md:gap-4 mt-2">
+                            <div>
+                              <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                              <p className="text-sm md:text-base font-black text-emerald-500">₹{variant.price?.toLocaleString() || '0'}</p>
+                            </div>
+                            <div>
+                              <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                              <p className={`text-sm md:text-base font-black ${(variant.quantity || 0) <= (variant.reorderLevel || 5) ? 'text-red-500' : 'text-indigo-500'}`}>
+                                {variant.quantity || 0}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className={`w-4 h-4 md:w-5 md:h-5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} flex-shrink-0`} />
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

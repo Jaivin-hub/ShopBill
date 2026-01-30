@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
     Package, Plus, AlertTriangle, Edit, Trash2, X, Search, 
     ListOrdered, Loader2, ScanLine, Upload, Hash, Layers, Bell, Info, 
-    ChevronDown, ChevronUp, Settings2
+    ChevronDown, ChevronUp, Settings2, ChevronRight
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
 
@@ -131,73 +131,281 @@ const InputField = ({ label, darkMode, ...props }) => (
 );
 
 const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, darkMode }) => {
-    const isLowStock = item.quantity <= (item.reorderLevel || 5);
+    const [showVariants, setShowVariants] = useState(false);
+    const hasVariants = item.variants && item.variants.length > 0;
+    
+    // Calculate totals for products with variants
+    const totalQuantity = hasVariants 
+        ? item.variants.reduce((sum, v) => sum + (v.quantity || 0), 0)
+        : (item.quantity || 0);
+    
+    const priceRange = hasVariants && item.variants.length > 0
+        ? {
+            min: Math.min(...item.variants.map(v => v.price || 0)),
+            max: Math.max(...item.variants.map(v => v.price || 0))
+        }
+        : null;
+    
+    // Check low stock - for variants, check each variant
+    const isLowStock = hasVariants
+        ? item.variants.some(v => {
+            const variantReorderLevel = v.reorderLevel !== null && v.reorderLevel !== undefined 
+                ? v.reorderLevel 
+                : (item.reorderLevel || 5);
+            return (v.quantity || 0) <= variantReorderLevel;
+        })
+        : (item.quantity || 0) <= (item.reorderLevel || 5);
+    
     const cardBg = darkMode 
         ? (isLowStock ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900/80 border-slate-800/50 hover:border-indigo-500/30') 
         : (isLowStock ? 'bg-red-50/80 border-red-200' : 'bg-white border-slate-200 shadow-sm hover:border-indigo-300');
     
     return (
-        <article className={`group p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${cardBg}`}>
-            <div className="flex items-center justify-between gap-3">
-                {/* Left: Product Info */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className={`p-2 rounded-lg flex-shrink-0 ${isLowStock ? 'bg-red-500/10' : 'bg-indigo-500/10'}`}>
-                        <Package className={`w-4 h-4 ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className={`text-sm font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {item.name}
-                            </h4>
-                            {isLowStock && <Bell className="w-3.5 h-3.5 text-red-500 animate-pulse flex-shrink-0" />}
+        <article className={`group rounded-xl border transition-all duration-200 hover:shadow-md ${cardBg}`}>
+            <div className="p-3 md:p-4">
+                {/* Mobile: Stacked Layout */}
+                <div className="md:hidden space-y-3">
+                    {/* Top Row: Name and Actions */}
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className={`p-1.5 rounded-lg flex-shrink-0 ${isLowStock ? 'bg-red-500/10' : 'bg-indigo-500/10'}`}>
+                                <Package className={`w-3.5 h-3.5 ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h4 className={`text-xs font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                        {item.name}
+                                    </h4>
+                                    {isLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
+                                    {hasVariants && (
+                                        <span className={`text-[7px] font-black px-1 py-0.5 rounded ${darkMode ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-100 text-indigo-600 border border-indigo-200'}`}>
+                                            {item.variants.length}V
+                                        </span>
+                                    )}
+                                </div>
+                                {item.hsn && (
+                                    <p className={`text-[8px] font-bold tracking-wider flex items-center gap-1 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        <Hash className="w-2.5 h-2.5" /> {item.hsn}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                        {item.hsn && (
-                            <p className={`text-[9px] font-bold tracking-wider flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                <Hash className="w-3 h-3" /> {item.hsn}
+                        <div className="flex gap-1 flex-shrink-0">
+                            {hasVariants && (
+                                <button
+                                    onClick={() => setShowVariants(!showVariants)}
+                                    className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg transition-all active:scale-90`}
+                                >
+                                    <ChevronDown className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'} transition-transform ${showVariants ? 'rotate-180' : ''}`} />
+                                </button>
+                            )}
+                            <button 
+                                onClick={() => handleEditClick(item)} 
+                                className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg text-indigo-500 transition-all active:scale-90`}
+                            >
+                                <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteClick(item._id || item.id, item.name)} 
+                                disabled={loading} 
+                                className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg text-red-500 transition-all active:scale-90`}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Stats Row: Compact Grid */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                            <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                            <p className={`text-sm font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
+                                {totalQuantity}
                             </p>
+                        </div>
+                        {!hasVariants && (
+                            <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                                <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                                <p className={`text-sm font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    {item.reorderLevel || 5}
+                                </p>
+                            </div>
                         )}
+                        <div className={`text-center p-2 rounded-lg bg-slate-950/30 ${!hasVariants ? '' : 'col-span-2'}`}>
+                            <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                            {hasVariants && priceRange ? (
+                                <p className="text-sm font-black text-emerald-500 tabular-nums">
+                                    {priceRange.min === priceRange.max 
+                                        ? `₹${priceRange.min.toLocaleString()}`
+                                        : `₹${priceRange.min.toLocaleString()}-${priceRange.max.toLocaleString()}`
+                                    }
+                                </p>
+                            ) : (
+                                <p className="text-sm font-black text-emerald-500 tabular-nums">
+                                    ₹{item.price?.toLocaleString() || '0'}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Center: Stats */}
-                <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-center">
-                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
-                        <p className={`text-base font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
-                            {item.quantity}
-                        </p>
+                {/* Desktop: Original Horizontal Layout */}
+                <div className="hidden md:flex items-center justify-between gap-3">
+                    {/* Left: Product Info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${isLowStock ? 'bg-red-500/10' : 'bg-indigo-500/10'}`}>
+                            <Package className={`w-4 h-4 ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <h4 className={`text-sm font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {item.name}
+                                </h4>
+                                {isLowStock && <Bell className="w-3.5 h-3.5 text-red-500 animate-pulse flex-shrink-0" />}
+                                {hasVariants && (
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${darkMode ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-100 text-indigo-600 border border-indigo-200'}`}>
+                                        {item.variants.length} {item.variants.length === 1 ? 'Variant' : 'Variants'}
+                                    </span>
+                                )}
+                            </div>
+                            {item.hsn && (
+                                <p className={`text-[9px] font-bold tracking-wider flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    <Hash className="w-3 h-3" /> {item.hsn}
+                                </p>
+                            )}
+                        </div>
                     </div>
-                    <div className="text-center">
-                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
-                        <p className={`text-base font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {item.reorderLevel || 5}
-                        </p>
-                    </div>
-                    <div className="text-center">
-                        <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
-                        <p className="text-base font-black text-emerald-500 tabular-nums">₹{item.price?.toLocaleString()}</p>
-                    </div>
-                </div>
 
-                {/* Right: Actions */}
-                <div className="flex gap-1.5 flex-shrink-0">
-                    <button 
-                        onClick={() => handleEditClick(item)} 
-                        className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-indigo-600' : 'bg-slate-100 hover:bg-indigo-600'} rounded-lg text-indigo-500 hover:text-white transition-all active:scale-90`}
-                        title="Edit"
-                    >
-                        <Edit className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => handleDeleteClick(item._id || item.id, item.name)} 
-                        disabled={loading} 
-                        className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-red-600' : 'bg-slate-100 hover:bg-red-600'} rounded-lg text-red-500 hover:text-white transition-all active:scale-90`}
-                        title="Delete"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* Center: Stats */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="text-center">
+                            <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                            <p className={`text-base font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
+                                {totalQuantity}
+                            </p>
+                        </div>
+                        {!hasVariants && (
+                            <div className="text-center">
+                                <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
+                                <p className={`text-base font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    {item.reorderLevel || 5}
+                                </p>
+                            </div>
+                        )}
+                        <div className="text-center">
+                            <p className={`text-[8px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                            {hasVariants && priceRange ? (
+                                <p className="text-base font-black text-emerald-500 tabular-nums">
+                                    {priceRange.min === priceRange.max 
+                                        ? `₹${priceRange.min.toLocaleString()}`
+                                        : `₹${priceRange.min.toLocaleString()}-${priceRange.max.toLocaleString()}`
+                                    }
+                                </p>
+                            ) : (
+                                <p className="text-base font-black text-emerald-500 tabular-nums">
+                                    ₹{item.price?.toLocaleString() || '0'}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex gap-1.5 flex-shrink-0">
+                        {hasVariants && (
+                            <button
+                                onClick={() => setShowVariants(!showVariants)}
+                                className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'} rounded-lg transition-all active:scale-90`}
+                                title={showVariants ? 'Hide Variants' : 'Show Variants'}
+                            >
+                                <ChevronDown className={`w-4 h-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'} transition-transform ${showVariants ? 'rotate-180' : ''}`} />
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => handleEditClick(item)} 
+                            className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-indigo-600' : 'bg-slate-100 hover:bg-indigo-600'} rounded-lg text-indigo-500 hover:text-white transition-all active:scale-90`}
+                            title="Edit"
+                        >
+                            <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                            onClick={() => handleDeleteClick(item._id || item.id, item.name)} 
+                            disabled={loading} 
+                            className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-red-600' : 'bg-slate-100 hover:bg-red-600'} rounded-lg text-red-500 hover:text-white transition-all active:scale-90`}
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* Variants List - Expandable */}
+            {hasVariants && showVariants && (
+                <div className={`px-3 md:px-4 pb-3 md:pb-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                    <div className="pt-2 md:pt-3 space-y-2">
+                        {item.variants.map((variant, idx) => {
+                            const variantReorderLevel = variant.reorderLevel !== null && variant.reorderLevel !== undefined 
+                                ? variant.reorderLevel 
+                                : (item.reorderLevel || 5);
+                            const variantIsLowStock = (variant.quantity || 0) <= variantReorderLevel;
+                            
+                            return (
+                                <div key={variant._id || idx} className={`p-2.5 md:p-3 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                    {/* Mobile: Stacked Layout */}
+                                    <div className="md:hidden space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`text-xs font-black ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                    {variant.label}
+                                                </span>
+                                                {variantIsLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                                <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                                                <p className={`text-xs font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
+                                                    {variant.quantity || 0}
+                                                </p>
+                                            </div>
+                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                                <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                                                <p className="text-xs font-black text-emerald-500 tabular-nums">
+                                                    ₹{variant.price?.toLocaleString() || '0'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Desktop: Horizontal Layout */}
+                                    <div className="hidden md:flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <span className={`text-xs font-black ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                {variant.label}
+                                            </span>
+                                            {variantIsLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
+                                        </div>
+                                        <div className="flex items-center gap-4 flex-shrink-0">
+                                            <div className="text-center">
+                                                <p className={`text-[8px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
+                                                <p className={`text-sm font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
+                                                    {variant.quantity || 0}
+                                                </p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className={`text-[8px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
+                                                <p className="text-sm font-black text-emerald-500 tabular-nums">
+                                                    ₹{variant.price?.toLocaleString() || '0'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </article>
     );
 };
