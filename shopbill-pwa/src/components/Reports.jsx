@@ -73,15 +73,31 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
         try {
             const [summaryResponse, chartResponse, suppliersRes, purchasesRes, allBestSellersRes] = await Promise.all([
                 apiClient.get(API.reportsSummary, { params: queryParams }),
-                apiClient.get(API.reportsChartData, { params: { ...queryParams, viewType: viewType } }),
+                apiClient.get(API.reportsChartData, { params: { ...queryParams, viewType: viewType } }).catch(err => {
+                    console.error('Chart data fetch error:', err);
+                    // Return empty array on error instead of failing the whole request
+                    return { data: [] };
+                }),
                 apiClient.get(API.scmSuppliers).catch(() => ({ data: [] })),
                 apiClient.get(API.scmPurchases).catch(() => ({ data: [] })),
                 apiClient.get(API.reportsSummary, { params: { ...queryParams, topItemsLimit: 100 } }) // Fetch all best sellers
             ]);
 
             setSummaryData(summaryResponse.data);
-            // Ensure chartData is an array
-            const chartDataArray = Array.isArray(chartResponse.data) ? chartResponse.data : [];
+            // Ensure chartData is an array - handle both 200 and 204 responses
+            let chartDataArray = [];
+            if (chartResponse && chartResponse.data) {
+                chartDataArray = Array.isArray(chartResponse.data) ? chartResponse.data : [];
+            } else if (chartResponse && Array.isArray(chartResponse)) {
+                chartDataArray = chartResponse;
+            }
+            
+            console.log('Chart data received:', {
+                response: chartResponse,
+                data: chartDataArray,
+                length: chartDataArray.length
+            });
+            
             setChartData(chartDataArray);
             setSuppliers(suppliersRes.data);
             setPurchases(purchasesRes.data);

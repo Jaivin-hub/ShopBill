@@ -1,6 +1,7 @@
-// routes/salesRouter.js
+// routes/reportRoutes.js
 
 const express = require('express');
+const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
@@ -176,13 +177,39 @@ router.get('/chart-data', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        const matchStage = { $match: { 
-            ...dateFilter, 
-            storeId: req.user.storeId 
-        } }; 
+        // Build the match filter properly - ensure storeId is ObjectId
+        const matchFilter = { 
+            storeId: mongoose.Types.ObjectId.isValid(req.user.storeId) 
+                ? new mongoose.Types.ObjectId(req.user.storeId) 
+                : req.user.storeId
+        };
+        
+        // Add date filter if it exists - properly structure it
+        if (dateFilter && dateFilter.timestamp) {
+            if (dateFilter.timestamp.$gte || dateFilter.timestamp.$lt) {
+                matchFilter.timestamp = {};
+                if (dateFilter.timestamp.$gte) {
+                    matchFilter.timestamp.$gte = new Date(dateFilter.timestamp.$gte);
+                }
+                if (dateFilter.timestamp.$lt) {
+                    matchFilter.timestamp.$lt = new Date(dateFilter.timestamp.$lt);
+                }
+            }
+        }
+
+        console.log('Chart Data Query:', JSON.stringify({
+            storeId: req.user.storeId,
+            storeIdType: typeof req.user.storeId,
+            dateFilter: dateFilter,
+            matchFilter: matchFilter,
+            viewType: viewType,
+            normalizedViewType: normalizedViewType,
+            dateFormat: dateFormat,
+            labelName: labelName
+        }, null, 2));
 
         const chartData = await Sale.aggregate([
-            matchStage,
+            { $match: matchFilter },
             {
                 $group: {
                     // Use dateToString to get an actual date string as the ID
@@ -205,7 +232,14 @@ router.get('/chart-data', protect, async (req, res) => {
             { $sort: { [labelName]: 1 } }
         ]);
 
-        res.json(chartData);
+        console.log('Chart Data Result:', {
+            count: chartData.length,
+            sample: chartData.slice(0, 3),
+            allData: chartData
+        });
+
+        // Always return 200 with an array, even if empty
+        return res.status(200).json(chartData || []);
     } catch (error) {
         console.error('Reports Chart Data API Error:', error);
         res.status(500).json({ error: 'Failed to generate chart data.' });
