@@ -126,12 +126,14 @@ router.get('/alerts', protect, async (req, res) => {
             .limit(30);
 
         // Map notifications to include an 'isRead' boolean specific to THIS user
+        // Note: .lean() returns plain objects, so no need for .toObject()
         const formattedAlerts = notifications.map(n => {
-            const doc = n.toObject();
+            // Ensure readBy is an array (it should be from the schema)
+            const readByArray = Array.isArray(n.readBy) ? n.readBy : (n.readBy ? [n.readBy] : []);
             return {
-                ...doc,
+                ...n,
                 // Check if current logged-in user ID exists in the readBy array
-                isRead: n.readBy && n.readBy.some(userId => userId.toString() === req.user._id.toString())
+                isRead: readByArray.some(userId => userId.toString() === req.user._id.toString())
             };
         });
 
