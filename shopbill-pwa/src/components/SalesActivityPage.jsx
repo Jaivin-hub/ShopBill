@@ -128,6 +128,20 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                         </div>
                     </div>
 
+                    {/* Payment Method Display */}
+                    {sale.paymentMethod && (
+                        <div className={`flex flex-col gap-1 p-3.5 rounded-lg border print-bg ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
+                            <span className={`text-[9px] font-bold tracking-widest print-text ${secondaryText}`}>Payment Method</span>
+                            <span className={`text-sm font-bold print-text ${textColor}`}>
+                                {sale.paymentMethod === 'Cash' && '💵 Cash'}
+                                {sale.paymentMethod === 'UPI' && '📱 UPI'}
+                                {sale.paymentMethod === 'Card' && '💳 Card'}
+                                {sale.paymentMethod === 'Credit' && '📝 Credit'}
+                                {sale.paymentMethod === 'Mixed' && '🔀 Mixed Payment'}
+                            </span>
+                        </div>
+                    )}
+
                     <div className="space-y-3">
                         <span className={`text-[9px] font-bold tracking-widest px-1 print-text ${secondaryText}`}>Line Items</span>
                         <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
@@ -378,6 +392,14 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                                             <span className={`text-[9px] font-bold  ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                                                 {sale.items?.length || 0} Items
                                             </span>
+                                            {sale.paymentMethod && (
+                                                <>
+                                                    <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
+                                                    <span className={`text-[9px] font-bold uppercase ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                                                        {sale.paymentMethod}
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

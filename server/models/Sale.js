@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 
 const SaleSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true, min: 0 },
-    // paymentMethod: 'Mixed' allows splitting between Cash and Credit/UPI
-    paymentMethod: { type: String, enum: ['Cash', 'Credit', 'UPI', 'Mixed'], required: true }, 
+    // paymentMethod: 'Mixed' allows splitting between Cash, Card, UPI, and Credit
+    paymentMethod: { type: String, enum: ['Cash', 'Card', 'Credit', 'UPI', 'Mixed'], required: true }, 
     
     // Link to the Customer model (Customer must belong to the same storeId)
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null }, 

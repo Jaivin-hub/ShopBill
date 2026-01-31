@@ -156,8 +156,9 @@ router.get('/chats', protect, async (req, res) => {
 
         // Enrich participants with Staff model data (name, outletName)
         const enrichedChats = await Promise.all(chats.map(async (chat) => {
-            const chatObj = chat.toObject();
-            const enrichedParticipants = await Promise.all(chatObj.participants.map(async (participant) => {
+            // Note: .lean() returns plain objects, so no need for .toObject()
+            const chatObj = chat;
+            const enrichedParticipants = await Promise.all((chatObj.participants || []).map(async (participant) => {
                 // Check if this participant is a staff member
                 const staffRecord = await Staff.findOne({ userId: participant._id, active: true })
                     .populate('storeId', 'name');
@@ -180,8 +181,9 @@ router.get('/chats', protect, async (req, res) => {
                 };
             }));
 
-            const lastMessage = chat.messages && chat.messages.length > 0 
-                ? chat.messages[chat.messages.length - 1] 
+            const messages = Array.isArray(chat.messages) ? chat.messages : [];
+            const lastMessage = messages.length > 0 
+                ? messages[messages.length - 1] 
                 : null;
             
             // Calculate unread count for current user
@@ -195,16 +197,18 @@ router.get('/chats', protect, async (req, res) => {
                 }
             }
             let unreadCount = 0;
+            const messages = Array.isArray(chat.messages) ? chat.messages : [];
             if (lastReadAt) {
-                unreadCount = chat.messages.filter(msg => {
+                unreadCount = messages.filter(msg => {
+                    if (!msg || !msg.timestamp) return false;
                     const msgTime = new Date(msg.timestamp);
                     const readTime = new Date(lastReadAt);
-                    return msgTime > readTime && msg.senderId.toString() !== req.user.id.toString();
+                    return msgTime > readTime && msg.senderId && msg.senderId.toString() !== req.user.id.toString();
                 }).length;
-            } else if (chat.messages.length > 0) {
+            } else if (messages.length > 0) {
                 // If user has never read, count all messages not sent by them
-                unreadCount = chat.messages.filter(msg => 
-                    msg.senderId.toString() !== req.user.id.toString()
+                unreadCount = messages.filter(msg => 
+                    msg && msg.senderId && msg.senderId.toString() !== req.user.id.toString()
                 ).length;
             }
             

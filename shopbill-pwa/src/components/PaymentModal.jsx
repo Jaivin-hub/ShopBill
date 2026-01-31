@@ -61,6 +61,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                 effPaid = total; 
                 chgDue = paid - total;
                 amtCred = 0;
+                // Keep the selected payment method (Cash, UPI, or Card)
+                finalMethod = paymentType;
             } else {
                 effPaid = paid;
                 amtCred = total - paid;
@@ -326,11 +328,12 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     {/* Payment Selector */}
                     <div className="space-y-1.5">
                         <label className={theme.muted}>Settlement Method</label>
-                        <div className={`grid grid-cols-3 gap-1.5 p-1.5 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className={`grid grid-cols-4 gap-1.5 p-1.5 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                             {[
-                                { id: 'UPI', icon: Smartphone, color: 'text-indigo-500' },
                                 { id: 'Cash', icon: Banknote, color: 'text-emerald-500' },
-                                { id: 'Credit', icon: CreditCard, color: 'text-rose-500' }
+                                { id: 'UPI', icon: Smartphone, color: 'text-indigo-500' },
+                                { id: 'Card', icon: CreditCard, color: 'text-blue-500' },
+                                { id: 'Credit', icon: Receipt, color: 'text-rose-500' }
                             ].map((m) => (
                                 <button key={m.id} 
                                     disabled={m.id === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id}
