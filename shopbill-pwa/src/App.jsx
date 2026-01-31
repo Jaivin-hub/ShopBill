@@ -181,7 +181,7 @@ const UpdatePrompt = () => {
 const UTILITY_NAV_ITEMS_CONFIG = [
   { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
   { id: 'staffPermissions', name: 'Staff & Permissions', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
-  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 },
+  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 },
   { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
@@ -398,7 +398,7 @@ const App = () => {
     setCurrentUser(normalizedUser);
     const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
     setCurrentOutletId(lastSelectedOutletId || normalizedUser.activeStoreId || null);
-    setCurrentPage(normalizedUser.role === USER_ROLES.CASHIER ? 'billing' : 'dashboard');
+    setCurrentPage('dashboard'); // All roles start at dashboard now
   }, []);
 
   const handleOutletSwitch = useCallback((outlet) => {
@@ -426,12 +426,42 @@ const App = () => {
     setIsLoadingAuth(false);
   }, [logout]);
 
+  // Fetch effective plan for staff members to ensure chat access is correct
+  useEffect(() => {
+    const fetchEffectivePlan = async () => {
+      if (!currentUser) return;
+      
+      // For staff members, fetch the effective plan (owner's plan)
+      if (currentUser.role !== 'owner' && currentUser.role !== 'superadmin') {
+        try {
+          const response = await apiClient.get(API.currentPlan);
+          if (response.data?.success && response.data?.plan) {
+            const effectivePlan = response.data.plan.toUpperCase();
+            // Update currentUser with effective plan if it's different
+            if (currentUser.plan?.toUpperCase() !== effectivePlan) {
+              const updatedUser = { ...currentUser, plan: effectivePlan };
+              localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+              setCurrentUser(updatedUser);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch effective plan:', error);
+        }
+      }
+    };
+
+    if (currentUser && apiClient) {
+      fetchEffectivePlan();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]); // Only run when user ID changes (after login)
+
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const userPlan = currentUser?.plan?.toUpperCase();
     const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
-      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: 1, manager: 1, cashier: null } },
+      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 1, manager: 1, cashier: 1 } },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
       { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
@@ -450,7 +480,7 @@ const App = () => {
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
       [USER_ROLES.MANAGER]: ['dashboard', 'billing', 'inventory', 'scm', 'chat'], // Dashboard, Billing, Inventory, Supply Chain, Messages
-      [USER_ROLES.CASHIER]: ['billing', 'khata', 'chat'], // Billing, Ledger, Messages
+      [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
     
     // Define role-specific secondary menu order (for More menu)

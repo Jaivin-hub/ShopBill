@@ -10,7 +10,7 @@ import {
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
 const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser }) => {
-    const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
+    const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
 
     // --- States ---
     const [inventory, setInventory] = useState([]);

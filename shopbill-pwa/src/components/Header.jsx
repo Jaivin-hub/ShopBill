@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     User, Bell, Sun, Moon, 
     CreditCard, LayoutGrid, Store, Plus, ChevronRight,
-    Loader2
+    Loader2, Settings
 } from 'lucide-react';
 
 const Header = ({
@@ -30,6 +30,7 @@ const Header = ({
 
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
+    const isOwner = userRole?.toLowerCase() === 'owner';
 
     const headerBg = darkMode ? 'bg-slate-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
@@ -115,7 +116,7 @@ const Header = ({
                         <h1 className={`text-lg font-bold tracking-tight truncate leading-tight ${logoText}`}>
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
-                        {isPremium && currentOutlet && (
+                        {isPremium && isOwner && currentOutlet && (
                             <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
                                 {currentOutlet.name}
                             </p>
@@ -124,13 +125,24 @@ const Header = ({
                 </div>
 
                 <div className="flex space-x-2 items-center">
-                    {isPremium && (
+                    {isPremium && isOwner && (
                         <button
                             onClick={() => setShowStoreHub(!showStoreHub)}
                             className={getButtonClasses('outlets', showStoreHub)}
                             aria-label="Toggle Store Hub"
                         >
                             <LayoutGrid className="w-5 h-5" aria-hidden="true" />
+                        </button>
+                    )}
+
+                    {/* Settings button for managers and cashiers */}
+                    {!isOwner && (
+                        <button 
+                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
+                            className={getButtonClasses('settings')}
+                            aria-label="Settings"
+                        >
+                            <Settings className="w-5 h-5" />
                         </button>
                     )}
 
@@ -154,7 +166,7 @@ const Header = ({
             </header>
 
             {/* Expansion Panel (Store Hub) */}
-            {isPremium && showStoreHub && (
+            {isPremium && isOwner && showStoreHub && (
                 <div className={`fixed top-[73px] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-[10px] font-black tracking-widest opacity-50 uppercase">Select Active Branch</span>
