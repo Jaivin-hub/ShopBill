@@ -120,6 +120,15 @@ const ChatListSidebar = ({
                     )}
                 </div>
             </div>
+            
+            {/* Floating Add Button - Above Footer (Mobile Only) */}
+            <button
+                onClick={onNewGroupClick}
+                className="md:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
+                aria-label="Create new chat"
+            >
+                <Plus className="w-6 h-6" strokeWidth={2.5} />
+            </button>
         </div>
     );
 };

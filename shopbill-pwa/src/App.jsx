@@ -590,17 +590,7 @@ const App = () => {
 
   return (
     <ApiProvider>
-      <style>{`
-        .sidebar-scroll::-webkit-scrollbar { width: 5px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { 
-          background: ${darkMode ? '#1e1b4b' : '#e2e8f0'}; 
-          border-radius: 10px; 
-        }
-        .sidebar-scroll::-webkit-scrollbar-thumb:hover { 
-          background: #6366f1; 
-        }
-      `}</style>
+      {/* Scrollbar styles are now handled globally in index.css */}
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />

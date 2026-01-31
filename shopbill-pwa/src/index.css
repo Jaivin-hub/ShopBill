@@ -65,38 +65,213 @@
     }
 }
 
-/* Global Custom Scrollbar Styles */
+/* ============================================
+   GLOBAL SCROLLBAR DESIGN SYSTEM
+   ============================================ */
+
+/* Base Custom Scrollbar - Used throughout the app */
 .custom-scrollbar::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
     border-radius: 10px;
+    margin: 2px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6366f1;
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
     border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #4f46e5;
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
 }
 
-/* For dark mode scrollbars */
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%);
+}
+
+/* Firefox scrollbar support */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Dark mode scrollbar adjustments */
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6366f1;
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #818cf8;
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+}
+
+.dark .custom-scrollbar {
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Sidebar scrollbar - Slightly thinner for sidebars */
+.sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+    margin: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s ease;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+    width: 6px;
+}
+
+.sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Dropdown scrollbar - Optimized for dropdowns and select menus */
+.custom-scrollbar::-webkit-scrollbar:vertical {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar:horizontal {
+    height: 6px;
+}
+
+/* Dropdown specific styling */
+select::-webkit-scrollbar,
+.dropdown-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+select::-webkit-scrollbar-track,
+.dropdown-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    margin: 2px;
+}
+
+select::-webkit-scrollbar-thumb,
+.dropdown-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+select::-webkit-scrollbar-thumb:hover,
+.dropdown-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
+}
+
+/* Dark mode dropdown scrollbar */
+.dark select::-webkit-scrollbar-track,
+.dark .dropdown-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dark select::-webkit-scrollbar-thumb,
+.dark .dropdown-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark select::-webkit-scrollbar-thumb:hover,
+.dark .dropdown-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+}
+
+/* Ledger scrollbar - Specific style for ledger components */
+.custom-ledger-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.custom-ledger-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+    margin: 2px;
+}
+
+.custom-ledger-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #475569 0%, #334155 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.custom-ledger-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+.custom-ledger-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #475569 transparent;
+}
+
+.dark .custom-ledger-scroll {
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Thin scrollbar variant - For compact spaces */
+.thin-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 8px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    width: 5px;
+}
+
+.thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
 }
 
 /* Hide scrollbar but keep functionality */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
 }
 
 .no-scrollbar {
@@ -104,38 +279,224 @@
     scrollbar-width: none;
 }
 
-/* Sidebar scrollbar (slightly different style) */
-.sidebar-scroll::-webkit-scrollbar {
+/* Modal scrollbar - Enhanced for modals */
+.modal-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.modal-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 10px;
+    margin: 4px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
+.modal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 rgba(0, 0, 0, 0.02);
+}
+
+/* Product grid scrollbar */
+.product-grid-scroll::-webkit-scrollbar {
     width: 5px;
+    height: 5px;
 }
 
-.sidebar-scroll::-webkit-scrollbar-track {
+.product-grid-scroll::-webkit-scrollbar-track {
     background: transparent;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb {
-    background: #6366f1;
     border-radius: 10px;
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background: #818cf8;
+.product-grid-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
 }
 
-/* Ledger scrollbar */
-.custom-ledger-scroll::-webkit-scrollbar {
+.product-grid-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+.product-grid-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Notification scrollbar */
+.notif-scroll::-webkit-scrollbar {
     width: 4px;
+    height: 4px;
 }
 
-.custom-ledger-scroll::-webkit-scrollbar-track {
+.notif-scroll::-webkit-scrollbar-track {
     background: transparent;
+    border-radius: 8px;
 }
 
-.custom-ledger-scroll::-webkit-scrollbar-thumb {
-    background: #334155;
+.notif-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.notif-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+}
+
+.notif-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Bill scrollbar */
+.bill-scroll::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.bill-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 8px;
+}
+
+.bill-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.bill-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+}
+
+.bill-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+/* Smooth scrolling for all scrollable elements */
+.custom-scrollbar,
+.sidebar-scroll,
+.custom-ledger-scroll,
+.dropdown-scroll,
+.modal-scroll,
+.product-grid-scroll,
+.notif-scroll,
+.bill-scroll,
+.thin-scrollbar {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Global select/dropdown scrollbar styling */
+select,
+select option {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+select::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+select::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    margin: 2px;
+}
+
+select::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+select::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
+}
+
+/* Dark mode select scrollbar */
+.dark select::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dark select::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark select::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+}
+
+/* Apply to common scrollable elements */
+div[class*="overflow"],
+div[class*="overflow-y"],
+div[class*="overflow-x"],
+ul[class*="overflow"],
+ol[class*="overflow"] {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 transparent;
+}
+
+div[class*="overflow"]::-webkit-scrollbar,
+div[class*="overflow-y"]::-webkit-scrollbar,
+div[class*="overflow-x"]::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+div[class*="overflow"]::-webkit-scrollbar-track,
+div[class*="overflow-y"]::-webkit-scrollbar-track,
+div[class*="overflow-x"]::-webkit-scrollbar-track {
+    background: transparent;
     border-radius: 10px;
 }
 
-.custom-ledger-scroll::-webkit-scrollbar-thumb:hover {
-    background: #6366f1;
+div[class*="overflow"]::-webkit-scrollbar-thumb,
+div[class*="overflow-y"]::-webkit-scrollbar-thumb,
+div[class*="overflow-x"]::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+div[class*="overflow"]::-webkit-scrollbar-thumb:hover,
+div[class*="overflow-y"]::-webkit-scrollbar-thumb:hover,
+div[class*="overflow-x"]::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Ensure no-scrollbar class overrides everything */
+.no-scrollbar,
+.no-scrollbar * {
+    scrollbar-width: none !important;
+    scrollbar-color: transparent transparent !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }

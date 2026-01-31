@@ -148,9 +148,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     // --- Sub-Form: Add New Customer ---
     if (isNewCustomerFormOpen) {
         return (
-            <div className="fixed inset-0 z-[200] flex justify-center items-center px-4 bg-slate-950/60 backdrop-blur-sm">
-                <div className={`${theme.bg} w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden`}>
-                    <div className="px-6 py-4 border-b flex justify-between items-center bg-inherit">
+            <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 md:p-6 bg-slate-950/60 backdrop-blur-sm overflow-y-auto">
+                <div className={`${theme.bg} w-full max-w-md rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+                    <div className="px-4 sm:px-5 md:px-6 py-3 sm:py-4 border-b flex justify-between items-center bg-inherit flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <UserPlus className="w-4 h-4 text-emerald-500" />
                             <h2 className={`text-sm font-black uppercase tracking-tight ${theme.text}`}>Register Account</h2>
@@ -159,7 +159,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <X className="w-4 h-4 text-slate-500" />
                         </button>
                     </div>
-                    <form onSubmit={handleAddNewCustomerSubmit} className="p-6 space-y-4">
+                    <form onSubmit={handleAddNewCustomerSubmit} className="p-4 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                         <div>
                             <label className={theme.muted}>Full Name</label>
                             <input type="text" value={newCustomerName} placeholder="Customer Name"
@@ -197,11 +197,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     }
 
     return (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center px-4 bg-slate-950/60 backdrop-blur-sm">
-            <div className={`${theme.bg} w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}>
+        <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 md:p-6 bg-slate-950/60 backdrop-blur-sm overflow-y-auto">
+            <div className={`${theme.bg} w-full max-w-md rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col my-auto max-h-[95vh] sm:max-h-[90vh]`}>
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-inherit">
+                <div className="px-4 sm:px-5 md:px-6 py-3 sm:py-4 border-b flex justify-between items-center bg-inherit flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                             <Receipt className="w-4 h-4 text-indigo-500" />
@@ -213,7 +213,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     </button>
                 </div>
 
-                <div className="p-5 space-y-5">
+                <div className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
                     {/* Amount Banner */}
                     <div className={`p-4 rounded-xl border flex justify-between items-center ${darkMode ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                         <span className={theme.muted}>Final Payable</span>
@@ -398,7 +398,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                 </div>
 
                 {/* Footer Action */}
-                <div className="px-5 pb-6 pt-2">
+                <div className="px-4 sm:px-5 md:px-6 pb-4 sm:pb-5 md:pb-6 pt-2 flex-shrink-0">
                     {creditError && (
                         <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex gap-3 items-start animate-pulse">
                             <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
@@ -412,7 +412,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     <button 
                         onClick={() => handleConfirmPayment(!!creditError)} 
                         disabled={isSubmitting}
-                        className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.97] shadow-xl ${
+                        className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-[0.97] shadow-xl ${
                             creditError 
                                 ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20' 
                                 : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
@@ -422,8 +422,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
-                                {creditError ? 'Bypass & Process' : 'Finalize Transaction'}
-                                <ArrowRight className="w-4 h-4" />
+                                <span className="hidden sm:inline">{creditError ? 'Bypass & Process' : 'Finalize Transaction'}</span>
+                                <span className="sm:hidden">{creditError ? 'Bypass' : 'Finalize'}</span>
+                                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                             </>
                         )}
                     </button>

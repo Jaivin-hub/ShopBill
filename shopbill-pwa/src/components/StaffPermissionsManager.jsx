@@ -27,9 +27,9 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
     const inputBg = darkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-slate-300 text-black';
 
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-            <div className={`${modalBg} w-full max-w-md rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200`}>
-                <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto">
+            <div className={`${modalBg} w-full max-w-md rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'} flex-shrink-0`}>
                     <div>
                         <h2 className={`text-lg font-black tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
                             <Edit3 className="w-5 h-5 mr-3 text-indigo-500" />
@@ -42,7 +42,7 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                     </button>
                 </div>
                 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
                     <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-500`}>
                             <User className="w-5 h-5" />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Search, User, Store } from 'lucide-react';
+import { X, Search, User, Store, Loader2 } from 'lucide-react';
 
 const NewChatModal = ({
     show,
@@ -33,21 +33,22 @@ const NewChatModal = ({
     });
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
-            <div className={`${cardBase} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl`}>
-                <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
-                    <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto">
+            <div className={`${cardBase} w-full max-w-md rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center flex-shrink-0`}>
+                    <h3 className={`text-base sm:text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {newChatType === 'group' ? 'Create Custom Group' : 'New Direct Chat'}
                     </h3>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500"
+                        className="p-1.5 sm:p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
+                        aria-label="Close modal"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
+                <div className="p-4 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                     {/* Group Name */}
                     {newChatType === 'group' && (
                         <div>
@@ -155,7 +156,7 @@ const NewChatModal = ({
                                     className={`w-full pl-10 pr-4 py-2 ${inputBase} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                 />
                             </div>
-                            <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2">
+                            <div className="max-h-40 sm:max-h-48 md:max-h-56 overflow-y-auto custom-scrollbar space-y-2">
                                 {filteredUsers.length === 0 ? (
                                     <div className={`p-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                         <p className="text-sm">No staff members found</p>
@@ -207,12 +208,12 @@ const NewChatModal = ({
                         </div>
                 </div>
 
-                <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
                     <button
                         type="button"
                         onClick={onClose}
-                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
-                            darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                        className={`flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                            darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
                         Cancel
@@ -225,15 +226,19 @@ const NewChatModal = ({
                             (newChatType === 'group' && (!newChatName.trim() || selectedUsers.length === 0)) ||
                             (newChatType === 'direct' && selectedUsers.length !== 1)
                         }
-                        className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isCreatingChat ? (
                             <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Creating...
+                                <span className="hidden sm:inline">Creating...</span>
+                                <span className="sm:hidden">Creating</span>
                             </>
                         ) : (
-                            newChatType === 'group' ? 'Create Custom Group' : 'Create Chat'
+                            <>
+                                <span className="hidden sm:inline">{newChatType === 'group' ? 'Create Custom Group' : 'Create Chat'}</span>
+                                <span className="sm:hidden">{newChatType === 'group' ? 'Create Group' : 'Create'}</span>
+                            </>
                         )}
                     </button>
                 </div>

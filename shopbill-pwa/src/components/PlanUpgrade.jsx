@@ -50,9 +50,9 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
     const isYellowWarning = modalWarning.icon === 'yellow';
     
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-            <div className={`${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300'} w-full max-w-md rounded-[1.25rem] shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-200`}>
-                <div className={`p-8 border-b ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto">
+            <div className={`${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300'} w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+                <div className={`p-4 sm:p-6 md:p-8 border-b ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'} flex-shrink-0`}>
                     <div className="w-16 h-16 bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-6">
                         <Crown className="w-8 h-8 text-indigo-500" />
                     </div>
@@ -62,7 +62,7 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
                     <p className={`text-xs font-bold tracking-widest mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Tier Transition</p>
                 </div>
                 
-                <div className="p-8 space-y-6">
+                <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
                     <p className={`text-sm font-bold leading-relaxed ${darkMode ? 'text-gray-300' : 'text-slate-800'}`} dangerouslySetInnerHTML={{ __html: modalWarning.title }} />
 
                     <div className={`rounded-2xl p-4 flex items-start gap-4 border ${isYellowWarning ? 'bg-amber-500/5 border-amber-500/20' : 'bg-indigo-500/5 border-indigo-500/20'}`}>
@@ -73,7 +73,7 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
                     </div>
                 </div>
 
-                <div className={`p-6 border-t flex flex-col gap-3 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-t flex flex-col gap-2 sm:gap-3 ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex-shrink-0`}>
                     <button
                         onClick={() => startUpgradeFlow(selectedPlan)}
                         disabled={isUpgrading}
@@ -97,9 +97,9 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
 
 const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alreadyInTerminalState, isCurrentlyInTrial, handleConfirmCancellation, cancellationMessage, formatDate, darkMode }) => {
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-            <div className={`${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300'} w-full max-w-md rounded-[1.25rem] shadow-2xl border overflow-hidden`}>
-                <div className="p-8 text-center">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto">
+            <div className={`${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300'} w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+                <div className="p-4 sm:p-6 md:p-8 text-center flex-shrink-0">
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <XCircle className="w-8 h-8 text-red-500" />
                     </div>
@@ -120,7 +120,7 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
                     </div>
                 </div>
 
-                <div className={`p-6 border-t flex flex-col gap-2 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-t flex flex-col gap-2 ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex-shrink-0`}>
                     {!alreadyInTerminalState && (
                         <button
                             onClick={handleConfirmCancellation}

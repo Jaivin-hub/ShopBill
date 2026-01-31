@@ -141,15 +141,15 @@ const ScannerModal = ({
     return (
         <div 
             ref={containerRef} 
-            className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[1000] p-4 font-sans"
+            className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[1000] p-3 sm:p-4 md:p-6 font-sans overflow-y-auto"
             onClick={isAutoClosing ? null : onClose} 
         >
             <div 
-                className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden transition-all transform animate-in zoom-in-95 duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                className={`w-full max-w-lg rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden transition-all transform animate-in zoom-in-95 duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}
                 onClick={(e) => e.stopPropagation()} 
             >
                 {/* Header Section */}
-                <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`p-4 sm:p-5 md:p-6 border-b flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'} flex-shrink-0`}>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
@@ -169,7 +169,7 @@ const ScannerModal = ({
                 </div>
 
                 {/* Viewport Section */}
-                <div className="p-6">
+                <div className="p-4 sm:p-5 md:p-6 overflow-y-auto flex-1 min-h-0">
                     <div 
                         className={`aspect-square w-full rounded-2xl overflow-hidden relative border-2 group cursor-none transition-all duration-300 ${darkMode ? 'bg-black border-gray-800' : 'bg-slate-100 border-slate-200'}`}
                         style={{ minHeight: '320px' }}
@@ -233,10 +233,10 @@ const ScannerModal = ({
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-1 gap-2 sm:gap-3 flex-shrink-0 pt-4">
                          <button 
                             onClick={onClose}
-                            className={`py-4 rounded-2xl font-black  text-[10px] tracking-widest transition-all ${darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                            className={`py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] tracking-widest transition-all ${darkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                             disabled={isBusy || isAutoClosing}
                         >
                             Cancel

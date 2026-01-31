@@ -293,8 +293,8 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                            <div className="p-4 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                                 <div>
                                     <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                         Branch Name <span className="text-red-500">*</span>
@@ -393,12 +393,12 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                 </div>
                             </div>
 
-                            <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3`}>
+                            <div className={`p-4 sm:p-5 md:p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
-                                        darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                    className={`flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                                        darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                     }`}
                                 >
                                     Cancel
@@ -406,15 +406,19 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {isSubmitting ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {editingOutlet ? 'Updating...' : 'Creating...'}
+                                            <span className="hidden sm:inline">{editingOutlet ? 'Updating...' : 'Creating...'}</span>
+                                            <span className="sm:hidden">{editingOutlet ? 'Updating' : 'Creating'}</span>
                                         </>
                                     ) : (
-                                        editingOutlet ? 'Update Branch' : 'Create Branch'
+                                        <>
+                                            <span className="hidden sm:inline">{editingOutlet ? 'Update Branch' : 'Create Branch'}</span>
+                                            <span className="sm:hidden">{editingOutlet ? 'Update' : 'Create'}</span>
+                                        </>
                                     )}
                                 </button>
                             </div>
