@@ -425,20 +425,95 @@ router.post('/create', protect, async (req, res) => {
  * @access Private (PRO/PREMIUM)
  */
 router.post('/:chatId/message', protect, (req, res, next) => {
-    // Determine which upload middleware to use based on messageType
-    const messageType = req.body.messageType;
-    if (messageType === 'audio') {
-        return audioUpload.single('audio')(req, res, next);
-    } else if (messageType === 'file') {
-        return fileUpload.single('file')(req, res, next);
+    // Use multer.any() to accept any file field, then we'll check the fieldname in the handler
+    // This avoids the issue of req.body not being available before multer processes the form
+    const contentType = req.headers['content-type'] || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+        // Create a combined middleware that handles both audio and file uploads
+        // We'll use multer.fields to accept both field names
+        const combinedUpload = multer({
+            storage: multer.diskStorage({
+                destination: (req, file, cb) => {
+                    // Determine destination based on fieldname
+                    let uploadDir;
+                    if (file.fieldname === 'audio') {
+                        uploadDir = path.join(__dirname, '../uploads/audio');
+                    } else if (file.fieldname === 'file') {
+                        uploadDir = path.join(__dirname, '../uploads/files');
+                    } else {
+                        return cb(new Error('Invalid field name'), null);
+                    }
+                    
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                    }
+                    cb(null, uploadDir);
+                },
+                filename: (req, file, cb) => {
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                    if (file.fieldname === 'audio') {
+                        cb(null, `voice-${uniqueSuffix}${path.extname(file.originalname)}`);
+                    } else {
+                        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+                        cb(null, `file-${uniqueSuffix}-${sanitizedName}`);
+                    }
+                }
+            }),
+            limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+            fileFilter: (req, file, cb) => {
+                if (file.fieldname === 'audio') {
+                    const allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/m4a'];
+                    if (allowedMimes.includes(file.mimetype)) {
+                        cb(null, true);
+                    } else {
+                        cb(new Error('Invalid file type. Only audio files are allowed.'), false);
+                    }
+                } else if (file.fieldname === 'file') {
+                    const allowedMimes = [
+                        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+                        'application/pdf',
+                        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'text/plain', 'text/csv'
+                    ];
+                    if (allowedMimes.includes(file.mimetype)) {
+                        cb(null, true);
+                    } else {
+                        cb(new Error('Invalid file type. Only images, PDFs, and documents are allowed.'), false);
+                    }
+                } else {
+                    cb(new Error('Invalid field name'), false);
+                }
+            }
+        }).fields([
+            { name: 'audio', maxCount: 1 },
+            { name: 'file', maxCount: 1 }
+        ]);
+        
+        return combinedUpload(req, res, (err) => {
+            if (err) {
+                return res.status(400).json({ error: err.message });
+            }
+            // Convert req.files to req.file format for compatibility
+            if (req.files) {
+                if (req.files['audio'] && req.files['audio'][0]) {
+                    req.file = req.files['audio'][0];
+                } else if (req.files['file'] && req.files['file'][0]) {
+                    req.file = req.files['file'][0];
+                }
+            }
+            next();
+        });
     } else {
-        // Text message, no file upload needed
+        // Not multipart, must be text message
         next();
     }
 }, async (req, res) => {
     try {
         const { chatId } = req.params;
-        const { content, audioDuration, messageType, fileName, fileType, fileSize } = req.body;
+        // Parse body - multer should have parsed it by now
+        const { content, audioDuration, messageType, fileName, fileType, fileSize } = req.body || {};
 
         // Validate: must have either content, audio file, or file
         if (!content?.trim() && !req.file) {
@@ -481,7 +556,14 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         }
 
         // Build message object
-        const detectedMessageType = messageType || (req.file ? (req.file.fieldname === 'audio' ? 'audio' : 'file') : 'text');
+        // Determine message type from file fieldname or explicit messageType
+        let detectedMessageType = 'text';
+        if (req.file) {
+            detectedMessageType = req.file.fieldname === 'audio' ? 'audio' : 'file';
+        } else if (messageType) {
+            detectedMessageType = messageType;
+        }
+        
         const message = {
             senderId: req.user.id,
             senderName: user.name || user.email,
@@ -496,6 +578,7 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         if (req.file && req.file.fieldname === 'audio') {
             message.audioUrl = `/uploads/audio/${req.file.filename}`;
             message.audioDuration = audioDuration ? parseFloat(audioDuration) : null;
+            console.log('[Server] Audio message saved:', { audioUrl: message.audioUrl, audioDuration: message.audioDuration });
         }
 
         // Handle file upload
@@ -504,6 +587,7 @@ router.post('/:chatId/message', protect, (req, res, next) => {
             message.fileName = fileName || req.file.originalname;
             message.fileType = fileType || req.file.mimetype;
             message.fileSize = fileSize ? parseInt(fileSize) : req.file.size;
+            console.log('[Server] File message saved:', { fileUrl: message.fileUrl, fileName: message.fileName, fileType: message.fileType });
         }
 
         // Add message to chat
