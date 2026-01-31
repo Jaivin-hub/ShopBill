@@ -180,6 +180,7 @@ const UpdatePrompt = () => {
 
 const UTILITY_NAV_ITEMS_CONFIG = [
   { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+  { id: 'staffPermissions', name: 'Staff & Permissions', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
   { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 },
   { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
@@ -452,6 +453,13 @@ const App = () => {
       [USER_ROLES.CASHIER]: ['billing', 'khata'], // Billing, Ledger
     };
     
+    // Define role-specific secondary menu order (for More menu)
+    const roleSecondaryMenuOrder = {
+      [USER_ROLES.OWNER]: ['scm', 'inventory', 'billing'], // Supply Chain, Inventory, Billing
+      [USER_ROLES.MANAGER]: [],
+      [USER_ROLES.CASHIER]: [],
+    };
+    
     const primaryMenuIds = rolePrimaryMenuIds[userRole] || [];
     
     // Get primary items in the specified order
@@ -463,12 +471,26 @@ const App = () => {
     const primaryIds = primary.map(item => item.id);
     const secondary = filtered.filter(item => !primaryIds.includes(item.id));
     
-    return { primaryNavItems: primary, secondaryNavItems: secondary };
+    // Sort secondary items by role-specific order
+    const secondaryOrder = roleSecondaryMenuOrder[userRole] || [];
+    const sortedSecondary = secondaryOrder
+      .map(id => secondary.find(item => item.id === id))
+      .filter(Boolean)
+      .concat(secondary.filter(item => !secondaryOrder.includes(item.id)));
+    
+    return { primaryNavItems: primary, secondaryNavItems: sortedSecondary };
   }, [navItems, userRole]);
 
-  const utilityNavItems = useMemo(() =>
-    UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole))
-    , [userRole]);
+  const utilityNavItems = useMemo(() => {
+    const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
+    // Sort by priority (lower number = higher priority), then by name
+    return filtered.sort((a, b) => {
+      const priorityA = a.priority ?? 999;
+      const priorityB = b.priority ?? 999;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return a.name.localeCompare(b.name);
+    });
+  }, [userRole]);
 
   const handleBackToOrigin = () => {
     setCurrentPage(pageOrigin || 'dashboard');
@@ -723,10 +745,10 @@ const App = () => {
               {secondaryNavItems.length > 0 && (
                 <button 
                   onClick={() => setShowMoreMenu(!showMoreMenu)} 
-                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative ${showMoreMenu ? 'flex-1' : 'flex-1'} ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative ${showMoreMenu ? 'flex-1' : 'flex-1'} ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
-                  {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
+                  {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
+                  <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
                     <MoreHorizontal className={`w-7 h-7 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
                     {chatUnreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
@@ -755,6 +777,25 @@ const App = () => {
                     </div>
                   </div>
                   <div className="px-2 pt-2 pb-4 pb-safe">
+                    {/* Staff & Permissions first (for owners) */}
+                    {utilityNavItems.filter(item => item.id === 'staffPermissions').map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setCurrentPage(item.id);
+                          setShowMoreMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
+                          currentPage === item.id
+                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-sm font-bold">{item.name}</span>
+                      </button>
+                    ))}
+                    {/* Secondary nav items (Supply Chain, Inventory, Billing for owners) */}
                     {secondaryNavItems.map(item => (
                       <button
                         key={item.id}
@@ -777,6 +818,7 @@ const App = () => {
                         )}
                       </button>
                     ))}
+                    {/* Settings last */}
                     {utilityNavItems.filter(item => item.id === 'settings').map(item => (
                       <button
                         key={item.id}

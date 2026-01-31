@@ -144,10 +144,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     ]);
 
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
-    const handleStaffPermissionsClick = () => {
-        setPageOrigin('settings');
-        setCurrentPage('staffPermissions');
-    }
     const handleChangePasswordClick = () => {
         setPageOrigin('settings');
         setCurrentPage('passwordChange');
@@ -233,14 +229,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                                 description="Manage enterprise plan and invoices." 
                                 onClick={handlePlanUpgradeClick} 
                                 accentColor="text-amber-600"
-                                darkMode={darkMode}
-                            />
-                            <SettingItem 
-                                icon={Users} 
-                                title="Staff Permissions" 
-                                description="Manage staff roles and access levels." 
-                                onClick={handleStaffPermissionsClick} 
-                                accentColor="text-indigo-600" 
                                 darkMode={darkMode}
                             />
                         </>
