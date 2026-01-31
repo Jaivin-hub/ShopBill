@@ -73,9 +73,37 @@ const fileUpload = multer({
     }
 });
 
-// Helper: Check if user has required plan
-const checkPlan = (user, requiredPlan) => {
-    const userPlan = (user.plan || '').toUpperCase();
+// Helper: Get the effective plan for a user (owner's plan for staff, user's plan for owners)
+const getEffectivePlan = async (user) => {
+    if (user.role === 'owner' || user.role === 'superadmin') {
+        return (user.plan || '').toUpperCase();
+    }
+    
+    // For staff members, get the owner's plan
+    if (user.activeStoreId) {
+        const store = await Store.findById(user.activeStoreId);
+        if (store && store.ownerId) {
+            const owner = await User.findById(store.ownerId);
+            if (owner) {
+                return (owner.plan || '').toUpperCase();
+            }
+        }
+    }
+    
+    // Fallback: try shopId
+    if (user.shopId) {
+        const owner = await User.findById(user.shopId);
+        if (owner) {
+            return (owner.plan || '').toUpperCase();
+        }
+    }
+    
+    return '';
+};
+
+// Helper: Check if user has required plan (checks owner's plan for staff)
+const checkPlan = async (user, requiredPlan) => {
+    const userPlan = await getEffectivePlan(user);
     return userPlan === requiredPlan || userPlan === 'PREMIUM'; // Premium can access PRO features
 };
 
@@ -101,8 +129,8 @@ router.get('/chats', protect, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Check if user has PRO or PREMIUM plan
-        if (!checkPlan(user, 'PRO')) {
+        // Check if user has PRO or PREMIUM plan (checks owner's plan for staff)
+        if (!(await checkPlan(user, 'PRO'))) {
             return res.status(403).json({ 
                 error: 'Chat feature is only available for PRO and PREMIUM plan users' 
             });
@@ -343,7 +371,7 @@ router.post('/create', protect, async (req, res) => {
         }
 
         // Check plan
-        if (!checkPlan(user, 'PRO')) {
+        if (!(await checkPlan(user, 'PRO'))) {
             return res.status(403).json({ 
                 error: 'Chat feature is only available for PRO and PREMIUM plan users' 
             });
@@ -673,7 +701,7 @@ router.get('/users', protect, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (!checkPlan(user, 'PRO')) {
+        if (!(await checkPlan(user, 'PRO'))) {
             return res.status(403).json({ 
                 error: 'Chat feature is only available for PRO and PREMIUM plan users' 
             });

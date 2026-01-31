@@ -120,6 +120,12 @@ router.post('/login', async (req, res) => {
                 }
             }
 
+            // Get effective plan (owner's plan for staff, user's plan for owners)
+            let effectivePlan = user.plan;
+            if (user.role !== 'owner' && user.role !== 'superadmin' && ownerAccount) {
+                effectivePlan = ownerAccount.plan;
+            }
+
             const token = generateToken(user._id, tokenShopId || user._id, user.role);
             res.json({
                 token,
@@ -129,7 +135,7 @@ router.post('/login', async (req, res) => {
                     role: user.role,
                     shopId: tokenShopId || user._id,
                     phone: user.phone,
-                    plan: user.plan
+                    plan: effectivePlan // Return effective plan (owner's plan for staff)
                 }
             });
         } else {
@@ -599,18 +605,42 @@ router.get('/current-plan', protect, async (req, res) => {
         const userId = req.user.id;
 
         // 1. Find the user by ID and SELECT the new fields
-        const user = await User.findById(userId).select('plan planEndDate subscriptionStatus');
+        const user = await User.findById(userId).select('plan planEndDate subscriptionStatus role activeStoreId shopId');
 
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
 
+        // Get effective plan (owner's plan for staff, user's plan for owners)
+        let effectivePlan = user.plan || 'BASIC';
+        let planEndDate = user.planEndDate;
+        let subscriptionStatus = user.subscriptionStatus;
+
+        if (user.role !== 'owner' && user.role !== 'superadmin') {
+            // For staff, get owner's plan details
+            let owner = null;
+            if (user.activeStoreId) {
+                const store = await Store.findById(user.activeStoreId);
+                if (store && store.ownerId) {
+                    owner = await User.findById(store.ownerId).select('plan planEndDate subscriptionStatus');
+                }
+            } else if (user.shopId) {
+                owner = await User.findById(user.shopId).select('plan planEndDate subscriptionStatus');
+            }
+            
+            if (owner) {
+                effectivePlan = owner.plan || 'BASIC';
+                planEndDate = owner.planEndDate;
+                subscriptionStatus = owner.subscriptionStatus;
+            }
+        }
+
         // 2. Return the plan and end date
         res.json({
             success: true,
-            plan: user.plan || 'BASIC', // Default to BASIC if plan is null/undefined
-            planEndDate: user.planEndDate, // 🔥 Include the end date
-            subscriptionStatus: user.subscriptionStatus, // Include status
+            plan: effectivePlan, // Effective plan (owner's plan for staff)
+            planEndDate: planEndDate, // 🔥 Include the end date
+            subscriptionStatus: subscriptionStatus, // Include status
         });
 
     } catch (error) {

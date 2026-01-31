@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const User = require('../models/User');
+const Store = require('../models/Store');
 
 const router = express.Router();
 
@@ -80,10 +81,30 @@ router.get('/plan', protect, async (req, res) => {
             });
         }
 
+        // Get effective plan (owner's plan for staff, user's plan for owners)
+        let effectivePlan = user.plan || 'Basic';
+        if (user.role !== 'owner' && user.role !== 'superadmin') {
+            // For staff, get owner's plan
+            if (user.activeStoreId) {
+                const store = await Store.findById(user.activeStoreId);
+                if (store && store.ownerId) {
+                    const owner = await User.findById(store.ownerId);
+                    if (owner) {
+                        effectivePlan = owner.plan || 'Basic';
+                    }
+                }
+            } else if (user.shopId) {
+                const owner = await User.findById(user.shopId);
+                if (owner) {
+                    effectivePlan = owner.plan || 'Basic';
+                }
+            }
+        }
+
         res.json({
             success: true,
             data: {
-                plan: user.plan || 'Basic',
+                plan: effectivePlan,
                 userId: user._id
             }
         });
