@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, Play, Pause, Store } from 'lucide-react';
+import { Mic, Play, Pause, Store, File, Download, Image as ImageIcon } from 'lucide-react';
 
 const MessageBubble = ({
     msg,
@@ -11,6 +11,7 @@ const MessageBubble = ({
     audioRefs
 }) => {
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
+    const isFileMessage = msg.messageType === 'file' || msg.fileUrl;
     
     // Logic for Audio Source
     let audioSrc = null;
@@ -24,6 +25,27 @@ const MessageBubble = ({
                        `${baseUrl}/api/uploads/audio/${msg.audioUrl}`;
         }
     }
+
+    // Logic for File Source
+    let fileSrc = null;
+    if (msg.fileUrl) {
+        if (msg.fileUrl.startsWith('http') || msg.fileUrl.startsWith('blob:')) {
+            fileSrc = msg.fileUrl;
+        } else {
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            fileSrc = msg.fileUrl.startsWith('/api/') ? `${baseUrl}${msg.fileUrl}` : 
+                      msg.fileUrl.startsWith('/uploads/') ? `${baseUrl}/api${msg.fileUrl}` : 
+                      `${baseUrl}/api/uploads/files/${msg.fileUrl}`;
+        }
+    }
+
+    const isImageFile = msg.fileType?.startsWith('image/');
+    const formatFileSize = (bytes) => {
+        if (!bytes) return '';
+        if (bytes < 1024) return `${bytes}B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    };
 
     return (
         <div className={`max-w-[85%] md:max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -78,6 +100,52 @@ const MessageBubble = ({
                             src={audioSrc}
                             onEnded={() => onToggleAudio(null, null)}
                         />
+                    </div>
+                ) : isFileMessage && fileSrc ? (
+                    <div className="flex flex-col gap-2 min-w-[200px] max-w-[300px]">
+                        {isImageFile ? (
+                            <a 
+                                href={fileSrc} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="block rounded-lg overflow-hidden"
+                            >
+                                <img 
+                                    src={fileSrc} 
+                                    alt={msg.fileName || 'Image'} 
+                                    className="w-full h-auto max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                />
+                            </a>
+                        ) : null}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl ${isOwn ? 'bg-white/10' : darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                            <div className={`p-2 rounded-lg ${isOwn ? 'bg-white/20' : 'bg-slate-600'}`}>
+                                {isImageFile ? (
+                                    <ImageIcon size={16} className={isOwn ? 'text-white' : 'text-slate-300'} />
+                                ) : (
+                                    <File size={16} className={isOwn ? 'text-white' : 'text-slate-300'} />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-black truncate ${isOwn ? 'text-white' : darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
+                                    {msg.fileName || msg.content || 'File'}
+                                </p>
+                                {msg.fileSize && (
+                                    <p className={`text-[9px] font-bold ${isOwn ? 'text-white/70' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        {formatFileSize(msg.fileSize)}
+                                    </p>
+                                )}
+                            </div>
+                            <a
+                                href={fileSrc}
+                                download={msg.fileName || 'file'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`p-2 rounded-lg transition-transform active:scale-95 ${isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-slate-600 hover:bg-slate-500'}`}
+                                title="Download file"
+                            >
+                                <Download size={14} className={isOwn ? 'text-white' : 'text-slate-200'} />
+                            </a>
+                        </div>
                     </div>
                 ) : (
                     <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.content}</p>

@@ -10,10 +10,14 @@ const MessageSchema = new mongoose.Schema({
     senderName: { type: String, required: true },
     senderRole: { type: String, required: true },
     senderStoreName: { type: String, default: null }, // Store name for staff members or when owner sends from specific outlet
-    content: { type: String, required: false, trim: true, default: '' }, // Made optional for voice messages
+    content: { type: String, required: false, trim: true, default: '' }, // Made optional for voice/file messages
     audioUrl: { type: String, default: null }, // URL to audio file for voice messages
     audioDuration: { type: Number, default: null }, // Duration in seconds
-    messageType: { type: String, enum: ['text', 'audio'], default: 'text' },
+    fileUrl: { type: String, default: null }, // URL to file for file messages
+    fileName: { type: String, default: null }, // Original file name
+    fileType: { type: String, default: null }, // MIME type of the file
+    fileSize: { type: Number, default: null }, // File size in bytes
+    messageType: { type: String, enum: ['text', 'audio', 'file'], default: 'text' },
     timestamp: { type: Date, default: Date.now }
 }, { _id: true });
 

@@ -40,12 +40,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve uploaded files
 const path = require('path');
-const uploadsDir = path.join(__dirname, 'uploads', 'audio');
 const fs = require('fs');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+
+// Audio uploads
+const audioUploadsDir = path.join(__dirname, 'uploads', 'audio');
+if (!fs.existsSync(audioUploadsDir)) {
+    fs.mkdirSync(audioUploadsDir, { recursive: true });
 }
-app.use('/uploads/audio', express.static(uploadsDir));
+app.use('/uploads/audio', express.static(audioUploadsDir));
+
+// File uploads
+const fileUploadsDir = path.join(__dirname, 'uploads', 'files');
+if (!fs.existsSync(fileUploadsDir)) {
+    fs.mkdirSync(fileUploadsDir, { recursive: true });
+}
+app.use('/uploads/files', express.static(fileUploadsDir));
 
 // --- SOCKET.IO CONFIG ---
 const io = new Server(server, {

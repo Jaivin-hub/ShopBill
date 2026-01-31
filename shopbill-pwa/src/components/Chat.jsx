@@ -56,12 +56,18 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [playingAudioId, setPlayingAudioId] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
     
+    // File upload state
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [filePreview, setFilePreview] = useState(null);
+    const [isUploadingFile, setIsUploadingFile] = useState(false);
+    
     // Refs
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
     const recordingTimerRef = useRef(null);
     const audioRefs = useRef({});
+    const mediaStreamRef = useRef(null); // Track the media stream for cleanup
 
     // Constants
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
@@ -96,6 +102,23 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
     }, [hasChatAccess, selectedChat]);
+
+    // Cleanup media stream on unmount
+    useEffect(() => {
+        return () => {
+            // Clean up any active recording
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                mediaStreamRef.current = null;
+            }
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current);
+            }
+            if (audioUrl) {
+                URL.revokeObjectURL(audioUrl);
+            }
+        };
+    }, [audioUrl]);
 
     const fetchChats = useCallback(async () => {
         if (!hasChatAccess) { setIsLoading(false); return; }
@@ -198,40 +221,336 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     };
 
     const startRecording = async () => {
+        // Don't allow recording if already recording
+        if (isRecording) {
+            return;
+        }
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
+            // Check if MediaRecorder is supported
+            if (typeof MediaRecorder === 'undefined') {
+                showToast('Voice recording not supported in this browser', 'error');
+                return;
+            }
+
+            // Check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast('Microphone access not available in this browser', 'error');
+                return;
+            }
+
+            // Clean up any existing stream first
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                mediaStreamRef.current = null;
+            }
+
+            // Stop any existing recording
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                try {
+                    mediaRecorder.stop();
+                } catch (e) {
+                    console.warn('Error stopping existing recorder:', e);
+                }
+            }
+
+            // Request microphone access
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                } 
+            });
+            mediaStreamRef.current = stream; // Store stream reference for cleanup
+            
+            // Determine best mimeType
+            let mimeType = 'audio/webm';
+            const supportedTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4',
+                'audio/mpeg'
+            ];
+            
+            for (const type of supportedTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    mimeType = type;
+                    break;
+                }
+            }
+
+            const options = { mimeType };
+            const recorder = new MediaRecorder(stream, options);
             const chunks = [];
-            recorder.ondataavailable = (e) => chunks.push(e.data);
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                setAudioBlob(blob);
-                setAudioUrl(URL.createObjectURL(blob));
+            
+            recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    chunks.push(e.data);
+                }
             };
-            recorder.start();
+            
+            recorder.onstop = () => {
+                // Stop all tracks to release microphone
+                if (mediaStreamRef.current) {
+                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                    mediaStreamRef.current = null;
+                }
+                
+                if (chunks.length > 0) {
+                    const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+                    setAudioBlob(blob);
+                    const url = URL.createObjectURL(blob);
+                    setAudioUrl(url);
+                } else {
+                    showToast('Recording failed: No audio data captured', 'error');
+                    setIsRecording(false);
+                    setRecordingTime(0);
+                }
+            };
+
+            recorder.onerror = (e) => {
+                console.error('MediaRecorder error:', e);
+                showToast('Recording error occurred', 'error');
+                setIsRecording(false);
+                if (recordingTimerRef.current) {
+                    clearInterval(recordingTimerRef.current);
+                    recordingTimerRef.current = null;
+                }
+                if (mediaStreamRef.current) {
+                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                    mediaStreamRef.current = null;
+                }
+            };
+
+            // Start recording with timeslice to ensure data is collected
+            recorder.start(100); // Collect data every 100ms
             setMediaRecorder(recorder);
             setIsRecording(true);
             setRecordingTime(0);
-            recordingTimerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
-        } catch (error) { showToast('Mic access denied', 'error'); }
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current);
+            }
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (error) {
+            console.error('Recording error:', error);
+            setIsRecording(false);
+            setRecordingTime(0);
+            
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                showToast('Microphone access denied. Please allow microphone access in browser settings.', 'error');
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                showToast('No microphone found. Please connect a microphone.', 'error');
+            } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                showToast('Microphone is being used by another application.', 'error');
+            } else {
+                showToast(`Failed to start recording: ${error.message || 'Unknown error'}`, 'error');
+            }
+            
+            // Clean up stream if it was created
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                mediaStreamRef.current = null;
+            }
+        }
     };
 
     const stopRecording = () => {
         if (mediaRecorder && isRecording) {
-            mediaRecorder.stop();
-            setIsRecording(false);
-            clearInterval(recordingTimerRef.current);
+            try {
+                // Request final data chunk before stopping
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.requestData();
+                }
+                mediaRecorder.stop();
+                setIsRecording(false);
+                if (recordingTimerRef.current) {
+                    clearInterval(recordingTimerRef.current);
+                    recordingTimerRef.current = null;
+                }
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+                setIsRecording(false);
+                if (recordingTimerRef.current) {
+                    clearInterval(recordingTimerRef.current);
+                    recordingTimerRef.current = null;
+                }
+            }
         }
     };
 
     const cancelRecording = () => {
-        stopRecording();
+        // Stop recording first
+        if (mediaRecorder && isRecording) {
+            try {
+                if (mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+            } catch (error) {
+                console.error('Error canceling recording:', error);
+            }
+        }
+        
+        // Clean up stream
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current = null;
+        }
+        
+        setIsRecording(false);
+        if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        
+        // Clean up blob URLs to prevent memory leaks
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+        
         setAudioBlob(null);
         setAudioUrl(null);
+        setRecordingTime(0);
+    };
+
+    const handleFileSelect = (file) => {
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            showToast('File size too large. Maximum size is 10MB', 'error');
+            return;
+        }
+
+        // Validate file type
+        const allowedTypes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain', 'text/csv'
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            showToast('File type not supported. Please select an image, PDF, or document file.', 'error');
+            return;
+        }
+
+        setSelectedFile(file);
+        
+        // Create preview for images
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => setFilePreview(e.target.result);
+            reader.readAsDataURL(file);
+        } else {
+            setFilePreview(null);
+        }
+    };
+
+    const cancelFileSelection = () => {
+        if (filePreview) {
+            URL.revokeObjectURL(filePreview);
+        }
+        setSelectedFile(null);
+        setFilePreview(null);
+    };
+
+    const sendFileMessage = async () => {
+        if (!selectedFile || !selectedChat) {
+            showToast('No file selected to send', 'error');
+            return;
+        }
+
+        setIsUploadingFile(true);
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('messageType', 'file');
+        formData.append('content', selectedFile.name);
+        formData.append('fileName', selectedFile.name);
+        formData.append('fileType', selectedFile.type);
+        formData.append('fileSize', selectedFile.size.toString());
+
+        // Optimistic update
+        const tempMessageId = `temp-file-${Date.now()}`;
+        const optimisticMessage = {
+            _id: tempMessageId,
+            senderId: currentUser._id || currentUser.id,
+            senderName: currentUser.name || currentUser.email,
+            senderRole: currentUser.role,
+            content: selectedFile.name,
+            messageType: 'file',
+            fileUrl: filePreview || null,
+            fileName: selectedFile.name,
+            fileType: selectedFile.type,
+            fileSize: selectedFile.size,
+            timestamp: new Date(),
+            isOptimistic: true
+        };
+
+        setMessages(prev => [...prev, optimisticMessage]);
+        const fileToSend = selectedFile;
+        const previewToRevoke = filePreview;
+        cancelFileSelection();
+        scrollToBottom(true);
+
+        try {
+            const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                timeout: 60000,
+            });
+
+            if (response.data.success) {
+                // Revoke preview URL
+                if (previewToRevoke && previewToRevoke.startsWith('blob:')) {
+                    URL.revokeObjectURL(previewToRevoke);
+                }
+                
+                // Replace optimistic message with real one
+                setMessages(prev => {
+                    const filtered = prev.filter(m => m._id !== tempMessageId);
+                    const exists = filtered.some(m => m._id === response.data.data._id);
+                    if (!exists) {
+                        return [...filtered, response.data.data];
+                    }
+                    return filtered;
+                });
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('File upload error:', error);
+            setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+            
+            if (error.response) {
+                const errorMsg = error.response.data?.error || error.response.data?.message || 'Upload failed';
+                showToast(errorMsg, 'error');
+            } else if (error.request) {
+                showToast('Network error. Please check your connection.', 'error');
+            } else {
+                showToast('Failed to send file', 'error');
+            }
+        } finally {
+            setIsUploadingFile(false);
+        }
     };
 
     const sendVoiceMessage = async () => {
-        if (!audioBlob || !selectedChat) return;
+        if (!audioBlob || !selectedChat) {
+            showToast('No audio recording to send', 'error');
+            return;
+        }
+
+        // Validate blob size (max 10MB)
+        if (audioBlob.size > 10 * 1024 * 1024) {
+            showToast('Audio file too large. Maximum size is 10MB', 'error');
+            cancelRecording();
+            return;
+        }
+
         const formData = new FormData();
         formData.append('audio', audioBlob, 'voice.webm');
         formData.append('messageType', 'audio');
@@ -239,7 +558,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         
         // Optimistic update - add voice message immediately
         const tempMessageId = `temp-voice-${Date.now()}`;
-        const audioUrl = URL.createObjectURL(audioBlob);
+        const audioUrlForPreview = URL.createObjectURL(audioBlob);
         const optimisticMessage = {
             _id: tempMessageId,
             senderId: currentUser._id || currentUser.id,
@@ -247,19 +566,42 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             senderRole: currentUser.role,
             content: '',
             messageType: 'audio',
-            audioUrl: audioUrl,
+            audioUrl: audioUrlForPreview,
             audioDuration: recordingTime,
             timestamp: new Date(),
             isOptimistic: true
         };
         
         setMessages(prev => [...prev, optimisticMessage]);
-        cancelRecording();
+        
+        // Clean up recording state but keep blob for retry if needed
+        const blobToSend = audioBlob;
+        const timeToSend = recordingTime;
+        
+        // Reset recording state
+        setIsRecording(false);
+        if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        setRecordingTime(0);
+        setAudioBlob(null);
+        setAudioUrl(null);
+        
         scrollToBottom(true); // Instant scroll for optimistic update
         
         try {
-            const response = await apiClient.post(API.sendMessage(selectedChat._id), formData);
+            const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                timeout: 60000, // 60 second timeout for file upload
+            });
+            
             if (response.data.success) {
+                // Revoke the optimistic blob URL
+                URL.revokeObjectURL(audioUrlForPreview);
+                
                 // Replace optimistic message with real one
                 setMessages(prev => {
                     const filtered = prev.filter(m => m._id !== tempMessageId);
@@ -271,11 +613,27 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+            } else {
+                throw new Error('Server returned unsuccessful response');
             }
-        } catch (error) { 
+        } catch (error) {
+            console.error('Voice message send error:', error);
+            
+            // Revoke the optimistic blob URL
+            URL.revokeObjectURL(audioUrlForPreview);
+            
             // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m._id !== tempMessageId));
-            showToast('Upload failed', 'error'); 
+            
+            // Show specific error message
+            if (error.response) {
+                const errorMsg = error.response.data?.error || error.response.data?.message || 'Upload failed';
+                showToast(errorMsg, 'error');
+            } else if (error.request) {
+                showToast('Network error. Please check your connection.', 'error');
+            } else {
+                showToast('Failed to send voice message', 'error');
+            }
         }
     };
 
@@ -559,6 +917,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                     onSendVoiceMessage={sendVoiceMessage}
                                     onCancelRecording={cancelRecording}
                                     formatRecordingTime={formatRecordingTime}
+                                    onFileSelect={handleFileSelect}
+                                    selectedFile={selectedFile}
+                                    filePreview={filePreview}
+                                    onSendFile={sendFileMessage}
+                                    onCancelFile={cancelFileSelection}
+                                    isUploadingFile={isUploadingFile}
                                     darkMode={darkMode}
                                 />
                             </div>
