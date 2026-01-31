@@ -61,8 +61,10 @@ router.post('/login', async (req, res) => {
             }
 
             // --- SUBSCRIPTION VALIDATION ---
+            // Declare ownerAccount in outer scope so it's available for token generation
+            let ownerAccount = user; // Default to user (for owners)
+            
             if (user.role !== 'superadmin') {
-                let ownerAccount = user;
                 if (user.role !== 'owner') {
                     // For staff members (Manager/Cashier), find the owner through the Store
                     if (user.activeStoreId) {
