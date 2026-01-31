@@ -197,7 +197,6 @@ router.get('/chats', protect, async (req, res) => {
                 }
             }
             let unreadCount = 0;
-            const messages = Array.isArray(chat.messages) ? chat.messages : [];
             if (lastReadAt) {
                 unreadCount = messages.filter(msg => {
                     if (!msg || !msg.timestamp) return false;
