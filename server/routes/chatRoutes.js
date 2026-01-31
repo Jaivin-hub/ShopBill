@@ -182,10 +182,35 @@ router.get('/chats', protect, async (req, res) => {
                 ? chat.messages[chat.messages.length - 1] 
                 : null;
             
+            // Calculate unread count for current user
+            // Handle both Map and plain object (Mongoose converts Map to object when serializing)
+            let lastReadAt = null;
+            if (chat.lastReadBy) {
+                if (chat.lastReadBy instanceof Map) {
+                    lastReadAt = chat.lastReadBy.get(req.user.id.toString()) || null;
+                } else if (typeof chat.lastReadBy === 'object') {
+                    lastReadAt = chat.lastReadBy[req.user.id.toString()] || null;
+                }
+            }
+            let unreadCount = 0;
+            if (lastReadAt) {
+                unreadCount = chat.messages.filter(msg => {
+                    const msgTime = new Date(msg.timestamp);
+                    const readTime = new Date(lastReadAt);
+                    return msgTime > readTime && msg.senderId.toString() !== req.user.id.toString();
+                }).length;
+            } else if (chat.messages.length > 0) {
+                // If user has never read, count all messages not sent by them
+                unreadCount = chat.messages.filter(msg => 
+                    msg.senderId.toString() !== req.user.id.toString()
+                ).length;
+            }
+            
             return {
                 ...chatObj,
                 participants: enrichedParticipants,
-                messages: lastMessage ? [lastMessage] : []
+                messages: lastMessage ? [lastMessage] : [],
+                unreadCount: unreadCount
             };
         }));
 
@@ -215,6 +240,13 @@ router.get('/:chatId/messages', protect, async (req, res) => {
         if (!chat.participants.includes(req.user.id)) {
             return res.status(403).json({ error: 'Access denied' });
         }
+
+        // Mark messages as read for this user
+        if (!chat.lastReadBy) {
+            chat.lastReadBy = new Map();
+        }
+        chat.lastReadBy.set(req.user.id.toString(), new Date());
+        await chat.save();
 
         // Paginate messages (most recent first)
         const skip = (page - 1) * limit;

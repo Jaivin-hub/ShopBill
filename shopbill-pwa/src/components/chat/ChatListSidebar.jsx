@@ -29,89 +29,96 @@ const ChatListSidebar = ({
 
     return (
         <div 
-            className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full overflow-hidden transition-all duration-300 ${sidebarBg}`}
+            className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full transition-all duration-300 ${sidebarBg} overflow-hidden`}
         >
-            
-            {/* Sticky Header Area */}
-            <div className={`sticky top-0 z-50 p-6 border-b ${darkMode ? 'border-slate-800/60 bg-slate-900/20 backdrop-blur-xl' : 'bg-white/95 backdrop-blur-xl'} shrink-0`}>
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Network <span className="text-indigo-500">Comms</span>
-                        </h1>
-                        <p className={`text-[9px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Real-time team communication and coordination.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onNewGroupClick}
-                        className="p-2.5 rounded-xl bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
-                    >
-                        <Plus className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Toggle */}
-                <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-                    <button
-                        onClick={() => setViewMode('chats')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black tracking-[0.2em] transition-all ${
-                            viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                        }`}
-                    >
-                        <LayoutGrid size={12} />
-                        GROUPS
-                    </button>
-                    <button
-                        onClick={() => setViewMode('users')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black tracking-[0.2em] transition-all ${
-                            viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                        }`}
-                    >
-                        <UserSquare2 size={12} />
-                        STAFF
-                    </button>
-                </div>
-            </div>
-
-            {/* Search */}
-            <div className={`px-4 py-4 border-b ${darkMode ? 'border-slate-800/40 bg-indigo-500/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
-                <div className="relative group">
-                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
-                    <input
-                        type="text"
-                        placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
-                        value={searchTerm}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
-                    />
-                </div>
-            </div>
-
-            {/* Scroll Area */}
+            {/* Scrollable Container - Required for sticky to work */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {viewMode === 'users' ? (
-                    <StaffListView
-                        staffList={staffList}
-                        searchTerm={searchTerm}
-                        isLoadingStaff={isLoadingStaff}
-                        onQuickMessage={onQuickMessage}
-                        darkMode={darkMode}
-                        currentUser={currentUser}
-                    />
-                ) : (
-                    <ChatListView
-                        chats={chats}
-                        selectedChat={selectedChat}
-                        onSelectChat={onSelectChat}
-                        searchTerm={searchTerm}
-                        isLoading={isLoading}
-                        getChatDisplayName={getChatDisplayName}
-                        formatTime={formatTime}
-                        currentUser={currentUser}
-                        darkMode={darkMode}
-                    />
-                )}
+                {/* Sticky Header Area - Title, Description, Toggle, and Search */}
+                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg`}>
+                    {/* Title and Description */}
+                    <div className="p-4 md:p-6 pb-3 md:pb-4">
+                        <div className="flex items-center justify-between mb-3 md:mb-4">
+                            <div className="flex-1 min-w-0">
+                                <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    Network <span className="text-indigo-500">Comms</span>
+                                </h1>
+                                <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 md:mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Real-time team communication and coordination.
+                                </p>
+                            </div>
+                            <button
+                                onClick={onNewGroupClick}
+                                className="p-2 md:p-2.5 rounded-xl bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/20 flex-shrink-0 ml-2"
+                            >
+                                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+                        </div>
+
+                        {/* Toggle */}
+                        <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                            <button
+                                onClick={() => setViewMode('chats')}
+                                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                    viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                }`}
+                            >
+                                <LayoutGrid size={11} className="md:w-3 md:h-3" />
+                                <span className="hidden sm:inline">GROUPS</span>
+                                <span className="sm:hidden">Group</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('users')}
+                                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                    viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                }`}
+                            >
+                                <UserSquare2 size={11} className="md:w-3 md:h-3" />
+                                <span className="hidden sm:inline">STAFF</span>
+                                <span className="sm:hidden">Staff</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Search - Inside Sticky Header */}
+                    <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+                        <div className="relative group">
+                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
+                            <input
+                                type="text"
+                                placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
+                                value={searchTerm}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                className={`w-full pl-10 pr-4 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Scrollable Content Area - Chat List */}
+                <div className="min-h-0">
+                    {viewMode === 'users' ? (
+                        <StaffListView
+                            staffList={staffList}
+                            searchTerm={searchTerm}
+                            isLoadingStaff={isLoadingStaff}
+                            onQuickMessage={onQuickMessage}
+                            darkMode={darkMode}
+                            currentUser={currentUser}
+                        />
+                    ) : (
+                        <ChatListView
+                            chats={chats}
+                            selectedChat={selectedChat}
+                            onSelectChat={onSelectChat}
+                            searchTerm={searchTerm}
+                            isLoading={isLoading}
+                            getChatDisplayName={getChatDisplayName}
+                            formatTime={formatTime}
+                            currentUser={currentUser}
+                            darkMode={darkMode}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -281,7 +288,12 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                                 {chat.outletId.name.split(' ')[0]}
                                             </span>
                                         )}
-                                        {isSelected && (
+                                        {chat.unreadCount > 0 && (
+                                            <span className={`h-5 w-5 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-rose-500'} text-white text-[9px] font-black flex items-center justify-center ${isSelected ? 'shadow-[0_0_8px_#6366f1]' : 'animate-pulse'}`}>
+                                                {chat.unreadCount > 9 ? '9+' : chat.unreadCount}
+                                            </span>
+                                        )}
+                                        {isSelected && chat.unreadCount === 0 && (
                                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
                                         )}
                                     </div>

@@ -80,6 +80,13 @@ const ChatSchema = new mongoose.Schema({
     isGroupChat: {
         type: Boolean,
         default: false
+    },
+    
+    // Track when each user last read this chat (userId -> timestamp)
+    lastReadBy: {
+        type: Map,
+        of: Date,
+        default: new Map()
     }
 }, { timestamps: true });
 

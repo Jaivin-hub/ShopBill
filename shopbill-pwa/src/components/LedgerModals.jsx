@@ -35,7 +35,7 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
       <input
         {...props}
         id={name} name={name} type={type} value={value || ''} onChange={onChange} disabled={disabled}
-        className={`w-full ${Icon ? 'pl-11' : 'px-4'} py-3.5 border rounded-2xl outline-none transition-all font-bold
+        className={`w-full ${Icon ? 'pl-11' : 'px-4'} py-3.5 border rounded-2xl outline-none transition-all font-bold text-[16px] md:text-base
           ${darkMode ? 'bg-gray-950 text-white border-gray-800 placeholder-gray-700 focus:border-indigo-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/5'} 
           ${error ? 'border-rose-500 ring-2 ring-rose-500/10' : ''} 
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}

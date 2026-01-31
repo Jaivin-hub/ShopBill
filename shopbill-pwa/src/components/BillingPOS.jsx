@@ -283,7 +283,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handlePhysicalScannerInput}
-              className={`no-zoom-input w-full border rounded-2xl py-3.5 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${inputBase}`}
+              className={`w-full border rounded-2xl py-3.5 pl-12 pr-12 text-[16px] md:text-[10px] font-black tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${inputBase}`}
             />
             {searchTerm && <X onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />}
           </div>

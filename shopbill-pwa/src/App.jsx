@@ -177,6 +177,7 @@ const App = () => {
   });
   const [isChatSelected, setIsChatSelected] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -506,7 +507,7 @@ const App = () => {
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
@@ -640,8 +641,8 @@ const App = () => {
               </div>
             </aside>
           )}
-          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto') : 'w-full overflow-y-auto'}`}>
-            <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : 'max-w-7xl mx-auto min-h-full'} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
+          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto')) : 'w-full overflow-y-auto'}`}>
+            <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : (currentPage === 'chat' ? 'h-full' : 'max-w-7xl mx-auto min-h-full')} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
               {renderContent()}
             </div>
           </main>
@@ -661,8 +662,13 @@ const App = () => {
                   className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative ${showMoreMenu ? 'flex-1' : 'flex-1'} ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
                   {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
+                  <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
                     <MoreHorizontal className={`w-7 h-7 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+                    {chatUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                      </span>
+                    )}
                   </div>
                 </button>
               )}
@@ -692,7 +698,7 @@ const App = () => {
                           setCurrentPage(item.id);
                           setShowMoreMenu(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
                           currentPage === item.id
                             ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
                             : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
@@ -700,6 +706,11 @@ const App = () => {
                       >
                         <item.icon className="w-5 h-5" />
                         <span className="text-sm font-bold">{item.name}</span>
+                        {item.id === 'chat' && chatUnreadCount > 0 && (
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                          </span>
+                        )}
                       </button>
                     ))}
                     {utilityNavItems.filter(item => item.id === 'settings').map(item => (

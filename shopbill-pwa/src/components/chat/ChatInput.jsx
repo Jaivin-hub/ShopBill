@@ -85,7 +85,7 @@ const ChatInput = ({
                         value={messageInput}
                         onChange={(e) => onMessageChange(e.target.value)}
                         placeholder="Transmission..."
-                        className={`flex-1 ${inputBg} ${darkMode ? 'text-white' : 'text-slate-900'} border-none rounded-2xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'} transition-all`}
+                        className={`flex-1 ${inputBg} ${darkMode ? 'text-white' : 'text-slate-900'} border-none rounded-2xl px-4 py-2.5 text-[16px] md:text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'} transition-all`}
                     />
 
                     {messageInput.trim() ? (

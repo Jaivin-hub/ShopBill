@@ -9,7 +9,7 @@ import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
 
-const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange }) => {
+const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange }) => {
     // Styling Vars matching Dashboard architecture
     const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
@@ -101,10 +101,18 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         if (!hasChatAccess) { setIsLoading(false); return; }
         try {
             const response = await apiClient.get(API.chatList);
-            if (response.data?.success) setChats(response.data.data || []);
+            if (response.data?.success) {
+                const fetchedChats = response.data.data || [];
+                setChats(fetchedChats);
+                // Calculate total unread count
+                const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+                if (onUnreadCountChange) {
+                    onUnreadCountChange(totalUnread);
+                }
+            }
         } catch (error) { console.error('Failed to fetch chats:', error); }
         finally { setIsLoading(false); }
-    }, [hasChatAccess, apiClient, API]);
+    }, [hasChatAccess, apiClient, API, onUnreadCountChange]);
 
     const fetchMessages = useCallback(async (chatId) => {
         setIsLoadingMessages(true);
@@ -113,10 +121,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             if (response.data.success) {
                 setMessages(response.data.data || []);
                 setTimeout(() => scrollToBottom(), 100);
+                // Refresh chats list to update unread counts after marking messages as read
+                fetchChats();
             }
         } catch (error) { showToast('Failed to load messages', 'error'); }
         finally { setIsLoadingMessages(false); }
-    }, [apiClient, API, showToast]);
+    }, [apiClient, API, showToast, fetchChats]);
 
     useEffect(() => {
         if (!hasChatAccess) return;

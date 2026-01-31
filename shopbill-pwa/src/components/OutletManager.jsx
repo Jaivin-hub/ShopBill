@@ -308,7 +308,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                             if (validationErrors.name) setValidationErrors(prev => ({ ...prev, name: null }));
                                         }}
                                         placeholder="e.g. Mumbai North Hub"
-                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${validationErrors.name ? 'border-red-500' : ''}`}
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${validationErrors.name ? 'border-red-500' : ''}`}
                                     />
                                     {validationErrors.name && <p className="text-[10px] text-red-500 font-bold mt-1">{validationErrors.name}</p>}
                                 </div>
@@ -322,7 +322,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         value={formData.taxId}
                                         onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
                                         placeholder="Optional"
-                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                     />
                                 </div>
 
@@ -372,7 +372,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         value={formData.address}
                                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                         placeholder="Complete street address, city, state..."
-                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none`}
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none`}
                                     />
                                 </div>
 
@@ -388,7 +388,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                             settings: { ...formData.settings, receiptFooter: e.target.value }
                                         })}
                                         placeholder="Visit again!"
-                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        className={`w-full ${inputBase} px-4 py-3 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                     />
                                 </div>
                             </div>

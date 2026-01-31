@@ -71,7 +71,7 @@ const CloudUploadConfirmationModal = ({
                                     placeholder="Enter backup email"
                                     value={connectEmail}
                                     onChange={(e) => setConnectEmail(e.target.value)}
-                                    className={`w-full pl-12 pr-4 py-4 border text-xs font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-slate-400 text-black'}`}
+                                    className={`w-full pl-12 pr-4 py-4 border text-[16px] md:text-xs font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-slate-400 text-black'}`}
                                 />
                             </div>
                         </div>
