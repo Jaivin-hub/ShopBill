@@ -293,7 +293,27 @@ router.get('/:chatId/messages', protect, async (req, res) => {
         const messages = chat.messages
             .sort((a, b) => b.timestamp - a.timestamp)
             .slice(skip, skip + parseInt(limit))
-            .reverse(); // Reverse to show oldest first
+            .reverse() // Reverse to show oldest first
+            .map(msg => {
+                // Convert Mongoose subdocument to plain object with all fields
+                const msgObj = msg.toObject ? msg.toObject() : msg;
+                return {
+                    _id: msgObj._id,
+                    senderId: msgObj.senderId,
+                    senderName: msgObj.senderName,
+                    senderRole: msgObj.senderRole,
+                    senderStoreName: msgObj.senderStoreName || null,
+                    content: msgObj.content || '',
+                    messageType: msgObj.messageType || 'text',
+                    timestamp: msgObj.timestamp,
+                    audioUrl: msgObj.audioUrl || null,
+                    audioDuration: msgObj.audioDuration || null,
+                    fileUrl: msgObj.fileUrl || null,
+                    fileName: msgObj.fileName || null,
+                    fileType: msgObj.fileType || null,
+                    fileSize: msgObj.fileSize || null
+                };
+            });
 
         res.json({ 
             success: true, 
@@ -491,16 +511,36 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         chat.lastMessageAt = new Date();
         await chat.save();
 
-        // Populate sender info for response
+        // Reload chat to get the saved message with all fields
+        const updatedChat = await Chat.findById(chatId);
+        const savedMessage = updatedChat.messages[updatedChat.messages.length - 1];
+        
+        // Convert Mongoose subdocument to plain object
+        const savedMessageObj = savedMessage.toObject ? savedMessage.toObject() : savedMessage;
+        
+        // Populate sender info for response - ensure all fields are included
         const populatedMessage = {
-            ...message,
-            _id: chat.messages[chat.messages.length - 1]._id,
+            _id: savedMessageObj._id,
             senderId: {
                 _id: user._id,
                 name: user.name || user.email,
                 role: user.role,
                 profileImageUrl: user.profileImageUrl
-            }
+            },
+            senderName: savedMessageObj.senderName,
+            senderRole: savedMessageObj.senderRole,
+            senderStoreName: savedMessageObj.senderStoreName || null,
+            content: savedMessageObj.content || '',
+            messageType: savedMessageObj.messageType || 'text',
+            timestamp: savedMessageObj.timestamp,
+            // Include audio fields if present
+            audioUrl: savedMessageObj.audioUrl || null,
+            audioDuration: savedMessageObj.audioDuration || null,
+            // Include file fields if present
+            fileUrl: savedMessageObj.fileUrl || null,
+            fileName: savedMessageObj.fileName || null,
+            fileType: savedMessageObj.fileType || null,
+            fileSize: savedMessageObj.fileSize || null
         };
 
         // Emit to Socket.IO for real-time updates

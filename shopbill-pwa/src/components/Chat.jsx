@@ -68,6 +68,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const recordingTimerRef = useRef(null);
     const audioRefs = useRef({});
     const mediaStreamRef = useRef(null); // Track the media stream for cleanup
+    const recordingChunksRef = useRef([]); // Track recording chunks
 
     // Constants
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
@@ -89,10 +90,15 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         socketRef.current.on('new_message', (data) => {
             if (data.chatId === selectedChat?._id) {
                 setMessages(prev => {
-                    // Remove any optimistic messages with same content
-                    const withoutOptimistic = prev.filter(m => !m.isOptimistic || m._id !== `temp-${Date.now()}`);
+                    // Remove any optimistic messages
+                    const withoutOptimistic = prev.filter(m => !m.isOptimistic);
                     const existingIndex = withoutOptimistic.findIndex(m => m._id === data.message._id);
-                    if (existingIndex >= 0) return withoutOptimistic;
+                    if (existingIndex >= 0) {
+                        // Update existing message
+                        const updated = [...withoutOptimistic];
+                        updated[existingIndex] = data.message;
+                        return updated;
+                    }
                     return [...withoutOptimistic, data.message];
                 });
                 setTimeout(() => scrollToBottom(), 50);
@@ -220,24 +226,35 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         return date.toLocaleDateString();
     };
 
-    const startRecording = async () => {
+    const startRecording = useCallback(async () => {
+        console.log('[startRecording] ========== FUNCTION CALLED ==========');
+        console.log('[startRecording] Current isRecording state:', isRecording);
+        
         // Don't allow recording if already recording
         if (isRecording) {
+            console.log('[startRecording] Already recording, aborting');
+            showToast('Recording already in progress', 'info');
             return;
         }
 
         try {
+            console.log('[startRecording] Checking browser support...');
+            
             // Check if MediaRecorder is supported
             if (typeof MediaRecorder === 'undefined') {
+                console.error('[startRecording] MediaRecorder not supported');
                 showToast('Voice recording not supported in this browser', 'error');
                 return;
             }
 
             // Check if getUserMedia is supported
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.error('[startRecording] getUserMedia not supported');
                 showToast('Microphone access not available in this browser', 'error');
                 return;
             }
+
+            console.log('[startRecording] Browser support OK, proceeding...');
 
             // Clean up any existing stream first
             if (mediaStreamRef.current) {
@@ -255,13 +272,22 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
 
             // Request microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                } 
-            });
+            console.log('[startRecording] Requesting microphone access...');
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+                console.log('[startRecording] Microphone access granted, stream:', stream);
+                console.log('[startRecording] Stream tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState })));
+            } catch (getUserMediaError) {
+                console.error('[startRecording] getUserMedia error:', getUserMediaError);
+                throw getUserMediaError;
+            }
             mediaStreamRef.current = stream; // Store stream reference for cleanup
             
             // Determine best mimeType
@@ -282,12 +308,28 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
 
             const options = { mimeType };
-            const recorder = new MediaRecorder(stream, options);
-            const chunks = [];
+            console.log('[startRecording] Creating MediaRecorder with options:', options);
+            let recorder;
+            try {
+                recorder = new MediaRecorder(stream, options);
+                console.log('[startRecording] MediaRecorder created successfully');
+                console.log('[startRecording] MediaRecorder state:', recorder.state);
+                console.log('[startRecording] MediaRecorder mimeType:', recorder.mimeType);
+            } catch (recorderError) {
+                console.error('[startRecording] Error creating MediaRecorder:', recorderError);
+                // Try without options as fallback
+                console.log('[startRecording] Trying without options as fallback...');
+                recorder = new MediaRecorder(stream);
+                console.log('[startRecording] MediaRecorder created with fallback, mimeType:', recorder.mimeType);
+            }
+            
+            // Reset chunks array
+            recordingChunksRef.current = [];
+            console.log('[startRecording] Chunks array reset');
             
             recorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) {
-                    chunks.push(e.data);
+                    recordingChunksRef.current.push(e.data);
                 }
             };
             
@@ -298,6 +340,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     mediaStreamRef.current = null;
                 }
                 
+                const chunks = recordingChunksRef.current;
                 if (chunks.length > 0) {
                     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
                     setAudioBlob(blob);
@@ -308,6 +351,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     setIsRecording(false);
                     setRecordingTime(0);
                 }
+                // Clear chunks after processing
+                recordingChunksRef.current = [];
             };
 
             recorder.onerror = (e) => {
@@ -325,18 +370,49 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             };
 
             // Start recording with timeslice to ensure data is collected
-            recorder.start(100); // Collect data every 100ms
-            setMediaRecorder(recorder);
-            setIsRecording(true);
-            setRecordingTime(0);
-            if (recordingTimerRef.current) {
-                clearInterval(recordingTimerRef.current);
+            try {
+                console.log('[startRecording] Setting MediaRecorder state...');
+                // Set the recorder first
+                setMediaRecorder(recorder);
+                
+                console.log('[startRecording] Starting MediaRecorder...');
+                // Start recording
+                recorder.start(100); // Collect data every 100ms
+                
+                // Small delay to ensure state is updated
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                console.log('[startRecording] MediaRecorder state after start:', recorder.state);
+                
+                // Verify recording started
+                if (recorder.state === 'recording') {
+                    console.log('[startRecording] Recording started successfully!');
+                    setIsRecording(true);
+                    setRecordingTime(0);
+                    
+                    if (recordingTimerRef.current) {
+                        clearInterval(recordingTimerRef.current);
+                    }
+                    recordingTimerRef.current = setInterval(() => {
+                        setRecordingTime(prev => prev + 1);
+                    }, 1000);
+                    console.log('[startRecording] Timer started, UI should update now');
+                } else {
+                    console.error('[startRecording] MediaRecorder state is not recording:', recorder.state);
+                    throw new Error(`MediaRecorder failed to start. State: ${recorder.state}`);
+                }
+            } catch (startError) {
+                console.error('[startRecording] Error starting MediaRecorder:', startError);
+                showToast('Failed to start recording. Please try again.', 'error');
+                setIsRecording(false);
+                setMediaRecorder(null);
+                if (mediaStreamRef.current) {
+                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                    mediaStreamRef.current = null;
+                }
             }
-            recordingTimerRef.current = setInterval(() => {
-                setRecordingTime(prev => prev + 1);
-            }, 1000);
         } catch (error) {
-            console.error('Recording error:', error);
+            console.error('[startRecording] Recording error:', error);
             setIsRecording(false);
             setRecordingTime(0);
             
@@ -356,7 +432,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 mediaStreamRef.current = null;
             }
         }
-    };
+    }, [isRecording, showToast]);
 
     const stopRecording = () => {
         if (mediaRecorder && isRecording) {
@@ -520,6 +596,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+                
+                // Refresh messages to ensure we have the latest with all fields
+                if (selectedChat) {
+                    setTimeout(() => fetchMessages(selectedChat._id), 300);
+                }
             }
         } catch (error) {
             console.error('File upload error:', error);
@@ -613,6 +694,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+                
+                // Refresh messages to ensure we have the latest with all fields
+                if (selectedChat) {
+                    setTimeout(() => fetchMessages(selectedChat._id), 300);
+                }
             } else {
                 throw new Error('Server returned unsuccessful response');
             }
