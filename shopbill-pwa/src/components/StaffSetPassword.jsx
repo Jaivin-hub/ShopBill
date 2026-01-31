@@ -12,9 +12,15 @@ const apiClient = axios.create();
 const getTokenFromPath = () => {
     // Expected path format: /staff-setup/TOKEN_STRING
     const path = window.location.pathname;
-    // Regex specifically for the staff-setup path
-    const match = path.match(/\/staff-setup\/([a-fA-F0-9]{64,})/); 
-    return match ? match[1] : null;
+    // Regex specifically for the staff-setup path - token is 64 hex characters
+    // Updated to be more flexible and handle any hex string after /staff-setup/
+    const match = path.match(/\/staff-setup\/([a-fA-F0-9]+)/); 
+    if (match && match[1]) {
+        console.log('[StaffSetPassword] Token extracted from URL:', match[1]);
+        return match[1];
+    }
+    console.warn('[StaffSetPassword] No token found in URL path:', path);
+    return null;
 };
 
 

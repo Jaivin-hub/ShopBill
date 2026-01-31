@@ -194,14 +194,38 @@ const SUPERADMIN_NAV_ITEMS = [
 
 const checkDeepLinkPath = () => {
   const path = window.location.pathname;
-  if (path.startsWith('/staff-setup/')) return 'staffSetPassword';
-  if (path.startsWith('/reset-password/')) return 'resetPassword';
+  if (path.startsWith('/staff-setup/')) {
+    return 'staffSetPassword';
+  }
+  if (path.startsWith('/reset-password/')) {
+    return 'resetPassword';
+  }
   return null;
 };
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
   const [pageOrigin, setPageOrigin] = useState('dashboard');
+
+  // Watch for URL changes to handle deep links (e.g., staff-setup, reset-password)
+  useEffect(() => {
+    const handlePathChange = () => {
+      const deepLinkPage = checkDeepLinkPath();
+      if (deepLinkPage && deepLinkPage !== currentPage) {
+        setCurrentPage(deepLinkPage);
+      }
+    };
+    
+    // Check immediately on mount
+    handlePathChange();
+    
+    // Listen for popstate events (browser back/forward)
+    window.addEventListener('popstate', handlePathChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePathChange);
+    };
+  }, [currentPage]);
   const [currentUser, setCurrentUser] = useState(() => {
     const userJson = localStorage.getItem('currentUser');
     return userJson ? JSON.parse(userJson) : null;
@@ -419,12 +443,22 @@ const App = () => {
   }, [showToast]);
 
   useEffect(() => {
+    // Check if we're on a public page that doesn't require auth
+    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
+    const isPublicPage = publicPages.includes(currentPage);
+    
+    // Don't check auth for public pages
+    if (isPublicPage) {
+      setIsLoadingAuth(false);
+      return;
+    }
+    
     const token = localStorage.getItem('userToken');
     if (!token || token === 'undefined') {
       logout();
     }
     setIsLoadingAuth(false);
-  }, [logout]);
+  }, [logout, currentPage]);
 
   // Fetch effective plan for staff members to ensure chat access is correct
   useEffect(() => {
@@ -528,9 +562,11 @@ const App = () => {
   };
 
   const renderContent = () => {
-    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
+    // Render public pages immediately, even during auth loading
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
+    
+    if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
     if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} />;
     if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} />;
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} />;
