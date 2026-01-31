@@ -379,10 +379,10 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                 </div>
             </div>
 
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{__html: `
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            `}} />
         </div>
     );
 };

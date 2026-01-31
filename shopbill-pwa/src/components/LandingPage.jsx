@@ -103,7 +103,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
 
     return (
         <div className="min-h-screen bg-gray-950 text-gray-300 font-sans selection:bg-indigo-500/30">
-            <style jsx="true" global="true">{`
+            <style dangerouslySetInnerHTML={{__html: `
                 .text-gradient {
                     background-image: linear-gradient(to right, #818cf8, #2dd4bf);
                     -webkit-background-clip: text;
@@ -119,7 +119,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                     transform: translateY(-8px);
                     background: rgba(31, 41, 55, 0.8);
                 }
-            `}</style>
+            `}} />
 
             <nav className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-800">
                 <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">

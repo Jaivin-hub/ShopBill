@@ -110,6 +110,32 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         return content[userRole] || { title: `Business`, desc: `Operations dashboard.` };
     }, [userRole]);
 
+    // Role-based quick actions
+    const quickActions = useMemo(() => {
+        const allActions = [
+            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 1, manager: 1, cashier: 1 } },
+            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 2, manager: 2, cashier: null } },
+            { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 3, cashier: 2 } },
+            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 4, manager: 4, cashier: 3 } },
+            ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
+                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 5, manager: 5, cashier: null } }]
+                : []
+            ),
+            { label: 'Refresh', icon: RefreshCw, color: 'bg-slate-600', action: fetchDashboardData, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 6, manager: 6, cashier: 4 } }
+        ];
+        
+        // Filter by role and sort by order
+        return allActions
+            .filter(action => action.roles.includes(userRole))
+            .sort((a, b) => {
+                const orderA = a.order[userRole];
+                const orderB = b.order[userRole];
+                if (orderA === null) return 1;
+                if (orderB === null) return -1;
+                return orderA - orderB;
+            });
+    }, [userRole, currentUser?.plan, fetchDashboardData]);
+
     const EmptyState = ({ icon: Icon, title, message, actionText, onAction }) => (
         <div className="flex flex-col items-center justify-center py-8 text-center px-4">
             <div className={`p-3 rounded-full mb-3 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
@@ -206,17 +232,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
                     {/* ACTION BUTTONS */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[
-                            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing' },
-                            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory' },
-                            { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata' },
-                            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity' },
-                            ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
-                                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm' }]
-                                : []
-                            ),
-                            { label: 'Refresh', icon: RefreshCw, color: 'bg-slate-600', action: fetchDashboardData }
-                        ].map((btn, i) => (
+                        {quickActions.map((btn, i) => (
                             <button
                                 key={i}
                                 onClick={btn.action || (() => setCurrentPage(btn.page))}

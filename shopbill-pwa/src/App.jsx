@@ -224,6 +224,7 @@ const App = () => {
   const [isChatSelected, setIsChatSelected] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [hasModalOpen, setHasModalOpen] = useState(false);
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -556,7 +557,7 @@ const App = () => {
           switch (currentPage) {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
             case 'billing': return <BillingPOS key={componentKey} {...commonProps} />;
-            case 'khata': return <Ledger key={componentKey} {...commonProps} />;
+            case 'khata': return <Ledger key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
             case 'inventory': return <InventoryManager key={componentKey} {...commonProps} />;
             case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
@@ -613,6 +614,7 @@ const App = () => {
             currentOutletId={currentOutletId}
             onOutletSwitch={handleOutletSwitch}
             showToast={showToast}
+            hasModalOpen={hasModalOpen}
           />
         )}
         <div className="flex flex-1 overflow-hidden relative">

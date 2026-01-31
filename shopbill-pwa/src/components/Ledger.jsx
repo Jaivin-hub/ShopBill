@@ -36,7 +36,7 @@ const scrollbarStyles = `
 
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
 
-const Ledger = ({ darkMode, apiClient, API, showToast }) => {
+const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,6 +49,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [newCustomerData, setNewCustomerData] = useState(initialNewCustomerState);
+  
+  // Notify parent when modal state changes
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(!!activeModal);
+    }
+  }, [activeModal, onModalStateChange]);
   
   // State for specific error feedback in Add Customer Modal
   const [addCustomerError, setAddCustomerError] = useState(null);
@@ -189,142 +196,213 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
 
   const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-  const headerBg = darkMode ? 'bg-slate-950/95' : 'bg-white/95';
+  const sidebarBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
+  const headerBg = darkMode ? 'bg-slate-950' : 'bg-white';
+  const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all duration-500 ${themeBase}`}>
+    <div className={`flex flex-col md:flex-row ${themeBase} w-full h-screen overflow-hidden`}>
       <style>{scrollbarStyles}</style>
 
-      <header className={`sticky top-0 z-[100] w-full isolate backdrop-blur-xl border-b px-6 py-4 md:py-6 ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl md:text-2xl font-black tracking-tight flex items-center gap-2">
-              Ledger <span className="text-indigo-500">Terminal</span>
-            </h1>
-            <div className="flex items-center gap-2">
-              <p className="text-[9px] text-slate-500 font-black tracking-[0.15em]">System Live • 128-bit Encrypted</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setShowSearch(!showSearch); setShowSort(false); }}
-              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSearch ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 shadow-sm')}`}
-            >
-              <Search size={18} />
-            </button>
-            <button
-              onClick={() => { setShowSort(!showSort); setShowSearch(false); }}
-              className={`p-2.5 md:p-3 rounded-2xl border transition-all active:scale-90 ${showSort ? 'bg-indigo-600 border-indigo-500 text-white' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 shadow-sm')}`}
-            >
-              <Filter size={18} />
-            </button>
-            <button
-              onClick={() => { setAddCustomerError(null); setValidationErrors({}); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-              className="hidden md:flex items-center gap-2 bg-slate-900 text-white border border-slate-700 hover:border-indigo-500 px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95"
-            >
-              <UserPlus size={14} className="text-indigo-400" /> New Account
-            </button>
-          </div>
-        </div>
-
-        {(showSearch || showSort) && (
-          <div className="max-w-7xl mx-auto mt-4 animate-in fade-in slide-in-from-top-3">
-            {showSearch ? (
-              <div className="relative group px-1">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-500 transition-colors z-10" />
-                <input
-                  autoFocus
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="search account..."
-                  className="no-zoom-input w-full border rounded-2xl py-4 pl-12 pr-12 text-base md:text-[10px] font-black tracking-widest outline-none transition-all bg-transparent"
-                />
-                <X onClick={() => { setShowSearch(false); setSearchTerm('') }} className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 cursor-pointer hover:text-indigo-500 z-10" />
+      {/* Sidebar - Customer List */}
+      <div className={`w-full md:w-80 flex flex-col h-full transition-all duration-300 ${sidebarBg} ${darkMode ? 'border-slate-800' : 'border-slate-200'} border-r overflow-hidden`}>
+        {/* Scrollable Container */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {/* Sticky Header Area */}
+          <div className={`sticky top-0 border-b ${borderStyle} ${darkMode ? 'bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg transition-all duration-300 ${activeModal ? 'z-[50]' : 'z-[100]'}`}>
+            {activeModal && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-10" />
+            )}
+            <div className={`relative ${activeModal ? 'opacity-30' : ''}`}>
+            {/* Title and Description */}
+            <div className="p-4 md:p-6 pb-3 md:pb-4">
+              <div className="mb-3 md:mb-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Ledger <span className="text-indigo-500">Terminal</span>
+                  </h1>
+                  <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 md:mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Customer account management system.
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
-                {[
-                  { id: 'due-high', label: 'Highest Priority' },
-                  { id: 'due-low', label: 'Settled Priority' },
-                  { id: 'alpha', label: 'A-Z Index' }
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => setSortBy(opt.id)}
-                    className={`px-6 py-3 rounded-2xl text-[9px] font-black border transition-all active:scale-95 whitespace-nowrap ${sortBy === opt.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400')}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+
+              {/* Toggle - Search/Filter */}
+              <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                <button
+                  onClick={() => { setShowSearch(true); setShowSort(false); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                    showSearch ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]' : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                  }`}
+                >
+                  <Search size={11} className="md:w-3 md:h-3" />
+                  <span className="hidden sm:inline">SEARCH</span>
+                  <span className="sm:hidden">Search</span>
+                </button>
+                <button
+                  onClick={() => { setShowSort(true); setShowSearch(false); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                    showSort ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]' : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                  }`}
+                >
+                  <Filter size={11} className="md:w-3 md:h-3" />
+                  <span className="hidden sm:inline">FILTER</span>
+                  <span className="sm:hidden">Filter</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Search - Inside Sticky Header */}
+            {showSearch && (
+              <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+                <div className="relative group">
+                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search accounts..."
+                    className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                  />
+                  <X 
+                    onClick={() => { setShowSearch(false); setSearchTerm(''); }} 
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`} 
+                  />
+                </div>
+              </div>
+            )}
+
+            </div>
+            {/* Sort Options */}
+            {showSort && (
+              <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                  {[
+                    { id: 'due-high', label: 'Highest Priority' },
+                    { id: 'due-low', label: 'Settled Priority' },
+                    { id: 'alpha', label: 'A-Z Index' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setSortBy(opt.id); setShowSort(false); }}
+                      className={`px-4 py-2 rounded-xl text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all whitespace-nowrap ${
+                        sortBy === opt.id 
+                          ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]' 
+                          : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-300' : 'bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        )}
-      </header>
 
-      <main className="px-4 py-4">
-        {/* Total Outstanding Card */}
-        <div className="max-w-7xl mx-auto space-y-4 pb-32">
-          <div className={`rounded-xl p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 border border-rose-500/20 shadow-sm">
-                  <AlertCircle size={20} />
+          {/* Scrollable Content Area - Customer List */}
+          <div className="min-h-0">
+            <CustomerList
+              customersList={customers}
+              searchTerm={debouncedSearchTerm}
+              sortBy={sortBy}
+              openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
+              openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
+              openRemindModal={openRemindModal}
+              isProcessing={isProcessing}
+              setActiveModal={setActiveModal}
+              darkMode={darkMode}
+              sentReminders={sentReminders}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 flex-col w-full min-w-0 h-full overflow-hidden">
+        {/* Fixed Header */}
+        <div className={`shrink-0 w-full ${headerBg} border-b ${borderStyle} shadow-sm transition-all duration-300 relative ${activeModal ? 'z-[50]' : 'z-50'}`}>
+          {activeModal && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-10" />
+          )}
+          <div className={`relative ${activeModal ? 'opacity-30' : ''}`}>
+            <div className={`p-3 md:p-4 flex items-center justify-between gap-2 overflow-hidden`}>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="relative shrink-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
+                  darkMode 
+                    ? 'bg-slate-800 text-slate-400 border-slate-700' 
+                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                }`}>
+                  <Wallet size={18} />
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-0.5">Total Outstanding</p>
-                  <h2 className="text-3xl md:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none">
-                    ₹{totalOutstanding.toLocaleString('en-IN')}
-                  </h2>
+                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 ${darkMode ? 'border-slate-950' : 'border-white'} rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
+              </div>
+
+              <div className="flex-1 min-w-0 text-left overflow-hidden">
+                <h3 className={`text-[13px] font-black truncate tracking-tight uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Account Overview
+                </h3>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+                  <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest truncate">
+                    {customers.length} ACCOUNTS ACTIVE
+                  </p>
                 </div>
               </div>
-              <div className={`hidden md:flex flex-col items-end border-l pl-6 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Risk Status</p>
-                <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">MONITORED</span>
-              </div>
+            </div>
+            
+            <div className="flex items-center gap-1 shrink-0">
+              <button className={`hidden md:flex p-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-600 hover:text-indigo-600'}`}>
+                <TrendingUp size={18} />
+              </button>
+              <button 
+                onClick={fetchCustomers}
+                className={`p-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-600 hover:text-indigo-600'}`}
+              >
+                <RefreshCcw size={18} />
+              </button>
             </div>
           </div>
+          </div>
+        </div>
 
-          {/* Customer Registry Table Container */}
-          <div className={`rounded-xl border overflow-hidden ${cardBase}`}>
-            <div className="px-6 py-5 border-b border-inherit flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-500">
-                  <LayoutGrid size={20} />
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar min-h-0">
+          <div className="max-w-7xl mx-auto space-y-4">
+
+            {/* Total Outstanding Card */}
+            <div className={`rounded-xl p-4 md:p-5 border relative overflow-hidden group transition-all duration-700 ${cardBase}`}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-rose-500/10 transition-colors" />
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-4 md:gap-5">
+                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center border ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-500/10 border-rose-500/20'} shadow-sm`}>
+                    <AlertCircle size={18} className="md:w-5 md:h-5 text-rose-500" />
+                  </div>
+                  <div>
+                    <p className={`text-[9px] md:text-[10px] font-black tracking-[0.2em] mb-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Outstanding</p>
+                    <h2 className={`text-2xl md:text-3xl lg:text-4xl font-black text-rose-500 tracking-tighter tabular-nums leading-none ${darkMode ? 'text-rose-400' : 'text-rose-500'}`}>
+                      ₹{totalOutstanding.toLocaleString('en-IN')}
+                    </h2>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-[11px] font-black text-slate-500 tracking-[0.2em]">Customer Registry</h3>
-                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">Managing {customers.length} Accounts</p>
+                <div className={`hidden md:flex flex-col items-end border-l pl-4 md:pl-6 ${borderStyle}`}>
+                  <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Risk Status</p>
+                  <span className={`text-[9px] md:text-[10px] font-black text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 ${darkMode ? 'text-rose-400' : 'text-rose-500'}`}>MONITORED</span>
                 </div>
               </div>
-            </div>
-
-            <div className="p-3 md:p-6">
-              <CustomerList
-                customersList={customers}
-                searchTerm={debouncedSearchTerm}
-                sortBy={sortBy}
-                openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
-                openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
-                openRemindModal={openRemindModal}
-                isProcessing={isProcessing}
-                setActiveModal={setActiveModal}
-                darkMode={darkMode}
-                sentReminders={sentReminders}
-              />
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       {/* FAB for Mobile Account Creation */}
       <button
         onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="md:hidden fixed bottom-24 right-6 w-12 h-12 bg-indigo-600 text-white rounded-xl shadow-[0_15px_30px_rgba(79,70,229,0.4)] flex items-center justify-center z-50 active:scale-90 transition-all border-2 border-white/10"
+        className="md:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
+        aria-label="Create new account"
       >
-        <UserPlus size={24} />
+        <UserPlus className="w-6 h-6" strokeWidth={2.5} />
       </button>
 
       {/* Modals Rendering */}

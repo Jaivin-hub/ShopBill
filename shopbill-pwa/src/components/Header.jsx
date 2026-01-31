@@ -20,7 +20,8 @@ const Header = ({
     currentOutlet,
     currentOutletId,
     onOutletSwitch,
-    showToast
+    showToast,
+    hasModalOpen = false
 }) => {
     const [showStoreHub, setShowStoreHub] = useState(false);
     const [outlets, setOutlets] = useState([]);
@@ -102,7 +103,10 @@ const Header = ({
 
     return (
         <>
-            <header className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] p-4 flex justify-between items-center backdrop-blur-md ${headerBg}`}>
+            <header className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] p-4 flex justify-between items-center backdrop-blur-md ${headerBg} ${hasModalOpen ? 'opacity-30 pointer-events-none' : ''} transition-opacity duration-300`}>
+                {hasModalOpen && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md -z-10" />
+                )}
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setCurrentPage('dashboard'); setShowStoreHub(false); }}>
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
                         <CreditCard className="w-5 h-5 text-white" />
@@ -211,7 +215,7 @@ const Header = ({
                 />
             )}
 
-            <style jsx="true">{`
+            <style dangerouslySetInnerHTML={{__html: `
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                 @keyframes slide-in-top {
@@ -219,7 +223,7 @@ const Header = ({
                     to { transform: translateY(0); opacity: 1; }
                 }
                 .animate-in { animation: slide-in-top 0.3s ease-out forwards; }
-            `}</style>
+            `}} />
         </>
     );
 };

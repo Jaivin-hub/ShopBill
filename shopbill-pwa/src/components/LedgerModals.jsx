@@ -216,61 +216,61 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
     const tabBtnBase = "flex-1 py-3 text-[10px] font-black tracking-[0.2em] transition-all duration-300 rounded-xl flex items-center justify-center gap-2";
 
     return (
-        <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-            <div className={`w-full max-w-lg rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+        <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+            <div className={`w-full max-w-lg max-h-[95vh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
                 
                 {/* Header: Title and Close */}
-                <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                            <History size={18} />
+                <div className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className="p-1.5 sm:p-2 bg-indigo-500/10 rounded-lg text-indigo-500 shrink-0">
+                            <History size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </div>
-                        <h2 className={`text-sm font-black tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <h2 className={`text-xs sm:text-sm font-black tracking-widest truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             Customer Activity
                         </h2>
                     </div>
-                    <button onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}>
-                        <X className="w-5 h-5" />
+                    <button onClick={onClose} className={`p-2 rounded-xl transition-colors shrink-0 ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}>
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                 </div>
 
-                {/* Account Summary (The "Livya / ₹1,000" section you wanted) */}
-                <div className="px-6 pt-6">
-                    <div className={`flex justify-between items-center p-5 rounded-2xl border mb-4 ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
-                        <div className="truncate pr-4">
-                            <p className={`text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account Holder</p>
-                            <p className={`text-lg font-black truncate tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {/* Account Summary */}
+                <div className="px-4 sm:px-6 pt-4 sm:pt-6 shrink-0">
+                    <div className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 p-4 sm:p-5 rounded-xl sm:rounded-2xl border mb-4 ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
+                        <div className="truncate sm:pr-4 min-w-0">
+                            <p className={`text-[8px] sm:text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account Holder</p>
+                            <p className={`text-base sm:text-lg font-black truncate tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {customer?.name}
                             </p>
                         </div>
-                        <div className="text-right whitespace-nowrap">
-                            <p className={`text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-rose-500/70' : 'text-rose-400'}`}>Balance Due</p>
-                            <p className={`text-xl font-black tracking-tighter ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        <div className="text-left sm:text-right whitespace-nowrap">
+                            <p className={`text-[8px] sm:text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-rose-500/70' : 'text-rose-400'}`}>Balance Due</p>
+                            <p className={`text-lg sm:text-xl font-black tracking-tighter ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
                                 ₹{customer?.outstandingCredit?.toLocaleString('en-IN')}
                             </p>
                         </div>
                     </div>
 
                     {/* Tab Switcher */}
-                    <div className={`flex p-1 rounded-2xl border mb-6 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-100 shadow-inner'}`}>
+                    <div className={`flex p-1 rounded-xl sm:rounded-2xl border mb-4 sm:mb-6 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-100 shadow-inner'}`}>
                         <button 
                             onClick={() => setActiveTab('ledger')}
                             className={`${tabBtnBase} ${activeTab === 'ledger' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <DollarSign size={14} /> FINANCIALS
+                            <DollarSign size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">FINANCIALS</span><span className="sm:hidden">FIN</span>
                         </button>
                         <button 
                             onClick={() => setActiveTab('reminders')}
                             className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <BellRing size={14} /> REMINDERS
+                            <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDERS</span><span className="sm:hidden">REM</span>
                         </button>
                     </div>
                 </div>
 
                 {/* Content Area */}
-                <div className="px-6 pb-6">
-                    <div className="h-72 overflow-y-auto pr-2 custom-ledger-scroll">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex-1 min-h-0 overflow-hidden">
+                    <div className="h-full max-h-[50vh] sm:max-h-[18rem] overflow-y-auto pr-2 custom-ledger-scroll">
                         {isLoading ? (
                             <div className="h-full flex flex-col items-center justify-center opacity-50">
                                 <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
@@ -284,15 +284,15 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                     const styles = getTypeStyles(t.type, darkMode);
                                     const isCredit = t.type === 'credit_sale' || t.type === 'initial_due';
                                     return (
-                                        <div key={t._id} className={`flex items-center p-4 mb-3 rounded-2xl border transition-all hover:translate-x-1 ${styles.color}`}>
-                                            <div className={`p-2 rounded-xl mr-4 ${darkMode ? 'bg-gray-900/50' : 'bg-white shadow-sm'}`}>{styles.icon}</div>
+                                        <div key={t._id} className={`flex items-center p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border transition-all hover:translate-x-1 ${styles.color}`}>
+                                            <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl mr-3 sm:mr-4 shrink-0 ${darkMode ? 'bg-gray-900/50' : 'bg-white shadow-sm'}`}>{styles.icon}</div>
                                             <div className="flex-grow min-w-0">
-                                                <p className={`font-black text-[10px] tracking-widest uppercase truncate ${darkMode ? 'text-white' : 'text-slate-800'}`}>{styles.label}</p>
-                                                <div className="flex items-center text-[9px] font-bold text-slate-400 mt-1 uppercase">
-                                                    <Calendar size={10} className="mr-1" /> {formatDate(t.timestamp)}
+                                                <p className={`font-black text-[9px] sm:text-[10px] tracking-widest uppercase truncate ${darkMode ? 'text-white' : 'text-slate-800'}`}>{styles.label}</p>
+                                                <div className="flex items-center text-[8px] sm:text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                                                    <Calendar size={9} className="sm:w-[10px] sm:h-[10px] mr-1" /> {formatDate(t.timestamp)}
                                                 </div>
                                             </div>
-                                            <div className={`font-black text-base shrink-0 ${isCredit ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                            <div className={`font-black text-sm sm:text-base shrink-0 whitespace-nowrap ml-2 ${isCredit ? 'text-rose-500' : 'text-emerald-500'}`}>
                                                 {isCredit ? '+' : '-'} ₹{t.amount?.toLocaleString('en-IN')}
                                             </div>
                                         </div>
@@ -304,19 +304,19 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                 <EmptyState message="No reminders sent yet" darkMode={darkMode} />
                             ) : (
                                 reminderEntries.map(t => (
-                                    <div key={t._id} className={`p-4 mb-3 rounded-2xl border animate-in slide-in-from-left-2 ${darkMode ? 'bg-amber-500/5 border-amber-500/10' : 'bg-amber-50 border-amber-100 shadow-sm shadow-amber-500/5'}`}>
-                                        <div className="flex justify-between items-start mb-2">
+                                    <div key={t._id} className={`p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border animate-in slide-in-from-left-2 ${darkMode ? 'bg-amber-500/5 border-amber-500/10' : 'bg-amber-50 border-amber-100 shadow-sm shadow-amber-500/5'}`}>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 mb-2">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-1.5 bg-amber-500 rounded-lg text-white">
-                                                    <MessageCircle size={12} />
+                                                <div className="p-1 sm:p-1.5 bg-amber-500 rounded-lg text-white shrink-0">
+                                                    <MessageCircle size={11} className="sm:w-3 sm:h-3" />
                                                 </div>
-                                                <p className={`text-[10px] font-black tracking-widest ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>MSG DISPATCHED</p>
+                                                <p className={`text-[9px] sm:text-[10px] font-black tracking-widest ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>MSG DISPATCHED</p>
                                             </div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter opacity-60">
+                                            <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-tighter opacity-60 whitespace-nowrap">
                                                 {formatDate(t.timestamp)}
                                             </p>
                                         </div>
-                                        <p className={`text-[11px] font-bold leading-relaxed mb-3 ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
+                                        <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
                                             {t.details?.includes('Reminder') ? t.details : "Standard payment reminder sent via system automation."}
                                         </p>
                                     </div>
@@ -327,8 +327,8 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                 </div>
 
                 {/* Footer Action */}
-                <div className={`p-6 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/30'}`}>
-                    <button onClick={onClose} className={`w-full py-4 rounded-2xl font-black tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-gray-800 hover:bg-gray-700 text-white shadow-lg shadow-black/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'}`}>
+                <div className={`p-4 sm:p-6 border-t shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/30'}`}>
+                    <button onClick={onClose} className={`w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-gray-800 hover:bg-gray-700 text-white shadow-lg shadow-black/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'}`}>
                         BACK TO LEDGER
                     </button>
                 </div>
