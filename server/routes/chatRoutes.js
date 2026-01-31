@@ -145,11 +145,13 @@ router.get('/chats', protect, async (req, res) => {
             }
         }
 
-        // Find all chats where user is a participant
+        // Find all chats where user is a participant - Optimized with lean and projections
         const chats = await Chat.find({ participants: req.user.id })
+            .select('type name participants outletId createdBy messages lastMessageAt lastReadBy isDefault')
             .populate('participants', 'name email role profileImageUrl')
             .populate('outletId', 'name')
             .populate('createdBy', 'name')
+            .lean()
             .sort({ lastMessageAt: -1 });
 
         // Enrich participants with Staff model data (name, outletName)

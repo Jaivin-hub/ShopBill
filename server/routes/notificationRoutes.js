@@ -120,6 +120,8 @@ router.get('/alerts', protect, async (req, res) => {
             ? { ownerId: req.user._id }
             : { storeId: req.user.storeId };
         const notifications = await Notification.find(filter)
+            .select('type category title message metadata storeId ownerId readBy createdAt')
+            .lean()
             .sort({ createdAt: -1 })
             .limit(30);
 

@@ -127,7 +127,7 @@ const InputField = ({ label, darkMode, ...props }) => (
     </div>
 );
 
-const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, darkMode }) => {
+const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode }) => {
     const [showVariants, setShowVariants] = useState(false);
     const hasVariants = item.variants && item.variants.length > 0;
     
@@ -425,7 +425,18 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
             )}
         </article>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison for React.memo - only re-render if relevant props change
+    return (
+        prevProps.item._id === nextProps.item._id &&
+        prevProps.item.quantity === nextProps.item.quantity &&
+        prevProps.item.price === nextProps.item.price &&
+        prevProps.item.reorderLevel === nextProps.item.reorderLevel &&
+        prevProps.loading === nextProps.loading &&
+        prevProps.darkMode === nextProps.darkMode &&
+        JSON.stringify(prevProps.item.variants || []) === JSON.stringify(nextProps.item.variants || [])
+    );
+});
 
 const InventoryContent = ({
     inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, darkMode
@@ -954,7 +965,18 @@ const InventoryContent = ({
                 </div>
             )}
 
-            <ScannerModal isOpen={isScannerModalOpen} inventory={inventory} onClose={closeScannerModal} onScanSuccess={handleScannedItemSuccess} onScanNotFound={handleScannedItemNotFound} darkMode={darkMode} />
+            <ScannerModal 
+                isOpen={isScannerModalOpen} 
+                inventory={inventory} 
+                onClose={closeScannerModal} 
+                onScanSuccess={handleScannedItemSuccess} 
+                onScanNotFound={handleScannedItemNotFound}
+                onScanError={(error) => {
+                    console.error('Scanner error:', error);
+                    closeScannerModal();
+                }}
+                darkMode={darkMode} 
+            />
             <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={loading} darkMode={darkMode} />
         </div>
     );

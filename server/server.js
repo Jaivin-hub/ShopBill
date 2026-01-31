@@ -29,12 +29,14 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
 // --- MIDDLEWARE ---
+const compression = require('compression');
+app.use(compression()); // Enable gzip compression for all responses
 app.use(cors({
     origin: true, 
     credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve uploaded files
 const path = require('path');

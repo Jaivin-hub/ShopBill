@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
+import { useDebounce } from '../hooks/useDebounce';
 
-const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
+const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
@@ -37,8 +38,11 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
   // --- Core POS Logic ---
   const totalAmount = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
 
+  // Debounce search term for better performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const filteredInventory = useMemo(() => {
-    const term = (scannedBarcode || searchTerm).toLowerCase().trim();
+    const term = (scannedBarcode || debouncedSearchTerm).toLowerCase().trim();
     // Filter items that have stock (either base quantity or variant quantities)
     const inStockItems = inventory.filter(item => {
       if (item.variants && item.variants.length > 0) {
@@ -53,7 +57,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
       (item.barcode && item.barcode.includes(term)) || 
       (item.hsn && item.hsn.includes(term))
     ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, searchTerm, scannedBarcode]);
+  }, [inventory, debouncedSearchTerm, scannedBarcode]);
 
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id)], [customers]);
 
@@ -466,8 +470,16 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         onClose={() => setIsCameraScannerOpen(false)}
         inventory={inventory}
         onScanSuccess={(item) => { setIsCameraScannerOpen(false); addItemToCart(item); }}
-        onScanNotFound={() => setIsCameraScannerOpen(false)}
-        onScanError={() => setIsCameraScannerOpen(false)}
+        onScanNotFound={(code) => { 
+          showToast(`Item "${code}" not found.`, 'error'); 
+          setIsCameraScannerOpen(false);
+        }}
+        onScanError={(error) => {
+          console.error('Scanner error:', error);
+          showToast(error || 'Camera access failed.', 'error');
+          setIsCameraScannerOpen(false);
+        }}
+        darkMode={darkMode}
       />
 
       {/* Variant Selector Modal */}
@@ -538,6 +550,6 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
       )}
     </div>
   );
-};
+});
 
 export default BillingPOS;

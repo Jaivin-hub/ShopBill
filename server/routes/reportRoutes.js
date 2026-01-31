@@ -73,12 +73,12 @@ router.get('/summary', protect, async (req, res) => {
         }
         const salesFilter = { ...dateFilter, storeId: req.user.storeId };
         
-        // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS (all scoped)
+        // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS (all scoped) - Optimized with lean and projections
         const [filteredSales, customers, inventoryItems, allTimeSales] = await Promise.all([
-            Sale.find(salesFilter),
-            Customer.find({ storeId: req.user.storeId }), // Scoped
-            Inventory.find({ storeId: req.user.storeId }), // Scoped
-            Sale.find({ storeId: req.user.storeId }), // Scoped for all-time stats
+            Sale.find(salesFilter).select('totalAmount timestamp items').lean(),
+            Customer.find({ storeId: req.user.storeId }).select('name outstandingCredit').lean(), // Scoped
+            Inventory.find({ storeId: req.user.storeId }).select('name price _id').lean(), // Scoped - only needed fields
+            Sale.find({ storeId: req.user.storeId }).select('totalAmount timestamp').lean(), // Scoped for all-time stats
         ]);
         
         // Create a quick lookup map for current inventory names and prices

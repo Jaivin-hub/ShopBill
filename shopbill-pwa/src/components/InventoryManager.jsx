@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react';
 import InventoryContent from './InventoryContent';
+import { useDebounce } from '../hooks/useDebounce';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
@@ -39,6 +40,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
     const [formData, setFormData] = useState(initialItemState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search by 300ms
     const [sortOption, setSortOption] = useState('default');
     const [showStickySearch, setShowStickySearch] = useState(false);
 
@@ -244,7 +246,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
 
     // --- Pattern-Optimized Memoized Filtering ---
     const sortedAndFilteredInventory = useMemo(() => {
-        const query = searchTerm.toLowerCase();
+        const query = debouncedSearchTerm.toLowerCase();
         return [...inventory]
             .filter(item =>
                 item.name.toLowerCase().includes(query) ||
@@ -260,7 +262,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
                 }
                 return a.name.localeCompare(b.name);
             });
-    }, [inventory, searchTerm, sortOption]);
+    }, [inventory, debouncedSearchTerm, sortOption]);
 
     // --- Render States ---
     if (!hasAccess) {

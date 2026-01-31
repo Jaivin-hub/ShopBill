@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
     IndianRupee, CreditCard, Users, Package,
     List, Loader2, TrendingUp, Clock, Activity,
@@ -21,10 +21,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
         try {
+            // Limit sales to last 100 for dashboard performance
             const [invResponse, custResponse, salesResponse] = await Promise.all([
                 apiClient.get(API.inventory),
                 apiClient.get(API.customers),
-                apiClient.get(API.sales),
+                apiClient.get(`${API.sales}?limit=100`), // Limit sales for dashboard
             ]);
 
             setInventory(invResponse.data || []);
@@ -361,4 +362,4 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     );
 };
 
-export default Dashboard;
+export default memo(Dashboard);

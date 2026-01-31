@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'; 
+import React, { useMemo, memo } from 'react'; 
 import { 
     IndianRupee, History, Phone, Search, 
     ShieldAlert, CheckCircle2, UserCircle2, BellRing,
@@ -200,4 +200,4 @@ const CustomerList = ({
     );
 };
 
-export default CustomerList;
+export default memo(CustomerList);

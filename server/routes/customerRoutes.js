@@ -11,15 +11,19 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 
 const router = express.Router();
 
-// --- GET ALL CUSTOMERS ---
+// --- GET ALL CUSTOMERS --- (Optimized with lean and projection)
 router.get('/', protect, async (req, res) => {
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
-        const customers = await Customer.find({ storeId: req.user.storeId });
+        const customers = await Customer.find({ storeId: req.user.storeId })
+            .select('name phone outstandingCredit creditLimit storeId createdAt updatedAt')
+            .lean()
+            .sort({ name: 1 });
         res.json(customers);
     } catch (error) {
+        console.error('Customer fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch customers.' });
     }
 });
@@ -36,7 +40,11 @@ router.get('/:id/history', protect, async (req, res) => {
         const transactions = await KhataTransaction.find({
             customerId: customerId,
             storeId: req.user.storeId
-        }).sort({ timestamp: -1 });
+        })
+        .select('amount type details timestamp createdAt')
+        .lean()
+        .sort({ timestamp: -1 })
+        .limit(100); // Limit to last 100 transactions for performance
 
         res.json(transactions);
     } catch (error) {

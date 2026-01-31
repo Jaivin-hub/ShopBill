@@ -725,7 +725,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       )}
 
       <div className="relative z-[150]">
-        <ScannerModal isOpen={isScannerModalOpen} onClose={() => setIsScannerModalOpen(false)} onScanSuccess={handleScanSuccess} inventory={inventory} darkMode={darkMode} />
+        <ScannerModal 
+            isOpen={isScannerModalOpen} 
+            onClose={() => setIsScannerModalOpen(false)} 
+            onScanSuccess={handleScanSuccess}
+            onScanNotFound={(code) => {
+                console.warn('Scanned item not found:', code);
+            }}
+            onScanError={(error) => {
+                console.error('Scanner error:', error);
+                setIsScannerModalOpen(false);
+            }}
+            inventory={inventory} 
+            darkMode={darkMode} 
+        />
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `

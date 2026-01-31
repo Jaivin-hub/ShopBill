@@ -25,10 +25,30 @@ router.get('/', protect, async (req, res) => {
     }
 
     try {
+        // Add pagination for large datasets
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+        
         const sales = await Sale.find(filter)
+            .select('totalAmount paymentMethod customerId timestamp amountPaid amountCredited items')
             .populate('customerId', 'name')
-            .sort({ timestamp: -1 });
-        res.json(sales);
+            .lean()
+            .sort({ timestamp: -1 })
+            .limit(limit)
+            .skip(skip);
+            
+        const total = await Sale.countDocuments(filter);
+        
+        res.json({
+            sales,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         console.error('Failed to fetch sales data:', error);
         res.status(500).json({ error: 'Failed to fetch sales data.' });

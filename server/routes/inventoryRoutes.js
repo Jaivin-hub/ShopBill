@@ -84,15 +84,20 @@ const checkAndNotifyLowStock = async (req, item) => {
     }
 };
 
-// 1. Get Inventory (Scoped to Shop)
+// 1. Get Inventory (Scoped to Shop) - Optimized with lean() and projection
 router.get('/', protect, async (req, res) => {
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
-        const inventory = await Inventory.find({ storeId: req.user.storeId });
+        // Use lean() for faster queries and select only needed fields
+        const inventory = await Inventory.find({ storeId: req.user.storeId })
+            .select('name price quantity reorderLevel hsn variants storeId createdAt updatedAt')
+            .lean()
+            .sort({ name: 1 }); // Sort by name for consistent ordering
         res.json(inventory);
     } catch (error) {
+        console.error('Inventory fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch inventory.' });
     }
 });

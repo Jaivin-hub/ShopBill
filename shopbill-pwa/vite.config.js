@@ -26,8 +26,12 @@ export default defineConfig({
         name: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software',
         short_name: 'Pocket POS',
         description: 'Pocket POS - The #1 retail management software for Indian shops. Lightning-fast billing, real-time inventory management, digital Khata ledger, GST billing, and business reports. Works offline, syncs to cloud.',
+        start_url: '/',
+        display: 'standalone',
         theme_color: '#34495e',
         background_color: '#1a1a1a',
+        lang: 'en',
+        scope: '/',
         icons: [
           {
             src: './pwa-192x192.png',

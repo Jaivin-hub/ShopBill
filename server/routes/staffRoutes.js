@@ -28,7 +28,10 @@ router.get('/', protect, async (req, res) => {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
-        const staffList = await Staff.find({ storeId: req.user.storeId }).sort({ role: -1, name: 1 });
+        const staffList = await Staff.find({ storeId: req.user.storeId })
+            .select('name email role phone active storeId userId')
+            .lean()
+            .sort({ role: -1, name: 1 });
         res.json(staffList);
     } catch (error) {
         console.error('Staff GET all error:', error.message);

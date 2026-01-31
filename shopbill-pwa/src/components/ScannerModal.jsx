@@ -124,7 +124,11 @@ const ScannerModal = ({
         })
         .catch(err => {
             setLookupStatus('notFound'); 
-            onScanError("Camera access failed."); 
+            if (onScanError && typeof onScanError === 'function') {
+                onScanError("Camera access failed."); 
+            } else {
+                console.error("Scanner error:", err);
+            }
         });
         return () => resetScannerState();
     }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus]); 

@@ -44,7 +44,10 @@ router.get('/suppliers', protect, async (req, res) => {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
-        const suppliers = await Supplier.find({ storeId: req.user.storeId }).sort({ createdAt: -1 });
+        const suppliers = await Supplier.find({ storeId: req.user.storeId })
+            .select('name contact phone email address storeId createdAt')
+            .lean()
+            .sort({ createdAt: -1 });
         res.json(suppliers);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch suppliers.' });
@@ -73,9 +76,12 @@ router.get('/purchases', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const history = await Purchase.find({ storeId: req.user.storeId })
+            .select('productId supplierId quantity price date notes storeId createdAt')
             .populate('productId', 'name')
             .populate('supplierId', 'name')
-            .sort({ date: -1, createdAt: -1 });
+            .lean()
+            .sort({ date: -1, createdAt: -1 })
+            .limit(100); // Limit to last 100 purchases for performance
         res.json(history);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch purchase history.' });

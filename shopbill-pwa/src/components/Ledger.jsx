@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   UserPlus, TrendingUp, Loader, Search, X,
   Wallet, Bell, ShieldCheck, Filter, ChevronRight,
@@ -42,6 +43,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search by 300ms
   const [sortBy, setSortBy] = useState('due-high');
   const [activeModal, setActiveModal] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -302,7 +304,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
             <div className="p-3 md:p-6">
               <CustomerList
                 customersList={customers}
-                searchTerm={searchTerm}
+                searchTerm={debouncedSearchTerm}
                 sortBy={sortBy}
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
@@ -377,4 +379,4 @@ const Ledger = ({ darkMode, apiClient, API, showToast }) => {
   );
 };
 
-export default Ledger;
+export default memo(Ledger);

@@ -22,8 +22,9 @@ router.get('/', protect, authorize('owner'), async (req, res) => {
         }
 
         const outlets = await Store.find({ ownerId: req.user.id, isActive: true })
-            .sort({ createdAt: -1 })
-            .select('-__v');
+            .select('name address phone email isActive createdAt')
+            .lean()
+            .sort({ createdAt: -1 });
 
         res.json({
             success: true,
