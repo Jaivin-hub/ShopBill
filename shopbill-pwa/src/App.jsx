@@ -679,7 +679,7 @@ const App = () => {
               <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                 <div 
-                  className={`fixed bottom-[72px] left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[calc(100vh-144px)] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  className={`fixed bottom-0 left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100vh] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
