@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
+const Store = require('../models/Store');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
 
@@ -63,7 +64,17 @@ router.post('/login', async (req, res) => {
             if (user.role !== 'superadmin') {
                 let ownerAccount = user;
                 if (user.role !== 'owner') {
-                    ownerAccount = await User.findById(user.shopId);
+                    // For staff members (Manager/Cashier), find the owner through the Store
+                    if (user.activeStoreId) {
+                        const store = await Store.findById(user.activeStoreId);
+                        if (store && store.ownerId) {
+                            ownerAccount = await User.findById(store.ownerId);
+                        }
+                    }
+                    // Fallback: if no store found, try to find owner by shopId (for backward compatibility)
+                    if (!ownerAccount && user.shopId) {
+                        ownerAccount = await User.findById(user.shopId);
+                    }
                 }
 
                 if (!ownerAccount) {
@@ -92,14 +103,29 @@ router.post('/login', async (req, res) => {
             }
             // --- END SUBSCRIPTION VALIDATION ---
 
-            const token = generateToken(user._id, user.shopId, user.role);
+            // For token generation, use owner's ID as shopId for staff members
+            let tokenShopId = user.shopId;
+            if (user.role !== 'owner' && user.role !== 'superadmin') {
+                // For staff, use owner's ID as shopId
+                if (ownerAccount && ownerAccount._id) {
+                    tokenShopId = ownerAccount._id;
+                } else if (user.activeStoreId) {
+                    // Fallback: get owner from store
+                    const store = await Store.findById(user.activeStoreId);
+                    if (store && store.ownerId) {
+                        tokenShopId = store.ownerId;
+                    }
+                }
+            }
+
+            const token = generateToken(user._id, tokenShopId || user._id, user.role);
             res.json({
                 token,
                 user: {
                     id: user._id,
                     email: user.email,
                     role: user.role,
-                    shopId: user.shopId,
+                    shopId: tokenShopId || user._id,
                     phone: user.phone,
                     plan: user.plan
                 }

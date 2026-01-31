@@ -9,6 +9,14 @@ const UserSchema = new mongoose.Schema({
 
     role: { type: String, enum: ['superadmin', 'owner', 'Manager', 'Cashier'], required: true },
 
+    // Reference to the owner User account (for staff members) or self (for owners)
+    // This is used for subscription validation and token generation
+    shopId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+
     // NEW: Reference to the store the user is currently managing/working in.
     // This is vital for Staff (Managers/Cashiers) who are restricted to one store.
     activeStoreId: {

@@ -108,13 +108,17 @@ router.post('/', protect, async (req, res) => {
         }
         
         // --- 2. Create the User Login Record ---
+        // Get the owner's ID (req.user.id is the owner who is creating the staff)
+        const ownerId = req.user.id;
+        
         const newUser = await User.create({
             email,
             phone: phone || null,
             role, 
             shopName: `staff-temp-${req.user.storeId}-${email}`,
             isActive: true,
-            activeStoreId: req.user.storeId
+            activeStoreId: req.user.storeId,
+            shopId: ownerId // Set shopId to owner's ID for token generation and owner lookup
         });
 
         // --- 3. Create the Staff record ---
