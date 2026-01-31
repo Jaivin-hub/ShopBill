@@ -738,9 +738,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             font-size: inherit !important;
           }
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: ${darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 10px; }
         
         input[type="date"]::-webkit-calendar-picker-indicator { 
           background: transparent;

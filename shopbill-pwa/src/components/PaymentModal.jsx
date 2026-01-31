@@ -284,7 +284,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                     </button>
 
                                     {/* Customer List */}
-                                    <div className="max-h-60 overflow-y-auto py-1">
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar py-1">
                                         {filteredOptions.length > 0 ? (
                                             filteredOptions.map(c => (
                                                 <button 

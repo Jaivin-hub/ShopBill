@@ -467,7 +467,7 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
     ];
 
     return (
-        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/WebPage">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto custom-scrollbar" itemScope itemType="https://schema.org/WebPage">
             {/* Header */}
             <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
@@ -498,7 +498,7 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     return (

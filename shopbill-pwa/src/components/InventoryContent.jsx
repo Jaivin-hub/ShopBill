@@ -9,9 +9,6 @@ import ScannerModal from './ScannerModal';
 const ScrollbarStyles = ({ darkMode }) => (
     <style dangerouslySetInnerHTML={{
         __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: ${darkMode ? 'rgba(15, 23, 42, 0.5)' : '#f1f5f9'}; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
         /* Prevent Auto-Zoom on iOS while maintaining design scale */

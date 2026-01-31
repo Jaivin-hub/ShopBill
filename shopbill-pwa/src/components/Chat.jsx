@@ -597,14 +597,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             />
 
             <style dangerouslySetInnerHTML={{
-                __html: `
-                    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-                    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                    .custom-scrollbar::-webkit-scrollbar-thumb { 
-                        background: ${darkMode ? '#1e293b' : '#cbd5e1'}; 
-                        border-radius: 10px; 
-                    }
-                `
+                __html: ``
             }} />
         </div>
     );

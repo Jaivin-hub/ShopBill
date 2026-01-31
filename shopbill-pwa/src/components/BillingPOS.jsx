@@ -247,6 +247,9 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .product-grid-scroll { max-height: 450px; overflow-y: auto; }
+        .product-grid-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+        .product-grid-scroll::-webkit-scrollbar-track { background: transparent; }
+        .product-grid-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .no-zoom-input { font-size: 16px !important; }
         @media (max-width: 768px) {
           .no-zoom-input { transform: scale(0.8); transform-origin: left center; width: 125% !important; }
@@ -492,7 +495,7 @@ const BillingPOS = ({ darkMode, apiClient, API, showToast }) => {
               </button>
             </div>
 
-            <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+            <div className="p-4 md:p-6 overflow-y-auto custom-scroll flex-1 min-h-0">
               <div className="space-y-2">
                 {variantSelectorItem.variants
                   .filter(v => (v.quantity || 0) > 0)

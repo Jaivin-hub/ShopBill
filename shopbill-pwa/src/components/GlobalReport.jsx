@@ -247,7 +247,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     const maxRevenue = Math.max(...chartData.map(d => d.revenue));
     
     return (
-        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/Report">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto custom-scrollbar" itemScope itemType="https://schema.org/Report">
             {/* Header */}
             <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
@@ -385,7 +385,7 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                    <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
                         {chartData.map((item, index) => {
                             const percentage = (item.revenue / maxRevenue) * 100;
                             return (

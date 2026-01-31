@@ -641,7 +641,7 @@ const App = () => {
               </div>
             </aside>
           )}
-          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto')) : 'w-full overflow-y-auto'}`}>
+          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
             <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : (currentPage === 'chat' ? 'h-full' : 'max-w-7xl mx-auto min-h-full')} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
               {renderContent()}
             </div>
@@ -679,7 +679,7 @@ const App = () => {
               <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                 <div 
-                  className={`fixed bottom-[72px] left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[calc(100vh-144px)] overflow-y-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  className={`fixed bottom-[72px] left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[calc(100vh-144px)] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>

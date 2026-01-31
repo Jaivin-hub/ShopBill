@@ -119,7 +119,7 @@ const OutletSelector = ({ apiClient, currentUser, currentOutletId, onOutletSwitc
                         onClick={() => setIsOpen(false)}
                         aria-hidden="true"
                     />
-                    <div className="absolute top-full left-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50 max-h-96 overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50 max-h-96 overflow-y-auto custom-scrollbar">
                         <div className="p-2">
                             {outlets.length === 0 ? (
                                 <div className="p-4 text-center text-gray-400">

@@ -100,7 +100,7 @@ export const AddCustomerModal = ({
   if (!data) return null;
 
   return (
-    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
       <form onSubmit={onConfirm} className={`w-full max-w-md rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 my-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
         <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
           <h2 className={`text-sm font-black tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>

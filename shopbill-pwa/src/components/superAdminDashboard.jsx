@@ -174,7 +174,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
     }
 
     return (
-        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto" itemScope itemType="https://schema.org/Dashboard">
+        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto custom-scrollbar" itemScope itemType="https://schema.org/Dashboard">
             {/* Header */}
             <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
@@ -371,7 +371,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser }) => {
                         <Activity className="w-5 h-5 text-indigo-400" />
                         Recent Activity
                     </h2>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
                         {dashboardData.recentActivity.map((activity, index) => {
                             const getActivityIcon = () => {
                                 // Use dynamic status color if available

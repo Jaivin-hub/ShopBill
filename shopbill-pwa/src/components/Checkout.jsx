@@ -291,7 +291,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                         <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3 text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
-                                        <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
+                                        <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
                                             <input type="text" placeholder="Search country..." className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white mb-2 outline-none focus:border-indigo-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                                             {filteredCodes.map(c => (
                                                 <div key={c.code} onClick={() => handleSelectCountry(c.code)} className="flex justify-between p-2 hover:bg-indigo-600 rounded-lg cursor-pointer text-xs font-bold text-gray-200">
