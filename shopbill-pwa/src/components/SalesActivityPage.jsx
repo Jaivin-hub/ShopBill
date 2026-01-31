@@ -259,7 +259,9 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                     params.append('endDate', end.toISOString());
                 }
                 const response = await apiClient.get(`${API.sales}?${params.toString()}`);
-                setSales(Array.isArray(response.data) ? response.data : []);
+                // Handle paginated response structure - sales API returns { sales: [...], pagination: {...} }
+                const salesData = response.data;
+                setSales(Array.isArray(salesData) ? salesData : (salesData?.sales || []));
             } catch (error) {
                 showToast?.('Sync failed', 'error');
             } finally {

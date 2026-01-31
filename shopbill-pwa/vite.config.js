@@ -53,8 +53,8 @@ export default defineConfig({
       },
       
       workbox: {
-        // Force the new service worker to activate immediately
-        skipWaiting: true,
+        // Don't skip waiting - let the user confirm the update first
+        // skipWaiting: false, // Default is false, so we can omit it
         clientsClaim: true,
         
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],

@@ -46,24 +46,27 @@ const Chat = lazy(() => import('./components/Chat'));
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
   const [registration, setRegistration] = useState(null);
+  const updateHandlerRef = useRef(null);
+  const pendingVersionRef = useRef(null);
 
   useEffect(() => {
-    // 1. Prevent showing if we just updated in this session
-    if (sessionStorage.getItem('pwa_updated_this_session')) return;
+    const onUpdate = async (e) => {
+      // onNeedRefresh is only called when there's actually a new version
+      const updateHandler = e.detail?.updateHandler;
+      if (!updateHandler) return;
 
-    const onUpdate = (e) => {
-      // The event detail should contain the service worker registration
-      setRegistration(e.detail?.registration || null);
-      setShow(true);
-    };
-
-    const checkUpdate = async () => {
+      // Get the service worker registration to check for waiting worker
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          reg.update();
-          // If there is already a waiting worker, show prompt
-          if (reg.waiting) {
+        if (reg && reg.waiting) {
+          // Generate a unique identifier for this version using the waiting worker's script URL and install time
+          const versionId = `${reg.waiting.scriptURL}-${Date.now()}`;
+          const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
+          
+          // Only show if this version hasn't been dismissed yet
+          if (versionId !== lastDismissedVersion) {
+            pendingVersionRef.current = versionId;
+            updateHandlerRef.current = updateHandler;
             setRegistration(reg);
             setShow(true);
           }
@@ -71,31 +74,51 @@ const UpdatePrompt = () => {
       }
     };
 
+    // Only listen for the update event (which fires when onNeedRefresh is called)
+    // This event is ONLY triggered when a new service worker is detected
     window.addEventListener('pwa-update-available', onUpdate);
-    checkUpdate();
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkUpdate();
+    // Check once on mount if there's already a waiting worker (user might have refreshed before clicking update)
+    const checkWaitingWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg && reg.waiting) {
+          // Generate version ID for the waiting worker
+          const versionId = `${reg.waiting.scriptURL}-${Date.now()}`;
+          const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
+          
+          // Only show if this version hasn't been dismissed
+          if (versionId !== lastDismissedVersion) {
+            pendingVersionRef.current = versionId;
+            setRegistration(reg);
+            setShow(true);
+          }
+        }
       }
     };
-    window.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Small delay to ensure service worker is registered
+    setTimeout(checkWaitingWorker, 1000);
 
     return () => {
       window.removeEventListener('pwa-update-available', onUpdate);
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
   const handleUpdate = () => {
     if (registration && registration.waiting) {
-      // 2. Tell the waiting worker to skipWaiting
+      // Mark this version as updated (so we don't show again)
+      if (pendingVersionRef.current) {
+        localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
+      }
+      
+      // Tell the waiting worker to skipWaiting
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
       
-      // 3. Mark as updated to prevent immediate re-prompt
-      sessionStorage.setItem('pwa_updated_this_session', 'true');
+      // Hide the prompt immediately
+      setShow(false);
       
-      // 4. Reload after the new worker takes control
+      // Reload after the new worker takes control
       registration.waiting.addEventListener('statechange', (e) => {
         if (e.target.state === 'activated') {
           window.location.reload();
@@ -103,10 +126,25 @@ const UpdatePrompt = () => {
       });
       
       // Fallback reload if statechange doesn't fire fast enough
-      setTimeout(() => window.location.reload(), 1000);
-    } else {
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else if (updateHandlerRef.current) {
+      // Use the update handler if available
+      updateHandlerRef.current();
+      if (pendingVersionRef.current) {
+        localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
+      }
+      setShow(false);
     }
+  };
+
+  const handleDismiss = () => {
+    // Mark this version as dismissed (so we don't show again for this version)
+    if (pendingVersionRef.current) {
+      localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
+    }
+    setShow(false);
   };
 
   if (!show) return null;
@@ -120,12 +158,20 @@ const UpdatePrompt = () => {
           </div>
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
-          <button
-            onClick={handleUpdate}
-            className="w-full mt-6 bg-white text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
-          >
-            Update & Reload Now
-          </button>
+          <div className="flex gap-2 w-full mt-6">
+            <button
+              onClick={handleDismiss}
+              className="flex-1 py-3 bg-indigo-700/50 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
+            >
+              Later
+            </button>
+            <button
+              onClick={handleUpdate}
+              className="flex-1 py-3 bg-white text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
+            >
+              Update Now
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -383,25 +429,39 @@ const App = () => {
     const userPlan = currentUser?.plan?.toUpperCase();
     const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
-      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
-      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 1 },
-      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 1 },
-      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
-      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 }] : []),
-      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER], priority: 2 },
-      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 }] : []),
+      { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: 1, manager: 1, cashier: null } },
+      { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
+      { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
+      { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
+      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: null, cashier: null } }] : []),
+      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER], displayOrder: { owner: 4, manager: null, cashier: null } },
+      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 3, manager: null, cashier: null } }] : []),
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole, isPremium, currentUser]);
 
-  // Split nav items into primary (footer) and secondary (more menu)
+  // Split nav items into primary (footer) and secondary (more menu) based on role
   const { primaryNavItems, secondaryNavItems } = useMemo(() => {
     const filtered = navItems.filter(item => item.roles.includes(userRole));
-    // Primary items: Dashboard, Billing, Ledger, Inventory (max 4)
-    const primary = filtered.filter(item => item.priority === 1).slice(0, 4);
-    // Secondary items: Everything else (Reports, Supply Chain, Messages, etc.)
+    
+    // Define role-specific primary menu items (displayed first)
+    const rolePrimaryMenuIds = {
+      [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
+      [USER_ROLES.MANAGER]: ['dashboard', 'billing', 'inventory', 'scm'], // Dashboard, Billing, Inventory, Supply Chain
+      [USER_ROLES.CASHIER]: ['billing', 'khata'], // Billing, Ledger
+    };
+    
+    const primaryMenuIds = rolePrimaryMenuIds[userRole] || [];
+    
+    // Get primary items in the specified order
+    const primary = primaryMenuIds
+      .map(id => filtered.find(item => item.id === id))
+      .filter(Boolean); // Remove undefined items (e.g., if chat is not available)
+    
+    // Secondary items: Everything else
     const primaryIds = primary.map(item => item.id);
     const secondary = filtered.filter(item => !primaryIds.includes(item.id));
+    
     return { primaryNavItems: primary, secondaryNavItems: secondary };
   }, [navItems, userRole]);
 
@@ -601,12 +661,24 @@ const App = () => {
 
               <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto pt-4 sidebar-scroll">
                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Main Menu</p>
-                {navItems.map(item => (
+                {/* Primary menu items (shown first) */}
+                {primaryNavItems.map(item => (
                   <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
                     <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
                     <span className="text-sm font-bold tracking-tight">{item.name}</span>
                   </button>
                 ))}
+                {/* Secondary menu items (shown after primary, if any) */}
+                {secondaryNavItems.length > 0 && (
+                  <>
+                    {secondaryNavItems.map(item => (
+                      <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
+                        <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
+                        <span className="text-sm font-bold tracking-tight">{item.name}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
                 <div className={`pt-6 mt-6 border-t space-y-1.5 ${darkMode ? 'border-gray-900' : 'border-slate-100'}`}>
                   <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account</p>
                   {utilityNavItems.map(item => (
