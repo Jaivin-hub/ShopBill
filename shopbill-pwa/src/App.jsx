@@ -715,7 +715,7 @@ const App = () => {
                 <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
               </div>
 
-              {isPremium && (
+              {isPremium && userRole === USER_ROLES.OWNER && (
                 <div className="px-4 mb-4">
                   <OutletSelector
                     apiClient={apiClient}
