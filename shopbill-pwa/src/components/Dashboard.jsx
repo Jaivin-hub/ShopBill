@@ -30,7 +30,9 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
             setInventory(invResponse.data || []);
             setCustomers(custResponse.data || []);
-            setSales(salesResponse.data || []);
+            // Handle paginated response structure - sales API returns { sales: [...], pagination: {...} }
+            const salesData = salesResponse.data;
+            setSales(Array.isArray(salesData) ? salesData : (salesData?.sales || []));
 
         } catch (error) {
             const errorData = error.response?.data;
@@ -51,9 +53,10 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
     // --- Optimized Data Calculations ---
     const today = useMemo(() => {
+        if (!Array.isArray(sales)) return { totalSales: 0, totalCredit: 0 };
         const start = new Date();
         start.setHours(0, 0, 0, 0);
-        const todaySales = sales.filter(s => new Date(s.timestamp) > start);
+        const todaySales = sales.filter(s => s && new Date(s.timestamp) > start);
         return {
             totalSales: todaySales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0),
             totalCredit: todaySales.reduce((sum, sale) => sum + (sale.amountCredited || 0), 0)
