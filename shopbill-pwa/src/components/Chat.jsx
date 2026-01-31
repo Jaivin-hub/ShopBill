@@ -768,15 +768,32 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
     };
 
-    const toggleAudio = (messageId) => {
+    const toggleAudio = (messageId, audioSrc) => {
         const audio = audioRefs.current[messageId];
-        if (!audio) return;
+        if (!audio) {
+            console.error('[toggleAudio] Audio element not found for message:', messageId);
+            return;
+        }
+        
+        // Ensure audio source is set
+        if (audioSrc && audio.src !== audioSrc) {
+            audio.src = audioSrc;
+        }
+        
         if (playingAudioId === messageId) {
             audio.pause();
             setPlayingAudioId(null);
         } else {
-            if (playingAudioId && audioRefs.current[playingAudioId]) audioRefs.current[playingAudioId].pause();
-            audio.play();
+            // Pause any currently playing audio
+            if (playingAudioId && audioRefs.current[playingAudioId]) {
+                audioRefs.current[playingAudioId].pause();
+            }
+            
+            // Play the selected audio
+            audio.play().catch(error => {
+                console.error('[toggleAudio] Error playing audio:', error);
+                showToast('Failed to play audio. Please check the file URL.', 'error');
+            });
             setPlayingAudioId(messageId);
         }
     };

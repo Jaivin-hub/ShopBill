@@ -19,10 +19,12 @@ const MessageBubble = ({
         if (msg.audioUrl.startsWith('http') || msg.audioUrl.startsWith('blob:')) {
             audioSrc = msg.audioUrl;
         } else {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            audioSrc = msg.audioUrl.startsWith('/api/') ? `${baseUrl}${msg.audioUrl}` : 
-                       msg.audioUrl.startsWith('/uploads/') ? `${baseUrl}/api${msg.audioUrl}` : 
-                       `${baseUrl}/api/uploads/audio/${msg.audioUrl}`;
+            // Server serves files at /uploads/audio, not /api/uploads/audio
+            // So we need to remove /api from the base URL for file access
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
+            const serverBaseUrl = baseUrl.replace('/api', ''); // Remove /api to get server base
+            audioSrc = msg.audioUrl.startsWith('/uploads/') ? `${serverBaseUrl}${msg.audioUrl}` : 
+                       `${serverBaseUrl}/uploads/audio/${msg.audioUrl}`;
         }
     }
 
@@ -32,10 +34,12 @@ const MessageBubble = ({
         if (msg.fileUrl.startsWith('http') || msg.fileUrl.startsWith('blob:')) {
             fileSrc = msg.fileUrl;
         } else {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            fileSrc = msg.fileUrl.startsWith('/api/') ? `${baseUrl}${msg.fileUrl}` : 
-                      msg.fileUrl.startsWith('/uploads/') ? `${baseUrl}/api${msg.fileUrl}` : 
-                      `${baseUrl}/api/uploads/files/${msg.fileUrl}`;
+            // Server serves files at /uploads/files, not /api/uploads/files
+            // So we need to remove /api from the base URL for file access
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
+            const serverBaseUrl = baseUrl.replace('/api', ''); // Remove /api to get server base
+            fileSrc = msg.fileUrl.startsWith('/uploads/') ? `${serverBaseUrl}${msg.fileUrl}` : 
+                      `${serverBaseUrl}/uploads/files/${msg.fileUrl}`;
         }
     }
 
