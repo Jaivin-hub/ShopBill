@@ -502,9 +502,9 @@ const InventoryContent = ({
         };
         setFormData(prev => ({
             ...prev,
-            variants: [...(prev.variants || []), newVariant]
+            variants: [newVariant, ...(prev.variants || [])]
         }));
-        setEditingVariantIndex((formData.variants || []).length);
+        setEditingVariantIndex(0);
     };
 
     const updateVariant = (index, field, value) => {
