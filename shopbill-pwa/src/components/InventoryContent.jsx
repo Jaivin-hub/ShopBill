@@ -214,13 +214,13 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                     
                     {/* Stats Row: Compact Grid */}
                     <div className={`grid gap-2 ${hasVariants ? 'grid-cols-3' : 'grid-cols-3'}`}>
-                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                             <p className={`text-sm font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                 {totalQuantity}
                             </p>
                         </div>
-                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
                             {hasVariants ? (
                                 <p className={`text-[10px] font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -232,7 +232,7 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                                 </p>
                             )}
                         </div>
-                        <div className="text-center p-2 rounded-lg bg-slate-950/30">
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                             {hasVariants && priceRange ? (
                                 <p className="text-sm font-black text-emerald-500 tabular-nums">
@@ -367,19 +367,19 @@ const InventoryListCard = ({ item, handleEditClick, handleDeleteClick, loading, 
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
-                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                                                 <p className={`text-xs font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                                     {variant.quantity || 0}
                                                 </p>
                                             </div>
-                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
                                                 <p className={`text-xs font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                     {variantReorderLevel}
                                                 </p>
                                             </div>
-                                            <div className="text-center p-1.5 rounded bg-slate-950/30">
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                                                 <p className="text-xs font-black text-emerald-500 tabular-nums">
                                                     ₹{variant.price?.toLocaleString() || '0'}
