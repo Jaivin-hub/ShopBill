@@ -278,14 +278,42 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                                 ? 'text-slate-500 group-hover:text-slate-400'
                                                 : 'text-slate-600 group-hover:text-slate-700'
                                     }`}>
-                                        {lastMsg ? (
-                                            <>
-                                                <span className="font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 uppercase">
-                                                    {(lastMsg.senderId?._id === currentUser._id || lastMsg.senderId === currentUser._id) ? 'YOU:' : 'INCOMING:'}
-                                                </span>
-                                                {lastMsg.content}
-                                            </>
-                                        ) : (
+                                        {lastMsg ? (() => {
+                                            // Determine if message is from current user
+                                            let senderId = null;
+                                            if (lastMsg.senderId) {
+                                                if (typeof lastMsg.senderId === 'object' && lastMsg.senderId !== null) {
+                                                    senderId = lastMsg.senderId._id || lastMsg.senderId.id;
+                                                } else {
+                                                    senderId = lastMsg.senderId;
+                                                }
+                                            }
+                                            const currentUserId = currentUser?._id || currentUser?.id;
+                                            const isOwn = Boolean(senderId && currentUserId && String(senderId) === String(currentUserId));
+                                            
+                                            // Determine message preview text
+                                            let previewText = '';
+                                            if (lastMsg.messageType === 'audio' || lastMsg.audioUrl) {
+                                                previewText = 'Voice note';
+                                            } else if (lastMsg.messageType === 'file' || lastMsg.fileUrl) {
+                                                if (lastMsg.fileType?.startsWith('image/')) {
+                                                    previewText = 'Image';
+                                                } else {
+                                                    previewText = lastMsg.fileName || 'File';
+                                                }
+                                            } else {
+                                                previewText = lastMsg.content || '';
+                                            }
+                                            
+                                            return (
+                                                <>
+                                                    <span className="font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 uppercase">
+                                                        {isOwn ? 'YOU:' : (lastMsg.senderName ? `${lastMsg.senderName.toUpperCase()}:` : 'INCOMING:')}
+                                                    </span>
+                                                    {previewText}
+                                                </>
+                                            );
+                                        })() : (
                                             <span className="text-[9px] uppercase tracking-widest opacity-20 italic">Awaiting Signal</span>
                                         )}
                                     </p>

@@ -596,11 +596,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
-                
-                // Refresh messages to ensure we have the latest with all fields
-                if (selectedChat) {
-                    setTimeout(() => fetchMessages(selectedChat._id), 300);
-                }
             }
         } catch (error) {
             console.error('File upload error:', error);
@@ -694,11 +689,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
-                
-                // Refresh messages to ensure we have the latest with all fields
-                if (selectedChat) {
-                    setTimeout(() => fetchMessages(selectedChat._id), 300);
-                }
             } else {
                 throw new Error('Server returned unsuccessful response');
             }
