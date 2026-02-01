@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, Play, Pause, Store, File, Download, Image as ImageIcon } from 'lucide-react';
+import { Mic, Play, Pause, File, Download, Image as ImageIcon } from 'lucide-react';
 
 const MessageBubble = ({
     msg,
@@ -56,16 +56,17 @@ const MessageBubble = ({
             {/* SENDER LABEL: Only show for other members */}
             {!isOwn && (
                 <div className="flex items-center gap-1.5 mb-1 px-1">
+                    {msg.senderName && (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {msg.senderName}
+                        </span>
+                    )}
+                    {msg.senderName && msg.senderRole && (
+                        <span className="text-[10px] opacity-50">•</span>
+                    )}
                     <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
                         {msg.senderRole || 'Staff'}
                     </span>
-                    {msg.senderStoreName && (
-                        <div className="flex items-center gap-1 opacity-50">
-                            <span className="text-[10px]">•</span>
-                            <Store size={10} />
-                            <span className="text-[9px] font-bold uppercase">{msg.senderStoreName}</span>
-                        </div>
-                    )}
                 </div>
             )}
 

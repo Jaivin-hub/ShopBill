@@ -645,13 +645,19 @@ router.post('/:chatId/message', protect, (req, res, next) => {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Get store name for the sender
+        // Get store name and sender name for the sender
         let senderStoreName = null;
+        let senderName = user.name || user.email;
+        
         if (user.role === 'Manager' || user.role === 'Cashier') {
-            // For staff, get their assigned store
+            // For staff, get their assigned store and name from Staff model
             const staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
-            if (staffRecord && staffRecord.storeId) {
-                senderStoreName = staffRecord.storeId.name;
+            if (staffRecord) {
+                // Use staff name from Staff model (preferred over User model)
+                senderName = staffRecord.name || user.name || user.email;
+                if (staffRecord.storeId) {
+                    senderStoreName = staffRecord.storeId.name;
+                }
             }
         } else if (user.role === 'owner') {
             // For owner, check if chat is for a specific outlet or all outlets
@@ -676,7 +682,7 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         
         const message = {
             senderId: req.user.id,
-            senderName: user.name || user.email,
+            senderName: senderName,
             senderRole: user.role,
             senderStoreName: senderStoreName,
             content: content?.trim() || '',
@@ -717,11 +723,11 @@ router.post('/:chatId/message', protect, (req, res, next) => {
             _id: savedMessageObj._id,
             senderId: {
                 _id: user._id,
-                name: user.name || user.email,
+                name: senderName, // Use the same senderName we calculated (from Staff model for staff)
                 role: user.role,
                 profileImageUrl: user.profileImageUrl
             },
-            senderName: savedMessageObj.senderName,
+            senderName: savedMessageObj.senderName, // This already has the correct name from Staff model
             senderRole: savedMessageObj.senderRole,
             senderStoreName: savedMessageObj.senderStoreName || null,
             content: savedMessageObj.content || '',
