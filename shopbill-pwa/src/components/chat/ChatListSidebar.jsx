@@ -308,7 +308,11 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                             return (
                                                 <>
                                                     <span className="font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 uppercase">
-                                                        {isOwn ? 'YOU:' : (lastMsg.senderName ? `${lastMsg.senderName.toUpperCase()}:` : 'INCOMING:')}
+                                                        {isOwn ? 'YOU:' : (
+                                                            lastMsg.senderRole?.toLowerCase() === 'owner' 
+                                                                ? `${lastMsg.senderRole.toUpperCase()}:` 
+                                                                : (lastMsg.senderName ? `${lastMsg.senderName.toUpperCase()}:` : 'INCOMING:')
+                                                        )}
                                                     </span>
                                                     {previewText}
                                                 </>

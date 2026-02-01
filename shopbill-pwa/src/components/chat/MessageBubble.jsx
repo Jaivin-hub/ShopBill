@@ -57,17 +57,26 @@ const MessageBubble = ({
             {/* SENDER LABEL: Only show for other members and when showSenderInfo is true */}
             {!isOwn && showSenderInfo && (
                 <div className="flex items-center gap-1.5 mb-1 px-1">
-                    {msg.senderName && (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {msg.senderName}
+                    {/* For owner, only show role label. For staff, show name and role */}
+                    {msg.senderRole?.toLowerCase() === 'owner' ? (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+                            {msg.senderRole}
                         </span>
+                    ) : (
+                        <>
+                            {msg.senderName && (
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    {msg.senderName}
+                                </span>
+                            )}
+                            {msg.senderName && msg.senderRole && (
+                                <span className="text-[10px] opacity-50">•</span>
+                            )}
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+                                {msg.senderRole || 'Staff'}
+                            </span>
+                        </>
                     )}
-                    {msg.senderName && msg.senderRole && (
-                        <span className="text-[10px] opacity-50">•</span>
-                    )}
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                        {msg.senderRole || 'Staff'}
-                    </span>
                 </div>
             )}
 

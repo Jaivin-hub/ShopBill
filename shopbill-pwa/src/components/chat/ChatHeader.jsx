@@ -14,7 +14,9 @@ const ChatHeader = ({
     darkMode,
     showInfo: externalShowInfo,
     onShowInfoChange,
-    currentUser
+    currentUser,
+    staffList = [],
+    onNavigateToStaffPermissions
 }) => {
     const [internalShowInfo, setInternalShowInfo] = useState(false);
     const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
@@ -23,6 +25,40 @@ const ChatHeader = ({
     const participants = selectedChat?.participants || [];
     const isGroup = selectedChat?.type === 'group' || selectedChat?.isDefault;
     const displayName = getChatDisplayName(selectedChat);
+    
+    // Check if user is owner
+    const isOwner = currentUser?.role?.toLowerCase() === 'owner';
+    
+    // Count all participants in the group (total members)
+    const memberCount = participants.length;
+    
+    // Get outlet ID from selected chat
+    const chatOutletId = selectedChat?.outletId?._id || selectedChat?.outletId;
+    
+    // Check if outlet has any staff (excluding owner)
+    // staffList contains users with outletId field (can be object with _id or string)
+    const outletHasStaff = chatOutletId && staffList.some(staff => {
+        const staffOutletId = staff.outletId?._id || staff.outletId;
+        const staffRole = staff.role?.toLowerCase();
+        // Check if staff belongs to this outlet and is not an owner
+        return staffOutletId && 
+               String(staffOutletId) === String(chatOutletId) && 
+               staffRole !== 'owner';
+    });
+    
+    // Handle Add Staff button click
+    // For outlet groups, always redirect to staff permissions page to add new staff
+    const handleAddStaff = () => {
+        setShowInfo(false);
+        // Check if this is an outlet group (has outletId)
+        if (chatOutletId && onNavigateToStaffPermissions) {
+            // For outlet groups, navigate to staff permissions page
+            onNavigateToStaffPermissions();
+        } else if (onAddMember) {
+            // For non-outlet groups, use the existing add member functionality
+            onAddMember();
+        }
+    };
 
     // Theme Colors
     const drawerBg = darkMode ? 'bg-slate-950' : 'bg-white';
@@ -65,7 +101,11 @@ const ChatHeader = ({
                         <div className="flex items-center gap-2">
                             <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
                             <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">
-                                {isGroup ? `${participants.length} STAFF CONNECTED` : 'SECURE LINE'}
+                                {isGroup ? (
+                                    memberCount > 0 
+                                        ? `${memberCount} ${memberCount === 1 ? 'MEMBER' : 'MEMBERS'}` 
+                                        : 'NO MEMBERS'
+                                ) : 'SECURE LINE'}
                             </p>
                         </div>
                     </div>
@@ -128,11 +168,11 @@ const ChatHeader = ({
                                 </div>
                             </div>
 
-                            {/* Actions Area - Only show for groups */}
-                            {isGroup && (
+                            {/* Actions Area - Only show for groups and owners */}
+                            {isGroup && isOwner && (
                                 <div className={`p-4 grid grid-cols-2 gap-3 border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
                                     <button 
-                                        onClick={() => { setShowInfo(false); onAddMember?.(); }}
+                                        onClick={handleAddStaff}
                                         className={`flex flex-col items-center gap-2 p-4 rounded-2xl border hover:border-indigo-500/50 transition-all group ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'}`}
                                     >
                                         <UserPlus size={20} className="text-indigo-500 group-hover:scale-110 transition-transform" />
@@ -148,7 +188,11 @@ const ChatHeader = ({
                             {/* Members List */}
                             <div className="p-6">
                                 <p className="text-[10px] font-black tracking-[0.3em] text-indigo-500 uppercase mb-6">
-                                    {isGroup ? `Active Directory (${participants.length})` : 'Contact Information'}
+                                    {isGroup ? (
+                                        memberCount > 0 
+                                            ? `Active Directory (${memberCount} ${memberCount === 1 ? 'Member' : 'Members'})` 
+                                            : 'Active Directory (Empty)'
+                                    ) : 'Contact Information'}
                                 </p>
 
                                 <div className="space-y-1">

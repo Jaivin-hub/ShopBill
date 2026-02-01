@@ -702,7 +702,7 @@ const App = () => {
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
-            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={() => setCurrentPage('staffPermissions')} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}

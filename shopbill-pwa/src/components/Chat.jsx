@@ -9,7 +9,7 @@ import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
 
-const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange }) => {
+const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange, onNavigateToStaffPermissions }) => {
     // Styling Vars matching Dashboard architecture
     const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
@@ -977,6 +977,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 showInfo={showInfo}
                                 onShowInfoChange={setShowInfo}
                                 currentUser={currentUser}
+                                staffList={staffList}
+                                onNavigateToStaffPermissions={onNavigateToStaffPermissions}
                             />
                         </div>
 
