@@ -32,9 +32,17 @@ router.get('/', protect, async (req, res) => {
         }
         const staffList = await Staff.find({ storeId: req.user.storeId })
             .select('name email role phone active storeId userId')
+            .populate('userId', 'resetPasswordToken')
             .lean()
             .sort({ role: -1, name: 1 });
-        res.json(staffList);
+        
+        // Add passwordSetupStatus to each staff member
+        const enrichedStaffList = staffList.map(staff => ({
+            ...staff,
+            passwordSetupStatus: staff.userId?.resetPasswordToken ? 'pending' : 'completed'
+        }));
+        
+        res.json(enrichedStaffList);
     } catch (error) {
         console.error('Staff GET all error:', error.message);
         res.status(500).json({ error: 'Failed to fetch staff list.' });
