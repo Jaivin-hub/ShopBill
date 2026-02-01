@@ -135,17 +135,6 @@ const Header = ({
                         </button>
                     )}
 
-                    {/* Settings button for managers and cashiers */}
-                    {!isOwner && (
-                        <button 
-                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
-                            className={getButtonClasses('settings')}
-                            aria-label="Settings"
-                        >
-                            <Settings className="w-5 h-5" />
-                        </button>
-                    )}
-
                     <button onClick={() => setDarkMode(!darkMode)} className={getButtonClasses('theme-toggle')}>
                         {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
                     </button>
@@ -158,6 +147,17 @@ const Header = ({
                             </span>
                         )}
                     </button>
+
+                    {/* Settings button for managers and cashiers - after notifications */}
+                    {!isOwner && (
+                        <button 
+                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
+                            className={getButtonClasses('settings')}
+                            aria-label="Settings"
+                        >
+                            <Settings className="w-5 h-5" />
+                        </button>
+                    )}
 
                     <button onClick={() => { setCurrentPage('profile'); setShowStoreHub(false); }} className={getButtonClasses('profile')}>
                         <User className="w-5 h-5" />
