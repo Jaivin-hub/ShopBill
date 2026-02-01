@@ -2,6 +2,7 @@ const express = require('express');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const Store = require('../models/Store');
 const User = require('../models/User');
+const Chat = require('../models/Chat');
 const router = express.Router();
 
 /**
@@ -134,6 +135,21 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
                 receiptFooter: 'Thank you for shopping!'
             },
             isActive: true
+        });
+
+        // Automatically create a default group for this new outlet
+        const storeGroupName = `${newOutlet.name} Group`;
+        const requiredPlan = owner.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO';
+        
+        await Chat.create({
+            type: 'group',
+            name: storeGroupName,
+            isGroupChat: true,
+            participants: [owner._id], // Start with just the owner
+            createdBy: owner._id,
+            isDefault: true,
+            outletId: newOutlet._id,
+            requiredPlan: requiredPlan
         });
 
         res.status(201).json({

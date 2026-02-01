@@ -2,6 +2,8 @@ const express = require('express');
 const crypto = require('crypto'); // REQUIRED: For secure token generation
 const Staff = require('../models/Staff'); 
 const User = require('../models/User'); // REQUIRED: To create a login account
+const Chat = require('../models/Chat'); // REQUIRED: To add staff to outlet groups
+const Store = require('../models/Store'); // REQUIRED: To get outlet name for group lookup
 const { protect } = require('../middleware/authMiddleware'); 
 const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activation link
 
@@ -141,6 +143,34 @@ router.post('/', protect, async (req, res) => {
         newUser.resetPasswordToken = activationTokenHash;
         newUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; 
         await newUser.save({ validateBeforeSave: false }); 
+
+        // --- 4.5. Add staff to outlet's default group ---
+        try {
+            if (req.user.storeId) {
+                const store = await Store.findById(req.user.storeId);
+                if (store) {
+                    const storeGroupName = `${store.name} Group`;
+                    const outletGroup = await Chat.findOne({
+                        name: storeGroupName,
+                        type: 'group',
+                        createdBy: ownerId,
+                        isDefault: true,
+                        outletId: req.user.storeId
+                    });
+
+                    if (outletGroup) {
+                        // Add the new staff member to the outlet group if not already a participant
+                        if (!outletGroup.participants.includes(newUser._id)) {
+                            outletGroup.participants.push(newUser._id);
+                            await outletGroup.save();
+                        }
+                    }
+                }
+            }
+        } catch (groupError) {
+            // Log error but don't fail staff creation if group update fails
+            console.error('Error adding staff to outlet group:', groupError);
+        }
         
         // --- 5. Email Sending ---
         const activationUrl = `${process.env.CLIENT_URL}/staff-setup/${activationToken}`;

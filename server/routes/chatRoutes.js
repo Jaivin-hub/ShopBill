@@ -139,40 +139,8 @@ router.get('/chats', protect, async (req, res) => {
         // Auto-create default groups for owners if they don't exist
         if (user.role === 'owner') {
             const stores = await Store.find({ ownerId: user._id, isActive: true });
-            const storeIds = stores.map(s => s._id);
-            const allStaff = await Staff.find({ 
-                storeId: { $in: storeIds }, 
-                active: true 
-            }).populate('userId', '_id');
-            
-            const allStaffUserIds = allStaff
-                .map(s => s.userId?._id)
-                .filter(id => id && id.toString() !== user._id.toString());
 
-            // 1. Create "All Outlet Staffs" group if it doesn't exist
-            const defaultGroupName = 'All Outlet Staffs';
-            let allOutletsGroup = await Chat.findOne({ 
-                name: defaultGroupName, 
-                type: 'group',
-                createdBy: user._id,
-                isDefault: true,
-                outletId: null
-            });
-
-            if (!allOutletsGroup) {
-                allOutletsGroup = await Chat.create({
-                    type: 'group',
-                    name: defaultGroupName,
-                    isGroupChat: true,
-                    participants: [user._id, ...allStaffUserIds],
-                    createdBy: user._id,
-                    isDefault: true,
-                    outletId: null, // All outlets group
-                    requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
-                });
-            }
-
-            // 2. Create individual store groups for each outlet
+            // Create individual store groups for each outlet
             for (const store of stores) {
                 const storeGroupName = `${store.name} Group`;
                 let storeGroup = await Chat.findOne({ 
