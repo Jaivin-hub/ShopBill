@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Store = require('../models/Store');
 const Staff = require('../models/Staff');
+const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
 
@@ -514,6 +515,54 @@ router.put('/activate/:activationToken', async (req, res) => {
         if (staff) {
             staff.active = true;
             await staff.save();
+
+            // 5.1. Add staff to outlet's default group after activation
+            try {
+                if (staff.storeId) {
+                    const store = await Store.findById(staff.storeId);
+                    if (store) {
+                        const owner = await User.findById(store.ownerId);
+                        if (owner) {
+                            const storeGroupName = `${store.name} Group`;
+                            const outletGroup = await Chat.findOne({
+                                name: storeGroupName,
+                                type: 'group',
+                                createdBy: owner._id,
+                                isDefault: true,
+                                outletId: staff.storeId
+                            });
+
+                            if (outletGroup) {
+                                // Add the staff member to the outlet group if not already a participant
+                                if (!outletGroup.participants.includes(user._id)) {
+                                    outletGroup.participants.push(user._id);
+                                    await outletGroup.save();
+                                }
+                            }
+
+                            // Also add to "All Outlet Staffs" group if it exists
+                            const allOutletsGroup = await Chat.findOne({
+                                name: 'All Outlet Staffs',
+                                type: 'group',
+                                createdBy: owner._id,
+                                isDefault: true,
+                                outletId: null
+                            });
+
+                            if (allOutletsGroup) {
+                                // Add the staff member to the all outlets group if not already a participant
+                                if (!allOutletsGroup.participants.includes(user._id)) {
+                                    allOutletsGroup.participants.push(user._id);
+                                    await allOutletsGroup.save();
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (groupError) {
+                // Log error but don't fail activation if group update fails
+                console.error('Error adding staff to outlet group after activation:', groupError);
+            }
         }
 
         // 6. Success response
