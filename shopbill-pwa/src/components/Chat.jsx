@@ -855,6 +855,54 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
     };
 
+    const handleDeleteChat = async (chatId) => {
+        if (!chatId) {
+            showToast('Invalid chat ID', 'error');
+            return;
+        }
+
+        // Find the chat to check if it's a custom group
+        const chatToDelete = chats.find(c => c._id === chatId);
+        if (!chatToDelete) {
+            showToast('Chat not found', 'error');
+            return;
+        }
+
+        // Only allow deletion of custom groups (not default groups)
+        if (chatToDelete.isDefault) {
+            showToast('Default groups cannot be deleted', 'error');
+            return;
+        }
+
+        // Confirm deletion
+        const confirmed = window.confirm('Are you sure you want to delete this group? This action cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await apiClient.delete(API.deleteChat(chatId));
+            
+            if (response.data?.success) {
+                showToast('Group deleted successfully', 'success');
+                
+                // If the deleted chat was selected, clear selection
+                if (selectedChat?._id === chatId) {
+                    setSelectedChat(null);
+                    setMessages([]);
+                    setShowInfo(false);
+                }
+                
+                // Refresh chats list
+                await fetchChats();
+            }
+        } catch (error) {
+            console.error('Failed to delete chat:', error);
+            const errorMsg = error.response?.data?.error || 'Failed to delete group';
+            showToast(errorMsg, 'error');
+        }
+    };
+
     const handleQuickMessage = async (userId) => {
         if (!userId || !currentUser) {
             console.error('Missing userId or currentUser:', { userId, currentUser });
@@ -979,6 +1027,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 currentUser={currentUser}
                                 staffList={staffList}
                                 onNavigateToStaffPermissions={onNavigateToStaffPermissions}
+                                onDeleteChat={handleDeleteChat}
                             />
                         </div>
 

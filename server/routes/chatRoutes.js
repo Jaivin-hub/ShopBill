@@ -931,5 +931,60 @@ router.get('/users', protect, async (req, res) => {
     }
 });
 
+/**
+ * @route DELETE /api/chat/:chatId
+ * @desc Delete a custom chat group (only non-default groups, only by creator)
+ * @access Private (PRO/PREMIUM)
+ */
+router.delete('/:chatId', protect, async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const user = await User.findById(req.user.id);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Check plan
+        if (!(await checkPlan(user, 'PRO'))) {
+            return res.status(403).json({ 
+                error: 'Chat feature is only available for PRO and PREMIUM plan users' 
+            });
+        }
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        // Only allow deletion of custom groups (not default groups)
+        if (chat.isDefault) {
+            return res.status(403).json({ 
+                error: 'Default groups cannot be deleted' 
+            });
+        }
+
+        // Only allow the creator to delete the group
+        if (chat.createdBy && chat.createdBy.toString() !== req.user.id.toString()) {
+            return res.status(403).json({ 
+                error: 'Only the group creator can delete this group' 
+            });
+        }
+
+        // Check if user is a participant (additional safety check)
+        if (!chat.participants.includes(req.user.id)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Delete the chat
+        await Chat.findByIdAndDelete(chatId);
+
+        res.json({ success: true, message: 'Group deleted successfully' });
+    } catch (error) {
+        console.error('Delete Chat Error:', error);
+        res.status(500).json({ error: 'Failed to delete chat' });
+    }
+});
+
 module.exports = router;
 

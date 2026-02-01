@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     ArrowLeft, Users, User, X, ShieldCheck, 
     Store, UserPlus, MessageSquare, 
-    MoreVertical, Camera, Bell, Lock
+    MoreVertical, Camera, Bell, Lock, Trash2
 } from 'lucide-react';
 
 const ChatHeader = ({
@@ -16,7 +16,8 @@ const ChatHeader = ({
     onShowInfoChange,
     currentUser,
     staffList = [],
-    onNavigateToStaffPermissions
+    onNavigateToStaffPermissions,
+    onDeleteChat
 }) => {
     const [internalShowInfo, setInternalShowInfo] = useState(false);
     const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
@@ -31,6 +32,27 @@ const ChatHeader = ({
     
     // Count all participants in the group (total members)
     const memberCount = participants.length;
+    
+    // Check if this is a custom group (can be deleted)
+    const isCustomGroup = isGroup && !selectedChat?.isDefault;
+    
+    // Check if current user is the creator of the group
+    const currentUserId = currentUser?._id || currentUser?.id;
+    // Handle createdBy - it can be an object (populated) or just an ID string
+    let chatCreatorId = null;
+    if (selectedChat?.createdBy) {
+        if (typeof selectedChat.createdBy === 'object' && selectedChat.createdBy !== null) {
+            // If populated, it might have _id or just be the ID
+            chatCreatorId = selectedChat.createdBy._id || selectedChat.createdBy;
+        } else {
+            // If it's just an ID string
+            chatCreatorId = selectedChat.createdBy;
+        }
+    }
+    const isCreator = currentUserId && chatCreatorId && String(currentUserId) === String(chatCreatorId);
+    
+    // Can delete if it's a custom group and user is the creator
+    const canDelete = isCustomGroup && isCreator;
     
     // Get outlet ID from selected chat
     const chatOutletId = selectedChat?.outletId?._id || selectedChat?.outletId;
@@ -181,6 +203,27 @@ const ChatHeader = ({
                                     <button className={`flex flex-col items-center gap-2 p-4 rounded-2xl border hover:border-indigo-500/50 transition-all group ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                         <Bell size={20} className={`${darkMode ? 'text-slate-600 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'} transition-colors`} />
                                         <span className={`text-[8px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Mute Node</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Delete Group Button - Only show for custom groups created by current user */}
+                            {canDelete && onDeleteChat && (
+                                <div className={`p-4 border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
+                                    <button 
+                                        onClick={() => {
+                                            if (onDeleteChat && selectedChat?._id) {
+                                                onDeleteChat(selectedChat._id);
+                                            }
+                                        }}
+                                        className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl border transition-all group ${
+                                            darkMode 
+                                                ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50' 
+                                                : 'bg-red-50 border-red-200 hover:bg-red-100 hover:border-red-300'
+                                        }`}
+                                    >
+                                        <Trash2 size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+                                        <span className={`text-[10px] font-black tracking-widest uppercase text-red-500`}>Delete Group</span>
                                     </button>
                                 </div>
                             )}

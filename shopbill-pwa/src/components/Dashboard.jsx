@@ -76,7 +76,19 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
     const lowStock = useMemo(() =>
         inventory
-            .filter(i => (i.quantity || 0) <= (i.reorderLevel || 0))
+            .filter(i => {
+                // For items with variants, check if any variant is low stock
+                if (i.variants && i.variants.length > 0) {
+                    return i.variants.some(v => {
+                        const variantReorderLevel = v.reorderLevel !== null && v.reorderLevel !== undefined 
+                            ? v.reorderLevel 
+                            : (i.reorderLevel || 5);
+                        return (v.quantity || 0) <= variantReorderLevel;
+                    });
+                }
+                // For items without variants, check base quantity
+                return (i.quantity || 0) <= (i.reorderLevel || 0);
+            })
             .slice(0, 5)
         , [inventory]);
 
@@ -265,14 +277,21 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             <div className="p-5 flex-1">
                                 {lowStock.length > 0 ? (
                                     <div className="space-y-3">
-                                        {lowStock.map(item => (
-                                            <div key={item._id} className="flex justify-between items-center p-2 hover:bg-slate-500/5 rounded-lg transition-colors border border-transparent hover:border-inherit">
-                                                <span className="text-sm font-semibold truncate pr-2">{item.name}</span>
-                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded whitespace-nowrap ${darkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                                                    {item.quantity} LEFT
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {lowStock.map(item => {
+                                            // Calculate total quantity: sum of variants or base quantity
+                                            const totalQuantity = item.variants && item.variants.length > 0
+                                                ? item.variants.reduce((sum, v) => sum + (v.quantity || 0), 0)
+                                                : (item.quantity || 0);
+                                            
+                                            return (
+                                                <div key={item._id} className="flex justify-between items-center p-2 hover:bg-slate-500/5 rounded-lg transition-colors border border-transparent hover:border-inherit">
+                                                    <span className="text-sm font-semibold truncate pr-2">{item.name}</span>
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded whitespace-nowrap ${darkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                                        {totalQuantity} LEFT
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <EmptyState icon={Package} title="Optimal Levels" message="All stock levels healthy." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
@@ -355,9 +374,9 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                                             </span>
                                                         </>
                                                     ) : (
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border  ${sale.paymentMethod === 'Cash' || sale.paymentMethod === 'UPI'
-                                                            ? (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100')
-                                                            : (darkMode ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-100')
+                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border  ${sale.paymentMethod === 'Credit'
+                                                            ? (darkMode ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-100')
+                                                            : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-100')
                                                             }`}>
                                                             {sale.paymentMethod === 'Credit'
                                                                 ? `DUE: ₹${sale.totalAmount.toLocaleString()}`

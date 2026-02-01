@@ -559,7 +559,7 @@ const App = () => {
     // Define role-specific primary menu items (displayed first)
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
-      [USER_ROLES.MANAGER]: ['dashboard', 'billing', 'inventory', 'scm', 'chat'], // Dashboard, Billing, Inventory, Supply Chain, Messages
+      [USER_ROLES.MANAGER]: ['dashboard', 'inventory', 'scm', 'khata', 'chat'], // Dashboard, Inventory, Supply Chain, Ledger, Messages
       [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
     
