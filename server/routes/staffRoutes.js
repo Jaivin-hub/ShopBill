@@ -130,7 +130,7 @@ router.post('/', protect, async (req, res) => {
             name,
             email,
             role,
-            active: true 
+            active: false // Staff starts as inactive until they set their password
         });
         
         // --- 4. Generate Activation Token ---

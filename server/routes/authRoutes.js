@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const Store = require('../models/Store');
+const Staff = require('../models/Staff');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
 
@@ -508,7 +509,14 @@ router.put('/activate/:activationToken', async (req, res) => {
         // Mongoose pre-save hook will hash the new password before saving
         await user.save();
 
-        // 5. Success response
+        // 5. Activate the staff member (set active: true)
+        const staff = await Staff.findOne({ userId: user._id });
+        if (staff) {
+            staff.active = true;
+            await staff.save();
+        }
+
+        // 6. Success response
         res.json({ message: 'Account activated and password set successfully. You can now log in.' });
 
     } catch (error) {
