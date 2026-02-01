@@ -8,7 +8,8 @@ const MessageBubble = ({
     playingAudioId,
     onToggleAudio,
     formatRecordingTime,
-    audioRefs
+    audioRefs,
+    showSenderInfo = true
 }) => {
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
     const isFileMessage = msg.messageType === 'file' || msg.fileUrl;
@@ -53,8 +54,8 @@ const MessageBubble = ({
 
     return (
         <div className={`max-w-[85%] md:max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-            {/* SENDER LABEL: Only show for other members */}
-            {!isOwn && (
+            {/* SENDER LABEL: Only show for other members and when showSenderInfo is true */}
+            {!isOwn && showSenderInfo && (
                 <div className="flex items-center gap-1.5 mb-1 px-1">
                     {msg.senderName && (
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">

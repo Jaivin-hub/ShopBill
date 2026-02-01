@@ -879,7 +879,7 @@ const App = () => {
                   {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
                   <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
                     <MoreHorizontal className={`w-7 h-7 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-                    {chatUnreadCount > 0 && (
+                    {chatUnreadCount > 0 && secondaryNavItems.some(item => item.id === 'chat') && (
                       <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
                         {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                       </span>

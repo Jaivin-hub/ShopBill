@@ -52,6 +52,29 @@ const ChatMessages = ({
                 const isOwn = Boolean(senderId && currentUserId && String(senderId) === String(currentUserId));
                 const isOptimistic = msg.isOptimistic;
                 
+                // Determine if we should show sender info
+                // Show sender info if:
+                // 1. It's the first message (idx === 0), OR
+                // 2. Previous message is from a different sender
+                let showSenderInfo = false;
+                if (!isOwn) {
+                    if (idx === 0) {
+                        showSenderInfo = true;
+                    } else {
+                        const prevMsg = messages[idx - 1];
+                        let prevSenderId = null;
+                        if (prevMsg.senderId) {
+                            if (typeof prevMsg.senderId === 'object' && prevMsg.senderId !== null) {
+                                prevSenderId = prevMsg.senderId._id || prevMsg.senderId.id;
+                            } else {
+                                prevSenderId = prevMsg.senderId;
+                            }
+                        }
+                        // Show sender info if previous message is from a different sender
+                        showSenderInfo = String(prevSenderId) !== String(senderId);
+                    }
+                }
+                
                 return (
                     <div 
                         key={msg._id || idx} 
@@ -66,6 +89,7 @@ const ChatMessages = ({
                             onToggleAudio={onToggleAudio}
                             formatRecordingTime={formatRecordingTime}
                             audioRefs={audioRefs}
+                            showSenderInfo={showSenderInfo}
                         />
                     </div>
                 );
