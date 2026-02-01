@@ -378,6 +378,26 @@ const App = () => {
     });
   }, [currentPage, currentOutletId]);
 
+  // Function to fetch and update chat unread count
+  const updateChatUnreadCount = useCallback(async () => {
+    if (!currentUser) return;
+    const userPlan = currentUser.plan?.toUpperCase();
+    const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
+    if (!hasChatAccess) return;
+
+    try {
+      const response = await apiClient.get(API.chatList);
+      if (response.data?.success) {
+        const fetchedChats = response.data.data || [];
+        const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+        setChatUnreadCount(totalUnread);
+      }
+    } catch (error) {
+      // Silently fail - chat might not be accessible
+      console.error('Failed to fetch chat unread count:', error);
+    }
+  }, [currentUser, apiClient, API]);
+
   useEffect(() => {
     if (!currentUser) return;
     fetchNotificationHistory();
@@ -388,19 +408,45 @@ const App = () => {
       reconnection: true
     });
     const socket = socketRef.current;
-    socket.on('connect', () => {
+    
+    const handleConnect = () => {
       const roomId = currentOutletId || currentUser._id || 'default';
       socket.emit('join_shop', String(roomId));
-    });
-    socket.on('new_notification', (newAlert) => {
+      // Initial fetch of chat unread count after connection
+      updateChatUnreadCount();
+    };
+    
+    const handleNewNotification = (newAlert) => {
       setNotifications(prev => {
         if (prev.some(n => n._id === newAlert._id)) return prev;
         return [newAlert, ...prev];
       });
       showToast(newAlert.message, 'info');
-    });
-    return () => { if (socket) socket.disconnect(); };
-  }, [currentUser, currentOutletId, fetchNotificationHistory, showToast]);
+    };
+    
+    const handleNewMessage = (data) => {
+      // Update chat unread count when a new message arrives
+      updateChatUnreadCount();
+    };
+    
+    socket.on('connect', handleConnect);
+    socket.on('new_notification', handleNewNotification);
+    socket.on('new_message', handleNewMessage);
+    
+    // If already connected, trigger initial fetch
+    if (socket.connected) {
+      handleConnect();
+    }
+    
+    return () => {
+      if (socket) {
+        socket.off('connect', handleConnect);
+        socket.off('new_notification', handleNewNotification);
+        socket.off('new_message', handleNewMessage);
+        socket.disconnect();
+      }
+    };
+  }, [currentUser, currentOutletId, fetchNotificationHistory, showToast, updateChatUnreadCount]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
@@ -743,18 +789,28 @@ const App = () => {
                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Main Menu</p>
                 {/* Primary menu items (shown first) */}
                 {primaryNavItems.map(item => (
-                  <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
+                  <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
                     <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
                     <span className="text-sm font-bold tracking-tight">{item.name}</span>
+                    {item.id === 'chat' && chatUnreadCount > 0 && (
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                      </span>
+                    )}
                   </button>
                 ))}
                 {/* Secondary menu items (shown after primary, if any) */}
                 {secondaryNavItems.length > 0 && (
                   <>
                     {secondaryNavItems.map(item => (
-                      <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
+                      <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-lg' : `border border-transparent ${navText}`}`}>
                         <item.icon className={`w-5 h-5 mr-3 transition-colors ${currentPage === item.id ? 'text-indigo-400' : 'group-hover:text-indigo-500'}`} />
                         <span className="text-sm font-bold tracking-tight">{item.name}</span>
+                        {item.id === 'chat' && chatUnreadCount > 0 && (
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </>
@@ -805,7 +861,14 @@ const App = () => {
               {!showMoreMenu && primaryNavItems.map(item => (
                 <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
                   {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}><item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} /></div>
+                  <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
+                    <item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+                    {item.id === 'chat' && chatUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
               {secondaryNavItems.length > 0 && (
