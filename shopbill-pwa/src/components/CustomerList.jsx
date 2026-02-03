@@ -125,7 +125,7 @@ const CustomerList = ({
                 </button>
                 
                 {/* Action Buttons and Price Badge - Single line alignment */}
-                <div className="flex items-center gap-1.5 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity shrink-0">
+                <div className="flex items-center gap-1.5 opacity-100 transition-opacity shrink-0">
                     {outstandingAmount > 0 && (
                         <span className={`h-5 w-5 rounded-full ${isOverLimit ? 'bg-rose-500' : 'bg-amber-500'} text-white text-[9px] font-black flex items-center justify-center ${isOverLimit ? 'animate-pulse' : ''}`}>
                             {isOverLimit ? '!' : outstandingAmount > 9999 ? '9+' : (outstandingAmount >= 1000 ? `${Math.floor(outstandingAmount / 1000)}k` : outstandingAmount)}

@@ -21,7 +21,7 @@ const initialItemState = {
 
 
 // Added darkMode to props
-const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => {
+const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet }) => {
     // Permission Logic
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
@@ -41,8 +41,18 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode }) => 
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search by 300ms
-    const [sortOption, setSortOption] = useState('default');
+    const [sortOption, setSortOption] = useState(initialSortOption || 'default');
     const [showStickySearch, setShowStickySearch] = useState(false);
+
+    // Set initial sort option when provided
+    useEffect(() => {
+        if (initialSortOption) {
+            setSortOption(initialSortOption);
+            if (onSortOptionSet) {
+                onSortOptionSet();
+            }
+        }
+    }, [initialSortOption, onSortOptionSet]);
 
     // --- Data Fetching Logic (Memoized for Pattern Consistency) ---
     const fetchInventory = useCallback(async (isSilent = false) => {

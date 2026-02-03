@@ -31,11 +31,11 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
   <div className="space-y-1.5">
     <label htmlFor={name} className={`text-[10px] font-black  tracking-widest ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>{label}</label>
     <div className="relative group">
-      {Icon && <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-gray-500 group-focus-within:text-indigo-400' : 'text-slate-400 group-focus-within:text-indigo-600'}`} />}
+      {Icon && <Icon className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-gray-500 group-focus-within:text-indigo-400' : 'text-slate-400 group-focus-within:text-indigo-600'}`} />}
       <input
         {...props}
         id={name} name={name} type={type} value={value || ''} onChange={onChange} disabled={disabled}
-        className={`w-full ${Icon ? 'pl-11' : 'px-4'} py-3.5 border rounded-2xl outline-none transition-all font-bold text-[16px] md:text-base
+        className={`w-full ${Icon ? 'pl-10 sm:pl-11' : 'px-3 sm:px-4'} py-3 sm:py-3.5 border rounded-xl sm:rounded-2xl outline-none transition-all font-bold text-base sm:text-[16px] md:text-base
           ${darkMode ? 'bg-gray-950 text-white border-gray-800 placeholder-gray-700 focus:border-indigo-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/5'} 
           ${error ? 'border-rose-500 ring-2 ring-rose-500/10' : ''} 
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -46,16 +46,16 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 );
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
-  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-    <section className={`max-sm rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
-      <header className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
+  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+    <section className={`w-full max-w-md max-h-[95vh] sm:max-h-[90vh] rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 my-auto flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+      <header className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
         <h2 className={`text-sm font-black  tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           <CreditCard className="w-4 h-4 text-teal-500" /> Collect Payment
         </h2>
         <button onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}><X className="w-5 h-5" /></button>
       </header>
       
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
         <div className="text-center">
             <p className={`text-[10px] font-black  tracking-widest mb-1 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>Customer Account</p>
             <p className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{customer?.name}</p>
@@ -100,9 +100,9 @@ export const AddCustomerModal = ({
   if (!data) return null;
 
   return (
-    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-4 overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-      <form onSubmit={onConfirm} className={`w-full max-w-md rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 my-auto ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
-        <div className={`p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
+    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+      <form onSubmit={onConfirm} className={`w-full max-w-md max-h-[95vh] sm:max-h-[90vh] rounded-xl sm:rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 my-auto flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+        <div className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
           <h2 className={`text-sm font-black tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
             <UserPlus className="w-4 h-4 text-indigo-500" /> New Account
           </h2>
@@ -111,7 +111,7 @@ export const AddCustomerModal = ({
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* --- API ERROR FEEDBACK --- */}
           {errorMessage && (
             <div className={`p-4 rounded-xl border flex items-start gap-3 animate-in shake duration-300 ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-100'}`}>
@@ -175,17 +175,17 @@ export const AddCustomerModal = ({
           </div>
         </div>
 
-        <div className={`p-6 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+        <div className={`p-4 sm:p-6 border-t shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
           <button 
             type="submit" 
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20" 
+            className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20 text-xs sm:text-sm" 
             disabled={isProcessing || !isValid}
           >
             {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
             Create Account
           </button>
           {!isValid && !isProcessing && (
-            <p className={`text-center text-[10px] font-bold mt-4 tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
+            <p className={`text-center text-[10px] font-bold mt-3 sm:mt-4 tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
           )}
         </div>
       </form>

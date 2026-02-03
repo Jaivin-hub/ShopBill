@@ -1,13 +1,16 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Notification = require('../models/Notification');
+const Staff = require('../models/Staff');
+const Store = require('../models/Store');
 
 const router = express.Router();
 
 /**
  * UTILITY: emitAlert
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
- * UPDATED: Ensures readBy is initialized as an empty array.
+ * UPDATED: Smart notification targeting - excludes the actor from their own action notifications.
+ * Only sends notifications to managers and cashiers (excluding the person who performed the action).
  */
 const emitAlert = async (req, storeId, type, data) => {
     const io = req.app.get('socketio');
@@ -17,6 +20,7 @@ const emitAlert = async (req, storeId, type, data) => {
     let metadata = {};
     const storeIdStr = storeId.toString();
     const ownerId = req.user.role === 'owner' ? req.user._id : (req.user.ownerId || req.user._id);
+    const actorId = req.user._id; // Track who performed the action
 
     switch (type) {
         case 'inventory_low':
@@ -50,6 +54,7 @@ const emitAlert = async (req, storeId, type, data) => {
         const newNotification = await Notification.create({
             storeId: storeIdStr,
             ownerId: ownerId,
+            actorId: actorId, // Store who performed the action
             type,
             category,
             title,
@@ -60,8 +65,56 @@ const emitAlert = async (req, storeId, type, data) => {
         });
 
         if (io) {
-            // For real-time, we tell the client it is NOT read (false)
-            io.to(storeIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
+            // Smart notification targeting: Only send to relevant users, excluding the actor
+            try {
+                // Get all managers and cashiers for this store
+                const staffMembers = await Staff.find({
+                    storeId: storeIdStr,
+                    role: { $in: ['Manager', 'Cashier'] },
+                    active: true
+                }).select('userId').lean();
+
+                // Get owner of the store (they should also receive notifications from staff actions)
+                const store = await Store.findById(storeIdStr).select('ownerId').lean();
+                const targetUserIds = new Set();
+
+                // Add owner if they exist and are not the actor
+                if (store && store.ownerId) {
+                    const ownerIdStr = store.ownerId.toString();
+                    const actorIdStr = actorId.toString();
+                    if (ownerIdStr !== actorIdStr) {
+                        targetUserIds.add(ownerIdStr);
+                    }
+                }
+
+                // Add staff members (managers and cashiers) excluding the actor
+                staffMembers.forEach(staff => {
+                    if (staff.userId) {
+                        const staffUserIdStr = staff.userId.toString();
+                        const actorIdStr = actorId.toString();
+                        // Only add if not the actor
+                        if (staffUserIdStr !== actorIdStr) {
+                            targetUserIds.add(staffUserIdStr);
+                        }
+                    }
+                });
+
+                // Emit to specific user rooms instead of broadcasting to all
+                const notificationData = { ...newNotification.toObject(), isRead: false };
+                targetUserIds.forEach(userId => {
+                    io.to(`user_${userId}`).emit('new_notification', notificationData);
+                });
+
+                // Also emit to store room for backward compatibility (but filter on client side)
+                // This ensures users who haven't refreshed still get notifications
+                io.to(storeIdStr).emit('new_notification', notificationData);
+
+                console.log(`📢 Notification sent to ${targetUserIds.size} users (excluding actor ${actorId})`);
+            } catch (targetingError) {
+                console.error("❌ Error in smart notification targeting:", targetingError);
+                // Fallback to broadcast if targeting fails
+                io.to(storeIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
+            }
         }
         return newNotification;
     } catch (error) {
@@ -109,6 +162,7 @@ const resolveLowStockAlert = async (req, storeId, itemId, variantId = null) => {
 /**
  * GET /alerts
  * Fetches notifications and calculates 'isRead' specifically for the logged-in user.
+ * UPDATED: Filters out notifications where the current user is the actor (they don't need to see their own actions).
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
@@ -119,15 +173,26 @@ router.get('/alerts', protect, async (req, res) => {
         const filter = req.user.role === 'owner' 
             ? { ownerId: req.user._id }
             : { storeId: req.user.storeId };
+        
         const notifications = await Notification.find(filter)
-            .select('type category title message metadata storeId ownerId readBy createdAt')
+            .select('type category title message metadata storeId ownerId actorId readBy createdAt')
             .lean()
             .sort({ createdAt: -1 })
             .limit(30);
 
+        // Filter out notifications where the current user is the actor
+        // Users don't need to see notifications about their own actions
+        const filteredNotifications = notifications.filter(n => {
+            // If actorId exists and matches current user, exclude this notification
+            if (n.actorId && n.actorId.toString() === req.user._id.toString()) {
+                return false;
+            }
+            return true;
+        });
+
         // Map notifications to include an 'isRead' boolean specific to THIS user
         // Note: .lean() returns plain objects, so no need for .toObject()
-        const formattedAlerts = notifications.map(n => {
+        const formattedAlerts = filteredNotifications.map(n => {
             // Ensure readBy is an array (it should be from the schema)
             const readByArray = Array.isArray(n.readBy) ? n.readBy : (n.readBy ? [n.readBy] : []);
             return {

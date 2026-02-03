@@ -74,23 +74,44 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             .slice(0, 5)
         , [customers]);
 
-    const lowStock = useMemo(() =>
-        inventory
-            .filter(i => {
-                // For items with variants, check if any variant is low stock
-                if (i.variants && i.variants.length > 0) {
-                    return i.variants.some(v => {
-                        const variantReorderLevel = v.reorderLevel !== null && v.reorderLevel !== undefined 
-                            ? v.reorderLevel 
-                            : (i.reorderLevel || 5);
-                        return (v.quantity || 0) <= variantReorderLevel;
+    const lowStock = useMemo(() => {
+        const lowStockItems = [];
+        
+        inventory.forEach(item => {
+            // For items with variants, check each variant individually
+            if (item.variants && item.variants.length > 0) {
+                item.variants.forEach(variant => {
+                    const variantReorderLevel = variant.reorderLevel !== null && variant.reorderLevel !== undefined 
+                        ? variant.reorderLevel 
+                        : (item.reorderLevel || 5);
+                    if ((variant.quantity || 0) <= variantReorderLevel) {
+                        lowStockItems.push({
+                            productId: item._id,
+                            productName: item.name,
+                            variantLabel: variant.label,
+                            quantity: variant.quantity || 0,
+                            reorderLevel: variantReorderLevel,
+                            isVariant: true
+                        });
+                    }
+                });
+            } else {
+                // For items without variants, check base quantity
+                if ((item.quantity || 0) <= (item.reorderLevel || 0)) {
+                    lowStockItems.push({
+                        productId: item._id,
+                        productName: item.name,
+                        variantLabel: null,
+                        quantity: item.quantity || 0,
+                        reorderLevel: item.reorderLevel || 0,
+                        isVariant: false
                     });
                 }
-                // For items without variants, check base quantity
-                return (i.quantity || 0) <= (i.reorderLevel || 0);
-            })
-            .slice(0, 5)
-        , [inventory]);
+            }
+        });
+        
+        return lowStockItems.slice(0, 5);
+    }, [inventory]);
 
     const recentSales = useMemo(() =>
         [...sales]
@@ -277,17 +298,17 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             <div className="p-5 flex-1">
                                 {lowStock.length > 0 ? (
                                     <div className="space-y-3">
-                                        {lowStock.map(item => {
-                                            // Calculate total quantity: sum of variants or base quantity
-                                            const totalQuantity = item.variants && item.variants.length > 0
-                                                ? item.variants.reduce((sum, v) => sum + (v.quantity || 0), 0)
-                                                : (item.quantity || 0);
+                                        {lowStock.map((item, index) => {
+                                            // Display product name with variant label if it's a variant
+                                            const displayName = item.isVariant 
+                                                ? `${item.productName} - ${item.variantLabel}`
+                                                : item.productName;
                                             
                                             return (
-                                                <div key={item._id} className="flex justify-between items-center p-2 hover:bg-slate-500/5 rounded-lg transition-colors border border-transparent hover:border-inherit">
-                                                    <span className="text-sm font-semibold truncate pr-2">{item.name}</span>
+                                                <div key={`${item.productId}-${item.variantLabel || 'base'}-${index}`} className="flex justify-between items-center p-2 hover:bg-slate-500/5 rounded-lg transition-colors border border-transparent hover:border-inherit">
+                                                    <span className="text-sm font-semibold truncate pr-2">{displayName}</span>
                                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded whitespace-nowrap ${darkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                                                        {totalQuantity} LEFT
+                                                        {item.quantity} LEFT
                                                     </span>
                                                 </div>
                                             );

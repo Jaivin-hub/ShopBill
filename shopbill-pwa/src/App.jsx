@@ -139,14 +139,6 @@ const UpdatePrompt = () => {
     }
   };
 
-  const handleDismiss = () => {
-    // Mark this version as dismissed (so we don't show again for this version)
-    if (pendingVersionRef.current) {
-      localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
-    }
-    setShow(false);
-  };
-
   if (!show) return null;
 
   return (
@@ -158,16 +150,10 @@ const UpdatePrompt = () => {
           </div>
           <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
-          <div className="flex gap-2 w-full mt-6">
-            <button
-              onClick={handleDismiss}
-              className="flex-1 py-3 bg-indigo-700/50 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
-            >
-              Later
-            </button>
+          <div className="w-full mt-6">
             <button
               onClick={handleUpdate}
-              className="flex-1 py-3 bg-white text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
+              className="w-full py-3 bg-white text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
             >
               Update Now
             </button>
@@ -274,7 +260,11 @@ const App = () => {
 
   const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
   const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
-  const handleViewAllInventory = useCallback(() => setCurrentPage('inventory'), []);
+  const [showLowStockFilter, setShowLowStockFilter] = useState(false);
+  const handleViewAllInventory = useCallback(() => {
+    setShowLowStockFilter(true);
+    setCurrentPage('inventory');
+  }, []);
 
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser) return;
@@ -417,6 +407,12 @@ const App = () => {
     };
     
     const handleNewNotification = (newAlert) => {
+      // Filter out notifications where the current user is the actor
+      // Users don't need to see notifications about their own actions
+      if (newAlert.actorId && currentUser && newAlert.actorId.toString() === currentUser._id.toString()) {
+        return; // Don't add notification if user is the actor
+      }
+      
       setNotifications(prev => {
         if (prev.some(n => n._id === newAlert._id)) return prev;
         return [newAlert, ...prev];
@@ -692,7 +688,7 @@ const App = () => {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
             case 'billing': return <BillingPOS key={componentKey} {...commonProps} />;
             case 'khata': return <Ledger key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
-            case 'inventory': return <InventoryManager key={componentKey} {...commonProps} />;
+            case 'inventory': return <InventoryManager key={componentKey} {...commonProps} initialSortOption={showLowStockFilter ? 'low-stock' : null} onSortOptionSet={() => setShowLowStockFilter(false)} />;
             case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;

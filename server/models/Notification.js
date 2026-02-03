@@ -15,6 +15,13 @@ const NotificationSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    // Track who performed the action that triggered this notification
+    // This allows us to exclude the actor from receiving their own action notifications
+    actorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
     type: { 
         type: String, 
         enum: ['inventory_low', 'credit_exceeded', 'system', 'success', 'system_update'], 
