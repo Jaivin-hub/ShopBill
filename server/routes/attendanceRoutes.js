@@ -13,6 +13,8 @@ const router = express.Router();
  */
 router.post('/punch-in', protect, async (req, res) => {
     try {
+        const body = req.body || {};
+
         // Only staff (Manager/Cashier) can punch in
         if (req.user.role === 'owner') {
             return res.status(403).json({ error: 'Owners cannot punch in. This feature is for staff members only.' });
@@ -100,16 +102,16 @@ router.post('/punch-in', protect, async (req, res) => {
                 date: attendanceDate,
                 punchIn: new Date(),
                 status: 'active',
-                notes: req.body.notes || '',
+                notes: body.notes || '',
                 workingHours: 0 // Initialize to 0 for active status
             };
 
             // Add location only if provided and valid
-            if (req.body.location && typeof req.body.location === 'object') {
-                if (req.body.location.latitude !== undefined || req.body.location.longitude !== undefined) {
+            if (body.location && typeof body.location === 'object') {
+                if (body.location.latitude !== undefined || body.location.longitude !== undefined) {
                     attendanceData.location = {
-                        latitude: req.body.location.latitude || null,
-                        longitude: req.body.location.longitude || null
+                        latitude: body.location.latitude || null,
+                        longitude: body.location.longitude || null
                     };
                 }
             }
@@ -217,6 +219,8 @@ router.post('/punch-in', protect, async (req, res) => {
  */
 router.post('/punch-out', protect, async (req, res) => {
     try {
+        const body = req.body || {};
+
         // Only staff (Manager/Cashier) can punch out
         if (req.user.role === 'owner') {
             return res.status(403).json({ error: 'Owners cannot punch out. This feature is for staff members only.' });
@@ -260,8 +264,8 @@ router.post('/punch-out', protect, async (req, res) => {
         const diff = attendance.punchOut - attendance.punchIn;
         attendance.workingHours = Math.round(diff / (1000 * 60)); // in minutes
         
-        if (req.body.notes) {
-            attendance.notes = req.body.notes;
+        if (body.notes) {
+            attendance.notes = body.notes;
         }
 
         await attendance.save();
