@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
@@ -22,13 +23,46 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Find staff record
-        const staff = await Staff.findOne({ 
+        // Try with ObjectId conversion first, then fallback to direct values
+        let staff = await Staff.findOne({ 
             userId: req.user._id, 
             storeId: req.user.storeId 
         });
 
+        // If not found, try with ObjectId conversion
+        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
+            try {
+                staff = await Staff.findOne({ 
+                    userId: new mongoose.Types.ObjectId(req.user._id), 
+                    storeId: new mongoose.Types.ObjectId(req.user.storeId)
+                });
+            } catch (lookupError) {
+                console.error('Staff lookup error with ObjectId:', lookupError);
+            }
+        }
+
         if (!staff) {
-            return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
+            console.error('Staff not found:', {
+                userId: req.user._id,
+                userIdType: typeof req.user._id,
+                storeId: req.user.storeId,
+                storeIdType: typeof req.user.storeId,
+                userRole: req.user.role
+            });
+            
+            // Try to find any staff record for this user to help debug
+            const anyStaff = await Staff.findOne({ userId: req.user._id });
+            if (anyStaff) {
+                console.error('Found staff record but storeId mismatch:', {
+                    foundStoreId: anyStaff.storeId,
+                    requestedStoreId: req.user.storeId
+                });
+            }
+            
+            return res.status(404).json({ 
+                error: 'Staff record not found. Please contact your administrator.',
+                details: 'Your account is not linked to a staff record for this outlet.'
+            });
         }
 
         // Check if already punched in today
@@ -57,15 +91,32 @@ router.post('/punch-in', protect, async (req, res) => {
         // Set date to start of day for consistent querying
         const attendanceDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const attendance = await Attendance.create({
-            staffId: staff._id,
-            storeId: req.user.storeId,
-            date: attendanceDate,
-            punchIn: new Date(),
-            status: 'active',
-            location: req.body.location || null,
-            notes: req.body.notes || ''
-        });
+        let attendance;
+        try {
+            attendance = await Attendance.create({
+                staffId: staff._id,
+                storeId: req.user.storeId,
+                date: attendanceDate,
+                punchIn: new Date(),
+                status: 'active',
+                location: req.body.location || null,
+                notes: req.body.notes || ''
+            });
+        } catch (createError) {
+            console.error('Attendance creation error:', createError);
+            console.error('Create error details:', {
+                message: createError.message,
+                name: createError.name,
+                errors: createError.errors,
+                staffId: staff._id,
+                storeId: req.user.storeId,
+                date: attendanceDate
+            });
+            return res.status(500).json({ 
+                error: 'Failed to create attendance record.',
+                details: process.env.NODE_ENV === 'development' ? createError.message : undefined
+            });
+        }
 
         res.status(201).json({
             success: true,
