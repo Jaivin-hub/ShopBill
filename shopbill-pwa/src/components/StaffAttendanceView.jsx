@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, TrendingUp, Users, Loader2, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Clock, Loader2, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 
 const StaffAttendanceView = ({ apiClient, API, showToast, darkMode, staffId, staffName }) => {
     const [attendance, setAttendance] = useState([]);
@@ -15,13 +15,8 @@ const StaffAttendanceView = ({ apiClient, API, showToast, darkMode, staffId, sta
     });
     const [isExpanded, setIsExpanded] = useState(false);
 
-    useEffect(() => {
-        if (staffId) {
-            fetchAttendance();
-        }
-    }, [staffId, startDate, endDate]);
-
-    const fetchAttendance = async () => {
+    const fetchAttendance = React.useCallback(async () => {
+        if (!staffId || !apiClient || !API) return;
         try {
             setIsLoading(true);
             const response = await apiClient.get(
@@ -33,11 +28,17 @@ const StaffAttendanceView = ({ apiClient, API, showToast, darkMode, staffId, sta
             }
         } catch (error) {
             console.error('Error fetching attendance:', error);
-            showToast('Failed to fetch attendance records', 'error');
+            if (showToast) showToast('Failed to fetch attendance records', 'error');
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [staffId, startDate, endDate, apiClient, API, showToast]);
+
+    useEffect(() => {
+        if (staffId) {
+            fetchAttendance();
+        }
+    }, [staffId, fetchAttendance]);
 
     const formatTime = (dateString) => {
         if (!dateString) return 'N/A';

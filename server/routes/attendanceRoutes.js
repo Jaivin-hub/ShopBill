@@ -32,14 +32,17 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Check if already punched in today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         const existingAttendance = await Attendance.findOne({
             staffId: staff._id,
-            date: { $gte: today, $lt: tomorrow },
+            date: { 
+                $gte: today, 
+                $lt: tomorrow 
+            },
             status: 'active'
         });
 
@@ -51,10 +54,13 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Create new attendance record
+        // Set date to start of day for consistent querying
+        const attendanceDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
         const attendance = await Attendance.create({
             staffId: staff._id,
             storeId: req.user.storeId,
-            date: new Date(),
+            date: attendanceDate,
             punchIn: new Date(),
             status: 'active',
             location: req.body.location || null,
@@ -73,7 +79,15 @@ router.post('/punch-in', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Punch In Error:', error);
-        res.status(500).json({ error: 'Failed to punch in. Please try again.' });
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        res.status(500).json({ 
+            error: 'Failed to punch in. Please try again.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 
@@ -104,8 +118,8 @@ router.post('/punch-out', protect, async (req, res) => {
         }
 
         // Find today's active attendance
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -179,8 +193,8 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 

@@ -5,7 +5,7 @@ import {
     ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, HelpCircle
 } from 'lucide-react';
 import API from '../config/api';
-import StaffAttendanceView from './StaffAttendanceView';
+import AttendanceCalendar from './AttendanceCalendar';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -119,23 +119,23 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                 className={`group flex flex-col p-4 md:p-6 border rounded-xl md:rounded-2xl transition-all ${cardBase} ${darkMode ? 'hover:border-slate-700' : 'hover:border-indigo-200'}`}
             >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-            <div className="flex items-center gap-4 md:gap-5 flex-1 min-w-0">
-                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center border shrink-0 ${getRoleStyles(staff.role, darkMode)}`}>
-                    {staff.role === 'owner' ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <User className="w-5 h-5 md:w-6 md:h-6" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h3 className={`text-base md:text-lg font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
-                    <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${getRoleStyles(staff.role, darkMode)}`}>
-                            {staff.role}
-                        </span>
+                    <div className="flex items-center gap-4 md:gap-5 flex-1 min-w-0">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center border shrink-0 ${getRoleStyles(staff.role, darkMode)}`}>
+                            {staff.role === 'owner' ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <User className="w-5 h-5 md:w-6 md:h-6" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className={`text-base md:text-lg font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
+                            <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${getRoleStyles(staff.role, darkMode)}`}>
+                                    {staff.role}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            
-            <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
-                <div className="relative flex-1 sm:flex-none">
+                    
+                    <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
+                        <div className="relative flex-1 sm:flex-none">
                     <button
                         onClick={() => onToggleActive(staff)}
                         disabled={isActionDisabled || isPendingActivation} 
@@ -176,23 +176,24 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             )}
                         </>
                     )}
-                </div>
+                        </div>
 
-                <button
-                    onClick={() => onEdit(staff)}
-                    disabled={isActionDisabled} 
-                    className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
-                >
-                    <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-                
-                <button
-                    onClick={() => onRemove(staff)}
-                    disabled={isActionDisabled} 
-                    className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
-                >
-                    <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
+                        <button
+                            onClick={() => onEdit(staff)}
+                            disabled={isActionDisabled} 
+                            className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
+                        >
+                            <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
+                        
+                        <button
+                            onClick={() => onRemove(staff)}
+                            disabled={isActionDisabled} 
+                            className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
+                        >
+                            <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
+                    </div>
                 </div>
                 {staff.role !== 'owner' && (
                     <button
@@ -204,7 +205,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                 )}
             </div>
             {showAttendance && staff.role !== 'owner' && apiClient && API && showToast && (
-                <StaffAttendanceView
+                <AttendanceCalendar
                     apiClient={apiClient}
                     API={API}
                     showToast={showToast}

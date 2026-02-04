@@ -286,6 +286,10 @@ const App = () => {
       if (error.cancelled || error.message?.includes('cancelled')) {
         return null;
       }
+      // Silently handle 403 errors (user doesn't have premium or access)
+      if (error.response?.status === 403) {
+        return null;
+      }
       console.error('Error fetching outlet by ID:', error);
     }
     return null;
