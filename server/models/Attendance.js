@@ -52,6 +52,35 @@ const AttendanceSchema = new Schema({
     notes: {
         type: String,
         default: ''
+    },
+    // Break tracking: array of break periods
+    breaks: [{
+        breakStart: {
+            type: Date,
+            required: true
+        },
+        breakEnd: {
+            type: Date,
+            default: null
+        },
+        breakDuration: {
+            type: Number, // in minutes
+            default: 0
+        },
+        notes: {
+            type: String,
+            default: ''
+        }
+    }],
+    // Total break time in minutes (sum of all completed breaks)
+    totalBreakTime: {
+        type: Number, // in minutes
+        default: 0
+    },
+    // Current break status
+    onBreak: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 
@@ -69,11 +98,26 @@ AttendanceSchema.virtual('hoursWorked').get(function() {
     return Math.round((diff / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
 });
 
-// Pre-save hook to calculate working hours when punching out
+// Pre-save hook to calculate working hours when punching out (excluding break time)
 AttendanceSchema.pre('save', function(next) {
     if (this.punchOut && this.punchIn) {
-        const diff = this.punchOut - this.punchIn;
-        this.workingHours = Math.round(diff / (1000 * 60)); // Convert to minutes
+        // Calculate total break time
+        let totalBreakMinutes = 0;
+        if (this.breaks && this.breaks.length > 0) {
+            this.breaks.forEach(breakPeriod => {
+                if (breakPeriod.breakEnd && breakPeriod.breakStart) {
+                    const breakDiff = breakPeriod.breakEnd - breakPeriod.breakStart;
+                    breakPeriod.breakDuration = Math.round(breakDiff / (1000 * 60));
+                    totalBreakMinutes += breakPeriod.breakDuration;
+                }
+            });
+        }
+        this.totalBreakTime = totalBreakMinutes;
+        
+        // Calculate working hours excluding break time
+        const totalDiff = this.punchOut - this.punchIn;
+        const totalMinutes = Math.round(totalDiff / (1000 * 60));
+        this.workingHours = Math.max(0, totalMinutes - totalBreakMinutes); // Ensure non-negative
     }
     next();
 });

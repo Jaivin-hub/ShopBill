@@ -258,6 +258,17 @@ router.post('/punch-out', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
         }
 
+        // If on break, end the break first
+        if (attendance.onBreak) {
+            const activeBreak = attendance.breaks && attendance.breaks.find(b => !b.breakEnd);
+            if (activeBreak) {
+                activeBreak.breakEnd = new Date();
+                const breakDiff = activeBreak.breakEnd - activeBreak.breakStart;
+                activeBreak.breakDuration = Math.round(breakDiff / (1000 * 60));
+                attendance.onBreak = false;
+            }
+        }
+
         // Update attendance with punch out time
         attendance.punchOut = new Date();
         attendance.status = 'completed';
@@ -291,6 +302,177 @@ router.post('/punch-out', protect, async (req, res) => {
     } catch (error) {
         console.error('Punch Out Error:', error);
         res.status(500).json({ error: 'Failed to punch out. Please try again.' });
+    }
+});
+
+/**
+ * @route POST /api/attendance/break-start
+ * @desc Staff starts a break
+ * @access Private (Staff only - Manager/Cashier)
+ */
+router.post('/break-start', protect, async (req, res) => {
+    try {
+        const body = req.body || {};
+
+        // Only staff (Manager/Cashier) can take breaks
+        if (req.user.role === 'owner') {
+            return res.status(403).json({ error: 'Owners cannot take breaks. This feature is for staff members only.' });
+        }
+
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+
+        // Find staff record
+        const staff = await Staff.findOne({ 
+            userId: req.user._id, 
+            storeId: req.user.storeId 
+        });
+
+        if (!staff) {
+            return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
+        }
+
+        // Find today's active attendance
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const tomorrow = new Date(today);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+        const attendance = await Attendance.findOne({
+            staffId: staff._id,
+            date: { $gte: today, $lt: tomorrow },
+            status: 'active'
+        });
+
+        if (!attendance) {
+            return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
+        }
+
+        if (attendance.onBreak) {
+            return res.status(400).json({ error: 'You are already on a break. Please end your current break first.' });
+        }
+
+        // Add new break
+        attendance.breaks = attendance.breaks || [];
+        attendance.breaks.push({
+            breakStart: new Date(),
+            breakEnd: null,
+            breakDuration: 0,
+            notes: body.notes || ''
+        });
+        attendance.onBreak = true;
+
+        await attendance.save();
+
+        res.json({
+            success: true,
+            message: 'Break started successfully',
+            attendance: {
+                _id: attendance._id,
+                onBreak: attendance.onBreak,
+                breaks: attendance.breaks
+            }
+        });
+    } catch (error) {
+        console.error('Break Start Error:', error);
+        res.status(500).json({ error: 'Failed to start break. Please try again.' });
+    }
+});
+
+/**
+ * @route POST /api/attendance/break-end
+ * @desc Staff ends a break
+ * @access Private (Staff only - Manager/Cashier)
+ */
+router.post('/break-end', protect, async (req, res) => {
+    try {
+        const body = req.body || {};
+
+        // Only staff (Manager/Cashier) can end breaks
+        if (req.user.role === 'owner') {
+            return res.status(403).json({ error: 'Owners cannot take breaks. This feature is for staff members only.' });
+        }
+
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+
+        // Find staff record
+        const staff = await Staff.findOne({ 
+            userId: req.user._id, 
+            storeId: req.user.storeId 
+        });
+
+        if (!staff) {
+            return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
+        }
+
+        // Find today's active attendance
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const tomorrow = new Date(today);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+        const attendance = await Attendance.findOne({
+            staffId: staff._id,
+            date: { $gte: today, $lt: tomorrow },
+            status: 'active'
+        });
+
+        if (!attendance) {
+            return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
+        }
+
+        if (!attendance.onBreak) {
+            return res.status(400).json({ error: 'You are not currently on a break.' });
+        }
+
+        // Find the active break (the one without breakEnd)
+        const activeBreak = attendance.breaks && attendance.breaks.find(b => !b.breakEnd);
+        
+        if (!activeBreak) {
+            return res.status(400).json({ error: 'No active break found.' });
+        }
+
+        // End the break
+        activeBreak.breakEnd = new Date();
+        const breakDiff = activeBreak.breakEnd - activeBreak.breakStart;
+        activeBreak.breakDuration = Math.round(breakDiff / (1000 * 60)); // in minutes
+
+        // Update total break time
+        let totalBreakMinutes = 0;
+        attendance.breaks.forEach(breakPeriod => {
+            if (breakPeriod.breakEnd && breakPeriod.breakStart) {
+                totalBreakMinutes += breakPeriod.breakDuration || 0;
+            }
+        });
+        attendance.totalBreakTime = totalBreakMinutes;
+        attendance.onBreak = false;
+
+        await attendance.save();
+
+        // Calculate current working hours (excluding breaks)
+        const totalDiff = new Date() - attendance.punchIn;
+        const totalMinutes = Math.round(totalDiff / (1000 * 60));
+        const currentWorkingHours = Math.max(0, totalMinutes - attendance.totalBreakTime);
+        const hours = Math.floor(currentWorkingHours / 60);
+        const minutes = currentWorkingHours % 60;
+
+        res.json({
+            success: true,
+            message: 'Break ended successfully',
+            attendance: {
+                _id: attendance._id,
+                onBreak: attendance.onBreak,
+                breaks: attendance.breaks,
+                totalBreakTime: attendance.totalBreakTime,
+                currentWorkingHours: `${hours}h ${minutes}m`
+            }
+        });
+    } catch (error) {
+        console.error('Break End Error:', error);
+        res.status(500).json({ error: 'Failed to end break. Please try again.' });
     }
 });
 
@@ -331,10 +513,26 @@ router.get('/current', protect, async (req, res) => {
         });
 
         if (attendance) {
-            // Calculate hours worked so far
+            // Calculate hours worked so far (excluding breaks)
             const now = new Date();
-            const diff = now - attendance.punchIn;
-            const minutesWorked = Math.round(diff / (1000 * 60));
+            const totalDiff = now - attendance.punchIn;
+            const totalMinutes = Math.round(totalDiff / (1000 * 60));
+            
+            // Calculate total break time
+            let totalBreakMinutes = 0;
+            if (attendance.breaks && attendance.breaks.length > 0) {
+                attendance.breaks.forEach(breakPeriod => {
+                    if (breakPeriod.breakEnd && breakPeriod.breakStart) {
+                        totalBreakMinutes += breakPeriod.breakDuration || 0;
+                    } else if (breakPeriod.breakStart && !breakPeriod.breakEnd) {
+                        // Active break - calculate current break time
+                        const breakDiff = now - breakPeriod.breakStart;
+                        totalBreakMinutes += Math.round(breakDiff / (1000 * 60));
+                    }
+                });
+            }
+            
+            const minutesWorked = Math.max(0, totalMinutes - totalBreakMinutes);
             const hours = Math.floor(minutesWorked / 60);
             const mins = minutesWorked % 60;
 
@@ -344,6 +542,9 @@ router.get('/current', protect, async (req, res) => {
                     _id: attendance._id,
                     punchIn: attendance.punchIn,
                     status: attendance.status,
+                    onBreak: attendance.onBreak || false,
+                    breaks: attendance.breaks || [],
+                    totalBreakTime: totalBreakMinutes,
                     minutesWorked,
                     hoursWorked: `${hours}h ${mins}m`
                 }

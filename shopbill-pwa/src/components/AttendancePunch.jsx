@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, LogIn, LogOut, Calendar, TrendingUp, Loader2 } from 'lucide-react';
+import { Clock, LogIn, LogOut, Calendar, TrendingUp, Loader2, Coffee, RotateCcw } from 'lucide-react';
 
 const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) => {
     const [currentAttendance, setCurrentAttendance] = useState(null);
@@ -74,6 +74,46 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) =
         }
     };
 
+    const handleBreakStart = async () => {
+        try {
+            setIsPunching(true);
+            const response = await apiClient.post(API.attendanceBreakStart);
+            if (response.data?.success) {
+                await fetchCurrentStatus();
+                showToast('Break started', 'success');
+            }
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to start break', 'error');
+        } finally {
+            setIsPunching(false);
+        }
+    };
+
+    const handleBreakEnd = async () => {
+        try {
+            setIsPunching(true);
+            const response = await apiClient.post(API.attendanceBreakEnd);
+            if (response.data?.success) {
+                await fetchCurrentStatus();
+                showToast(`Break ended. ${response.data.attendance.currentWorkingHours} worked`, 'success');
+            }
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to end break', 'error');
+        } finally {
+            setIsPunching(false);
+        }
+    };
+
+    const formatBreakTime = (minutes) => {
+        if (!minutes) return '0m';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0) {
+            return `${hours}h ${mins}m`;
+        }
+        return `${mins}m`;
+    };
+
     const formatTime = (dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -124,40 +164,114 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) =
                 <>
                     {currentAttendance ? (
                         <div className="space-y-4">
-                            <div className={`p-4 rounded-xl border ${darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                            <div className={`p-4 rounded-xl border ${currentAttendance.onBreak 
+                                ? (darkMode ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200')
+                                : (darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200')
+                            }`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${darkMode ? 'bg-emerald-400' : 'bg-emerald-500'} animate-pulse`} />
-                                        <span className={`text-xs font-black tracking-widest uppercase ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Active</span>
+                                        <div className={`w-2 h-2 rounded-full ${currentAttendance.onBreak 
+                                            ? (darkMode ? 'bg-amber-400' : 'bg-amber-500')
+                                            : (darkMode ? 'bg-emerald-400' : 'bg-emerald-500')
+                                        } animate-pulse`} />
+                                        <span className={`text-xs font-black tracking-widest uppercase ${currentAttendance.onBreak 
+                                            ? (darkMode ? 'text-amber-400' : 'text-amber-600')
+                                            : (darkMode ? 'text-emerald-400' : 'text-emerald-600')
+                                        }`}>
+                                            {currentAttendance.onBreak ? 'On Break' : 'Active'}
+                                        </span>
                                     </div>
-                                    <span className={`text-xs font-bold ${textSecondary}`}>{currentAttendance.hoursWorked}</span>
+                                    <span className={`text-xs font-bold ${textSecondary}`}>{currentAttendance.hoursWorked || '0h 0m'}</span>
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <LogIn className={`w-4 h-4 ${textSecondary}`} />
                                         <span className={`text-sm font-bold ${textPrimary}`}>Punched In: {formatTime(currentAttendance.punchIn)}</span>
                                     </div>
+                                    {currentAttendance.totalBreakTime > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <Coffee className={`w-4 h-4 ${textSecondary}`} />
+                                            <span className={`text-xs font-bold ${textSecondary}`}>
+                                                Break Time: {formatBreakTime(currentAttendance.totalBreakTime)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {currentAttendance.onBreak && currentAttendance.breaks && currentAttendance.breaks.length > 0 && (() => {
+                                        const activeBreak = currentAttendance.breaks.find(b => !b.breakEnd);
+                                        return activeBreak ? (
+                                            <div className="flex items-center gap-2">
+                                                <Coffee className={`w-4 h-4 ${textSecondary}`} />
+                                                <span className={`text-xs font-bold ${textSecondary}`}>
+                                                    Break started: {formatTime(activeBreak.breakStart)}
+                                                </span>
+                                            </div>
+                                        ) : null;
+                                    })()}
                                     <p className={`text-[10px] ${textSecondary}`}>{formatDate(currentAttendance.punchIn)}</p>
                                 </div>
                             </div>
-                            <button
-                                onClick={handlePunchOut}
-                                disabled={isPunching}
-                                className={`w-full py-4 rounded-xl font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
-                                    darkMode 
-                                        ? 'bg-rose-600 hover:bg-rose-500 text-white' 
-                                        : 'bg-rose-500 hover:bg-rose-600 text-white'
-                                }`}
-                            >
-                                {isPunching ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                            
+                            {/* Break Controls */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {currentAttendance.onBreak ? (
+                                    <button
+                                        onClick={handleBreakEnd}
+                                        disabled={isPunching}
+                                        className={`col-span-2 py-3 rounded-xl font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                                            darkMode 
+                                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                                                : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                                        }`}
+                                    >
+                                        {isPunching ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <>
+                                        <RotateCcw className="w-4 h-4" />
+                                        End Break
+                                            </>
+                                        )}
+                                    </button>
                                 ) : (
-                                    <>
-                                        <LogOut className="w-5 h-5" />
-                                        Punch Out
-                                    </>
+                                    <button
+                                        onClick={handleBreakStart}
+                                        disabled={isPunching}
+                                        className={`py-3 rounded-xl font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                                            darkMode 
+                                                ? 'bg-amber-600 hover:bg-amber-500 text-white' 
+                                                : 'bg-amber-500 hover:bg-amber-600 text-white'
+                                        }`}
+                                    >
+                                        {isPunching ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Coffee className="w-4 h-4" />
+                                                Start Break
+                                            </>
+                                        )}
+                                    </button>
                                 )}
-                            </button>
+                                
+                                <button
+                                    onClick={handlePunchOut}
+                                    disabled={isPunching || currentAttendance.onBreak}
+                                    className={`py-3 rounded-xl font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                                        darkMode 
+                                            ? 'bg-rose-600 hover:bg-rose-500 text-white' 
+                                            : 'bg-rose-500 hover:bg-rose-600 text-white'
+                                    }`}
+                                >
+                                    {isPunching ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <LogOut className="w-4 h-4" />
+                                            Punch Out
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="space-y-4">

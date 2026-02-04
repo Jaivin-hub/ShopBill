@@ -25,6 +25,8 @@ const API = {
     // Attendance/Punch In-Out Endpoints
     attendancePunchIn: API_BASE_URL + '/attendance/punch-in', // POST
     attendancePunchOut: API_BASE_URL + '/attendance/punch-out', // POST
+    attendanceBreakStart: API_BASE_URL + '/attendance/break-start', // POST
+    attendanceBreakEnd: API_BASE_URL + '/attendance/break-end', // POST
     attendanceCurrent: API_BASE_URL + '/attendance/current', // GET
     attendanceMyRecords: API_BASE_URL + '/attendance/my-records', // GET
     attendanceStaff: (staffId) => `${API_BASE_URL}/attendance/staff/${staffId}`, // GET
