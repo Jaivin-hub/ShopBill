@@ -29,6 +29,7 @@ const API = {
     attendanceMyRecords: API_BASE_URL + '/attendance/my-records', // GET
     attendanceStaff: (staffId) => `${API_BASE_URL}/attendance/staff/${staffId}`, // GET
     attendanceAll: API_BASE_URL + '/attendance/all', // GET
+    attendanceActiveStatus: API_BASE_URL + '/attendance/active-status', // GET
 
     // Existing Business Endpoints
     inventory: API_BASE_URL + '/inventory',

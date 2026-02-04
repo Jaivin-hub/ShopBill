@@ -151,7 +151,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 2, manager: 2, cashier: null } },
             { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 3, cashier: 2 } },
             { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 4, manager: 4, cashier: 3 } },
-            { label: 'Staff & Permissions', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 5, manager: null, cashier: null } },
+            { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 5, manager: null, cashier: null } },
             ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
                 ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 6, manager: 5, cashier: null } }]
                 : []

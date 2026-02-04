@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
-    ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, HelpCircle
+    ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, HelpCircle, Clock, CheckCircle2, XCircle
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
@@ -109,9 +109,25 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
+
+    // Format punch in time
+    const formatPunchInTime = (punchIn) => {
+        if (!punchIn) return '';
+        const date = new Date(punchIn);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m ago`;
+        
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
 
     return (
         <div className="space-y-3">
@@ -126,10 +142,49 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         <div className="min-w-0 flex-1">
                             <h3 className={`text-base md:text-lg font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
                             <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
-                            <div className="flex items-center gap-2 mt-2">
+                            {staff.role !== 'owner' && (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <div className={`flex items-center gap-1.5 ${isCurrentlyActive 
+                                        ? (darkMode ? 'text-emerald-400' : 'text-emerald-600')
+                                        : (darkMode ? 'text-slate-500' : 'text-slate-400')
+                                    }`}>
+                                        <div className={`w-2 h-2 rounded-full ${isCurrentlyActive 
+                                            ? (darkMode ? 'bg-emerald-500' : 'bg-emerald-500')
+                                            : (darkMode ? 'bg-slate-600' : 'bg-slate-400')
+                                        } ${isCurrentlyActive ? 'animate-pulse' : ''}`} />
+                                        <span className={`text-[10px] md:text-[11px] font-bold ${isCurrentlyActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                            {isCurrentlyActive ? 'Currently Working' : 'Not Working'}
+                                        </span>
+                                    </div>
+                                    {isCurrentlyActive && punchInTime && (
+                                        <span className={`text-[9px] md:text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            • {formatPunchInTime(punchInTime)}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${getRoleStyles(staff.role, darkMode)}`}>
                                     {staff.role}
                                 </span>
+                                {staff.active && !isPendingActivation && (
+                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
+                                        <CheckCircle2 className="w-2.5 h-2.5" />
+                                        Account Active
+                                    </span>
+                                )}
+                                {!staff.active && !isPendingActivation && (
+                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-slate-700/50 text-slate-400 border-slate-600' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
+                                        <XCircle className="w-2.5 h-2.5" />
+                                        Account Deactivated
+                                    </span>
+                                )}
+                                {isPendingActivation && (
+                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>
+                                        <AlertCircle className="w-2.5 h-2.5" />
+                                        Pending Setup
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -141,14 +196,14 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         disabled={isActionDisabled || isPendingActivation} 
                         className={`w-full sm:w-auto px-4 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
                             staff.active 
-                            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white'
+                            ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
                             : isPendingActivation
                             ? (darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
-                            : (darkMode ? 'bg-slate-800 text-slate-400 border border-slate-700' : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-slate-400')
+                            : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white')
                         } disabled:opacity-20`}
                     >
                         <Power className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                        {staff.active ? 'Active' : isPendingActivation ? 'Pending Activation' : 'Offline'}
+                        {staff.active ? 'Deactivate Account' : isPendingActivation ? 'Pending Activation' : 'Activate Account'}
                     </button>
                     {isPendingActivation && (
                         <>
@@ -391,6 +446,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState(null);
+    const [activeStaffIds, setActiveStaffIds] = useState(new Set());
+    const [activeStaffMap, setActiveStaffMap] = useState({}); // Map of staffId -> { punchIn: Date }
 
     // Ensure we have write/read access
     const effectiveRole = currentUserRole || 'owner'; 
@@ -419,9 +476,42 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         }
     }, [apiClient, hasReadAccess, showToast]);
 
+    const fetchActiveStatus = useCallback(async () => {
+        if (!hasReadAccess || !apiClient) return;
+        try {
+            const response = await apiClient.get(API.attendanceActiveStatus);
+            if (response.data?.success) {
+                if (response.data?.activeStaffIds) {
+                    setActiveStaffIds(new Set(response.data.activeStaffIds));
+                }
+                // Store punch in times for display
+                if (response.data?.activeAttendance) {
+                    const map = {};
+                    response.data.activeAttendance.forEach(item => {
+                        if (item.staffId && item.punchIn) {
+                            map[item.staffId] = { punchIn: item.punchIn };
+                        }
+                    });
+                    setActiveStaffMap(map);
+                }
+            }
+        } catch (error) {
+            // Silently fail - active status is not critical
+            console.error('Failed to fetch active status:', error);
+        }
+    }, [apiClient, hasReadAccess]);
+
     useEffect(() => {
         fetchStaff();
-    }, [fetchStaff]);
+        fetchActiveStatus();
+        
+        // Refresh active status every 30 seconds
+        const interval = setInterval(() => {
+            fetchActiveStatus();
+        }, 30000);
+        
+        return () => clearInterval(interval);
+    }, [fetchStaff, fetchActiveStatus]);
 
     const [addStaffError, setAddStaffError] = useState(null);
 
@@ -507,7 +597,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         </button>
                         <div>
                             <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                Staff <span className="text-indigo-500">Directory</span>
+                                Team <span className="text-indigo-500">Management</span>
                             </h1>
                             <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 md:mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                 Access control & permissions management.
@@ -564,6 +654,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                             staff.map((s) => {
                                 const isActionDisabled = !hasWriteAccess || s.role === 'owner';
                                 const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
+                                const isCurrentlyActive = activeStaffIds.has(s._id);
+                                const punchInTime = activeStaffMap[s._id]?.punchIn;
                                 return (
                                     <StaffStatusButton
                                         key={s._id}
@@ -582,6 +674,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         apiClient={apiClient}
                                         API={API}
                                         showToast={showToast}
+                                        isCurrentlyActive={isCurrentlyActive}
+                                        punchInTime={punchInTime}
                                     />
                                 );
                             })

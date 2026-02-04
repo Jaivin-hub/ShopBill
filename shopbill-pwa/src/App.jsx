@@ -166,7 +166,7 @@ const UpdatePrompt = () => {
 
 const UTILITY_NAV_ITEMS_CONFIG = [
   { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-  { id: 'staffPermissions', name: 'Staff & Permissions', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
+  { id: 'staffPermissions', name: 'Team Management', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
   { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 },
   { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
@@ -957,7 +957,7 @@ const App = () => {
                     </div>
                   </div>
                   <div className="px-2 pt-2 pb-4 pb-safe">
-                    {/* Staff & Permissions first (for owners) */}
+                    {/* Team Management first (for owners) */}
                     {utilityNavItems.filter(item => item.id === 'staffPermissions').map(item => (
                       <button
                         key={item.id}

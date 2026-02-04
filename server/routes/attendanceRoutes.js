@@ -68,10 +68,11 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Check if already punched in today
+        // Use UTC to avoid timezone issues
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
         const existingAttendance = await Attendance.findOne({
             staffId: staff._id,
@@ -90,8 +91,8 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Create new attendance record
-        // Set date to start of day for consistent querying
-        const attendanceDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        // Set date to start of day in UTC for consistent querying (avoids timezone issues)
+        const attendanceDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
         let attendance;
         try {
@@ -241,10 +242,11 @@ router.post('/punch-out', protect, async (req, res) => {
         }
 
         // Find today's active attendance
+        // Use UTC to avoid timezone issues
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
         const attendance = await Attendance.findOne({
             staffId: staff._id,
@@ -316,10 +318,11 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
+        // Use UTC to avoid timezone issues
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
         const attendance = await Attendance.findOne({
             staffId: staff._id,
@@ -553,6 +556,68 @@ router.get('/all', protect, async (req, res) => {
     } catch (error) {
         console.error('Get All Attendance Error:', error);
         res.status(500).json({ error: 'Failed to fetch attendance records.' });
+    }
+});
+
+/**
+ * @route GET /api/attendance/active-status
+ * @desc Get active attendance status for all staff in the store (who is currently punched in)
+ * @access Private (Owner/Manager)
+ */
+router.get('/active-status', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'owner' && req.user.role !== 'Manager') {
+            return res.status(403).json({ error: 'Access denied. Only owners and managers can view active attendance status.' });
+        }
+
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected.' });
+        }
+
+        // Get today's date range - Use UTC to avoid timezone issues
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const tomorrow = new Date(today);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+        // Find all active attendance records for today
+        const activeAttendance = await Attendance.find({
+            storeId: req.user.storeId,
+            date: { 
+                $gte: today, 
+                $lt: tomorrow 
+            },
+            status: 'active'
+        })
+        .select('staffId punchIn')
+        .populate('staffId', 'name email')
+        .lean();
+
+        // Return array of staff IDs who are currently active and their punch in times
+        const activeStaffMap = {};
+        activeAttendance.forEach(record => {
+            const staffId = record.staffId?._id?.toString();
+            if (staffId) {
+                activeStaffMap[staffId] = {
+                    punchIn: record.punchIn,
+                    staffName: record.staffId?.name
+                };
+            }
+        });
+
+        res.json({
+            success: true,
+            activeStaffIds: Object.keys(activeStaffMap),
+            activeAttendance: Object.entries(activeStaffMap).map(([staffId, data]) => ({
+                staffId,
+                staffName: data.staffName,
+                punchIn: data.punchIn
+            })),
+            activeStaffMap // Include map for easy lookup
+        });
+    } catch (error) {
+        console.error('Get Active Status Error:', error);
+        res.status(500).json({ error: 'Failed to fetch active attendance status.' });
     }
 });
 

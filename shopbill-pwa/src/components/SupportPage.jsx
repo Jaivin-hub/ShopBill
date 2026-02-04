@@ -145,7 +145,7 @@ const SupportPage = ({ onBack, origin }) => {
                 </div>
                 <div className="space-y-2">
                   <h4 className="font-bold text-gray-200">Can I add more staff?</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">Yes, Owners can add staff via Settings &gt; Staff & Permissions and assign roles like Manager or Cashier.</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">Yes, Owners can add staff via Settings &gt; Team Management and assign roles like Manager or Cashier.</p>
                 </div>
               </div>
             </section>
