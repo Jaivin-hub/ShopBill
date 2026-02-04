@@ -93,28 +93,96 @@ router.post('/punch-in', protect, async (req, res) => {
 
         let attendance;
         try {
-            attendance = await Attendance.create({
+            // Prepare attendance data - mongoose will handle ObjectId conversion automatically
+            const attendanceData = {
                 staffId: staff._id,
-                storeId: req.user.storeId,
+                storeId: req.user.storeId, // mongoose will convert string to ObjectId if needed
                 date: attendanceDate,
                 punchIn: new Date(),
                 status: 'active',
-                location: req.body.location || null,
-                notes: req.body.notes || ''
+                notes: req.body.notes || '',
+                workingHours: 0 // Initialize to 0 for active status
+            };
+
+            // Add location only if provided and valid
+            if (req.body.location && typeof req.body.location === 'object') {
+                if (req.body.location.latitude !== undefined || req.body.location.longitude !== undefined) {
+                    attendanceData.location = {
+                        latitude: req.body.location.latitude || null,
+                        longitude: req.body.location.longitude || null
+                    };
+                }
+            }
+
+            // Validate all required fields before creation
+            if (!attendanceData.staffId) {
+                return res.status(400).json({ error: 'Staff ID is missing.' });
+            }
+            if (!attendanceData.storeId) {
+                return res.status(400).json({ error: 'Store ID is missing.' });
+            }
+            if (!attendanceData.date) {
+                return res.status(400).json({ error: 'Date is missing.' });
+            }
+            if (!attendanceData.punchIn) {
+                return res.status(400).json({ error: 'Punch in time is missing.' });
+            }
+
+            console.log('Creating attendance with data:', {
+                staffId: attendanceData.staffId?.toString(),
+                storeId: attendanceData.storeId?.toString(),
+                date: attendanceData.date,
+                punchIn: attendanceData.punchIn,
+                status: attendanceData.status
             });
+
+            // Use new Attendance() and save() instead of create() for better error handling
+            attendance = new Attendance(attendanceData);
+            await attendance.save();
+            
+            console.log('Attendance created successfully:', attendance._id);
         } catch (createError) {
-            console.error('Attendance creation error:', createError);
-            console.error('Create error details:', {
-                message: createError.message,
-                name: createError.name,
-                errors: createError.errors,
-                staffId: staff._id,
-                storeId: req.user.storeId,
-                date: attendanceDate
+            console.error('=== ATTENDANCE CREATION ERROR ===');
+            console.error('Error:', createError);
+            console.error('Error name:', createError.name);
+            console.error('Error message:', createError.message);
+            console.error('Error code:', createError.code);
+            
+            if (createError.errors) {
+                console.error('Validation errors:');
+                Object.keys(createError.errors).forEach(key => {
+                    console.error(`  ${key}:`, createError.errors[key].message);
+                });
+            }
+            
+            console.error('Data attempted:', {
+                staffId: staff._id?.toString(),
+                storeId: req.user.storeId?.toString(),
+                date: attendanceDate,
+                staffIdType: typeof staff._id,
+                storeIdType: typeof req.user.storeId
             });
+            console.error('=== END ERROR ===');
+            
+            // Return more specific error messages
+            if (createError.name === 'ValidationError') {
+                const validationErrors = Object.values(createError.errors).map(e => e.message).join(', ');
+                return res.status(400).json({ 
+                    error: 'Validation error',
+                    details: validationErrors
+                });
+            }
+            
+            if (createError.name === 'CastError') {
+                return res.status(400).json({ 
+                    error: 'Invalid data format',
+                    details: `Invalid ${createError.path}: ${createError.value}`
+                });
+            }
+            
             return res.status(500).json({ 
                 error: 'Failed to create attendance record.',
-                details: process.env.NODE_ENV === 'development' ? createError.message : undefined
+                details: process.env.NODE_ENV === 'development' ? createError.message : 'Please check server logs for details'
             });
         }
 
