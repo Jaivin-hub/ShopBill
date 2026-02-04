@@ -385,9 +385,13 @@ router.get('/my-records', protect, async (req, res) => {
         const query = { staffId: staff._id };
 
         if (startDate && endDate) {
+            // Parse dates and set to UTC midnight for start, and end of day for end date
+            // This ensures we capture all records for the date range regardless of timezone
+            const start = new Date(startDate + 'T00:00:00.000Z');
+            const end = new Date(endDate + 'T23:59:59.999Z');
             query.date = {
-                $gte: new Date(startDate),
-                $lte: new Date(endDate)
+                $gte: start,
+                $lte: end
             };
         }
 
@@ -450,9 +454,13 @@ router.get('/staff/:staffId', protect, async (req, res) => {
         const query = { staffId: staff._id };
 
         if (startDate && endDate) {
+            // Parse dates and set to UTC midnight for start, and end of day for end date
+            // This ensures we capture all records for the date range regardless of timezone
+            const start = new Date(startDate + 'T00:00:00.000Z');
+            const end = new Date(endDate + 'T23:59:59.999Z');
             query.date = {
-                $gte: new Date(startDate),
-                $lte: new Date(endDate)
+                $gte: start,
+                $lte: end
             };
         }
 
@@ -523,9 +531,13 @@ router.get('/all', protect, async (req, res) => {
         }
 
         if (startDate && endDate) {
+            // Parse dates and set to UTC midnight for start, and end of day for end date
+            // This ensures we capture all records for the date range regardless of timezone
+            const start = new Date(startDate + 'T00:00:00.000Z');
+            const end = new Date(endDate + 'T23:59:59.999Z');
             query.date = {
-                $gte: new Date(startDate),
-                $lte: new Date(endDate)
+                $gte: start,
+                $lte: end
             };
         }
 

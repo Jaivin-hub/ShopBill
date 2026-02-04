@@ -22,8 +22,10 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
             setIsLoading(true);
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
-            const startDate = new Date(year, month, 1).toISOString().split('T')[0];
-            const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+            // Use UTC dates to match server-side date storage (avoid timezone conversion issues)
+            const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
             const response = await apiClient.get(
                 `${API.attendanceStaff(staffId)}?startDate=${startDate}&endDate=${endDate}`
@@ -61,12 +63,17 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
 
     const getAttendanceForDate = (day) => {
         if (day === null) return null;
-        const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-        const dateStr = date.toISOString().split('T')[0];
+        // Create date in UTC to match server-side date storage
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
         return attendance.find(record => {
-            const recordDate = new Date(record.date).toISOString().split('T')[0];
-            return recordDate === dateStr;
+            if (!record.date) return false;
+            // Parse the record date and get the UTC date string
+            const recordDate = new Date(record.date);
+            const recordDateStr = `${recordDate.getUTCFullYear()}-${String(recordDate.getUTCMonth() + 1).padStart(2, '0')}-${String(recordDate.getUTCDate()).padStart(2, '0')}`;
+            return recordDateStr === dateStr;
         });
     };
 
