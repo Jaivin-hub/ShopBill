@@ -109,7 +109,7 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
 
@@ -145,15 +145,26 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             {staff.role !== 'owner' && (
                                 <div className="flex items-center gap-2 mt-2">
                                     <div className={`flex items-center gap-1.5 ${isCurrentlyActive 
-                                        ? (darkMode ? 'text-emerald-400' : 'text-emerald-600')
+                                        ? (isOnBreak 
+                                            ? (darkMode ? 'text-amber-400' : 'text-amber-600')
+                                            : (darkMode ? 'text-emerald-400' : 'text-emerald-600'))
                                         : (darkMode ? 'text-slate-500' : 'text-slate-400')
                                     }`}>
                                         <div className={`w-2 h-2 rounded-full ${isCurrentlyActive 
-                                            ? (darkMode ? 'bg-emerald-500' : 'bg-emerald-500')
+                                            ? (isOnBreak 
+                                                ? (darkMode ? 'bg-amber-500' : 'bg-amber-500')
+                                                : (darkMode ? 'bg-emerald-500' : 'bg-emerald-500'))
                                             : (darkMode ? 'bg-slate-600' : 'bg-slate-400')
                                         } ${isCurrentlyActive ? 'animate-pulse' : ''}`} />
-                                        <span className={`text-[10px] md:text-[11px] font-bold ${isCurrentlyActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                                            {isCurrentlyActive ? 'Currently Working' : 'Not Working'}
+                                        <span className={`text-[10px] md:text-[11px] font-bold ${isCurrentlyActive 
+                                            ? (isOnBreak 
+                                                ? 'text-amber-600 dark:text-amber-400'
+                                                : 'text-emerald-600 dark:text-emerald-400')
+                                            : 'text-slate-500 dark:text-slate-400'
+                                        }`}>
+                                            {isCurrentlyActive 
+                                                ? (isOnBreak ? 'On Break' : 'Currently Working')
+                                                : 'Not Working'}
                                         </span>
                                     </div>
                                     {isCurrentlyActive && punchInTime && (
@@ -484,12 +495,15 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 if (response.data?.activeStaffIds) {
                     setActiveStaffIds(new Set(response.data.activeStaffIds));
                 }
-                // Store punch in times for display
+                // Store punch in times and break status for display
                 if (response.data?.activeAttendance) {
                     const map = {};
                     response.data.activeAttendance.forEach(item => {
                         if (item.staffId && item.punchIn) {
-                            map[item.staffId] = { punchIn: item.punchIn };
+                            map[item.staffId] = { 
+                                punchIn: item.punchIn,
+                                onBreak: item.onBreak || false
+                            };
                         }
                     });
                     setActiveStaffMap(map);
@@ -656,6 +670,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
                                 const isCurrentlyActive = activeStaffIds.has(s._id);
                                 const punchInTime = activeStaffMap[s._id]?.punchIn;
+                                const isOnBreak = activeStaffMap[s._id]?.onBreak || false;
                                 return (
                                     <StaffStatusButton
                                         key={s._id}
@@ -676,6 +691,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         showToast={showToast}
                                         isCurrentlyActive={isCurrentlyActive}
                                         punchInTime={punchInTime}
+                                        isOnBreak={isOnBreak}
                                     />
                                 );
                             })

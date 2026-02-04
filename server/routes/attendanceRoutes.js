@@ -802,7 +802,7 @@ router.get('/active-status', protect, async (req, res) => {
             },
             status: 'active'
         })
-        .select('staffId punchIn')
+        .select('staffId punchIn onBreak')
         .populate('staffId', 'name email')
         .lean();
 
@@ -813,7 +813,8 @@ router.get('/active-status', protect, async (req, res) => {
             if (staffId) {
                 activeStaffMap[staffId] = {
                     punchIn: record.punchIn,
-                    staffName: record.staffId?.name
+                    staffName: record.staffId?.name,
+                    onBreak: record.onBreak || false
                 };
             }
         });
@@ -824,7 +825,8 @@ router.get('/active-status', protect, async (req, res) => {
             activeAttendance: Object.entries(activeStaffMap).map(([staffId, data]) => ({
                 staffId,
                 staffName: data.staffName,
-                punchIn: data.punchIn
+                punchIn: data.punchIn,
+                onBreak: data.onBreak
             })),
             activeStaffMap // Include map for easy lookup
         });
