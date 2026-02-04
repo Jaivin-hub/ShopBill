@@ -274,6 +274,23 @@ const App = () => {
     } catch (error) { console.error("Error fetching notifications:", error); }
   }, [currentUser]);
 
+  // Fetch a single outlet by ID
+  const fetchOutletById = useCallback(async (outletId) => {
+    if (!outletId || !isPremium) return null;
+    try {
+      const response = await apiClient.get(API.outletDetails(outletId));
+      if (response.data?.success) {
+        return response.data.data;
+      }
+    } catch (error) {
+      if (error.cancelled || error.message?.includes('cancelled')) {
+        return null;
+      }
+      console.error('Error fetching outlet by ID:', error);
+    }
+    return null;
+  }, [apiClient, API, isPremium]);
+
   const fetchOutlets = useCallback(async () => {
     if (!currentUser || !isPremium) {
       setOutlets([]);
@@ -330,7 +347,15 @@ const App = () => {
         } else {
           if (!currentOutlet && currentOutletId) {
             const activeOutlet = outletsList.find(o => o._id === currentOutletId);
-            if (activeOutlet) setCurrentOutlet(activeOutlet);
+            if (activeOutlet) {
+              setCurrentOutlet(activeOutlet);
+            } else {
+              // If outlet not found in list, fetch it individually
+              const fetchedOutlet = await fetchOutletById(currentOutletId);
+              if (fetchedOutlet) {
+                setCurrentOutlet(fetchedOutlet);
+              }
+            }
           }
         }
       }
@@ -341,7 +366,7 @@ const App = () => {
       }
       console.error('Error fetching outlets:', error);
     }
-  }, [currentUser, isPremium, currentOutlet, currentOutletId]);
+  }, [currentUser, isPremium, currentOutlet, currentOutletId, fetchOutletById, apiClient, API]);
 
   useEffect(() => {
     if (currentUser && isPremium) {
@@ -351,6 +376,17 @@ const App = () => {
       outletRestoredRef.current = false;
     }
   }, [currentUser, isPremium, fetchOutlets]);
+
+  // Ensure outlet is fetched if we have ID but not the outlet object
+  useEffect(() => {
+    if (currentUser && isPremium && currentOutletId && !currentOutlet) {
+      fetchOutletById(currentOutletId).then(outlet => {
+        if (outlet) {
+          setCurrentOutlet(outlet);
+        }
+      });
+    }
+  }, [currentUser, isPremium, currentOutletId, currentOutlet, fetchOutletById]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -457,15 +493,30 @@ const App = () => {
     outletRestoredRef.current = false;
   }, []);
 
-  const handleLoginSuccess = useCallback((user, token) => {
+  const handleLoginSuccess = useCallback(async (user, token) => {
     const normalizedUser = { ...user, role: user.role.toLowerCase() };
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
     const lastSelectedOutletId = localStorage.getItem('lastSelectedOutletId');
-    setCurrentOutletId(lastSelectedOutletId || normalizedUser.activeStoreId || null);
+    const outletId = lastSelectedOutletId || normalizedUser.activeStoreId || null;
+    setCurrentOutletId(outletId);
+    
+    // If we have an outlet ID and user is premium, fetch the outlet immediately
+    if (outletId && normalizedUser.plan?.toLowerCase() === 'premium') {
+      try {
+        const outlet = await apiClient.get(API.outletDetails(outletId));
+        if (outlet.data?.success && outlet.data.data) {
+          setCurrentOutlet(outlet.data.data);
+        }
+      } catch (error) {
+        // Silently fail - fetchOutlets will handle it
+        console.error('Failed to fetch outlet on login:', error);
+      }
+    }
+    
     setCurrentPage('dashboard'); // All roles start at dashboard now
-  }, []);
+  }, [apiClient, API]);
 
   const handleOutletSwitch = useCallback((outlet) => {
     if (outlet) {

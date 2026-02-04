@@ -5,6 +5,7 @@ import {
     ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, HelpCircle
 } from 'lucide-react';
 import API from '../config/api';
+import StaffAttendanceView from './StaffAttendanceView';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -108,13 +109,16 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast }) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const [showAttendance, setShowAttendance] = useState(false);
 
     return (
-        <div 
-            className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-6 border rounded-xl md:rounded-2xl transition-all ${cardBase} ${darkMode ? 'hover:border-slate-700' : 'hover:border-indigo-200'}`}
-        >
+        <div className="space-y-3">
+            <div 
+                className={`group flex flex-col p-4 md:p-6 border rounded-xl md:rounded-2xl transition-all ${cardBase} ${darkMode ? 'hover:border-slate-700' : 'hover:border-indigo-200'}`}
+            >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center gap-4 md:gap-5 flex-1 min-w-0">
                 <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center border shrink-0 ${getRoleStyles(staff.role, darkMode)}`}>
                     {staff.role === 'owner' ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <User className="w-5 h-5 md:w-6 md:h-6" />}
@@ -189,7 +193,26 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                 >
                     <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
+                </div>
+                {staff.role !== 'owner' && (
+                    <button
+                        onClick={() => setShowAttendance(!showAttendance)}
+                        className={`w-full mt-4 py-2 px-4 rounded-lg text-xs font-black transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+                    >
+                        {showAttendance ? 'Hide' : 'View'} Attendance
+                    </button>
+                )}
             </div>
+            {showAttendance && staff.role !== 'owner' && apiClient && API && showToast && (
+                <StaffAttendanceView
+                    apiClient={apiClient}
+                    API={API}
+                    showToast={showToast}
+                    darkMode={darkMode}
+                    staffId={staff._id}
+                    staffName={staff.name}
+                />
+            )}
         </div>
     );
 };
@@ -555,6 +578,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         darkMode={darkMode}
                                         borderStyle={borderStyle}
                                         cardBase={cardBase}
+                                        apiClient={apiClient}
+                                        API={API}
+                                        showToast={showToast}
                                     />
                                 );
                             })

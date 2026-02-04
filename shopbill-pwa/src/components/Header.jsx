@@ -36,6 +36,23 @@ const Header = ({
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
     const hubBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200';
 
+    // Fetch outlet if we have ID but not the outlet object
+    useEffect(() => {
+        if (isPremium && isOwner && currentOutletId && !currentOutlet && apiClient && API) {
+            const fetchOutlet = async () => {
+                try {
+                    const response = await apiClient.get(API.outletDetails(currentOutletId));
+                    if (response.data?.success && response.data.data) {
+                        onOutletSwitch(response.data.data);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch outlet in Header:', error);
+                }
+            };
+            fetchOutlet();
+        }
+    }, [isPremium, isOwner, currentOutletId, currentOutlet, apiClient, API, onOutletSwitch]);
+
     // Fetch outlets when Hub is opened
     useEffect(() => {
         if (showStoreHub && isPremium) {
@@ -116,7 +133,7 @@ const Header = ({
                         <h1 className={`text-lg font-bold tracking-tight truncate leading-tight ${logoText}`}>
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
-                        {isPremium && isOwner && currentOutlet && (
+                        {isPremium && isOwner && currentOutlet?.name && (
                             <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
                                 {currentOutlet.name}
                             </p>

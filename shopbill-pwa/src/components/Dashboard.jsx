@@ -6,6 +6,7 @@ import {
     ChevronRight, Inbox, Sparkles, Box, ArrowRight,
     Store, MapPin, BarChart3, Settings2, Truck
 } from 'lucide-react';
+import AttendancePunch from './AttendancePunch';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
@@ -150,11 +151,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 2, manager: 2, cashier: null } },
             { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 3, cashier: 2 } },
             { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 4, manager: 4, cashier: 3 } },
+            { label: 'Staff & Permissions', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 5, manager: null, cashier: null } },
             ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
-                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 5, manager: 5, cashier: null } }]
+                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 6, manager: 5, cashier: null } }]
                 : []
-            ),
-            { label: 'Refresh', icon: RefreshCw, color: 'bg-slate-600', action: fetchDashboardData, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 6, manager: 6, cashier: 4 } }
+            )
         ];
         
         // Filter by role and sort by order
@@ -213,6 +214,14 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                     </div>
                     
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={fetchDashboardData}
+                            disabled={isLoading}
+                            className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                            title="Refresh Dashboard"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'} ${isLoading ? 'animate-spin' : ''}`} />
+                        </button>
                         <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl border border-inherit">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-[10px] font-black tracking-widest opacity-60">SYSTEM LIVE</span>
@@ -263,18 +272,44 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                         </div>
                     </section>
 
+                    {/* ATTENDANCE PUNCH (For Staff Only) */}
+                    {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (
+                        <div className="mb-4">
+                            <AttendancePunch
+                                apiClient={apiClient}
+                                API={API}
+                                showToast={showToast}
+                                darkMode={darkMode}
+                                currentUser={currentUser}
+                            />
+                        </div>
+                    )}
+
                     {/* ACTION BUTTONS */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {quickActions.map((btn, i) => (
-                            <button
-                                key={i}
-                                onClick={btn.action || (() => setCurrentPage(btn.page))}
-                                className={`p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}
-                            >
-                                <div className={`${btn.color} p-2 rounded-xl text-white shadow-lg`}><btn.icon size={18} /></div>
-                                <span className="text-xs font-black tracking-tight ">{btn.label}</span>
-                            </button>
-                        ))}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                        {quickActions.map((btn, i) => {
+                            const totalItems = quickActions.length;
+                            const isLastItem = i === totalItems - 1;
+                            
+                            // Mobile: if last item is alone in 2-column grid (7 items = 2+2+2+1), make it span full width
+                            const itemsInLastRow2Col = totalItems % 2;
+                            const shouldSpanMobile = isLastItem && itemsInLastRow2Col === 1;
+                            
+                            // Tablet/Desktop: if last item is alone in 3-column grid (7 items = 3+3+1), make it span 2 columns
+                            const itemsInLastRow3Col = totalItems % 3;
+                            const shouldSpan3Col = isLastItem && itemsInLastRow3Col === 1 && totalItems > 3;
+                            
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={btn.action || (() => setCurrentPage(btn.page))}
+                                    className={`${shouldSpanMobile ? 'col-span-2 sm:col-span-1' : ''} ${shouldSpan3Col ? 'sm:col-span-2 lg:col-span-2 xl:col-span-1' : ''} p-3 rounded-2xl border flex items-center gap-3 hover:scale-[1.03] active:scale-95 transition-all ${cardBase}`}
+                                >
+                                    <div className={`${btn.color} p-2 rounded-xl text-white shadow-lg shrink-0`}><btn.icon size={18} /></div>
+                                    <span className="text-xs font-black tracking-tight">{btn.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* INSIGHTS GRID */}

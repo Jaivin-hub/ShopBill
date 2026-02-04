@@ -21,6 +21,14 @@ const API = {
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,
+    
+    // Attendance/Punch In-Out Endpoints
+    attendancePunchIn: API_BASE_URL + '/attendance/punch-in', // POST
+    attendancePunchOut: API_BASE_URL + '/attendance/punch-out', // POST
+    attendanceCurrent: API_BASE_URL + '/attendance/current', // GET
+    attendanceMyRecords: API_BASE_URL + '/attendance/my-records', // GET
+    attendanceStaff: (staffId) => `${API_BASE_URL}/attendance/staff/${staffId}`, // GET
+    attendanceAll: API_BASE_URL + '/attendance/all', // GET
 
     // Existing Business Endpoints
     inventory: API_BASE_URL + '/inventory',
