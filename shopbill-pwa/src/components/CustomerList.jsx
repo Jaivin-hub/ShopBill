@@ -127,11 +127,9 @@ const CustomerList = ({
                 {/* Action Buttons and Amount Display - Single line alignment */}
                 <div className="flex items-center gap-3 opacity-100 transition-opacity shrink-0">
                     {outstandingAmount > 0 && (
-                        <div className={`flex items-center px-3 py-1.5 rounded-lg border ${isOverLimit ? 'bg-rose-500/10 border-rose-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
-                            <p className={`text-sm font-black tracking-tight tabular-nums ${isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500'}`}>
-                                ₹{outstandingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                        </div>
+                        <p className={`text-sm font-black tracking-tight tabular-nums ${isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500'}`}>
+                            ₹{outstandingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
                     )}
                     <button
                         onClick={(e) => {
