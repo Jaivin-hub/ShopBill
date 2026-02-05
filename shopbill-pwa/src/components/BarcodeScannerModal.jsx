@@ -49,8 +49,8 @@ const BarcodeScannerModal = ({ isOpen, onClose, onScan, showToast }) => {
             overlayClassName="fixed inset-0 bg-black/75 z-40"
             aria-labelledby="barcode-scanner-title"
         >
-            <section className="bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 w-full max-w-md shadow-2xl my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col" role="dialog" aria-modal="true">
-                <header className="flex justify-between items-center border-b pb-3 border-gray-700 flex-shrink-0">
+            <section className="bg-gray-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 w-full max-w-md shadow-2xl h-[85vh] sm:h-[80vh] max-h-[550px] flex flex-col" role="dialog" aria-modal="true">
+                <header className="flex justify-between items-center border-b pb-2 sm:pb-3 border-gray-700 flex-shrink-0">
                     <h2 id="barcode-scanner-title" className="text-base sm:text-lg md:text-xl font-bold text-white flex items-center">
                         <Camera className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-teal-400" aria-hidden="true" /> <span className="hidden sm:inline">Mobile Camera Scan</span><span className="sm:hidden">Camera Scan</span>
                     </h2>
@@ -59,7 +59,7 @@ const BarcodeScannerModal = ({ isOpen, onClose, onScan, showToast }) => {
                     </button>
                 </div>
 
-                <div className="mt-4 p-3 sm:p-4 text-center bg-gray-900 rounded-lg h-48 sm:h-56 md:h-64 flex flex-col items-center justify-center relative flex-1 min-h-0">
+                <div className="mt-3 sm:mt-4 p-2 sm:p-3 text-center bg-gray-900 rounded-lg flex flex-col items-center justify-center relative flex-1 min-h-0 overflow-hidden">
                     {/* 🌟 NEW ELEMENT: The video feed for the scanner is referenced by 'ref' */}
                     <video ref={ref} className='w-full h-full object-cover rounded-lg' />
                     

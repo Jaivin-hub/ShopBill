@@ -61,7 +61,7 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
     const secondaryText = darkMode ? 'text-gray-400' : 'text-slate-500';
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm animate-in fade-in duration-200">
             {/* Custom Scrollbar Styles */}
             <style dangerouslySetInnerHTML={{ __html: `
                 .bill-scroll::-webkit-scrollbar { width: 4px; }
@@ -87,8 +87,8 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                 }
             `}} />
 
-            <div className={`${modalBg} print-content rounded-xl border w-full max-w-md overflow-hidden transform animate-in zoom-in-95 shadow-2xl`}>
-                <div className={`p-5 border-b flex justify-between items-center print-bg ${headerBg} ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+            <div className={`${modalBg} print-content rounded-xl border w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] overflow-hidden transform animate-in zoom-in-95 shadow-2xl flex flex-col`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center print-bg ${headerBg} ${darkMode ? 'border-gray-800' : 'border-slate-100'} flex-shrink-0`}>
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
                             <Receipt className="w-3.5 h-3.5 text-indigo-500 no-print" />
@@ -106,7 +106,7 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto bill-scroll">
+                <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto bill-scroll flex-1 min-h-0">
                     {/* Shop Header Information */}
                     {shopInfo && (
                         <div className={`pb-4 border-b text-center space-y-1 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>

@@ -553,13 +553,13 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
 
       {/* Recent Sales Modal */}
       {isRecentSalesOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setIsRecentSalesOpen(false)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4" onClick={() => setIsRecentSalesOpen(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div 
-            className={`relative w-full max-w-xl md:max-w-2xl max-h-[85vh] md:max-h-[80vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}
+            className={`relative w-full max-w-xl md:max-w-2xl h-[85vh] sm:h-[80vh] max-h-[600px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
+            <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
               <div className="flex items-center gap-3">
                 <Receipt className={`w-5 h-5 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
                 <div>
@@ -673,9 +673,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
 
       {/* Bill Modal - Reusing from SalesActivityPage */}
       {selectedSale && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }}>
           <div 
-            className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl max-h-[90vh] flex flex-col`}
+            className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl h-[85vh] sm:h-[80vh] max-h-[600px] flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             {isFetchingSaleDetail ? (

@@ -145,11 +145,11 @@ const ScannerModal = ({
             onClick={isAutoClosing ? null : onClose} 
         >
             <div 
-                className={`w-full max-w-lg rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden transition-all transform animate-in zoom-in-95 duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}
+                className={`w-full max-w-lg h-[85vh] sm:h-[80vh] max-h-[600px] rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden transition-all transform animate-in zoom-in-95 duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} flex flex-col`}
                 onClick={(e) => e.stopPropagation()} 
             >
                 {/* Header Section */}
-                <div className={`p-4 sm:p-5 md:p-6 border-b flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'} flex-shrink-0`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-100'} flex-shrink-0`}>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
@@ -169,7 +169,7 @@ const ScannerModal = ({
                 </div>
 
                 {/* Viewport Section */}
-                <div className="p-4 sm:p-5 md:p-6 overflow-y-auto flex-1 min-h-0">
+                <div className="p-3 sm:p-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                     <div 
                         className={`aspect-square w-full rounded-2xl overflow-hidden relative border-2 group cursor-none transition-all duration-300 ${darkMode ? 'bg-black border-gray-800' : 'bg-slate-100 border-slate-200'}`}
                         style={{ minHeight: '320px' }}

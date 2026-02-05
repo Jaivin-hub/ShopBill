@@ -99,6 +99,19 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
             });
         }
 
+        // Check store limit for PREMIUM accounts (max 10 stores)
+        const currentStoreCount = await Store.countDocuments({ 
+            ownerId: req.user.id, 
+            isActive: true 
+        });
+
+        if (currentStoreCount >= 10) {
+            return res.status(403).json({
+                success: false,
+                error: 'Store Limit Reached: Premium accounts can create up to 10 stores. You have reached the maximum limit. Please deactivate an existing store to create a new one.'
+            });
+        }
+
         const { name, taxId, address, phone, email, settings } = req.body;
 
         // Validate required fields

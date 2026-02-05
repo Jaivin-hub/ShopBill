@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { 
     AlertTriangle, CheckCircle, Info, X, BellOff, 
     ShieldAlert, Sparkles, Trash2, Clock, Activity,
-    ShieldCheck, Zap, Layers, Bell
+    ShieldCheck, Zap, Layers, Bell, CreditCard, DollarSign, ArrowDown, ArrowUp
 } from 'lucide-react';
 import apiClient from '../lib/apiClient';
 import Api from '../config/api'
@@ -56,7 +56,7 @@ const getNotificationTypeDetails = (type) => {
             };
         case 'ledger_payment':
             return { 
-                icon: CheckCircle, 
+                icon: CreditCard, 
                 color: 'text-emerald-500', 
                 bgColor: 'bg-emerald-500/10', 
                 borderColor: 'border-emerald-500/20',
@@ -65,7 +65,7 @@ const getNotificationTypeDetails = (type) => {
             };
         case 'ledger_credit':
             return { 
-                icon: AlertTriangle, 
+                icon: DollarSign, 
                 color: 'text-amber-500', 
                 bgColor: 'bg-amber-500/10', 
                 borderColor: 'border-amber-500/20',

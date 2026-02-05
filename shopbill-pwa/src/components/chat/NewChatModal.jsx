@@ -33,9 +33,9 @@ const NewChatModal = ({
     });
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto">
-            <div className={`${cardBase} w-full max-w-md rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
-                <div className={`p-4 sm:p-5 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center flex-shrink-0`}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-3 sm:p-4">
+            <div className={`${cardBase} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl flex flex-col`}>
+                <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center flex-shrink-0`}>
                     <h3 className={`text-base sm:text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {newChatType === 'group' ? 'Create Custom Group' : 'New Direct Chat'}
                     </h3>
@@ -48,7 +48,7 @@ const NewChatModal = ({
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                     {/* Group Name */}
                     {newChatType === 'group' && (
                         <div>
@@ -208,7 +208,7 @@ const NewChatModal = ({
                         </div>
                 </div>
 
-                <div className={`p-4 sm:p-5 md:p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
+                <div className={`p-3 sm:p-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
                     <button
                         type="button"
                         onClick={onClose}

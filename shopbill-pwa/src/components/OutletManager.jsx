@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import { 
     Store, Plus, MapPin, Phone, 
     MoreVertical, Power, Edit3, Trash2, 
     ArrowUpRight, Building2, ShieldCheck,
     Loader2, X, Save, Mail, Globe, 
-    Receipt, AlertCircle
+    Receipt, AlertCircle, Search
 } from 'lucide-react';
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
@@ -15,6 +16,8 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOutlet, setEditingOutlet] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const [formData, setFormData] = useState({
         name: '',
         taxId: '',
@@ -32,6 +35,19 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
+
+    // Filter outlets based on search term
+    const filteredOutlets = useMemo(() => {
+        if (!debouncedSearchTerm.trim()) return outlets;
+        const term = debouncedSearchTerm.toLowerCase().trim();
+        return outlets.filter(outlet =>
+            outlet.name?.toLowerCase().includes(term) ||
+            outlet.address?.toLowerCase().includes(term) ||
+            outlet.phone?.includes(term) ||
+            outlet.email?.toLowerCase().includes(term) ||
+            outlet.taxId?.toLowerCase().includes(term)
+        );
+    }, [outlets, debouncedSearchTerm]);
 
     useEffect(() => {
         if (isPremium && currentUser) {
@@ -197,26 +213,58 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     }
 
     return (
-        <main className="p-4 md:p-8 min-h-screen bg-transparent text-white">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                        STORE NETWORK
-                    </h1>
-                    <p className="text-slate-500 text-xs font-bold mt-1 tracking-wide uppercase opacity-70">
-                        Managing {outlets.length} active branches across your enterprise
-                    </p>
+        <main className="min-h-screen bg-transparent text-white">
+            {/* Sticky Header */}
+            <header className={`sticky top-0 z-[50] ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
+                <div className="p-4 md:p-6">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className={`text-2xl font-black tracking-tight flex items-center gap-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    STORE NETWORK
+                                </h1>
+                                <p className={`text-xs font-bold mt-1 tracking-wide uppercase opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Managing {outlets.length} active branches across your enterprise
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {/* Search Bar */}
+                        <div className="relative group">
+                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-600 group-focus-within:text-indigo-500' : 'text-slate-400 group-focus-within:text-indigo-500'} transition-colors`} />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search by name, address, phone, email, or tax ID..."
+                                className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${inputBase} border rounded-xl text-[16px] md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                            />
+                            {searchTerm && (
+                                <X 
+                                    onClick={() => setSearchTerm('')} 
+                                    className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`} 
+                                />
+                            )}
+                        </div>
+                    </div>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
-                >
-                    <Plus size={18} /> ADD NEW BRANCH
-                </button>
             </header>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {outlets.map((outlet) => {
+            {/* Content Area */}
+            <div className="p-4 md:p-8">
+                <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredOutlets.length === 0 && !isLoading ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20">
+                            <Store className={`w-16 h-16 ${darkMode ? 'text-slate-700' : 'text-slate-300'} mb-4`} />
+                            <p className={`text-lg font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {searchTerm ? 'No branches found' : 'No branches available'}
+                            </p>
+                            <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'} mt-2`}>
+                                {searchTerm ? 'Try a different search term' : 'Create your first branch to get started'}
+                            </p>
+                        </div>
+                    ) : (
+                        filteredOutlets.map((outlet) => {
                     const isActive = currentOutletId === outlet._id;
                     return (
                         <article
@@ -273,9 +321,20 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                 )}
                             </div>
                         </article>
-                    );
-                })}
-            </section>
+                        );
+                    })
+                    )}
+                </section>
+            </div>
+
+            {/* FAB: Add New Branch Button - Floating Icon */}
+            <button 
+                onClick={() => handleOpenModal()} 
+                className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
+                aria-label="Add new branch"
+            >
+                <Plus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
+            </button>
 
             {/* UPGRADED MODAL */}
             {isModalOpen && (
