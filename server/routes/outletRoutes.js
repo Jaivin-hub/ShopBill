@@ -108,7 +108,7 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
         if (currentStoreCount >= 10) {
             return res.status(403).json({
                 success: false,
-                error: 'Store Limit Reached: Premium accounts can create up to 10 stores. You have reached the maximum limit. Please deactivate an existing store to create a new one.'
+                error: 'Store limit reached. You can create up to 10 stores. Please deactivate an existing store to create a new one.'
             });
         }
 

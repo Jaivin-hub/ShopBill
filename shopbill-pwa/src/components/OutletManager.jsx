@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import { 
     Store, Plus, MapPin, Phone, 
@@ -28,6 +28,8 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     });
     const [errors, setErrors] = useState({});
     const [validationErrors, setValidationErrors] = useState({});
+    const [apiError, setApiError] = useState(null);
+    const errorRef = useRef(null);
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -91,6 +93,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         }
         setErrors({});
         setValidationErrors({});
+        setApiError(null);
         setIsModalOpen(true);
     };
 
@@ -139,6 +142,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         }
 
         setIsSubmitting(true);
+        setApiError(null); // Clear previous API errors
         try {
             const apiCall = editingOutlet 
                 ? apiClient.put(API.outletDetails(editingOutlet._id), formData)
@@ -150,9 +154,31 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 fetchOutlets();
                 handleCloseModal();
                 setValidationErrors({});
+                setApiError(null);
+            } else {
+                // Handle case where API returns success: false
+                const errorMessage = response.data?.error || response.data?.message || 'Save failed.';
+                setApiError(errorMessage);
+                showToast(errorMessage, 'error');
+                // Scroll to error after a brief delay to ensure it's rendered
+                setTimeout(() => {
+                    errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
             }
         } catch (error) {
-            showToast(error.response?.data?.error || 'Save failed.', 'error');
+            // Extract error message from response
+            const errorMessage = error.response?.data?.error 
+                || error.response?.data?.message 
+                || error.message 
+                || 'Save failed.';
+            
+            console.error('Store creation/update error:', error);
+            setApiError(errorMessage); // Set error to display in modal
+            showToast(errorMessage, 'error');
+            // Scroll to error after a brief delay to ensure it's rendered
+            setTimeout(() => {
+                errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
         } finally {
             setIsSubmitting(false);
         }
@@ -223,7 +249,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                 <h1 className={`text-2xl font-black tracking-tight flex items-center gap-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                     STORE NETWORK
                                 </h1>
-                                <p className={`text-xs font-bold mt-1 tracking-wide uppercase opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <p className={`text-xs font-bold mt-1 tracking-wide opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     Managing {outlets.length} active branches across your enterprise
                                 </p>
                             </div>
@@ -269,7 +295,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                     return (
                         <article
                             key={outlet._id}
-                            className={`group relative p-6 rounded-[2.5rem] border transition-all duration-300 ${cardBase} ${
+                            className={`group relative p-6 rounded-2xl border transition-all duration-300 ${cardBase} ${
                                 isActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
                             }`}
                         >
@@ -338,9 +364,9 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
             {/* UPGRADED MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
-                    <div className={`${cardBase} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl`}>
-                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-3 sm:p-4">
+                    <div className={`${cardBase} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-2xl border overflow-hidden shadow-2xl flex flex-col`}>
+                        <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center flex-shrink-0`}>
                             <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {editingOutlet ? 'Configure Branch' : 'New Branch'}
                             </h3>
@@ -353,7 +379,22 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                         </div>
 
                         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-                            <div className="p-4 sm:p-5 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                                {/* API Error Message */}
+                                {apiError && (
+                                    <div 
+                                        ref={errorRef}
+                                        className={`p-4 rounded-xl border flex gap-3 items-start animate-in slide-in-from-top-2 duration-300 ${darkMode ? 'bg-rose-500/10 border-rose-500/30 ring-2 ring-rose-500/20 animate-pulse' : 'bg-rose-50 border-rose-200 ring-2 ring-rose-500/10 animate-pulse'}`}
+                                    >
+                                        <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 animate-pulse ${darkMode ? 'text-rose-400' : 'text-rose-600'}`} />
+                                        <div className="flex-1">
+                                            <p className={`text-sm font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                                                {apiError}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 <div>
                                     <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                         Branch Name <span className="text-red-500">*</span>
@@ -452,7 +493,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                 </div>
                             </div>
 
-                            <div className={`p-4 sm:p-5 md:p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
+                            <div className={`p-3 sm:p-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
