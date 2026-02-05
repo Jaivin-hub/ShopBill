@@ -415,9 +415,14 @@ const App = () => {
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
   const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
 
-  const unreadCount = useMemo(() =>
-    (notifications || []).filter(n => n && (n.isRead === false || n.isRead === undefined)).length
-    , [notifications]);
+  // Calculate unread count - updates in real-time when notifications change via Socket.IO
+  const unreadCount = useMemo(() => {
+    const count = (notifications || []).filter(n => {
+      // Count as unread if isRead is explicitly false or undefined
+      return n && (n.isRead === false || n.isRead === undefined);
+    }).length;
+    return count;
+  }, [notifications]);
 
   const handleViewAllSales = useCallback(() => setCurrentPage('salesActivity'), []);
   const handleViewAllCredit = useCallback(() => setCurrentPage('khata'), []);
@@ -646,11 +651,17 @@ const App = () => {
         return; // Don't add notification if user is the actor
       }
       
+      // Ensure isRead is explicitly set to false for new notifications
+      const notificationWithReadStatus = {
+        ...newAlert,
+        isRead: false // Explicitly mark as unread for real-time notifications
+      };
+      
       setNotifications(prev => {
         // Check if notification already exists
         const exists = prev.some(n => {
           const nId = n._id || n.id;
-          const alertId = newAlert._id || newAlert.id;
+          const alertId = notificationWithReadStatus._id || notificationWithReadStatus.id;
           return nId && alertId && nId.toString() === alertId.toString();
         });
         
@@ -659,9 +670,9 @@ const App = () => {
           return prev;
         }
         
-        console.log('✅ Adding new notification to list');
-        // Add new notification at the beginning
-        const updated = [newAlert, ...prev];
+        console.log('✅ Adding new notification to list (unread)');
+        // Add new notification at the beginning with isRead: false
+        const updated = [notificationWithReadStatus, ...prev];
         // Limit to last 50 notifications to prevent memory issues
         return updated.slice(0, 50);
       });
@@ -1101,7 +1112,7 @@ const App = () => {
                       <span className="text-sm font-bold tracking-tight">{item.name}</span>
                       {item.id === 'notifications' && unreadCount > 0 && (
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
-                          {unreadCount}
+                          {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </button>

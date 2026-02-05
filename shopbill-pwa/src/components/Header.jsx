@@ -159,8 +159,8 @@ const Header = ({
                     <button onClick={() => { setCurrentPage('notifications'); setShowStoreHub(false); }} className={`${getButtonClasses('notifications')} relative`}>
                         <Bell className="w-5 h-5" />
                         {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center">
-                                {unreadCount > 9 ? '9+' : unreadCount}
+                            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                                {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                         )}
                     </button>
