@@ -19,8 +19,10 @@ const emitAlert = async (req, storeId, type, data) => {
     let message = '';
     let metadata = {};
     const storeIdStr = storeId.toString();
-    const ownerId = req.user.role === 'owner' ? req.user._id : (req.user.ownerId || req.user._id);
     const actorId = req.user._id; // Track who performed the action
+    
+    // Always get ownerId from the store to ensure accuracy (especially for staff actions)
+    // This will be set after we fetch the store below
 
     switch (type) {
         case 'inventory_low':
@@ -96,14 +98,31 @@ const emitAlert = async (req, storeId, type, data) => {
     }
 
     try {
+        // Get store name and ownerId to include in notification
+        const store = await Store.findById(storeIdStr).select('name ownerId').lean();
+        if (!store || !store.ownerId) {
+            console.error(`❌ Store not found or has no ownerId for storeId: ${storeIdStr}`);
+            return null;
+        }
+        
+        const storeName = store.name || 'Store';
+        const ownerId = store.ownerId; // Always use ownerId from store (most accurate)
+        
+        // Update message to include store name for owners
+        let finalMessage = message;
+        if (storeName && storeName !== 'Store') {
+            // For owners, include store name in the message
+            finalMessage = `[${storeName}] ${message}`;
+        }
+        
         const newNotification = await Notification.create({
             storeId: storeIdStr,
-            ownerId: ownerId,
+            ownerId: ownerId, // Use ownerId from store (always correct)
             actorId: actorId, // Store who performed the action
             type,
             category,
             title,
-            message,
+            message: finalMessage, // Include store name in message
             metadata,
             readBy: [], // Ensure this is initialized as empty
             createdAt: new Date()
@@ -119,17 +138,22 @@ const emitAlert = async (req, storeId, type, data) => {
                     active: true
                 }).select('userId').lean();
 
-                // Get owner of the store (they should also receive notifications from staff actions)
-                const store = await Store.findById(storeIdStr).select('ownerId').lean();
                 const targetUserIds = new Set();
 
-                // Add owner if they exist and are not the actor
+                // ALWAYS add owner if they exist and are not the actor
+                // Owner should receive ALL notifications from their stores
                 if (store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     const actorIdStr = actorId.toString();
+                    // Owner gets notification unless they performed the action themselves
                     if (ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
+                        console.log(`📢 Owner ${ownerIdStr} will receive notification (actor: ${actorIdStr})`);
+                    } else {
+                        console.log(`📢 Owner ${ownerIdStr} is the actor, skipping self-notification`);
                     }
+                } else {
+                    console.warn(`⚠️ Store ${storeIdStr} has no ownerId, owner will not receive notification`);
                 }
 
                 // Add staff members (managers and cashiers) excluding the actor
@@ -144,8 +168,14 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 });
 
+                // Prepare notification data with store name
+                const notificationData = { 
+                    ...newNotification.toObject(), 
+                    isRead: false,
+                    storeName: storeName // Include store name in notification data
+                };
+                
                 // Emit to specific user rooms instead of broadcasting to all
-                const notificationData = { ...newNotification.toObject(), isRead: false };
                 targetUserIds.forEach(userId => {
                     io.to(`user_${userId}`).emit('new_notification', notificationData);
                 });
@@ -154,11 +184,16 @@ const emitAlert = async (req, storeId, type, data) => {
                 // This ensures users who haven't refreshed still get notifications
                 io.to(storeIdStr).emit('new_notification', notificationData);
 
-                console.log(`📢 Notification sent to ${targetUserIds.size} users (excluding actor ${actorId})`);
+                console.log(`📢 Notification sent to ${targetUserIds.size} users (excluding actor ${actorId}) from store: ${storeName}`);
             } catch (targetingError) {
                 console.error("❌ Error in smart notification targeting:", targetingError);
                 // Fallback to broadcast if targeting fails
-                io.to(storeIdStr).emit('new_notification', { ...newNotification.toObject(), isRead: false });
+                const notificationData = { 
+                    ...newNotification.toObject(), 
+                    isRead: false,
+                    storeName: storeName
+                };
+                io.to(storeIdStr).emit('new_notification', notificationData);
             }
         }
         return newNotification;
@@ -211,14 +246,17 @@ const resolveLowStockAlert = async (req, storeId, itemId, variantId = null) => {
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
-        if (!req.user.storeId) {
+        // For owners, get notifications from all their stores (don't require storeId)
+        // For staff, require storeId and get notifications from current store only
+        if (req.user.role !== 'owner' && !req.user.storeId) {
             return res.json({ count: 0, alerts: [] });
         }
-        // For owners, get notifications from all their stores. For staff, only current store.
+        
         const filter = req.user.role === 'owner' 
             ? { ownerId: req.user._id }
             : { storeId: req.user.storeId };
         
+        // Get notifications - for owners, we'll fetch store names separately
         const notifications = await Notification.find(filter)
             .select('type category title message metadata storeId ownerId actorId readBy createdAt')
             .lean()
@@ -235,15 +273,36 @@ router.get('/alerts', protect, async (req, res) => {
             return true;
         });
 
+        // For owners, fetch store names for all unique storeIds
+        let storeNameMap = {};
+        if (req.user.role === 'owner' && filteredNotifications.length > 0) {
+            const uniqueStoreIds = [...new Set(filteredNotifications.map(n => n.storeId?.toString()).filter(Boolean))];
+            if (uniqueStoreIds.length > 0) {
+                const stores = await Store.find({ _id: { $in: uniqueStoreIds } })
+                    .select('_id name')
+                    .lean();
+                stores.forEach(store => {
+                    storeNameMap[store._id.toString()] = store.name;
+                });
+            }
+        }
+
         // Map notifications to include an 'isRead' boolean specific to THIS user
         // Note: .lean() returns plain objects, so no need for .toObject()
         const formattedAlerts = filteredNotifications.map(n => {
             // Ensure readBy is an array (it should be from the schema)
             const readByArray = Array.isArray(n.readBy) ? n.readBy : (n.readBy ? [n.readBy] : []);
+            
+            // Get store name for owners
+            const storeIdStr = n.storeId?.toString();
+            const storeName = req.user.role === 'owner' && storeIdStr ? (storeNameMap[storeIdStr] || null) : null;
+            
             return {
                 ...n,
                 // Check if current logged-in user ID exists in the readBy array
-                isRead: readByArray.some(userId => userId.toString() === req.user._id.toString())
+                isRead: readByArray.some(userId => userId.toString() === req.user._id.toString()),
+                // Include store name for owners
+                storeName: storeName || null
             };
         });
 
