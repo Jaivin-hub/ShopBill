@@ -250,6 +250,12 @@ router.put('/:id', protect, async (req, res) => {
             }
         }
         
+        // Get the old item before updating to compare quantities
+        const oldItem = await Inventory.findOne({ _id: id, storeId: req.user.storeId }).lean();
+        if (!oldItem) {
+            return res.status(404).json({ error: 'Item not found.' });
+        }
+
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: id, storeId: req.user.storeId }, 
             { $set: cleanedData }, 
@@ -260,16 +266,52 @@ router.put('/:id', protect, async (req, res) => {
             // This will now clear the "Low Stock" alert if quantity was increased
             await checkAndNotifyLowStock(req, updatedItem);
             
-            // Send notification for inventory update
-            try {
-                const actorNameWithRole = await getActorNameWithRole(req);
-                await emitAlert(req, req.user.storeId, 'inventory_updated', {
-                    _id: updatedItem._id,
-                    name: updatedItem.name,
-                    message: `${updatedItem.name} updated in inventory by ${actorNameWithRole}`
-                });
-            } catch (err) {
-                console.error("❌ Error sending inventory updated notification:", err);
+            // Check if stock (quantity) was actually changed
+            let stockChanged = false;
+            
+            // Check regular quantity (for items without variants)
+            if (!oldItem.variants || oldItem.variants.length === 0) {
+                const oldQty = Number(oldItem.quantity) || 0;
+                const newQty = Number(updatedItem.quantity) || 0;
+                if (oldQty !== newQty) {
+                    stockChanged = true;
+                }
+            } else {
+                // Check variant quantities
+                if (cleanedData.variants && Array.isArray(cleanedData.variants)) {
+                    for (const newVariant of cleanedData.variants) {
+                        const oldVariant = oldItem.variants.find(v => 
+                            (v._id && newVariant._id && v._id.toString() === newVariant._id.toString()) ||
+                            (v.label === newVariant.label && v.value === newVariant.value)
+                        );
+                        if (oldVariant) {
+                            const oldVariantQty = Number(oldVariant.quantity) || 0;
+                            const newVariantQty = Number(newVariant.quantity) || 0;
+                            if (oldVariantQty !== newVariantQty) {
+                                stockChanged = true;
+                                break;
+                            }
+                        } else if (newVariant.quantity && Number(newVariant.quantity) > 0) {
+                            // New variant with quantity
+                            stockChanged = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Only send notification if stock (quantity) was actually changed
+            if (stockChanged) {
+                try {
+                    const actorNameWithRole = await getActorNameWithRole(req);
+                    await emitAlert(req, req.user.storeId, 'inventory_updated', {
+                        _id: updatedItem._id,
+                        name: updatedItem.name,
+                        message: `${updatedItem.name} stock updated by ${actorNameWithRole}`
+                    });
+                } catch (err) {
+                    console.error("❌ Error sending inventory stock updated notification:", err);
+                }
             }
             
             res.json({ message: 'Item updated successfully', item: updatedItem });

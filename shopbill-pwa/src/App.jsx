@@ -90,28 +90,19 @@ const UpdatePrompt = () => {
         const waitingVersionId = getVersionId(reg.waiting);
         if (!waitingVersionId) return;
 
-        // Get the last updated version from localStorage
-        const lastUpdatedVersion = localStorage.getItem('pwa_updated_version');
-        const currentActiveVersion = localStorage.getItem('pwa_current_version');
+        // Get the current active version
+        const currentActiveVersion = getVersionId(reg.active);
 
-        // Only show update prompt if:
-        // 1. This is a NEW version (different from what we've already updated to)
-        // 2. The waiting version is different from the current active version
-        const isNewVersion = waitingVersionId !== lastUpdatedVersion && 
-                             waitingVersionId !== currentActiveVersion;
-
-        if (isNewVersion) {
-          console.log(`📢 New update available: ${waitingVersionId} (current: ${currentActiveVersion}, last updated: ${lastUpdatedVersion})`);
+        // Show update prompt whenever there's a waiting worker that's different from active
+        // This ensures users are prompted for every new production build
+        if (waitingVersionId !== currentActiveVersion) {
+          console.log(`📢 New production build detected: ${waitingVersionId} (current active: ${currentActiveVersion})`);
           pendingVersionRef.current = waitingVersionId;
           setRegistration(reg);
           setShow(true);
           return true; // Update available
         } else {
-          console.log(`✅ Update already handled for version: ${waitingVersionId}`);
-          // If this version was already updated, activate it silently
-          if (waitingVersionId === lastUpdatedVersion && reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
+          console.log(`✅ Service worker is up to date: ${waitingVersionId}`);
         }
       }
 
@@ -194,13 +185,7 @@ const UpdatePrompt = () => {
     try {
       if (registration && registration.waiting) {
         const versionId = pendingVersionRef.current || getVersionId(registration.waiting);
-        
-        // Mark this version as updated BEFORE activating
-        // This ensures we don't show the prompt again for this version
-        if (versionId) {
-          localStorage.setItem('pwa_updated_version', versionId);
-          console.log(`✅ Marked version ${versionId} as updated`);
-        }
+        console.log(`🔄 Updating to new production build: ${versionId}`);
         
         // Tell the waiting worker to skipWaiting
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -214,10 +199,11 @@ const UpdatePrompt = () => {
           if (e.target.state === 'activated') {
             activated = true;
             registration.waiting.removeEventListener('statechange', stateChangeHandler);
-            // Update current version in localStorage
+            // Update current version in localStorage for tracking
             const newVersion = getVersionId(e.target);
             if (newVersion) {
               localStorage.setItem('pwa_current_version', newVersion);
+              console.log(`✅ Updated to production build: ${newVersion}`);
             }
             // Clear all caches before reload
             if ('caches' in window) {
@@ -242,6 +228,7 @@ const UpdatePrompt = () => {
             const newVersion = getVersionId(registration.waiting);
             if (newVersion) {
               localStorage.setItem('pwa_current_version', newVersion);
+              console.log(`✅ Updated to production build: ${newVersion} (fallback)`);
             }
             // Clear caches and reload
             if ('caches' in window) {
@@ -257,10 +244,6 @@ const UpdatePrompt = () => {
         }, 2000);
       } else if (updateHandlerRef.current) {
         // Use the update handler if available
-        const versionId = pendingVersionRef.current;
-        if (versionId) {
-          localStorage.setItem('pwa_updated_version', versionId);
-        }
         updateHandlerRef.current();
         setShow(false);
         // Reload after a short delay
