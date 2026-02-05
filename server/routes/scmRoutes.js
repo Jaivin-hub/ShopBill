@@ -76,8 +76,8 @@ router.get('/purchases', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const history = await Purchase.find({ storeId: req.user.storeId })
-            .select('productId supplierId quantity price date notes storeId createdAt')
-            .populate('productId', 'name')
+            .select('productId supplierId quantity purchasePrice invoiceNumber date notes storeId createdAt')
+            .populate('productId', 'name hsn')
             .populate('supplierId', 'name')
             .lean()
             .sort({ date: -1, createdAt: -1 })

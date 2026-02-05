@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown, Receipt, Clock, ArrowRight } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
@@ -15,6 +15,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastAddedId, setLastAddedId] = useState(null);
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
+  const [isRecentSalesOpen, setIsRecentSalesOpen] = useState(false);
+  const [recentSales, setRecentSales] = useState([]);
+  const [isLoadingSales, setIsLoadingSales] = useState(false);
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [isFetchingSaleDetail, setIsFetchingSaleDetail] = useState(false);
+  const [shopInfo, setShopInfo] = useState(null);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -34,6 +40,54 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
   }, [apiClient, API.inventory, API.customers, showToast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch recent sales
+  const fetchRecentSales = useCallback(async () => {
+    setIsLoadingSales(true);
+    try {
+      const response = await apiClient.get(`${API.sales}?limit=10`);
+      setRecentSales(response.data?.sales || []);
+    } catch (error) {
+      console.error('Error fetching recent sales:', error);
+      showToast('Failed to load recent sales', 'error');
+    } finally {
+      setIsLoadingSales(false);
+    }
+  }, [apiClient, API.sales, showToast]);
+
+  // Fetch shop info for bill display
+  useEffect(() => {
+    const fetchShopInfo = async () => {
+      try {
+        const response = await apiClient.get(API.profile);
+        if (response.data) {
+          setShopInfo({
+            shopName: response.data.shopName || 'Shop',
+            address: response.data.address || '',
+            phone: response.data.phone || '',
+            email: response.data.email || ''
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching shop info:', error);
+      }
+    };
+    fetchShopInfo();
+  }, [apiClient, API.profile]);
+
+  // Fetch sale detail for viewing
+  const fetchSaleDetail = useCallback(async (saleId) => {
+    setIsFetchingSaleDetail(true);
+    try {
+      const response = await apiClient.get(`${API.sales}/${saleId}`);
+      setSelectedSale(response.data);
+    } catch (error) {
+      console.error('Error fetching sale detail:', error);
+      showToast('Failed to load bill details', 'error');
+    } finally {
+      setIsFetchingSaleDetail(false);
+    }
+  }, [apiClient, API.sales, showToast]);
 
   // --- Core POS Logic ---
   const totalAmount = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
@@ -218,6 +272,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
       setCart([]);
       setIsPaymentModalOpen(false);
       fetchData(); // Refresh inventory and customer balances
+      fetchRecentSales(); // Refresh recent sales
     } catch (error) {
       // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
       throw error; 
@@ -276,6 +331,20 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
               <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">Active Session • High Performance Mode</p>
             </div>
             <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    setIsRecentSalesOpen(true);
+                    fetchRecentSales();
+                  }} 
+                  className={`p-2.5 border rounded-xl transition-all active:scale-90 relative ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}
+                >
+                  <Receipt className="w-5 h-5" />
+                  {recentSales.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full">
+                      {recentSales.length > 9 ? '9+' : recentSales.length}
+                    </span>
+                  )}
+                </button>
                 <button onClick={() => setIsCameraScannerOpen(true)} className={`p-2.5 border rounded-xl transition-all active:scale-90 ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}>
                   <ScanLine className="w-5 h-5" />
                 </button>
@@ -481,6 +550,261 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
         }}
         darkMode={darkMode}
       />
+
+      {/* Recent Sales Modal */}
+      {isRecentSalesOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setIsRecentSalesOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div 
+            className={`relative w-full max-w-xl md:max-w-2xl max-h-[85vh] md:max-h-[80vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
+              <div className="flex items-center gap-3">
+                <Receipt className={`w-5 h-5 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                <div>
+                  <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Recent Sales
+                  </h3>
+                  <p className={`text-xs font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Click on any bill to view details
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRecentSalesOpen(false)}
+                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 md:p-6 overflow-y-auto custom-scroll flex-1 min-h-0">
+              {isLoadingSales ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                </div>
+              ) : recentSales.length > 0 ? (
+                <div className="space-y-2">
+                  {recentSales.map((sale) => {
+                    const formatTime = (timestamp) => {
+                      const date = new Date(timestamp);
+                      const now = new Date();
+                      const diffMs = now - date;
+                      const diffMins = Math.floor(diffMs / 60000);
+                      if (diffMins < 1) return 'Just now';
+                      if (diffMins < 60) return `${diffMins}m ago`;
+                      const diffHours = Math.floor(diffMins / 60);
+                      if (diffHours < 24) return `${diffHours}h ago`;
+                      return date.toLocaleDateString();
+                    };
+
+                    return (
+                      <div
+                        key={sale._id}
+                        onClick={() => fetchSaleDetail(sale._id)}
+                        className={`group flex items-center justify-between p-4 border rounded-xl transition-all cursor-pointer active:scale-[0.98] hover:border-indigo-500/50 ${
+                          darkMode 
+                            ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' 
+                            : 'bg-slate-50 border-slate-200 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
+                            sale.amountCredited > 0 
+                              ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' 
+                              : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600'
+                          }`}>
+                            <Receipt className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className={`text-sm font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {sale.customerName || sale.customerId?.name || 'Walk-in Customer'}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <Clock className="w-3 h-3 inline mr-1" />
+                                {formatTime(sale.timestamp)}
+                              </span>
+                              <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                              <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {sale.items?.length || 0} Items
+                              </span>
+                              {sale.paymentMethod && (
+                                <>
+                                  <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                                  <span className={`text-[10px] font-bold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {sale.paymentMethod}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 ml-4">
+                          <div className="text-right">
+                            <p className={`text-base font-black tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              ₹{sale.totalAmount?.toLocaleString()}
+                            </p>
+                            {sale.amountCredited > 0 && (
+                              <span className={`text-[10px] font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                                Due: ₹{sale.amountCredited.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <ArrowRight className={`w-5 h-5 transition-all ${darkMode ? 'text-slate-600 group-hover:text-indigo-400' : 'text-slate-400 group-hover:text-indigo-600'} group-hover:translate-x-1`} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <Receipt className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
+                  <p className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    No recent sales found
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Modal - Reusing from SalesActivityPage */}
+      {selectedSale && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }}>
+          <div 
+            className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl max-h-[90vh] flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isFetchingSaleDetail ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-3" />
+                <p className="text-[10px] font-black tracking-widest text-indigo-500 uppercase">Loading Bill...</p>
+              </div>
+            ) : selectedSale ? (
+              <>
+                <div className={`p-5 border-b flex justify-between items-center ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Receipt className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className="text-[10px] font-black text-indigo-500 tracking-widest">Invoice Summary</span>
+                    </div>
+                    <h3 className={`text-base font-bold tabular-nums tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      #{selectedSale._id?.slice(-12).toUpperCase()}
+                    </h3>
+                  </div>
+                  <button 
+                    onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }} 
+                    className={`p-2 rounded-lg transition-all ${darkMode ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-200 text-slate-400'}`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto custom-scroll">
+                  {shopInfo && (
+                    <div className={`pb-4 border-b text-center space-y-1 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                      <h2 className={`text-lg font-black uppercase tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {shopInfo.shopName}
+                      </h2>
+                      {shopInfo.address && (
+                        <p className={`text-[10px] font-bold leading-relaxed px-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {shopInfo.address}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Billed To</span>
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {selectedSale.customerName || selectedSale.customerId?.name || 'Walk-in Customer'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedSale.paymentMethod && (
+                    <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                      <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Payment Method</span>
+                      <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {selectedSale.paymentMethod}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <span className={`text-[9px] font-bold tracking-widest px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Line Items</span>
+                    <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                      {selectedSale.items?.map((item, i) => (
+                        <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 ${darkMode ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-white'}`}>
+                          <div className="flex flex-col">
+                            <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {item.name || 'General Item'}
+                            </span>
+                            <span className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Qty: {item.quantity} × ₹{item.price?.toLocaleString()}
+                            </span>
+                          </div>
+                          <span className={`font-bold tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-0.5">
+                      <p className={`text-[10px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Grand Total</p>
+                      <p className={`text-2xl font-black tabular-nums tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        ₹{selectedSale.totalAmount?.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={`px-2.5 py-1 rounded text-[9px] font-black tracking-tight border ${
+                        selectedSale.amountCredited > 0 
+                          ? 'border-rose-500/20 text-rose-500 bg-rose-500/5' 
+                          : 'border-emerald-500/20 text-emerald-600 bg-emerald-500/5'
+                      }`}>
+                        {selectedSale.amountCredited > 0 ? 'Payment Pending' : 'Fully Paid'}
+                      </span>
+                      {selectedSale.amountCredited > 0 && (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {selectedSale.amountPaid > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-600">Paid: ₹{selectedSale.amountPaid?.toLocaleString()}</span>
+                          )}
+                          <span className="text-[10px] font-bold text-rose-500">Balance: ₹{selectedSale.amountCredited?.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      onClick={() => window.print()} 
+                      className="flex-1 py-3 bg-indigo-600 text-white text-[11px] font-bold tracking-wider rounded-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                    >
+                      <Printer className="w-4 h-4" /> Print Receipt
+                    </button>
+                    <button 
+                      onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }} 
+                      className={`flex-1 py-3 text-[11px] font-bold tracking-wider rounded-lg border transition-all active:scale-[0.98] ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Variant Selector Modal */}
       {variantSelectorItem && (

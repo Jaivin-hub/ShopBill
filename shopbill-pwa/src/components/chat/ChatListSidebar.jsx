@@ -19,7 +19,8 @@ const ChatListSidebar = ({
     getChatDisplayName,
     formatTime,
     currentUser,
-    darkMode
+    darkMode,
+    staffUnreadMap = {}
 }) => {
     const [viewMode, setViewMode] = useState('chats');
 
@@ -104,6 +105,7 @@ const ChatListSidebar = ({
                             onQuickMessage={onQuickMessage}
                             darkMode={darkMode}
                             currentUser={currentUser}
+                            staffUnreadMap={staffUnreadMap}
                         />
                     ) : (
                         <ChatListView
@@ -133,7 +135,7 @@ const ChatListSidebar = ({
     );
 };
 
-const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser }) => {
+const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {} }) => {
     if (isLoadingStaff) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -153,7 +155,9 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
 
     return (
         <div className="flex flex-col">
-            {filteredStaff.map(staff => (
+            {filteredStaff.map(staff => {
+                const unread = staffUnreadMap[staff._id] || 0;
+                return (
                 <button
                     key={staff._id}
                     onClick={() => onQuickMessage(staff._id)}
@@ -177,9 +181,16 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
                             )}
                         </div>
                     </div>
-                    <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
+                    <div className="flex items-center gap-2">
+                        {unread > 0 && (
+                            <span className={`h-5 min-w-[20px] px-1 rounded-full ${darkMode ? 'bg-rose-600 text-white' : 'bg-rose-500 text-white'} text-[9px] font-black flex items-center justify-center ${unread > 9 ? 'px-2' : ''}`}>
+                                {unread > 99 ? '99+' : unread > 9 ? '9+' : unread}
+                            </span>
+                        )}
+                        <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
+                    </div>
                 </button>
-            ))}
+            )})}
         </div>
     );
 };

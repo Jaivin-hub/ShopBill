@@ -27,6 +27,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [staffUnreadMap, setStaffUnreadMap] = useState({});
     
     // Notify parent when chat selection changes (to hide/show main header)
     useEffect(() => {
@@ -135,13 +136,29 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 setChats(fetchedChats);
                 // Calculate total unread count
                 const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+                // Map unread counts for direct chats by staff user id
+                const currentUserId = currentUser?._id || currentUser?.id;
+                const unreadMap = {};
+                fetchedChats.forEach(chat => {
+                    if (chat.type === 'direct' && Array.isArray(chat.participants)) {
+                        const other = chat.participants.find(p => {
+                            const pid = typeof p === 'object' && p !== null ? (p._id || p.id || p) : p;
+                            return pid && currentUserId && pid.toString() !== currentUserId.toString();
+                        });
+                        const otherId = other && (other._id || other.id || other);
+                        if (otherId) {
+                            unreadMap[otherId] = (unreadMap[otherId] || 0) + (chat.unreadCount || 0);
+                        }
+                    }
+                });
+                setStaffUnreadMap(unreadMap);
                 if (onUnreadCountChange) {
                     onUnreadCountChange(totalUnread);
                 }
             }
         } catch (error) { console.error('Failed to fetch chats:', error); }
         finally { setIsLoading(false); }
-    }, [hasChatAccess, apiClient, API, onUnreadCountChange]);
+    }, [hasChatAccess, apiClient, API, onUnreadCountChange, currentUser]);
 
     const fetchMessages = useCallback(async (chatId) => {
         setIsLoadingMessages(true);
@@ -998,6 +1015,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 getChatDisplayName={getChatDisplayName}
                 formatTime={formatTime}
                 currentUser={currentUser}
+                staffUnreadMap={staffUnreadMap}
                 darkMode={darkMode}
             />
 

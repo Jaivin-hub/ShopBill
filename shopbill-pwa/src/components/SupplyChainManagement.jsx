@@ -121,7 +121,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const historyTotals = useMemo(() => {
     return filteredHistory.reduce((acc, curr) => {
       const qty = Number(curr.quantity) || 0;
-      const price = Number(curr.purchasePrice) || 0;
+      const price = Number(curr.purchasePrice || curr.price) || 0;
       return { totalQty: acc.totalQty + qty, totalValue: acc.totalValue + (qty * price) };
     }, { totalQty: 0, totalValue: 0 });
   }, [filteredHistory]);
@@ -421,16 +421,19 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                         <p className="text-[10px] font-mono font-bold text-slate-500 mt-1 ">{record.invoiceNumber || 'DIR-ENTRY'}</p>
                       </div>
                       <div className="text-right">
-                         <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-black">+{record.quantity}</span>
-                         <p className="text-[10px] font-black text-slate-500 mt-1.5">@ ₹{record.purchasePrice}</p>
+                         <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-black">+{record.quantity || 0}</span>
+                         <p className="text-[10px] font-black text-slate-500 mt-1.5">@ ₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                     </div>
                     <div className={`flex justify-between items-end pt-3 border-t ${darkMode ? 'border-slate-800/20' : 'border-slate-200'}`}>
                       <div>
-                        <p className="text-[10px] text-slate-500 font-black  tracking-tight">VNDR: {record.supplierId?.name}</p>
+                        <p className="text-[10px] text-slate-500 font-black  tracking-tight">VNDR: {record.supplierId?.name || 'Unknown'}</p>
                         <p className="text-[10px] text-slate-500 font-bold mt-0.5">{new Date(record.date).toLocaleDateString()}</p>
                       </div>
-                      <p className="text-sm font-black text-emerald-500">₹{((record.quantity || 0) * (record.purchasePrice || 0)).toLocaleString()}</p>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-emerald-500">₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">Total Amount</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -464,12 +467,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                             {record.supplierId?.name}
                           </span>
                         </td>
-                        <td className="px-8 py-5 text-center font-black text-slate-500">₹{record.purchasePrice}</td>
                         <td className="px-8 py-5 text-center">
-                          <span className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px]">+{record.quantity}</span>
+                          <div className="flex flex-col items-center">
+                            <span className="font-black text-slate-500">₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-[9px] font-bold text-slate-400 mt-0.5">per unit</span>
+                          </div>
                         </td>
-                        <td className="px-8 py-5 text-right font-black text-emerald-500 text-sm">
-                          ₹{((record.quantity || 0) * (record.purchasePrice || 0)).toLocaleString()}
+                        <td className="px-8 py-5 text-center">
+                          <span className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px]">+{Number(record.quantity || 0)}</span>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <div className="flex flex-col items-end">
+                            <span className="font-black text-emerald-500 text-sm">₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-[9px] font-bold text-slate-400 mt-0.5">Total</span>
+                          </div>
                         </td>
                       </tr>
                     ))}
