@@ -45,7 +45,7 @@ router.get('/suppliers', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const suppliers = await Supplier.find({ storeId: req.user.storeId })
-            .select('name contact phone email address storeId createdAt')
+            .select('name contactPerson phone email gstin address storeId createdAt')
             .lean()
             .sort({ createdAt: -1 });
         res.json(suppliers);
@@ -66,6 +66,25 @@ router.post('/suppliers', protect, async (req, res) => {
         res.status(201).json(supplier);
     } catch (error) {
         res.status(500).json({ error: 'Failed to add supplier.' });
+    }
+});
+
+router.put('/suppliers/:id', protect, async (req, res) => {
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const supplier = await Supplier.findOneAndUpdate(
+            { _id: req.params.id, storeId: req.user.storeId },
+            { ...req.body },
+            { new: true, runValidators: true }
+        );
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found.' });
+        }
+        res.json(supplier);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update supplier.' });
     }
 });
 

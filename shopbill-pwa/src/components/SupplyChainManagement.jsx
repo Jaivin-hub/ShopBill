@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
-  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell
+  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
@@ -40,6 +40,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
 
   const [purchaseForm, setPurchaseForm] = useState({
     productId: '', supplierId: '', quantity: '', purchasePrice: '',
@@ -172,13 +173,44 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     
     setIsLoading(true);
     try {
-      await apiClient.post(API.scmSuppliers, supplierForm);
-      showToast("Vendor added", "success");
+      if (editingSupplierId) {
+        // Update existing supplier
+        await apiClient.put(API.scmSupplierUpdate(editingSupplierId), supplierForm);
+        showToast("Vendor updated", "success");
+      } else {
+        // Create new supplier
+        await apiClient.post(API.scmSuppliers, supplierForm);
+        showToast("Vendor added", "success");
+      }
       setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
       setSupplierErrors({});
+      setEditingSupplierId(null);
       setIsSupplierModalOpen(false);
       fetchSCMData();
-    } catch (error) { showToast("Error adding vendor", "error"); } finally { setIsLoading(false); }
+    } catch (error) { 
+      showToast(editingSupplierId ? "Error updating vendor" : "Error adding vendor", "error"); 
+    } finally { 
+      setIsLoading(false); 
+    }
+  };
+
+  const handleEditSupplier = (supplier) => {
+    setSupplierForm({
+      name: supplier.name || '',
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      gstin: supplier.gstin || ''
+    });
+    setEditingSupplierId(supplier._id);
+    setSupplierErrors({});
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleCloseSupplierModal = () => {
+    setIsSupplierModalOpen(false);
+    setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
+    setSupplierErrors({});
+    setEditingSupplierId(null);
   };
 
   const handleQuickAddProduct = async (e) => {
@@ -294,7 +326,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2.5">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Invoice Number</label>
                       <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-4 rounded-2xl outline-none text-[16px] md:text-sm font-mono border focus:border-indigo-500`} placeholder="Optional" />
@@ -374,120 +406,218 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
         {activeTab === 'history' && (
           <div className="flex flex-col animate-in fade-in duration-500 space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
-              {[
-                { label: 'Logged Units', val: historyTotals.totalQty, icon: Package },
-                { label: 'Outlay Total', val: `₹${historyTotals.totalValue.toLocaleString()}`, icon: IndianRupee },
-                { label: 'Cycles', val: filteredHistory.length, icon: RefreshCcw },
-                { label: 'Avg Cost', val: `₹${(historyTotals.totalValue / (filteredHistory.length || 1)).toFixed(0)}`, icon: Calculator }
-              ].map((stat, i) => (
-                <div key={i} className={`${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl flex flex-col items-center text-center shadow-sm`}>
-                  <div className={`p-2.5 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'} rounded-xl mb-3 border`}><stat.icon className="w-5 h-5 text-indigo-500" /></div>
-                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-1.5 ">{stat.label}</p>
-                  <p className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{stat.val}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className={`${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} rounded-3xl flex flex-col overflow-hidden min-h-0`}>
-              <div className={`p-6 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'} border-b flex flex-col md:flex-row justify-between items-center px-8 gap-5 shrink-0`}>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar max-w-full">
-                  {DATE_FILTERS.map(f => (
-                    <button key={f.id} onClick={() => setSelectedFilter(f.id)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${selectedFilter === f.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : (darkMode ? 'text-slate-400 border-transparent hover:bg-indigo-500/10' : 'text-slate-500 border-transparent hover:bg-indigo-500/10')}`}>{f.label[0]} {f.label[1]}</button>
-                  ))}
-                </div>
-                {selectedFilter === 'custom' && (
-                  <div className="flex items-center gap-3 overflow-x-hidden w-full md:w-auto mt-2 md:mt-0">
-                    <div className="relative flex-1 md:w-44">
-                       <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                       <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-3 pl-10 rounded-xl outline-none border border-transparent focus:border-indigo-500 transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
-                    </div>
-                    <div className="relative flex-1 md:w-44">
-                       <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                       <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-3 pl-10 rounded-xl outline-none border border-transparent focus:border-indigo-500 transition-colors`} style={{ colorScheme: darkMode ? 'dark' : 'light' }} />
-                    </div>
+            {/* KPI Cards - Matching Dashboard Style */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                      Outlay Total
+                    </p>
+                    <h2 className="text-2xl font-black text-emerald-400">
+                      ₹{historyTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h2>
                   </div>
-                )}
+                  <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+                    <IndianRupee size={20} />
+                  </div>
+                </div>
+              </div>
+              <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                      Purchases
+                    </p>
+                    <h2 className="text-2xl font-black text-indigo-400">
+                      {filteredHistory.length}
+                    </h2>
+                  </div>
+                  <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500">
+                    <History size={20} />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Purchase History Table - Matching Dashboard Style */}
+            <section className={`${cardBase} rounded-2xl border overflow-hidden`}>
+              {/* Header with Filters */}
+              <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex flex-col md:flex-row justify-between items-start md:items-center gap-4`}>
+                <div>
+                  <h3 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Purchase History
+                  </h3>
+                  <p className={`text-[10px] font-black tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Complete procurement log
+                  </p>
+                </div>
+                
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {DATE_FILTERS.map(f => (
+                      <button 
+                        key={f.id} 
+                        onClick={() => setSelectedFilter(f.id)} 
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
+                          selectedFilter === f.id 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
+                            : (darkMode 
+                              ? 'text-slate-400 border-slate-700 hover:bg-indigo-500/10' 
+                              : 'text-slate-500 border-slate-200 hover:bg-indigo-500/10')
+                        }`}
+                      >
+                        {f.label[0]} {f.label[1]}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedFilter === 'custom' && (
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <div className="relative flex-1 md:w-40">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
+                        <input 
+                          type="date" 
+                          value={customStartDate} 
+                          onChange={(e) => setCustomStartDate(e.target.value)} 
+                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`} 
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }} 
+                        />
+                      </div>
+                      <div className="relative flex-1 md:w-40">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
+                        <input 
+                          type="date" 
+                          value={customEndDate} 
+                          onChange={(e) => setCustomEndDate(e.target.value)} 
+                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`} 
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }} 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="md:hidden p-6 space-y-4 overflow-y-auto max-h-[50vh] custom-scrollbar">
+              {/* Mobile View */}
+              <div className="md:hidden p-4 space-y-3 overflow-y-auto max-h-[60vh] custom-scrollbar">
                 {filteredHistory.length === 0 ? (
-                  <p className="text-center text-[11px] text-slate-500 font-black py-12 tracking-widest ">No records found</p>
+                  <div className="text-center py-12">
+                    <Package className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
+                    <p className={`text-sm font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No purchase records found</p>
+                  </div>
                 ) : filteredHistory.map(record => (
-                  <div key={record._id} className={`${cardBase} p-5 rounded-2xl border-l-4 border-l-indigo-500`}>
+                  <div key={record._id} className={`${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} p-4 rounded-xl border transition-all hover:border-indigo-500/50`}>
                     <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{record.productId?.name}</p>
-                        <p className="text-[10px] font-mono font-bold text-slate-500 mt-1 ">{record.invoiceNumber || 'DIR-ENTRY'}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {record.productId?.name || 'Unknown Product'}
+                        </p>
+                        <p className="text-[10px] font-mono font-bold text-slate-500 mt-1">
+                          {record.invoiceNumber || 'DIR-ENTRY'}
+                        </p>
                       </div>
-                      <div className="text-right">
-                         <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-black">+{record.quantity || 0}</span>
-                         <p className="text-[10px] font-black text-slate-500 mt-1.5">@ ₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <div className="text-right ml-3">
+                        <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-black">
+                          +{Number(record.quantity || 0)}
+                        </span>
+                        <p className="text-[10px] font-black text-slate-500 mt-1.5">
+                          @ ₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
                       </div>
                     </div>
-                    <div className={`flex justify-between items-end pt-3 border-t ${darkMode ? 'border-slate-800/20' : 'border-slate-200'}`}>
+                    <div className={`flex justify-between items-end pt-3 border-t ${darkMode ? 'border-slate-800/30' : 'border-slate-200'}`}>
                       <div>
-                        <p className="text-[10px] text-slate-500 font-black  tracking-tight">VNDR: {record.supplierId?.name || 'Unknown'}</p>
-                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">{new Date(record.date).toLocaleDateString()}</p>
+                        <p className="text-[10px] text-slate-500 font-black tracking-tight">
+                          {record.supplierId?.name || 'Unknown Vendor'}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          {new Date(record.date).toLocaleDateString()}
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-black text-emerald-500">₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">Total Amount</p>
+                      <div className="text-right ml-3">
+                        <p className="text-base font-black text-emerald-500">
+                          ₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">Total</p>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="hidden md:block overflow-auto custom-scrollbar flex-1 min-h-0">
-                <table className="w-full text-left min-w-[900px]">
-                  <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-slate-900' : 'bg-slate-100'} text-[10px] font-black text-slate-500 tracking-[0.2em] border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} `}>
-                    <tr>
-                      <th className="px-8 py-5">Date / Invoice</th>
-                      <th className="px-8 py-5">Product Identity</th>
-                      <th className="px-8 py-5">Vendor</th>
-                      <th className="px-8 py-5 text-center">Unit Cost</th>
-                      <th className="px-8 py-5 text-center">Qty</th>
-                      <th className="px-8 py-5 text-right">Net Valuation</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${darkMode ? 'divide-slate-800/30' : 'divide-slate-100'} text-xs`}>
-                    {filteredHistory.map((record) => (
-                      <tr key={record._id} className={`${darkMode ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'} transition-all group`}>
-                        <td className="px-8 py-5">
-                          <p className={`font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{new Date(record.date).toLocaleDateString()}</p>
-                          <p className="text-[10px] font-mono text-slate-500 mt-1 ">{record.invoiceNumber || 'DIR-ENTRY'}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                          <p className={`font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{record.productId?.name}</p>
-                          <p className="text-[10px] text-slate-500 font-bold mt-1  tracking-tighter">HSN: {record.productId?.hsn || '---'}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                          <span className={`${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-indigo-50 text-indigo-600'} px-3 py-1.5 rounded-xl text-[10px] font-black border ${darkMode ? 'border-slate-700' : 'border-indigo-100'}`}>
-                            {record.supplierId?.name}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 text-center">
-                          <div className="flex flex-col items-center">
-                            <span className="font-black text-slate-500">₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            <span className="text-[9px] font-bold text-slate-400 mt-0.5">per unit</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-center">
-                          <span className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px]">+{Number(record.quantity || 0)}</span>
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="font-black text-emerald-500 text-sm">₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            <span className="text-[9px] font-bold text-slate-400 mt-0.5">Total</span>
-                          </div>
-                        </td>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-auto custom-scrollbar">
+                {filteredHistory.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Package className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
+                    <p className={`text-sm font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No purchase records found</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left min-w-[900px]">
+                    <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-slate-900' : 'bg-slate-50'} text-[10px] font-black text-slate-500 tracking-[0.2em] border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <tr>
+                        <th className="px-6 py-4">Date / Invoice</th>
+                        <th className="px-6 py-4">Product</th>
+                        <th className="px-6 py-4">Vendor</th>
+                        <th className="px-6 py-4 text-center">Unit Cost</th>
+                        <th className="px-6 py-4 text-center">Quantity</th>
+                        <th className="px-6 py-4 text-right">Total Amount</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/30' : 'divide-slate-100'}`}>
+                      {filteredHistory.map((record) => (
+                        <tr key={record._id} className={`${darkMode ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'} transition-all group`}>
+                          <td className="px-6 py-4">
+                            <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {new Date(record.date).toLocaleDateString()}
+                            </p>
+                            <p className="text-[10px] font-mono text-slate-500 mt-1">
+                              {record.invoiceNumber || 'DIR-ENTRY'}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {record.productId?.name || 'Unknown Product'}
+                            </p>
+                            {record.productId?.hsn && (
+                              <p className="text-[10px] text-slate-500 font-bold mt-1 tracking-tighter">
+                                HSN: {record.productId.hsn}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`${darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-indigo-50 text-indigo-600 border-indigo-100'} px-3 py-1.5 rounded-xl text-[10px] font-black border`}>
+                              {record.supplierId?.name || 'Unknown Vendor'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-sm font-black text-slate-500">
+                                ₹{(Number(record.purchasePrice || record.price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400 mt-0.5">per unit</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px]">
+                              +{Number(record.quantity || 0)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className="text-base font-black text-emerald-500">
+                                ₹{((Number(record.quantity || 0)) * (Number(record.purchasePrice || record.price || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400 mt-0.5">Total</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
-            </div>
+            </section>
           </div>
         )}
 
@@ -499,7 +629,16 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-lg shadow-indigo-600/20">{s.name ? s.name[0] : 'V'}</div>
-                      <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-all cursor-pointer" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditSupplier(s);
+                        }}
+                        className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all group/edit"
+                        aria-label="Edit vendor"
+                      >
+                        <Edit className="w-4 h-4 text-slate-400 group-hover/edit:text-indigo-500 transition-all" />
+                      </button>
                     </div>
                     <h4 className={`text-sm font-black truncate mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.name}</h4>
                     <div className={`flex items-center gap-3 pt-4 border-t ${darkMode ? 'border-slate-800/50' : 'border-slate-100'}`}>
@@ -521,27 +660,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         </div>
       </main>
 
-      {/* FOOTER: Add New Vendor Button - Above Footer Menu */}
-      {activeTab === 'suppliers' && (
-        <div className={`fixed bottom-[72px] md:hidden inset-x-0 z-[40] px-4 py-3 border-t ${darkMode ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200'} backdrop-blur-xl shadow-[0_-10px_30px_rgba(0,0,0,0.1)]`}>
-          <button 
-            onClick={() => setIsSupplierModalOpen(true)} 
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-sm font-black tracking-widest uppercase">Add New Vendor</span>
-          </button>
-        </div>
-      )}
-
-      {/* DESKTOP: Add New Vendor Button - Fixed Position */}
+      {/* FAB: Add New Vendor Button - Floating Icon */}
       {activeTab === 'suppliers' && (
         <button 
-          onClick={() => setIsSupplierModalOpen(true)} 
-          className="hidden md:flex fixed bottom-6 right-6 w-16 h-16 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-2xl items-center justify-center active:scale-90 transition-all z-[100] group"
+          onClick={() => {
+            setEditingSupplierId(null);
+            setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
+            setSupplierErrors({});
+            setIsSupplierModalOpen(true);
+          }} 
+          className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
+          aria-label="Add new vendor"
         >
-          <Plus className="w-8 h-8 group-hover:rotate-90 transition-transform duration-300" />
-          <span className="absolute right-full mr-4 bg-slate-900 text-white text-[11px] font-black px-4 py-2 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity tracking-widest uppercase">Register Vendor</span>
+          <Plus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
+          <span className="hidden md:block absolute right-full mr-4 bg-slate-900 text-white text-[11px] font-black px-4 py-2 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity tracking-widest uppercase">Register Vendor</span>
         </button>
       )}
 
@@ -711,11 +843,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
       {isSupplierModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsSupplierModalOpen(false)} />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseSupplierModal} />
           <form onSubmit={handleAddSupplier} className={`relative w-full max-w-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-8 rounded-3xl border shadow-2xl animate-in zoom-in duration-300`}>
-            <h3 className={`text-xl font-black tracking-tighter mb-6 flex justify-between items-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              NEW VENDOR ENTRY <X className="w-6 h-6 cursor-pointer text-slate-500 hover:text-red-500" onClick={() => setIsSupplierModalOpen(false)} />
-            </h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {editingSupplierId ? 'Edit Vendor' : 'Add New Vendor'}
+              </h3>
+              <button
+                type="button"
+                onClick={handleCloseSupplierModal}
+                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Full Name</label>
@@ -729,7 +870,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Identification (GSTIN)</label>
                 <input placeholder="Optional ID" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-4 rounded-2xl outline-none text-[16px] md:text-xs font-mono text-indigo-500 border `} />
               </div>
-              <button className={`w-full mt-3 py-4 rounded-2xl font-black text-[11px] tracking-[0.2em] transition-all shadow-xl  ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Save Vendor</button>
+              <button 
+                type="submit"
+                disabled={isLoading}
+                className={`w-full mt-3 py-4 rounded-2xl font-black text-[11px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    {editingSupplierId ? 'Updating...' : 'Saving...'}
+                  </>
+                ) : (
+                  editingSupplierId ? 'Update Vendor' : 'Save Vendor'
+                )}
+              </button>
             </div>
           </form>
         </div>

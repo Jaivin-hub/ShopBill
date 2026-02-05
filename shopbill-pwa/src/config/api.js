@@ -44,6 +44,7 @@ const API = {
 
     // 🚛 NEW: SUPPLY CHAIN MANAGEMENT (SCM) ENDPOINTS 🚛
     scmSuppliers: API_BASE_URL + '/scm/suppliers',    // GET (All Suppliers), POST (Add Supplier)
+    scmSupplierUpdate: (id) => `${API_BASE_URL}/scm/suppliers/${id}`, // PUT (Update Supplier)
     scmPurchases: API_BASE_URL + '/scm/purchases',    // GET (Purchase History), POST (Record Purchase & Update Stock)
     // ------------------------------------------
 
