@@ -2,10 +2,36 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Customer = require('../models/Customer');
 const KhataTransaction = require('../models/KhataTransaction');
+const Staff = require('../models/Staff');
 const Shop = require('../models/User'); // Ensure this matches your model file name
 const mongoose = require('mongoose');
 const twilio = require('twilio');
 const { emitAlert } = require('./notificationRoutes');
+
+/**
+ * Helper function to get actor name with role for notifications
+ */
+const getActorNameWithRole = async (req) => {
+    let actorName = req.user.name || req.user.email;
+    let actorRole = req.user.role || 'User';
+    
+    // For staff (Manager/Cashier), get name from Staff model and use their role
+    if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+        const staffRecord = await Staff.findOne({ userId: req.user._id });
+        if (staffRecord) {
+            actorName = staffRecord.name || req.user.name || req.user.email;
+            actorRole = staffRecord.role || req.user.role;
+        }
+    }
+    
+    // Format role for display
+    const roleDisplay = actorRole === 'owner' ? 'Owner' : 
+                       actorRole === 'Manager' ? 'Manager' : 
+                       actorRole === 'Cashier' ? 'Cashier' : 
+                       actorRole;
+    
+    return `${actorName} (${roleDisplay})`;
+};
 
 // Initialize Twilio
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -158,12 +184,13 @@ router.put('/:customerId/credit', protect, async (req, res) => {
 
         // Send notification for payment received
         try {
+            const actorNameWithRole = await getActorNameWithRole(req);
             await emitAlert(req, req.user.storeId, 'ledger_payment', {
                 customerId: updatedCustomer._id,
                 customerName: updatedCustomer.name,
                 amount: paymentAmount || Math.abs(amountChange),
                 transactionId: transaction._id,
-                message: `Payment of ₹${(paymentAmount || Math.abs(amountChange)).toFixed(2)} received from ${updatedCustomer.name} by ${req.user.name || req.user.email}`
+                message: `Payment of ₹${(paymentAmount || Math.abs(amountChange)).toFixed(2)} received from ${updatedCustomer.name} by ${actorNameWithRole}`
             });
         } catch (err) {
             console.error("❌ Error sending payment notification:", err);

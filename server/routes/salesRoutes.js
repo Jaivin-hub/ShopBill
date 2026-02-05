@@ -208,12 +208,31 @@ router.post('/', protect, async (req, res) => {
             
             // Send notification for credit given during sale
             try {
+                const Staff = require('../models/Staff');
+                let actorName = req.user.name || req.user.email;
+                let actorRole = req.user.role || 'User';
+                
+                // For staff, get name from Staff model
+                if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+                    const staffRecord = await Staff.findOne({ userId: req.user._id });
+                    if (staffRecord) {
+                        actorName = staffRecord.name || req.user.name || req.user.email;
+                        actorRole = staffRecord.role || req.user.role;
+                    }
+                }
+                
+                const roleDisplay = actorRole === 'owner' ? 'Owner' : 
+                                   actorRole === 'Manager' ? 'Manager' : 
+                                   actorRole === 'Cashier' ? 'Cashier' : 
+                                   actorRole;
+                const actorNameWithRole = `${actorName} (${roleDisplay})`;
+                
                 await emitAlert(req, storeId.toString(), 'ledger_credit', {
                     customerId: updatedCustomer._id,
                     customerName: updatedCustomer.name,
                     amount: saleAmountCredited,
                     transactionId: newSale._id,
-                    message: `Credit of ₹${saleAmountCredited.toFixed(2)} given to ${updatedCustomer.name} by ${req.user.name || req.user.email}`
+                    message: `Credit of ₹${saleAmountCredited.toFixed(2)} given to ${updatedCustomer.name} by ${actorNameWithRole}`
                 });
             } catch (err) {
                 console.error("❌ Error sending credit notification:", err);

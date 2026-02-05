@@ -2,12 +2,38 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
+const Staff = require('../models/Staff');
 
 // Import your notification helpers
 const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
 
 const Supplier = require('../models/Supplier'); 
 const Purchase = require('../models/Purchase');
+
+/**
+ * Helper function to get actor name with role for notifications
+ */
+const getActorNameWithRole = async (req) => {
+    let actorName = req.user.name || req.user.email;
+    let actorRole = req.user.role || 'User';
+    
+    // For staff (Manager/Cashier), get name from Staff model and use their role
+    if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+        const staffRecord = await Staff.findOne({ userId: req.user._id });
+        if (staffRecord) {
+            actorName = staffRecord.name || req.user.name || req.user.email;
+            actorRole = staffRecord.role || req.user.role;
+        }
+    }
+    
+    // Format role for display
+    const roleDisplay = actorRole === 'owner' ? 'Owner' : 
+                       actorRole === 'Manager' ? 'Manager' : 
+                       actorRole === 'Cashier' ? 'Cashier' : 
+                       actorRole;
+    
+    return `${actorName} (${roleDisplay})`;
+};
 
 const router = express.Router();
 
@@ -154,11 +180,12 @@ router.post('/purchases', protect, async (req, res) => {
         
         // Send notification for purchase recording
         try {
+            const actorNameWithRole = await getActorNameWithRole(req);
             await emitAlert(req, storeId, 'purchase_recorded', {
                 purchaseId: purchase[0]._id,
                 itemId: updatedItem._id,
                 productName: updatedItem.name,
-                message: `Purchase of ${numQty} units of ${updatedItem.name} recorded by ${req.user.name || req.user.email}`
+                message: `Purchase of ${numQty} units of ${updatedItem.name} recorded by ${actorNameWithRole}`
             });
         } catch (err) {
             console.error("❌ Error sending purchase notification:", err);

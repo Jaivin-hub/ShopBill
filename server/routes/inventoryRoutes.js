@@ -3,7 +3,32 @@ const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
 const Staff = require('../models/Staff');
 // UPDATED: Import resolveLowStockAlert along with emitAlert
-const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
+const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
+
+/**
+ * Helper function to get actor name with role for notifications
+ */
+const getActorNameWithRole = async (req) => {
+    let actorName = req.user.name || req.user.email;
+    let actorRole = req.user.role || 'User';
+    
+    // For staff (Manager/Cashier), get name from Staff model and use their role
+    if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+        const staffRecord = await Staff.findOne({ userId: req.user._id });
+        if (staffRecord) {
+            actorName = staffRecord.name || req.user.name || req.user.email;
+            actorRole = staffRecord.role || req.user.role;
+        }
+    }
+    
+    // Format role for display
+    const roleDisplay = actorRole === 'owner' ? 'Owner' : 
+                       actorRole === 'Manager' ? 'Manager' : 
+                       actorRole === 'Cashier' ? 'Cashier' : 
+                       actorRole;
+    
+    return `${actorName} (${roleDisplay})`;
+}; 
 
 const router = express.Router();
 
@@ -144,19 +169,11 @@ router.post('/', protect, async (req, res) => {
         
         // Send notification for inventory addition
         try {
-            // Get actor name - for staff, get from Staff model; for owner, use User model
-            let actorName = req.user.name || req.user.email;
-            if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
-                const staffRecord = await Staff.findOne({ userId: req.user._id });
-                if (staffRecord) {
-                    actorName = staffRecord.name || req.user.name || req.user.email;
-                }
-            }
-            
+            const actorNameWithRole = await getActorNameWithRole(req);
             await emitAlert(req, req.user.storeId, 'inventory_added', {
                 _id: item._id,
                 name: item.name,
-                message: `${item.name} added to inventory by ${actorName}`
+                message: `${item.name} added to inventory by ${actorNameWithRole}`
             });
         } catch (err) {
             console.error("❌ Error sending inventory added notification:", err);
@@ -177,19 +194,11 @@ router.delete('/:id', protect, async (req, res) => {
         if (result) {
             // Send notification for inventory deletion
             try {
-                // Get actor name - for staff, get from Staff model; for owner, use User model
-                let actorName = req.user.name || req.user.email;
-                if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
-                    const staffRecord = await Staff.findOne({ userId: req.user._id });
-                    if (staffRecord) {
-                        actorName = staffRecord.name || req.user.name || req.user.email;
-                    }
-                }
-                
+                const actorNameWithRole = await getActorNameWithRole(req);
                 await emitAlert(req, req.user.storeId, 'inventory_deleted', {
                     _id: result._id,
                     name: result.name,
-                    message: `${result.name} deleted from inventory by ${actorName}`
+                    message: `${result.name} deleted from inventory by ${actorNameWithRole}`
                 });
             } catch (err) {
                 console.error("❌ Error sending inventory deleted notification:", err);
@@ -253,10 +262,11 @@ router.put('/:id', protect, async (req, res) => {
             
             // Send notification for inventory update
             try {
+                const actorNameWithRole = await getActorNameWithRole(req);
                 await emitAlert(req, req.user.storeId, 'inventory_updated', {
                     _id: updatedItem._id,
                     name: updatedItem.name,
-                    message: `${updatedItem.name} updated in inventory by ${req.user.name || req.user.email}`
+                    message: `${updatedItem.name} updated in inventory by ${actorNameWithRole}`
                 });
             } catch (err) {
                 console.error("❌ Error sending inventory updated notification:", err);
