@@ -69,6 +69,13 @@ const UpdatePrompt = () => {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) return;
 
+      // Get current active version
+      const currentVersion = reg.active ? getVersionId(reg.active) : null;
+      if (currentVersion) {
+        // Store current active version so we know what's already installed
+        localStorage.setItem('pwa_current_version', currentVersion);
+      }
+
       // Force update check by calling update()
       if (forceCheck) {
         try {
@@ -80,15 +87,32 @@ const UpdatePrompt = () => {
 
       // Check if there's a waiting worker
       if (reg.waiting) {
-        const versionId = getVersionId(reg.waiting);
-        if (!versionId) return;
+        const waitingVersionId = getVersionId(reg.waiting);
+        if (!waitingVersionId) return;
 
-        // FORCE UPDATE: Always show update prompt, don't check dismissed versions
-        // This ensures users are forced to update when a new build is published
-        pendingVersionRef.current = versionId;
-        setRegistration(reg);
-        setShow(true);
-        return true; // Update available
+        // Get the last updated version from localStorage
+        const lastUpdatedVersion = localStorage.getItem('pwa_updated_version');
+        const currentActiveVersion = localStorage.getItem('pwa_current_version');
+
+        // Only show update prompt if:
+        // 1. This is a NEW version (different from what we've already updated to)
+        // 2. The waiting version is different from the current active version
+        const isNewVersion = waitingVersionId !== lastUpdatedVersion && 
+                             waitingVersionId !== currentActiveVersion;
+
+        if (isNewVersion) {
+          console.log(`📢 New update available: ${waitingVersionId} (current: ${currentActiveVersion}, last updated: ${lastUpdatedVersion})`);
+          pendingVersionRef.current = waitingVersionId;
+          setRegistration(reg);
+          setShow(true);
+          return true; // Update available
+        } else {
+          console.log(`✅ Update already handled for version: ${waitingVersionId}`);
+          // If this version was already updated, activate it silently
+          if (waitingVersionId === lastUpdatedVersion && reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        }
       }
 
       // Also check for installing worker (might become waiting soon)
@@ -169,9 +193,20 @@ const UpdatePrompt = () => {
   const handleUpdate = async () => {
     try {
       if (registration && registration.waiting) {
-        // FORCE UPDATE: Don't mark as dismissed - always show until updated
+        const versionId = pendingVersionRef.current || getVersionId(registration.waiting);
+        
+        // Mark this version as updated BEFORE activating
+        // This ensures we don't show the prompt again for this version
+        if (versionId) {
+          localStorage.setItem('pwa_updated_version', versionId);
+          console.log(`✅ Marked version ${versionId} as updated`);
+        }
+        
         // Tell the waiting worker to skipWaiting
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        
+        // Hide the prompt immediately
+        setShow(false);
         
         // Wait for the new service worker to activate
         let activated = false;
@@ -179,6 +214,11 @@ const UpdatePrompt = () => {
           if (e.target.state === 'activated') {
             activated = true;
             registration.waiting.removeEventListener('statechange', stateChangeHandler);
+            // Update current version in localStorage
+            const newVersion = getVersionId(e.target);
+            if (newVersion) {
+              localStorage.setItem('pwa_current_version', newVersion);
+            }
             // Clear all caches before reload
             if ('caches' in window) {
               caches.keys().then(names => {
@@ -198,6 +238,11 @@ const UpdatePrompt = () => {
         setTimeout(() => {
           if (!activated) {
             registration.waiting.removeEventListener('statechange', stateChangeHandler);
+            // Update current version
+            const newVersion = getVersionId(registration.waiting);
+            if (newVersion) {
+              localStorage.setItem('pwa_current_version', newVersion);
+            }
             // Clear caches and reload
             if ('caches' in window) {
               caches.keys().then(names => {
@@ -212,7 +257,12 @@ const UpdatePrompt = () => {
         }, 2000);
       } else if (updateHandlerRef.current) {
         // Use the update handler if available
+        const versionId = pendingVersionRef.current;
+        if (versionId) {
+          localStorage.setItem('pwa_updated_version', versionId);
+        }
         updateHandlerRef.current();
+        setShow(false);
         // Reload after a short delay
         setTimeout(() => {
           window.location.reload(true);
@@ -378,12 +428,31 @@ const App = () => {
   }, []);
 
   const fetchNotificationHistory = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser || !apiClient || !API) {
+      console.log('⚠️ Cannot fetch notifications: missing currentUser, apiClient, or API');
+      return;
+    }
     try {
       const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
-      if (response.data && response.data.alerts) setNotifications(response.data.alerts);
-    } catch (error) { console.error("Error fetching notifications:", error); }
-  }, [currentUser]);
+      console.log('📬 Notification API response:', response.data);
+      
+      if (response.data) {
+        // API returns { count: number, alerts: array }
+        const alerts = response.data.alerts || [];
+        setNotifications(alerts);
+        const unreadCount = alerts.filter(a => !a.isRead).length;
+        console.log(`📬 Fetched ${alerts.length} notifications (${unreadCount} unread)`);
+      } else {
+        console.warn('⚠️ Notification API returned no data');
+        setNotifications([]);
+      }
+    } catch (error) { 
+      console.error("❌ Error fetching notifications:", error.response?.data || error.message);
+      // Don't clear notifications on error - keep existing ones
+      // Only set empty if we have no notifications at all
+      // setNotifications([]);
+    }
+  }, [currentUser, apiClient, API]);
 
   // Fetch a single outlet by ID
   const fetchOutletById = useCallback(async (outletId) => {
@@ -541,7 +610,10 @@ const App = () => {
 
   useEffect(() => {
     if (!currentUser) return;
+    
+    // Initial fetch of notifications
     fetchNotificationHistory();
+    
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
       auth: { token: localStorage.getItem('userToken') },
       transports: ['polling', 'websocket'],
@@ -551,24 +623,53 @@ const App = () => {
     const socket = socketRef.current;
     
     const handleConnect = () => {
-      const roomId = currentOutletId || currentUser._id || 'default';
+      const roomId = currentOutletId || currentUser.storeId || currentUser._id || 'default';
       socket.emit('join_shop', String(roomId));
-      // Initial fetch of chat unread count after connection
+      
+      // Join user-specific room for notifications (backup, already joined on connection)
+      if (currentUser._id) {
+        socket.emit('join_user', String(currentUser._id));
+      }
+      
+      // Fetch notifications and chat unread count after connection
+      fetchNotificationHistory();
       updateChatUnreadCount();
     };
     
     const handleNewNotification = (newAlert) => {
+      console.log('📬 New notification received:', newAlert);
+      
       // Filter out notifications where the current user is the actor
       // Users don't need to see notifications about their own actions
       if (newAlert.actorId && currentUser && newAlert.actorId.toString() === currentUser._id.toString()) {
+        console.log('🚫 Filtered out notification (user is actor)');
         return; // Don't add notification if user is the actor
       }
       
       setNotifications(prev => {
-        if (prev.some(n => n._id === newAlert._id)) return prev;
-        return [newAlert, ...prev];
+        // Check if notification already exists
+        const exists = prev.some(n => {
+          const nId = n._id || n.id;
+          const alertId = newAlert._id || newAlert.id;
+          return nId && alertId && nId.toString() === alertId.toString();
+        });
+        
+        if (exists) {
+          console.log('📬 Notification already exists, skipping');
+          return prev;
+        }
+        
+        console.log('✅ Adding new notification to list');
+        // Add new notification at the beginning
+        const updated = [newAlert, ...prev];
+        // Limit to last 50 notifications to prevent memory issues
+        return updated.slice(0, 50);
       });
-      showToast(newAlert.message, 'info');
+      
+      // Show toast notification
+      if (newAlert.message) {
+        showToast(newAlert.message, 'info');
+      }
     };
     
     const handleNewMessage = (data) => {
@@ -585,6 +686,19 @@ const App = () => {
       handleConnect();
     }
     
+    // Periodic notification refresh (every 30 seconds)
+    const notificationInterval = setInterval(() => {
+      fetchNotificationHistory();
+    }, 30000);
+    
+    // Refresh notifications when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden && currentUser) {
+        fetchNotificationHistory();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       if (socket) {
         socket.off('connect', handleConnect);
@@ -592,6 +706,8 @@ const App = () => {
         socket.off('new_message', handleNewMessage);
         socket.disconnect();
       }
+      clearInterval(notificationInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [currentUser, currentOutletId, fetchNotificationHistory, showToast, updateChatUnreadCount]);
 

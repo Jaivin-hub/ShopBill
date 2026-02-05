@@ -16,7 +16,61 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-amber-500/10', 
                 borderColor: 'border-amber-500/20',
                 glow: 'shadow-amber-500/5',
-                label: 'INVENTORY ALERT'
+                label: 'LOW STOCK'
+            };
+        case 'inventory_added':
+            return { 
+                icon: CheckCircle, 
+                color: 'text-emerald-500', 
+                bgColor: 'bg-emerald-500/10', 
+                borderColor: 'border-emerald-500/20',
+                glow: 'shadow-emerald-500/5',
+                label: 'INVENTORY ADDED'
+            };
+        case 'inventory_updated':
+            return { 
+                icon: Activity, 
+                color: 'text-blue-500', 
+                bgColor: 'bg-blue-500/10', 
+                borderColor: 'border-blue-500/20',
+                glow: 'shadow-blue-500/5',
+                label: 'INVENTORY UPDATED'
+            };
+        case 'inventory_deleted':
+            return { 
+                icon: AlertTriangle, 
+                color: 'text-orange-500', 
+                bgColor: 'bg-orange-500/10', 
+                borderColor: 'border-orange-500/20',
+                glow: 'shadow-orange-500/5',
+                label: 'INVENTORY DELETED'
+            };
+        case 'purchase_recorded':
+            return { 
+                icon: CheckCircle, 
+                color: 'text-indigo-500', 
+                bgColor: 'bg-indigo-500/10', 
+                borderColor: 'border-indigo-500/20',
+                glow: 'shadow-indigo-500/5',
+                label: 'PURCHASE RECORDED'
+            };
+        case 'ledger_payment':
+            return { 
+                icon: CheckCircle, 
+                color: 'text-emerald-500', 
+                bgColor: 'bg-emerald-500/10', 
+                borderColor: 'border-emerald-500/20',
+                glow: 'shadow-emerald-500/5',
+                label: 'PAYMENT RECEIVED'
+            };
+        case 'ledger_credit':
+            return { 
+                icon: AlertTriangle, 
+                color: 'text-amber-500', 
+                bgColor: 'bg-amber-500/10', 
+                borderColor: 'border-amber-500/20',
+                glow: 'shadow-amber-500/5',
+                label: 'CREDIT GIVEN'
             };
         case 'credit_exceeded':
             return { 

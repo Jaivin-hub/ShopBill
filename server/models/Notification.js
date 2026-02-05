@@ -24,7 +24,19 @@ const NotificationSchema = new mongoose.Schema({
     },
     type: { 
         type: String, 
-        enum: ['inventory_low', 'credit_exceeded', 'system', 'success', 'system_update'], 
+        enum: [
+            'inventory_low', 
+            'inventory_added', 
+            'inventory_updated', 
+            'inventory_deleted',
+            'purchase_recorded',
+            'ledger_payment',
+            'ledger_credit',
+            'credit_exceeded', 
+            'system', 
+            'success', 
+            'system_update'
+        ], 
         required: true 
     },
     category: { 

@@ -121,6 +121,15 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Join user-specific room for notifications
+    socket.on('join_user', (userId) => {
+        if (userId) {
+            const userRoom = `user_${String(userId)}`;
+            socket.join(userRoom);
+            console.log(`👤 Socket ${socket.id} joined user room: ${userRoom}`);
+        }
+    });
+
     // Join chat room for real-time messaging
     socket.on('join_chat', (chatId) => {
         if (chatId) {
