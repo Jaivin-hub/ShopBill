@@ -5,6 +5,7 @@ const KhataTransaction = require('../models/KhataTransaction');
 const Shop = require('../models/User'); // Ensure this matches your model file name
 const mongoose = require('mongoose');
 const twilio = require('twilio');
+const { emitAlert } = require('./notificationRoutes');
 
 // Initialize Twilio
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -147,13 +148,26 @@ router.put('/:customerId/credit', protect, async (req, res) => {
             return res.status(404).json({ error: 'Customer not found or does not belong to this shop.' });
         }
         
-        await KhataTransaction.create({
+        const transaction = await KhataTransaction.create({
             storeId: req.user.storeId,
             customerId: updatedCustomer._id,
             amount: paymentAmount || Math.abs(amountChange),
             type: type || 'payment_received',
             details: `Payment recorded: ₹${(paymentAmount || Math.abs(amountChange)).toFixed(0)}`,
         });
+
+        // Send notification for payment received
+        try {
+            await emitAlert(req, req.user.storeId, 'ledger_payment', {
+                customerId: updatedCustomer._id,
+                customerName: updatedCustomer.name,
+                amount: paymentAmount || Math.abs(amountChange),
+                transactionId: transaction._id,
+                message: `Payment of ₹${(paymentAmount || Math.abs(amountChange)).toFixed(2)} received from ${updatedCustomer.name} by ${req.user.name || req.user.email}`
+            });
+        } catch (err) {
+            console.error("❌ Error sending payment notification:", err);
+        }
 
         if (updatedCustomer.outstandingCredit < 0) {
              updatedCustomer = await Customer.findOneAndUpdate(

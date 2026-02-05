@@ -205,6 +205,19 @@ router.post('/', protect, async (req, res) => {
                     creditLimit: updatedCustomer.creditLimit
                 });
             }
+            
+            // Send notification for credit given during sale
+            try {
+                await emitAlert(req, storeId.toString(), 'ledger_credit', {
+                    customerId: updatedCustomer._id,
+                    customerName: updatedCustomer.name,
+                    amount: saleAmountCredited,
+                    transactionId: newSale._id,
+                    message: `Credit of ₹${saleAmountCredited.toFixed(2)} given to ${updatedCustomer.name} by ${req.user.name || req.user.email}`
+                });
+            } catch (err) {
+                console.error("❌ Error sending credit notification:", err);
+            }
         }
 
         // --- 6. REAL-TIME STOCK LOGIC ---

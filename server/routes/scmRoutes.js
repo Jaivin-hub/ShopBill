@@ -151,6 +151,18 @@ router.post('/purchases', protect, async (req, res) => {
         // 3. TRIGGER NOTIFICATIONS
         // We pass 'numQty' to let the user know exactly how much was added in the alert.
         await handlePurchaseNotifications(req, updatedItem, numQty);
+        
+        // Send notification for purchase recording
+        try {
+            await emitAlert(req, storeId, 'purchase_recorded', {
+                purchaseId: purchase[0]._id,
+                itemId: updatedItem._id,
+                productName: updatedItem.name,
+                message: `Purchase of ${numQty} units of ${updatedItem.name} recorded by ${req.user.name || req.user.email}`
+            });
+        } catch (err) {
+            console.error("❌ Error sending purchase notification:", err);
+        }
 
         res.status(201).json({
             message: 'Purchase recorded and stock updated.',

@@ -140,6 +140,18 @@ router.post('/', protect, async (req, res) => {
             storeId: req.user.storeId 
         });
         await checkAndNotifyLowStock(req, item);
+        
+        // Send notification for inventory addition
+        try {
+            await emitAlert(req, req.user.storeId, 'inventory_added', {
+                _id: item._id,
+                name: item.name,
+                message: `${item.name} added to inventory by ${req.user.name || req.user.email}`
+            });
+        } catch (err) {
+            console.error("❌ Error sending inventory added notification:", err);
+        }
+        
         res.json({ message: 'Item added successfully', item });
     } catch (error) {
         console.error('Add inventory item error:', error);
@@ -152,8 +164,21 @@ router.delete('/:id', protect, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await Inventory.findOneAndDelete({ _id: id, storeId: req.user.storeId });
-        if (result) res.json({ message: `Item deleted.` });
-        else res.status(404).json({ error: 'Item not found.' });
+        if (result) {
+            // Send notification for inventory deletion
+            try {
+                await emitAlert(req, req.user.storeId, 'inventory_deleted', {
+                    _id: result._id,
+                    name: result.name,
+                    message: `${result.name} deleted from inventory by ${req.user.name || req.user.email}`
+                });
+            } catch (err) {
+                console.error("❌ Error sending inventory deleted notification:", err);
+            }
+            res.json({ message: `Item deleted.` });
+        } else {
+            res.status(404).json({ error: 'Item not found.' });
+        }
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete.' });
     }
@@ -206,6 +231,18 @@ router.put('/:id', protect, async (req, res) => {
         if (updatedItem) {
             // This will now clear the "Low Stock" alert if quantity was increased
             await checkAndNotifyLowStock(req, updatedItem);
+            
+            // Send notification for inventory update
+            try {
+                await emitAlert(req, req.user.storeId, 'inventory_updated', {
+                    _id: updatedItem._id,
+                    name: updatedItem.name,
+                    message: `${updatedItem.name} updated in inventory by ${req.user.name || req.user.email}`
+                });
+            } catch (err) {
+                console.error("❌ Error sending inventory updated notification:", err);
+            }
+            
             res.json({ message: 'Item updated successfully', item: updatedItem });
         } else {
             res.status(404).json({ error: 'Item not found.' });

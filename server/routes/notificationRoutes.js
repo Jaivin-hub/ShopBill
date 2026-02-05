@@ -38,6 +38,51 @@ const emitAlert = async (req, storeId, type, data) => {
             message = `${data.name} has exceeded their credit limit.`;
             metadata = { customerId: data._id };
             break;
+        case 'inventory_added':
+            title = 'Inventory Added';
+            category = 'Info';
+            message = data.message || `${data.name || 'Item'} added to inventory.`;
+            metadata = data._id ? { itemId: data._id } : {};
+            break;
+        case 'inventory_updated':
+            title = 'Inventory Updated';
+            category = 'Info';
+            message = data.message || `${data.name || 'Item'} updated in inventory.`;
+            metadata = data._id ? { itemId: data._id } : {};
+            break;
+        case 'inventory_deleted':
+            title = 'Inventory Deleted';
+            category = 'Info';
+            message = data.message || `${data.name || 'Item'} deleted from inventory.`;
+            metadata = data._id ? { itemId: data._id } : {};
+            break;
+        case 'purchase_recorded':
+            title = 'Purchase Recorded';
+            category = 'Info';
+            message = data.message || `New purchase recorded: ${data.productName || 'Product'}`;
+            metadata = { 
+                purchaseId: data.purchaseId || null,
+                itemId: data.itemId || null
+            };
+            break;
+        case 'ledger_payment':
+            title = 'Payment Received';
+            category = 'Info';
+            message = data.message || `Payment of ₹${data.amount || 0} received from ${data.customerName || 'Customer'}.`;
+            metadata = { 
+                customerId: data.customerId || null,
+                transactionId: data.transactionId || null
+            };
+            break;
+        case 'ledger_credit':
+            title = 'Credit Given';
+            category = 'Info';
+            message = data.message || `Credit of ₹${data.amount || 0} given to ${data.customerName || 'Customer'}.`;
+            metadata = { 
+                customerId: data.customerId || null,
+                transactionId: data.transactionId || null
+            };
+            break;
         case 'success':
             title = 'Stock Updated';
             category = 'Info';
