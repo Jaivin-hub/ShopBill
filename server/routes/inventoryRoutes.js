@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
+const Staff = require('../models/Staff');
 // UPDATED: Import resolveLowStockAlert along with emitAlert
 const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
 
@@ -143,10 +144,19 @@ router.post('/', protect, async (req, res) => {
         
         // Send notification for inventory addition
         try {
+            // Get actor name - for staff, get from Staff model; for owner, use User model
+            let actorName = req.user.name || req.user.email;
+            if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+                const staffRecord = await Staff.findOne({ userId: req.user._id });
+                if (staffRecord) {
+                    actorName = staffRecord.name || req.user.name || req.user.email;
+                }
+            }
+            
             await emitAlert(req, req.user.storeId, 'inventory_added', {
                 _id: item._id,
                 name: item.name,
-                message: `${item.name} added to inventory by ${req.user.name || req.user.email}`
+                message: `${item.name} added to inventory by ${actorName}`
             });
         } catch (err) {
             console.error("❌ Error sending inventory added notification:", err);
@@ -167,10 +177,19 @@ router.delete('/:id', protect, async (req, res) => {
         if (result) {
             // Send notification for inventory deletion
             try {
+                // Get actor name - for staff, get from Staff model; for owner, use User model
+                let actorName = req.user.name || req.user.email;
+                if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+                    const staffRecord = await Staff.findOne({ userId: req.user._id });
+                    if (staffRecord) {
+                        actorName = staffRecord.name || req.user.name || req.user.email;
+                    }
+                }
+                
                 await emitAlert(req, req.user.storeId, 'inventory_deleted', {
                     _id: result._id,
                     name: result.name,
-                    message: `${result.name} deleted from inventory by ${req.user.name || req.user.email}`
+                    message: `${result.name} deleted from inventory by ${actorName}`
                 });
             } catch (err) {
                 console.error("❌ Error sending inventory deleted notification:", err);
