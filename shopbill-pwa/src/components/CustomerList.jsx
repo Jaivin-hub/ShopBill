@@ -124,12 +124,14 @@ const CustomerList = ({
                 
                 </button>
                 
-                {/* Action Buttons and Price Badge - Single line alignment */}
-                <div className="flex items-center gap-1.5 opacity-100 transition-opacity shrink-0">
+                {/* Action Buttons and Amount Display - Single line alignment */}
+                <div className="flex items-center gap-3 opacity-100 transition-opacity shrink-0">
                     {outstandingAmount > 0 && (
-                        <span className={`h-5 w-5 rounded-full ${isOverLimit ? 'bg-rose-500' : 'bg-amber-500'} text-white text-[9px] font-black flex items-center justify-center ${isOverLimit ? 'animate-pulse' : ''}`}>
-                            {isOverLimit ? '!' : outstandingAmount > 9999 ? '9+' : (outstandingAmount >= 1000 ? `${Math.floor(outstandingAmount / 1000)}k` : outstandingAmount)}
-                        </span>
+                        <div className={`flex items-center px-3 py-1.5 rounded-lg border ${isOverLimit ? 'bg-rose-500/10 border-rose-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                            <p className={`text-sm font-black tracking-tight tabular-nums ${isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500'}`}>
+                                ₹{outstandingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
                     )}
                     <button
                         onClick={(e) => {

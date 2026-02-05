@@ -46,40 +46,92 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 );
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
-  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-    <section className={`w-full max-w-md max-h-[95vh] sm:max-h-[90vh] rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 my-auto flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
-      <header className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
-        <h2 className={`text-sm font-black  tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          <CreditCard className="w-4 h-4 text-teal-500" /> Collect Payment
-        </h2>
-        <button onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}><X className="w-5 h-5" /></button>
+  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 overflow-y-auto ${darkMode ? 'bg-slate-950/80' : 'bg-slate-900/40'}`}>
+    <section className={`w-full max-w-md max-h-[95vh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 my-auto flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <header className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100 bg-slate-50/50'}`}>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="p-1.5 sm:p-2 bg-emerald-500/10 rounded-lg text-emerald-500 shrink-0">
+            <CreditCard size={16} className="sm:w-[18px] sm:h-[18px]" />
+          </div>
+          <div>
+            <h2 className={`text-xs sm:text-sm font-black tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              Collect Payment
+            </h2>
+            <p className={`text-[8px] sm:text-[9px] font-black tracking-widest mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Record Transaction
+            </p>
+          </div>
+        </div>
+        <button 
+          onClick={onClose} 
+          className={`p-2 rounded-xl transition-colors shrink-0 ${darkMode ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}
+        >
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
       </header>
       
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
-        <div className="text-center">
-            <p className={`text-[10px] font-black  tracking-widest mb-1 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>Customer Account</p>
-            <p className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{customer?.name}</p>
+      {/* Content */}
+      <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
+        {/* Customer Info */}
+        <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
+          <p className={`text-[8px] sm:text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            Customer Account
+          </p>
+          <p className={`text-lg sm:text-xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            {customer?.name}
+          </p>
         </div>
 
-        <div className={`p-4 rounded-2xl border flex flex-col items-center ${darkMode ? 'bg-rose-500/5 border-rose-500/10' : 'bg-rose-50 border-rose-100'}`}>
-          <span className={`text-[10px] font-black  tracking-[0.2em] mb-1 ${darkMode ? 'text-rose-500/60' : 'text-rose-400'}`}>Current Due</span>
-          <span className={`text-3xl font-black ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>₹{customer?.outstandingCredit?.toLocaleString('en-IN') || '0'}</span>
+        {/* Current Due */}
+        <div className={`p-5 sm:p-6 rounded-xl sm:rounded-2xl border flex flex-col items-center ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-200 shadow-sm'}`}>
+          <p className={`text-[9px] sm:text-[10px] font-black tracking-widest uppercase mb-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+            Current Outstanding
+          </p>
+          <p className={`text-2xl sm:text-3xl font-black tracking-tight tabular-nums ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+            ₹{customer?.outstandingCredit?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+          </p>
         </div>
 
-        <div className="relative">
-            <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black ${darkMode ? 'text-teal-500/50' : 'text-teal-300'}`}>₹</span>
+        {/* Payment Amount Input */}
+        <div className="space-y-2">
+          <label className={`text-[9px] sm:text-[10px] font-black tracking-widest ml-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            Payment Amount
+          </label>
+          <div className="relative">
+            <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-xl sm:text-2xl font-black ${darkMode ? 'text-emerald-500' : 'text-emerald-600'}`}>
+              ₹
+            </span>
             <input
-              type="number"  placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
-              className={`w-full py-5 pl-10 pr-4 border rounded-2xl text-3xl font-black text-center outline-none focus:ring-4 transition-all ${darkMode ? 'bg-gray-950 border-teal-500/30 text-teal-400 focus:ring-teal-500/10' : 'bg-white border-teal-200 text-teal-600 focus:ring-teal-600/5'}`}
+              type="number" 
+              step="0.01"
+              min="0"
+              placeholder="0.00" 
+              value={amount} 
+              onChange={(e) => setAmount(e.target.value)}
+              className={`w-full py-4 sm:py-5 pl-12 sm:pl-14 pr-4 border rounded-xl sm:rounded-2xl text-2xl sm:text-3xl font-black text-center outline-none focus:ring-4 transition-all tabular-nums ${darkMode ? 'bg-slate-950 border-slate-800 text-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20' : 'bg-white border-slate-200 text-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/10'}`}
+              autoFocus
             />
+          </div>
         </div>
 
+        {/* Confirm Button */}
         <button 
-          className="w-full py-4 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl font-black  tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-teal-600/20" 
-          onClick={onConfirm} disabled={!amount || isProcessing}
+          className="w-full py-4 sm:py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-600/20 text-xs sm:text-sm" 
+          onClick={onConfirm} 
+          disabled={!amount || parseFloat(amount) <= 0 || isProcessing}
         >
-          {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-          Confirm Payment
+          {isProcessing ? (
+            <>
+              <Loader className="w-5 h-5 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5" />
+              Confirm Payment
+            </>
+          )}
         </button>
       </div>
     </section>

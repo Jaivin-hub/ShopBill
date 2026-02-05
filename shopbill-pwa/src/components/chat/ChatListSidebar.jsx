@@ -106,6 +106,7 @@ const ChatListSidebar = ({
                             darkMode={darkMode}
                             currentUser={currentUser}
                             staffUnreadMap={staffUnreadMap}
+                            chats={chats}
                         />
                     ) : (
                         <ChatListView
@@ -135,7 +136,7 @@ const ChatListSidebar = ({
     );
 };
 
-const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {} }) => {
+const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {}, chats = [] }) => {
     if (isLoadingStaff) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -145,7 +146,46 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
         );
     }
 
-    const filteredStaff = staffList.filter(staff => {
+    // Get direct chats for each staff member to sort by last message time
+    const currentUserId = currentUser?._id || currentUser?.id;
+    const directChatsMap = {};
+    chats.forEach(chat => {
+        if (chat.type === 'direct' && Array.isArray(chat.participants)) {
+            const other = chat.participants.find(p => {
+                const pid = typeof p === 'object' && p !== null ? (p._id || p.id || p) : p;
+                return pid && currentUserId && pid.toString() !== currentUserId.toString();
+            });
+            if (other) {
+                const otherId = typeof other === 'object' && other !== null ? (other._id || other.id || other) : other;
+                if (otherId) {
+                    directChatsMap[otherId.toString()] = chat;
+                }
+            }
+        }
+    });
+
+    // Sort staff by last message time (most recent first), then by name
+    const sortedStaff = [...staffList].sort((a, b) => {
+        const chatA = directChatsMap[a._id?.toString()];
+        const chatB = directChatsMap[b._id?.toString()];
+        
+        const timeA = chatA?.lastMessageAt ? new Date(chatA.lastMessageAt).getTime() : 0;
+        const timeB = chatB?.lastMessageAt ? new Date(chatB.lastMessageAt).getTime() : 0;
+        
+        // If both have messages, sort by time (most recent first)
+        if (timeA > 0 && timeB > 0) {
+            return timeB - timeA;
+        }
+        // If only one has messages, prioritize it
+        if (timeA > 0) return -1;
+        if (timeB > 0) return 1;
+        // If neither has messages, sort alphabetically
+        const nameA = (a.name || a.email || '').toLowerCase();
+        const nameB = (b.name || b.email || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+
+    const filteredStaff = sortedStaff.filter(staff => {
         if (staff._id === currentUser?._id) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
@@ -205,12 +245,30 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
         );
     }
 
+    // Sort chats by lastMessageAt (from backend) - most recent first
+    // This ensures chats with new messages automatically move to the top
     const sortedChats = [...chats]
         .filter(c => c.type === 'group' || c.isDefault)
         .sort((a, b) => {
-            const timeA = a.messages?.length > 0 ? new Date(a.messages[a.messages.length - 1].timestamp).getTime() : 0;
-            const timeB = b.messages?.length > 0 ? new Date(b.messages[b.messages.length - 1].timestamp).getTime() : 0;
-            return timeB - timeA;
+            // Use lastMessageAt from backend (most reliable)
+            const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+            const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+            
+            // Fallback to last message timestamp if lastMessageAt is not available
+            if (timeA === 0 && a.messages?.length > 0) {
+                const lastMsg = a.messages[a.messages.length - 1];
+                if (lastMsg?.timestamp) {
+                    return new Date(lastMsg.timestamp).getTime();
+                }
+            }
+            if (timeB === 0 && b.messages?.length > 0) {
+                const lastMsg = b.messages[b.messages.length - 1];
+                if (lastMsg?.timestamp) {
+                    return new Date(lastMsg.timestamp).getTime();
+                }
+            }
+            
+            return timeB - timeA; // Most recent first
         });
 
     return (

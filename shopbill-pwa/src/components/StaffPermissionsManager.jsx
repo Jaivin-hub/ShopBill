@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
+import ConfirmationModal from './ConfirmationModal';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -252,13 +253,16 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                         
-                        <button
-                            onClick={() => onRemove(staff)}
-                            disabled={isActionDisabled} 
-                            className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
-                        >
-                            <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
+                        {/* Only show delete button for deactivated staff */}
+                        {!staff.active && (
+                            <button
+                                onClick={() => onRemove(staff)}
+                                disabled={isActionDisabled} 
+                                className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
+                            >
+                                <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+                        )}
                     </div>
                 </div>
                 {staff.role !== 'owner' && (
@@ -450,7 +454,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal, currentUserRole, darkMode }) => {
+const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, darkMode }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -459,6 +463,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [selectedStaff, setSelectedStaff] = useState(null);
     const [activeStaffIds, setActiveStaffIds] = useState(new Set());
     const [activeStaffMap, setActiveStaffMap] = useState({}); // Map of staffId -> { punchIn: Date }
+    const [confirmModal, setConfirmModal] = useState(null); // Internal confirmation modal state
 
     // Ensure we have write/read access
     const effectiveRole = currentUserRole || 'owner'; 
@@ -567,21 +572,61 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
-        try {
-            await apiClient.put(API.staffToggle(staffMember._id)); 
-            await fetchStaff();
-        } catch (error) {
-            if (showToast) showToast('Failed to toggle status.', 'error');
+        
+        // If activating, do it directly without confirmation
+        if (!staffMember.active) {
+            try {
+                await apiClient.put(API.staffToggle(staffMember._id)); 
+                if (showToast) showToast('Staff account activated successfully.', 'success');
+                await fetchStaff();
+            } catch (error) {
+                if (showToast) showToast('Failed to activate account.', 'error');
+            }
+            return;
         }
+        
+        // If deactivating, show confirmation modal
+        const showModal = externalSetConfirmModal || setConfirmModal;
+        showModal({
+            message: `Are you sure you want to deactivate ${staffMember.name}? The staff member will not be able to access your store. The staff's store account will be deactivated.`,
+            confirmText: 'Deactivate Account',
+            cancelText: 'Cancel',
+            onConfirm: async () => {
+                if (externalSetConfirmModal) {
+                    externalSetConfirmModal(null);
+                } else {
+                    setConfirmModal(null);
+                }
+                try {
+                    await apiClient.put(API.staffToggle(staffMember._id)); 
+                    if (showToast) showToast('Staff account deactivated successfully.', 'success');
+                    await fetchStaff();
+                } catch (error) {
+                    if (showToast) showToast('Failed to deactivate account.', 'error');
+                }
+            },
+            onCancel: () => {
+                if (externalSetConfirmModal) {
+                    externalSetConfirmModal(null);
+                } else {
+                    setConfirmModal(null);
+                }
+            }
+        });
     };
     
     const handleRemoveStaff = (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
 
-        setConfirmModal({
+        const showModal = externalSetConfirmModal || setConfirmModal;
+        showModal({
             message: `CRITICAL: Proceed with permanent removal of ${staffMember.name}? This terminates all access credentials immediately.`,
             onConfirm: async () => {
-                setConfirmModal(null); 
+                if (externalSetConfirmModal) {
+                    externalSetConfirmModal(null);
+                } else {
+                    setConfirmModal(null);
+                }
                 try {
                     await apiClient.delete(API.staffDelete(staffMember._id)); 
                     if (showToast) showToast('Staff member removed.', 'success');
@@ -590,7 +635,13 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     if (showToast) showToast('Removal failed.', 'error');
                 }
             },
-            onCancel: () => setConfirmModal(null) 
+            onCancel: () => {
+                if (externalSetConfirmModal) {
+                    externalSetConfirmModal(null);
+                } else {
+                    setConfirmModal(null);
+                }
+            }
         });
     };
     
@@ -630,21 +681,6 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             </header>
 
             <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
-                {/* Access Level Banner */}
-                <div className={`p-4 md:p-5 rounded-xl md:rounded-2xl border flex items-center gap-4 ${hasWriteAccess 
-                    ? (darkMode ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100') 
-                    : (darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-100')}`}>
-                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 ${hasWriteAccess ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                        {hasWriteAccess ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <ShieldAlert className="w-5 h-5 md:w-6 md:h-6" />}
-                    </div>
-                    <div className="min-w-0">
-                        <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Security Authorization</p>
-                        <p className={`text-xs md:text-sm font-black mt-0.5 ${hasWriteAccess ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-amber-400' : 'text-amber-600')}`}>
-                            {hasWriteAccess ? 'Owner Mode: Full Administrative Control Active' : `Restricted Mode: ${effectiveRole} privileges applied.`}
-                        </p>
-                    </div>
-                </div>
-
                 {/* Staff List */}
                 {isLoading ? (
                     <div className={`flex flex-col items-center justify-center p-12 md:p-20 rounded-xl md:rounded-2xl border ${cardBase}`}>
@@ -732,6 +768,18 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 isSubmitting={isProcessing}
                 darkMode={darkMode}
             />
+
+            {/* Confirmation Modal for Deactivation and Deletion */}
+            {confirmModal && !externalSetConfirmModal && (
+                <ConfirmationModal 
+                    message={confirmModal.message}
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={confirmModal.onCancel}
+                    darkMode={darkMode}
+                    confirmText={confirmModal.confirmText || 'Confirm'}
+                    cancelText={confirmModal.cancelText || 'Cancel'}
+                />
+            )}
         </main>
     );
 };

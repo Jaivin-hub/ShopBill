@@ -61,12 +61,38 @@ export default defineConfig({
       
       workbox: {
         // Don't skip waiting - let the user confirm the update first
-        // skipWaiting: false, // Default is false, so we can omit it
-        clientsClaim: true,
+        skipWaiting: false, // User must confirm update
+        clientsClaim: true, // Take control of all clients immediately after activation
+        
+        // Use network-first strategy for HTML to ensure fresh content
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/, /^\/_/, /^\/socket.io/],
         
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],
         
+        // Add cache versioning to force cache invalidation on updates
+        cacheId: 'pocket-pos-v1',
+        
+        // Clean up old caches on update
+        cleanupOutdatedCaches: true,
+        
+        // Maximum cache size
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        
         runtimeCaching: [
+          {
+            // Network-first for HTML to get fresh content
+            urlPattern: /^https?:\/\/.*\/.*\.html$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24, // 1 day
+              },
+              networkTimeoutSeconds: 3,
+            }
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',

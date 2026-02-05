@@ -31,7 +31,19 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
                 `${API.attendanceStaff(staffId)}?startDate=${startDate}&endDate=${endDate}`
             );
             if (response.data?.success) {
-                setAttendance(response.data.records || []);
+                // Handle both response.data.records and response.data.data.records
+                const records = response.data.records || response.data.data?.records || [];
+                // Debug: Log first record to check structure
+                if (records.length > 0) {
+                    console.log('Sample attendance record:', {
+                        date: records[0].date,
+                        punchIn: records[0].punchIn,
+                        punchOut: records[0].punchOut,
+                        status: records[0].status,
+                        workingHours: records[0].workingHours
+                    });
+                }
+                setAttendance(records);
             }
         } catch (error) {
             console.error('Error fetching attendance:', error);
@@ -79,8 +91,14 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
 
     const formatTime = (dateString) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            console.error('Error formatting time:', e, dateString);
+            return '';
+        }
     };
 
     const getDateStatus = (attendanceRecord) => {
@@ -208,7 +226,7 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
                                     key={day}
                                     onClick={() => setSelectedDate(day === selectedDate ? null : day)}
                                     className={dayClasses}
-                                    title={attendanceRecord ? `${formatTime(attendanceRecord.punchIn)} - ${attendanceRecord.punchOut ? formatTime(attendanceRecord.punchOut) : 'In Progress'}` : 'No attendance'}
+                                    title={attendanceRecord ? `${formatTime(attendanceRecord.punchIn)} - ${(attendanceRecord.punchOut && attendanceRecord.status === 'completed') ? formatTime(attendanceRecord.punchOut) : 'In Progress'}` : 'No attendance'}
                                 >
                                     <span>{day}</span>
                                     {status && (
@@ -259,17 +277,27 @@ const AttendanceCalendar = ({ apiClient, API, showToast, darkMode, staffId, staf
                             </div>
                             {(() => {
                                 const record = getAttendanceForDate(selectedDate);
-                                const hours = Math.floor(record.workingHours / 60);
-                                const minutes = record.workingHours % 60;
+                                if (!record) return null;
+                                
+                                const hours = Math.floor((record.workingHours || 0) / 60);
+                                const minutes = (record.workingHours || 0) % 60;
+                                
+                                // Check if punchOut exists and is a valid date
+                                const hasPunchOut = record.punchOut && 
+                                                   record.status === 'completed' && 
+                                                   new Date(record.punchOut).getTime() > 0;
+                                
+                                const punchOutTime = hasPunchOut ? formatTime(record.punchOut) : 'In Progress';
+                                
                                 return (
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
                                             <Clock className={`w-3 h-3 ${textSecondary}`} />
                                             <span className={`text-[10px] ${textSecondary}`}>
-                                                In: {formatTime(record.punchIn)} | Out: {record.punchOut ? formatTime(record.punchOut) : 'In Progress'}
+                                                In: {formatTime(record.punchIn)} | Out: {punchOutTime}
                                             </span>
                                         </div>
-                                        {record.status === 'completed' && (
+                                        {record.status === 'completed' && hasPunchOut && (
                                             <div className={`text-[10px] font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                                 Worked: {hours}h {minutes}m
                                             </div>

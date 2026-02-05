@@ -89,6 +89,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         });
 
         socketRef.current.on('new_message', (data) => {
+            // Update messages if this is the selected chat
             if (data.chatId === selectedChat?._id) {
                 setMessages(prev => {
                     // Remove any optimistic messages
@@ -104,6 +105,26 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 });
                 setTimeout(() => scrollToBottom(), 50);
             }
+            
+            // Immediately update the chat list to move the chat with new message to top
+            setChats(prevChats => {
+                const chatIndex = prevChats.findIndex(c => c._id === data.chatId);
+                if (chatIndex >= 0) {
+                    const updatedChats = [...prevChats];
+                    const updatedChat = {
+                        ...updatedChats[chatIndex],
+                        lastMessageAt: new Date(data.message.timestamp || Date.now()),
+                        messages: [...(updatedChats[chatIndex].messages || []), data.message]
+                    };
+                    // Remove from current position and add to top
+                    updatedChats.splice(chatIndex, 1);
+                    updatedChats.unshift(updatedChat);
+                    return updatedChats;
+                }
+                return prevChats;
+            });
+            
+            // Refresh chats from server to get accurate data
             fetchChats();
         });
 
@@ -292,36 +313,81 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             console.log('[startRecording] Requesting microphone access...');
             let stream;
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    } 
-                });
+                // iOS Safari requires simpler audio constraints
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                
+                const audioConstraints = isIOS 
+                    ? { audio: true } // iOS prefers simple constraints
+                    : {
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    };
+                
+                stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
                 console.log('[startRecording] Microphone access granted, stream:', stream);
                 console.log('[startRecording] Stream tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState })));
             } catch (getUserMediaError) {
                 console.error('[startRecording] getUserMedia error:', getUserMediaError);
+                
+                // Provide user-friendly error messages
+                let errorMessage = 'Failed to access microphone. ';
+                if (getUserMediaError.name === 'NotAllowedError' || getUserMediaError.name === 'PermissionDeniedError') {
+                    errorMessage += 'Please allow microphone access in your browser settings and try again.';
+                } else if (getUserMediaError.name === 'NotFoundError' || getUserMediaError.name === 'DevicesNotFoundError') {
+                    errorMessage += 'No microphone found. Please connect a microphone and try again.';
+                } else if (getUserMediaError.name === 'NotReadableError' || getUserMediaError.name === 'TrackStartError') {
+                    errorMessage += 'Microphone is being used by another application. Please close other apps and try again.';
+                } else {
+                    errorMessage += 'Please check your device settings and try again.';
+                }
+                
+                showToast(errorMessage, 'error');
                 throw getUserMediaError;
             }
             mediaStreamRef.current = stream; // Store stream reference for cleanup
             
-            // Determine best mimeType
-            let mimeType = 'audio/webm';
+            // Determine best mimeType - prioritize iOS-compatible formats
+            // iOS Safari requires AAC/MP4, Android supports WebM
+            let mimeType = null;
             const supportedTypes = [
+                // iOS-compatible formats (check first for iOS devices)
+                'audio/mp4', // AAC in MP4 container (iOS preferred)
+                'audio/m4a', // Alternative iOS format
+                'audio/aac', // Direct AAC
+                // Android/Chrome formats
                 'audio/webm;codecs=opus',
                 'audio/webm',
                 'audio/ogg;codecs=opus',
-                'audio/mp4',
-                'audio/mpeg'
+                // Fallback formats
+                'audio/mpeg',
+                'audio/wav'
             ];
             
-            for (const type of supportedTypes) {
+            // Detect iOS
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            // For iOS, prioritize MP4/AAC formats
+            const typesToCheck = isIOS 
+                ? ['audio/mp4', 'audio/m4a', 'audio/aac', ...supportedTypes]
+                : supportedTypes;
+            
+            for (const type of typesToCheck) {
                 if (MediaRecorder.isTypeSupported(type)) {
                     mimeType = type;
+                    console.log('[startRecording] Selected mimeType:', mimeType, 'for device:', isIOS ? 'iOS' : 'Android/Other');
                     break;
                 }
+            }
+            
+            // Fallback if no type is supported
+            if (!mimeType) {
+                console.warn('[startRecording] No supported mimeType found, using default');
+                mimeType = isIOS ? 'audio/mp4' : 'audio/webm';
             }
 
             const options = { mimeType };
@@ -333,11 +399,20 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 console.log('[startRecording] MediaRecorder state:', recorder.state);
                 console.log('[startRecording] MediaRecorder mimeType:', recorder.mimeType);
             } catch (recorderError) {
-                console.error('[startRecording] Error creating MediaRecorder:', recorderError);
+                console.error('[startRecording] Error creating MediaRecorder with options:', recorderError);
                 // Try without options as fallback
                 console.log('[startRecording] Trying without options as fallback...');
-                recorder = new MediaRecorder(stream);
-                console.log('[startRecording] MediaRecorder created with fallback, mimeType:', recorder.mimeType);
+                try {
+                    recorder = new MediaRecorder(stream);
+                    console.log('[startRecording] MediaRecorder created with fallback, mimeType:', recorder.mimeType);
+                    // Update mimeType to match what MediaRecorder actually supports
+                    if (recorder.mimeType) {
+                        mimeType = recorder.mimeType;
+                    }
+                } catch (fallbackError) {
+                    console.error('[startRecording] Fallback MediaRecorder creation also failed:', fallbackError);
+                    throw new Error('MediaRecorder is not supported on this device. Please use a different browser or device.');
+                }
             }
             
             // Reset chunks array
@@ -347,6 +422,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             recorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) {
                     recordingChunksRef.current.push(e.data);
+                    console.log('[startRecording] Data chunk received, size:', e.data.size);
                 }
             };
             
@@ -358,8 +434,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 }
                 
                 const chunks = recordingChunksRef.current;
+                console.log('[startRecording] Recording stopped, chunks count:', chunks.length);
                 if (chunks.length > 0) {
-                    const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+                    // Use the actual mimeType from recorder if available, otherwise use detected one
+                    const finalMimeType = recorder.mimeType || mimeType || 'audio/webm';
+                    const blob = new Blob(chunks, { type: finalMimeType });
+                    console.log('[startRecording] Blob created, type:', blob.type, 'size:', blob.size);
                     setAudioBlob(blob);
                     const url = URL.createObjectURL(blob);
                     setAudioUrl(url);
@@ -613,6 +693,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+                // Refresh chat list to move chat to top
+                fetchChats();
             }
         } catch (error) {
             console.error('File upload error:', error);
@@ -645,7 +727,30 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
 
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'voice.webm');
+        // Determine file extension based on blob type
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        let fileExtension = 'webm';
+        const blobType = audioBlob.type || '';
+        
+        console.log('[sendVoiceMessage] Blob type:', blobType, 'isIOS:', isIOS);
+        
+        if (blobType.includes('mp4') || blobType.includes('m4a') || blobType.includes('x-m4a')) {
+            fileExtension = 'm4a';
+        } else if (blobType.includes('aac')) {
+            fileExtension = 'aac';
+        } else if (blobType.includes('ogg')) {
+            fileExtension = 'ogg';
+        } else if (blobType.includes('webm')) {
+            fileExtension = 'webm';
+        } else if (isIOS) {
+            // iOS default - use m4a even if type is not detected
+            fileExtension = 'm4a';
+        }
+        
+        console.log('[sendVoiceMessage] Using file extension:', fileExtension);
+        
+        formData.append('audio', audioBlob, `voice.${fileExtension}`);
         formData.append('messageType', 'audio');
         formData.append('audioDuration', recordingTime.toString());
         
@@ -706,6 +811,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+                // Refresh chat list to move chat to top
+                fetchChats();
             } else {
                 throw new Error('Server returned unsuccessful response');
             }
@@ -752,6 +859,23 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         setMessages(prev => [...prev, optimisticMessage]);
         scrollToBottom(true); // Instant scroll for optimistic update
         
+        // Optimistically move chat to top
+        setChats(prevChats => {
+            const chatIndex = prevChats.findIndex(c => c._id === selectedChat._id);
+            if (chatIndex > 0) {
+                const updatedChats = [...prevChats];
+                const updatedChat = {
+                    ...updatedChats[chatIndex],
+                    lastMessageAt: new Date(),
+                    messages: [...(updatedChats[chatIndex].messages || []), optimisticMessage]
+                };
+                updatedChats.splice(chatIndex, 1);
+                updatedChats.unshift(updatedChat);
+                return updatedChats;
+            }
+            return prevChats;
+        });
+        
         try {
             const response = await apiClient.post(API.sendMessage(selectedChat._id), { content });
             if (response.data.success) {
@@ -766,10 +890,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     return filtered;
                 });
                 scrollToBottom();
+                // Refresh chat list to get updated lastMessageAt from server
+                fetchChats();
             }
         } catch (error) { 
             // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+            // Revert chat list change on error
+            fetchChats();
             showToast('Send failed', 'error'); 
             setMessageInput(content); 
         }
@@ -784,24 +912,51 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         
         // Ensure audio source is set
         if (audioSrc && audio.src !== audioSrc) {
+            // Reset audio element for better compatibility
+            audio.pause();
+            audio.currentTime = 0;
             audio.src = audioSrc;
+            // Force reload for iOS
+            audio.load();
         }
         
         if (playingAudioId === messageId) {
+            // Pause current audio
             audio.pause();
             setPlayingAudioId(null);
         } else {
             // Pause any currently playing audio
             if (playingAudioId && audioRefs.current[playingAudioId]) {
-                audioRefs.current[playingAudioId].pause();
+                const prevAudio = audioRefs.current[playingAudioId];
+                prevAudio.pause();
+                prevAudio.currentTime = 0;
             }
             
-            // Play the selected audio
-            audio.play().catch(error => {
-                console.error('[toggleAudio] Error playing audio:', error);
-                showToast('Failed to play audio. Please check the file URL.', 'error');
-            });
-            setPlayingAudioId(messageId);
+            // Play the selected audio with better error handling
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log('[toggleAudio] Audio playback started successfully');
+                        setPlayingAudioId(messageId);
+                    })
+                    .catch(error => {
+                        console.error('[toggleAudio] Error playing audio:', error);
+                        // Try to provide more specific error messages
+                        if (error.name === 'NotAllowedError') {
+                            showToast('Audio playback blocked. Please allow audio in your browser settings.', 'error');
+                        } else if (error.name === 'NotSupportedError') {
+                            showToast('Audio format not supported. Please try a different device.', 'error');
+                        } else {
+                            showToast('Failed to play audio. Please check your connection and try again.', 'error');
+                        }
+                        setPlayingAudioId(null);
+                    });
+            } else {
+                // Fallback for older browsers
+                setPlayingAudioId(messageId);
+            }
         }
     };
 

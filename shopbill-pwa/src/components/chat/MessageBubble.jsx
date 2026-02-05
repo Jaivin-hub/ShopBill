@@ -111,9 +111,26 @@ const MessageBubble = ({
                             </div>
                         </div>
                         <audio
-                            ref={el => { if (el) audioRefs.current[msg._id] = el; }}
+                            ref={el => { 
+                                if (el) {
+                                    audioRefs.current[msg._id] = el;
+                                    // Set audio attributes for better compatibility
+                                    el.preload = 'metadata';
+                                    el.crossOrigin = 'anonymous';
+                                    // Add error handler
+                                    el.onerror = (e) => {
+                                        console.error('[MessageBubble] Audio error:', e, 'for message:', msg._id);
+                                    };
+                                    // Add loaded event handler
+                                    el.onloadedmetadata = () => {
+                                        console.log('[MessageBubble] Audio metadata loaded for message:', msg._id);
+                                    };
+                                }
+                            }}
                             src={audioSrc}
                             onEnded={() => onToggleAudio(null, null)}
+                            preload="metadata"
+                            crossOrigin="anonymous"
                         />
                     </div>
                 ) : isFileMessage && fileSrc ? (

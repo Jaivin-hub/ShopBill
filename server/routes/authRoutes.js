@@ -57,7 +57,8 @@ router.post('/login', async (req, res) => {
 
         if (user && (await user.matchPassword(password))) {
 
-            // 1. Basic Active Check
+            // 1. Basic Active Check - Block login if account is deactivated
+            // Only block if explicitly set to false (default is true, so null/undefined should allow login)
             if (user.isActive === false) {
                 return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
             }

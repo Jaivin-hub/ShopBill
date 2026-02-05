@@ -48,94 +48,194 @@ const UpdatePrompt = () => {
   const [registration, setRegistration] = useState(null);
   const updateHandlerRef = useRef(null);
   const pendingVersionRef = useRef(null);
+  const checkIntervalRef = useRef(null);
+
+  // Generate a stable version ID from service worker script URL
+  const getVersionId = (sw) => {
+    if (!sw) return null;
+    // Use the script URL as version identifier (it includes hash in production)
+    // Extract hash from URL if present, otherwise use full URL
+    const url = sw.scriptURL || sw.scope || '';
+    // Remove query params and get the base URL with hash
+    const baseUrl = url.split('?')[0];
+    return baseUrl;
+  };
+
+  // Check for waiting service worker and show update prompt
+  const checkForUpdate = useCallback(async (forceCheck = false) => {
+    if (!('serviceWorker' in navigator)) return;
+
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return;
+
+      // Force update check by calling update()
+      if (forceCheck) {
+        try {
+          await reg.update();
+        } catch (err) {
+          console.warn('Service worker update check failed:', err);
+        }
+      }
+
+      // Check if there's a waiting worker
+      if (reg.waiting) {
+        const versionId = getVersionId(reg.waiting);
+        if (!versionId) return;
+
+        const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
+        
+        // Only show if this version hasn't been dismissed yet
+        if (versionId !== lastDismissedVersion) {
+          pendingVersionRef.current = versionId;
+          setRegistration(reg);
+          setShow(true);
+          return true; // Update available
+        }
+      }
+
+      // Also check for installing worker (might become waiting soon)
+      if (reg.installing) {
+        reg.installing.addEventListener('statechange', () => {
+          if (reg.installing?.state === 'installed' && reg.waiting) {
+            checkForUpdate(false);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error checking for service worker update:', error);
+    }
+
+    return false;
+  }, []);
 
   useEffect(() => {
     const onUpdate = async (e) => {
-      // onNeedRefresh is only called when there's actually a new version
       const updateHandler = e.detail?.updateHandler;
-      if (!updateHandler) return;
-
-      // Get the service worker registration to check for waiting worker
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg && reg.waiting) {
-          // Generate a unique identifier for this version using the waiting worker's script URL and install time
-          const versionId = `${reg.waiting.scriptURL}-${Date.now()}`;
-          const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
-          
-          // Only show if this version hasn't been dismissed yet
-          if (versionId !== lastDismissedVersion) {
-            pendingVersionRef.current = versionId;
-            updateHandlerRef.current = updateHandler;
-            setRegistration(reg);
-            setShow(true);
-          }
-        }
+      if (updateHandler) {
+        updateHandlerRef.current = updateHandler;
       }
+      // Check for waiting worker when update event fires
+      await checkForUpdate(false);
     };
 
-    // Only listen for the update event (which fires when onNeedRefresh is called)
-    // This event is ONLY triggered when a new service worker is detected
+    // Listen for the update event
     window.addEventListener('pwa-update-available', onUpdate);
 
-    // Check once on mount if there's already a waiting worker (user might have refreshed before clicking update)
-    const checkWaitingWorker = async () => {
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg && reg.waiting) {
-          // Generate version ID for the waiting worker
-          const versionId = `${reg.waiting.scriptURL}-${Date.now()}`;
-          const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
-          
-          // Only show if this version hasn't been dismissed
-          if (versionId !== lastDismissedVersion) {
-            pendingVersionRef.current = versionId;
-            setRegistration(reg);
-            setShow(true);
-          }
-        }
+    // Initial check after a delay to ensure service worker is registered
+    const initialCheck = setTimeout(() => {
+      checkForUpdate(true); // Force update check on mount
+    }, 2000);
+
+    // Periodic update checks every 5 minutes
+    checkIntervalRef.current = setInterval(() => {
+      checkForUpdate(true);
+    }, 5 * 60 * 1000); // 5 minutes
+
+    // Check for updates when page becomes visible (user returns to tab/app)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkForUpdate(true);
       }
     };
-    
-    // Small delay to ensure service worker is registered
-    setTimeout(checkWaitingWorker, 1000);
+
+    // Check for updates when window gains focus
+    const handleFocus = () => {
+      checkForUpdate(true);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    // Listen for service worker controller change (new SW activated)
+    const handleControllerChange = () => {
+      // Reload if a new service worker took control
+      if (navigator.serviceWorker.controller) {
+        window.location.reload();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
     return () => {
       window.removeEventListener('pwa-update-available', onUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      clearTimeout(initialCheck);
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
     };
-  }, []);
+  }, [checkForUpdate]);
 
-  const handleUpdate = () => {
-    if (registration && registration.waiting) {
-      // Mark this version as updated (so we don't show again)
-      if (pendingVersionRef.current) {
-        localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
-      }
-      
-      // Tell the waiting worker to skipWaiting
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      
-      // Hide the prompt immediately
-      setShow(false);
-      
-      // Reload after the new worker takes control
-      registration.waiting.addEventListener('statechange', (e) => {
-        if (e.target.state === 'activated') {
-          window.location.reload();
+  const handleUpdate = async () => {
+    try {
+      if (registration && registration.waiting) {
+        // Mark this version as updated (so we don't show again)
+        if (pendingVersionRef.current) {
+          localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
         }
-      });
-      
-      // Fallback reload if statechange doesn't fire fast enough
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } else if (updateHandlerRef.current) {
-      // Use the update handler if available
-      updateHandlerRef.current();
-      if (pendingVersionRef.current) {
-        localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
+        
+        // Tell the waiting worker to skipWaiting
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        
+        // Hide the prompt immediately
+        setShow(false);
+        
+        // Wait for the new service worker to activate
+        let activated = false;
+        const stateChangeHandler = (e) => {
+          if (e.target.state === 'activated') {
+            activated = true;
+            registration.waiting.removeEventListener('statechange', stateChangeHandler);
+            // Clear all caches before reload
+            if ('caches' in window) {
+              caches.keys().then(names => {
+                names.forEach(name => caches.delete(name));
+              }).finally(() => {
+                window.location.reload(true); // Force reload from server
+              });
+            } else {
+              window.location.reload(true);
+            }
+          }
+        };
+        
+        registration.waiting.addEventListener('statechange', stateChangeHandler);
+        
+        // Fallback reload if statechange doesn't fire within 2 seconds
+        setTimeout(() => {
+          if (!activated) {
+            registration.waiting.removeEventListener('statechange', stateChangeHandler);
+            // Clear caches and reload
+            if ('caches' in window) {
+              caches.keys().then(names => {
+                names.forEach(name => caches.delete(name));
+              }).finally(() => {
+                window.location.reload(true);
+              });
+            } else {
+              window.location.reload(true);
+            }
+          }
+        }, 2000);
+      } else if (updateHandlerRef.current) {
+        // Use the update handler if available
+        updateHandlerRef.current();
+        if (pendingVersionRef.current) {
+          localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
+        }
+        setShow(false);
+        // Reload after a short delay
+        setTimeout(() => {
+          window.location.reload(true);
+        }, 500);
       }
-      setShow(false);
+    } catch (error) {
+      console.error('Error during update:', error);
+      // Fallback: just reload
+      window.location.reload(true);
     }
   };
 
@@ -148,14 +248,32 @@ const UpdatePrompt = () => {
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
           </div>
-          <h4 className="font-extrabold text-2xl leading-tight">System Update</h4>
+          <h4 className="font-extrabold text-2xl leading-tight">System Update Available</h4>
           <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
-          <div className="w-full mt-6">
+          <div className="w-full mt-6 space-y-3">
             <button
               onClick={handleUpdate}
               className="w-full py-3 bg-white text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
             >
               Update Now
+            </button>
+            <button
+              onClick={async () => {
+                // Clear all caches and reload
+                if ('caches' in window) {
+                  try {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  } catch (err) {
+                    console.error('Error clearing caches:', err);
+                  }
+                }
+                // Force reload from server
+                window.location.reload(true);
+              }}
+              className="w-full py-2 text-indigo-100 text-sm hover:text-white transition-colors underline"
+            >
+              Clear Cache & Reload
             </button>
           </div>
         </div>
