@@ -4,7 +4,7 @@ import {
     List, Loader2, TrendingUp, Clock, Activity,
     ShieldCheck, RefreshCw, PlusCircle, ShoppingCart,
     ChevronRight, Inbox, Sparkles, Box, ArrowRight,
-    Store, MapPin, BarChart3, Settings2, Truck
+    Store, MapPin, BarChart3, Settings2, Truck, ChevronDown, ChevronUp
 } from 'lucide-react';
 import AttendancePunch from './AttendancePunch';
 
@@ -18,6 +18,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [customers, setCustomers] = useState([]);
     const [sales, setSales] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isAttendanceExpanded, setIsAttendanceExpanded] = useState(false); // Collapsed by default to save space
+    const [currentAttendance, setCurrentAttendance] = useState(null); // Track attendance status for indicator
 
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
@@ -48,9 +50,39 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [apiClient, API, showToast, onLogout]);
 
+    // Fetch attendance status for manager/cashier
+    const fetchAttendanceStatus = useCallback(async () => {
+        if ((userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && apiClient && API) {
+            try {
+                const response = await apiClient.get(API.attendanceCurrent);
+                if (response.data?.success) {
+                    setCurrentAttendance(response.data.attendance);
+                } else {
+                    setCurrentAttendance(null);
+                }
+            } catch (error) {
+                console.error('Error fetching attendance status:', error);
+                setCurrentAttendance(null);
+            }
+        }
+    }, [userRole, apiClient, API]);
+
     useEffect(() => {
-        if (hasAccess) fetchDashboardData();
-    }, [hasAccess, fetchDashboardData]);
+        if (hasAccess) {
+            fetchDashboardData();
+            fetchAttendanceStatus();
+        }
+    }, [hasAccess, fetchDashboardData, fetchAttendanceStatus]);
+
+    // Refresh attendance status periodically (every 30 seconds)
+    useEffect(() => {
+        if ((userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && apiClient && API) {
+            const interval = setInterval(() => {
+                fetchAttendanceStatus();
+            }, 30000); // Every 30 seconds
+            return () => clearInterval(interval);
+        }
+    }, [userRole, apiClient, API, fetchAttendanceStatus]);
 
     // --- Optimized Data Calculations ---
     const today = useMemo(() => {
@@ -233,6 +265,64 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
                 <div className="max-w-7xl mx-auto space-y-8 pb-12">
 
+                    {/* ATTENDANCE PUNCH (For Staff Only) - Before Today's Sales */}
+                    {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (
+                        <section className={`rounded-2xl border overflow-hidden transition-all ${cardBase}`}>
+                            <button
+                                onClick={() => setIsAttendanceExpanded(!isAttendanceExpanded)}
+                                className={`w-full px-5 py-4 flex items-center justify-between transition-all hover:bg-slate-500/5 ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500">
+                                        <Clock className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="text-sm font-black tracking-tight">Attendance</h3>
+                                        <p className="text-[10px] font-bold text-slate-500 tracking-widest">Punch In/Out</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {/* Status Indicator */}
+                                    {currentAttendance ? (
+                                        currentAttendance.onBreak ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                <span className="text-[10px] font-black tracking-widest text-amber-500">ON BREAK</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span className="text-[10px] font-black tracking-widest text-emerald-500">PUNCHED IN</span>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-slate-500" />
+                                            <span className="text-[10px] font-black tracking-widest text-slate-500">PUNCHED OUT</span>
+                                        </div>
+                                    )}
+                                    {isAttendanceExpanded ? (
+                                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                                    ) : (
+                                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                                    )}
+                                </div>
+                            </button>
+                            {isAttendanceExpanded && (
+                                <div className="px-5 pb-5 pt-2">
+                                    <AttendancePunch
+                                        apiClient={apiClient}
+                                        API={API}
+                                        showToast={showToast}
+                                        darkMode={darkMode}
+                                        currentUser={currentUser}
+                                        onStatusChange={fetchAttendanceStatus} // Callback to update status when attendance changes
+                                    />
+                                </div>
+                            )}
+                        </section>
+                    )}
+
                     {/* KPI CARDS */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
@@ -271,19 +361,6 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                             </div>
                         </div>
                     </section>
-
-                    {/* ATTENDANCE PUNCH (For Staff Only) */}
-                    {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (
-                        <div className="mb-4">
-                            <AttendancePunch
-                                apiClient={apiClient}
-                                API={API}
-                                showToast={showToast}
-                                darkMode={darkMode}
-                                currentUser={currentUser}
-                            />
-                        </div>
-                    )}
 
                     {/* ACTION BUTTONS */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">

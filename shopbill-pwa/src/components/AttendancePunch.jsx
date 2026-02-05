@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, LogIn, LogOut, Calendar, TrendingUp, Loader2, Coffee, RotateCcw, Timer } from 'lucide-react';
 
-const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) => {
+const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onStatusChange }) => {
     const [currentAttendance, setCurrentAttendance] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPunchingIn, setIsPunchingIn] = useState(false);
@@ -19,16 +19,26 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) =
             const response = await apiClient.get(API.attendanceCurrent);
             if (response.data?.success) {
                 setCurrentAttendance(response.data.attendance);
+                // Notify parent component of status change
+                if (onStatusChange) {
+                    onStatusChange(response.data.attendance);
+                }
             } else {
                 setCurrentAttendance(null);
+                if (onStatusChange) {
+                    onStatusChange(null);
+                }
             }
         } catch (error) {
             console.error('Error fetching attendance status:', error);
             setCurrentAttendance(null);
+            if (onStatusChange) {
+                onStatusChange(null);
+            }
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, API]);
+    }, [apiClient, API, onStatusChange]);
 
     const fetchMyRecords = useCallback(async () => {
         try {
@@ -71,6 +81,9 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser }) =
             const response = await apiClient.post(API.attendancePunchOut);
             if (response.data?.success) {
                 setCurrentAttendance(null);
+                if (onStatusChange) {
+                    onStatusChange(null);
+                }
                 showToast(`Punched out successfully! Worked: ${response.data.attendance.hoursWorked}`, 'success');
                 await fetchMyRecords();
             }
