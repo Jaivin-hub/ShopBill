@@ -83,15 +83,12 @@ const UpdatePrompt = () => {
         const versionId = getVersionId(reg.waiting);
         if (!versionId) return;
 
-        const lastDismissedVersion = localStorage.getItem('pwa_dismissed_version');
-        
-        // Only show if this version hasn't been dismissed yet
-        if (versionId !== lastDismissedVersion) {
-          pendingVersionRef.current = versionId;
-          setRegistration(reg);
-          setShow(true);
-          return true; // Update available
-        }
+        // FORCE UPDATE: Always show update prompt, don't check dismissed versions
+        // This ensures users are forced to update when a new build is published
+        pendingVersionRef.current = versionId;
+        setRegistration(reg);
+        setShow(true);
+        return true; // Update available
       }
 
       // Also check for installing worker (might become waiting soon)
@@ -127,10 +124,10 @@ const UpdatePrompt = () => {
       checkForUpdate(true); // Force update check on mount
     }, 2000);
 
-    // Periodic update checks every 5 minutes
+    // Periodic update checks every 1 minute (more frequent for forced updates)
     checkIntervalRef.current = setInterval(() => {
       checkForUpdate(true);
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 60 * 1000); // 1 minute
 
     // Check for updates when page becomes visible (user returns to tab/app)
     const handleVisibilityChange = () => {
@@ -172,16 +169,9 @@ const UpdatePrompt = () => {
   const handleUpdate = async () => {
     try {
       if (registration && registration.waiting) {
-        // Mark this version as updated (so we don't show again)
-        if (pendingVersionRef.current) {
-          localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
-        }
-        
+        // FORCE UPDATE: Don't mark as dismissed - always show until updated
         // Tell the waiting worker to skipWaiting
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        
-        // Hide the prompt immediately
-        setShow(false);
         
         // Wait for the new service worker to activate
         let activated = false;
@@ -223,10 +213,6 @@ const UpdatePrompt = () => {
       } else if (updateHandlerRef.current) {
         // Use the update handler if available
         updateHandlerRef.current();
-        if (pendingVersionRef.current) {
-          localStorage.setItem('pwa_dismissed_version', pendingVersionRef.current);
-        }
-        setShow(false);
         // Reload after a short delay
         setTimeout(() => {
           window.location.reload(true);
@@ -242,14 +228,21 @@ const UpdatePrompt = () => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-      <div className="max-w-sm w-full bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300">
+    <div 
+      className="fixed inset-0 bg-gray-950/95 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+      // Prevent closing by clicking outside
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div 
+        className="max-w-sm w-full bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex flex-col items-center text-center">
           <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
             <RefreshCw className="w-8 h-8 animate-spin text-white" />
           </div>
-          <h4 className="font-extrabold text-2xl leading-tight">System Update Available</h4>
-          <p className="text-indigo-100 mt-2 text-sm">A new version is available. Update now to keep your data synced and secure.</p>
+          <h4 className="font-extrabold text-2xl leading-tight">System Update Required</h4>
+          <p className="text-indigo-100 mt-2 text-sm">A new version is available. You must update to continue using the application.</p>
           <div className="w-full mt-6 space-y-3">
             <button
               onClick={handleUpdate}

@@ -22,14 +22,14 @@ const updateSW = registerSW({
     // Store registration globally for UpdatePrompt to access
     window.__swRegistration = registration;
     
-    // Set up periodic update checks
+    // Set up periodic update checks - More frequent for forced updates
     if (registration) {
-      // Check for updates every 30 seconds
+      // Check for updates every 15 seconds to catch new builds quickly
       setInterval(() => {
         registration.update().catch(err => {
           console.warn('Periodic update check failed:', err);
         });
-      }, 30 * 1000); // 30 seconds
+      }, 15 * 1000); // 15 seconds
     }
   },
   onRegisteredSW(swUrl, registration) {
