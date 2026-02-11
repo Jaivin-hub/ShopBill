@@ -7,7 +7,7 @@ import API from '../config/api';
 import { validatePhoneNumber, validateEmail, validateShopName, validateTaxId, validateAddress } from '../utils/validation';
 
 // --- HELPER COMPONENT ---
-const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '', onChange, isEditing, darkMode }) => (
+const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, placeholder = '', onChange, isEditing, darkMode, validationErrors = {}, setValidationErrors }) => (
     <div className="flex flex-col space-y-2">
         <label className={`text-[10px] font-bold tracking-[0.2em] flex items-center ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
             <Icon className="w-3 h-3 mr-2 text-indigo-500" /> {label}
@@ -259,6 +259,8 @@ function Profile({ apiClient, showToast, darkMode }) {
                             onChange={handleChange}
                             isEditing={isEditing}
                             darkMode={darkMode}
+                            validationErrors={validationErrors}
+                            setValidationErrors={setValidationErrors}
                         />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -271,6 +273,8 @@ function Profile({ apiClient, showToast, darkMode }) {
                                 onChange={handleChange}
                                 isEditing={isEditing}
                                 darkMode={darkMode}
+                                validationErrors={validationErrors}
+                                setValidationErrors={setValidationErrors}
                             />
                             <ProfileInputField 
                                 label="Operational Headquarters" 
@@ -281,6 +285,8 @@ function Profile({ apiClient, showToast, darkMode }) {
                                 onChange={handleChange}
                                 isEditing={isEditing}
                                 darkMode={darkMode}
+                                validationErrors={validationErrors}
+                                setValidationErrors={setValidationErrors}
                             />
                         </div>
 
@@ -294,6 +300,8 @@ function Profile({ apiClient, showToast, darkMode }) {
                                 onChange={handleChange}
                                 isEditing={isEditing}
                                 darkMode={darkMode}
+                                validationErrors={validationErrors}
+                                setValidationErrors={setValidationErrors}
                             />
                             <ProfileInputField 
                                 label="Regional Synchronization Timezone" 
@@ -304,6 +312,8 @@ function Profile({ apiClient, showToast, darkMode }) {
                                 onChange={handleChange}
                                 isEditing={isEditing}
                                 darkMode={darkMode}
+                                validationErrors={validationErrors}
+                                setValidationErrors={setValidationErrors}
                             />
                         </div>
                     </div>

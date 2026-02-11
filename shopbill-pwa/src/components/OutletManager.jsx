@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import { 
     Store, Plus, MapPin, Phone, 
@@ -10,7 +10,7 @@ import {
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 
-const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode }) => {
+const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage }) => {
     const [outlets, setOutlets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,6 +30,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [validationErrors, setValidationErrors] = useState({});
     const [apiError, setApiError] = useState(null);
     const errorRef = useRef(null);
+    const isSwitchingRef = useRef(false);
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -51,27 +52,41 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         );
     }, [outlets, debouncedSearchTerm]);
 
+    const fetchOutlets = useCallback(async (showLoading = true, preserveOnError = false) => {
+        if (showLoading) setIsLoading(true);
+        try {
+            const response = await apiClient.get(API.outlets);
+            if (response.data.success && Array.isArray(response.data.data)) {
+                setOutlets(response.data.data);
+            } else if (response.data.success && !Array.isArray(response.data.data)) {
+                // If response is successful but data is not an array, set empty array
+                setOutlets([]);
+            }
+        } catch (error) {
+            console.error('Failed to fetch outlets:', error);
+            // Only show toast if this is the initial load, not a refetch
+            if (showLoading) {
+                showToast('Failed to load store locations.', 'error');
+            }
+            // If preserveOnError is true, don't clear the outlets list
+            if (!preserveOnError) {
+                setOutlets([]);
+            }
+        } finally {
+            if (showLoading) setIsLoading(false);
+        }
+    }, [apiClient, showToast]);
+
     useEffect(() => {
         if (isPremium && currentUser) {
-            fetchOutlets();
+            // Skip refetch if we're in the middle of switching (manual refetch will handle it)
+            if (!isSwitchingRef.current) {
+                fetchOutlets();
+            }
         } else {
             setIsLoading(false);
         }
-    }, [isPremium, currentUser, currentOutletId]);
-
-    const fetchOutlets = async () => {
-        setIsLoading(true);
-        try {
-            const response = await apiClient.get(API.outlets);
-            if (response.data.success) {
-                setOutlets(response.data.data || []);
-            }
-        } catch (error) {
-            showToast('Failed to load store locations.', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    }, [isPremium, currentUser, currentOutletId, fetchOutlets]);
 
     const handleOpenModal = (outlet = null) => {
         if (outlet) {
@@ -186,18 +201,28 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     const handleSwitchOutlet = async (outletId) => {
         setIsSubmitting(true);
+        isSwitchingRef.current = true; // Mark that we're switching
         try {
             const response = await apiClient.put(API.switchOutlet(outletId));
             if (response.data.success) {
                 showToast(`Switched to ${response.data.data.outlet.name}`, 'success');
-                if (onOutletSwitch) onOutletSwitch(response.data.data.outlet);
-                // Refetch outlets to update the list and show which outlet is now active
-                await fetchOutlets();
+                // Update parent state first - this will trigger useEffect, but we'll skip it
+                if (onOutletSwitch) {
+                    onOutletSwitch(response.data.data.outlet);
+                }
+                // Manually refetch immediately to ensure list updates
+                // Don't show loading state during refetch to avoid clearing the list
+                // Preserve existing outlets if refetch fails
+                await fetchOutlets(false, true);
             }
         } catch (error) {
             showToast('Failed to switch outlet.', 'error');
         } finally {
             setIsSubmitting(false);
+            // Reset switching flag after a short delay to allow useEffect to work normally next time
+            setTimeout(() => {
+                isSwitchingRef.current = false;
+            }, 500);
         }
     };
 
@@ -391,6 +416,22 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                             <p className={`text-sm font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
                                                 {apiError}
                                             </p>
+                                            {apiError && apiError.includes('Store limit reached') && setCurrentPage && (
+                                                <p className={`text-xs mt-2 ${darkMode ? 'text-rose-300' : 'text-rose-500'}`}>
+                                                    If you want to create more stores,{' '}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            handleCloseModal();
+                                                            setCurrentPage('support');
+                                                        }}
+                                                        className={`underline font-bold hover:opacity-80 transition-opacity ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}
+                                                    >
+                                                        contact support
+                                                    </button>
+                                                    .
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}

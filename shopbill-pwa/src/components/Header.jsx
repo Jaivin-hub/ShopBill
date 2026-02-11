@@ -27,6 +27,7 @@ const Header = ({
     const [outlets, setOutlets] = useState([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
+    const [switchingOutletId, setSwitchingOutletId] = useState(null);
 
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
@@ -81,6 +82,7 @@ const Header = ({
         }
         
         setIsSwitching(true);
+        setSwitchingOutletId(outletId); // Track which outlet is being switched to
         try {
             const response = await apiClient.put(API.switchOutlet(outletId));
             if (response.data.success) {
@@ -102,6 +104,7 @@ const Header = ({
             showToast('Failed to switch outlet.', 'error');
         } finally {
             setIsSwitching(false);
+            setSwitchingOutletId(null); // Clear switching outlet ID
         }
     };
 
@@ -205,6 +208,7 @@ const Header = ({
                             <>
                                 {outlets.map((outlet) => {
                                     const isActive = currentOutletId === outlet._id;
+                                    const isSwitchingToThis = switchingOutletId === outlet._id;
                                     return (
                                         <button
                                             key={outlet._id}
@@ -216,7 +220,11 @@ const Header = ({
                                                 : (darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-600')
                                             } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
-                                            {isSwitching && isActive ? <Loader2 size={14} className="animate-spin" /> : <Store size={14} />}
+                                            {isSwitchingToThis ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <Store size={14} />
+                                            )}
                                             <span className="text-xs font-black whitespace-nowrap uppercase tracking-tight">{outlet.name}</span>
                                         </button>
                                     );
