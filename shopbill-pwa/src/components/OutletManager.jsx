@@ -18,6 +18,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOutlet, setEditingOutlet] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
     const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const [formData, setFormData] = useState({
         name: '',
@@ -395,34 +396,58 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             <header className={`sticky top-0 z-[50] ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
                 <div className="p-4 md:p-6">
                     <div className="flex flex-col gap-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h1 className={`text-2xl font-black tracking-tight flex items-center gap-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    STORE NETWORK
-                                </h1>
-                                <p className={`text-xs font-bold mt-1 tracking-wide opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Managing {outlets.length} active branches across your enterprise
-                                </p>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex-1">
+                                    <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                        STORE NETWORK
+                                    </h1>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowSearch(!showSearch);
+                                        if (showSearch) {
+                                            setSearchTerm(''); // Clear search when hiding
+                                        }
+                                    }}
+                                    className={`p-3 rounded-xl border transition-all active:scale-95 shrink-0 ${
+                                        showSearch 
+                                            ? darkMode 
+                                                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400' 
+                                                : 'bg-indigo-50 border-indigo-500/50 text-indigo-600'
+                                            : darkMode 
+                                                ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400' 
+                                                : 'bg-white border-slate-200 hover:border-indigo-500/50 text-slate-600 hover:text-indigo-600'
+                                    }`}
+                                >
+                                    <Search size={18} />
+                                </button>
                             </div>
+                            <p className={`text-xs font-bold tracking-wide opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                Managing {outlets.length} active branches across your enterprise
+                            </p>
                         </div>
                         
-                        {/* Search Bar */}
-                        <div className="relative group">
-                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-600 group-focus-within:text-indigo-500' : 'text-slate-400 group-focus-within:text-indigo-500'} transition-colors`} />
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by name, address, phone, email, or tax ID..."
-                                className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${inputBase} border rounded-xl text-[16px] md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
-                            />
-                            {searchTerm && (
-                                <X 
-                                    onClick={() => setSearchTerm('')} 
-                                    className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`} 
+                        {/* Search Bar - Only show when showSearch is true */}
+                        {showSearch && (
+                            <div className="relative group">
+                                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-600 group-focus-within:text-indigo-500' : 'text-slate-400 group-focus-within:text-indigo-500'} transition-colors`} />
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search by name, address, phone, email, or tax ID..."
+                                    className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${inputBase} border rounded-xl text-[16px] md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                                    autoFocus
                                 />
-                            )}
-                        </div>
+                                {searchTerm && (
+                                    <X 
+                                        onClick={() => setSearchTerm('')} 
+                                        className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`} 
+                                    />
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>

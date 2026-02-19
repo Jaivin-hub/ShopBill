@@ -67,10 +67,23 @@ router.post('/punch-in', protect, async (req, res) => {
             });
         }
 
-        // Check if already punched in today
-        // Use UTC to avoid timezone issues
+        // Get client's local date from request body to ensure correct date is saved
+        // This fixes the issue where punching in at 12:02 AM local time was saved as previous day
         const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        let attendanceDate;
+        
+        if (body.localDate) {
+            // Use the client's local date string (YYYY-MM-DD) to create the date
+            // Parse as UTC midnight to avoid timezone conversion issues
+            const [year, month, day] = body.localDate.split('-').map(Number);
+            attendanceDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        } else {
+            // Fallback: use server's current date (UTC) if client date not provided
+            attendanceDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        }
+
+        // Use the same date for checking existing attendance
+        const today = new Date(attendanceDate);
         const tomorrow = new Date(today);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
@@ -91,17 +104,19 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Create new attendance record
-        // Set date to start of day in UTC for consistent querying (avoids timezone issues)
-        const attendanceDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        // Use client's local date to ensure correct date is saved
 
         let attendance;
         try {
             // Prepare attendance data - mongoose will handle ObjectId conversion automatically
+            // Use client time if provided (with exact milliseconds), otherwise use server time
+            const punchInTime = body.clientTime ? new Date(body.clientTime) : new Date();
+            
             const attendanceData = {
                 staffId: staff._id,
                 storeId: req.user.storeId, // mongoose will convert string to ObjectId if needed
                 date: attendanceDate,
-                punchIn: new Date(),
+                punchIn: punchInTime, // Use exact client time with milliseconds
                 status: 'active',
                 notes: body.notes || '',
                 workingHours: 0 // Initialize to 0 for active status

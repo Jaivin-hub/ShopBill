@@ -61,7 +61,17 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
     const handlePunchIn = async () => {
         try {
             setIsPunchingIn(true);
-            const response = await apiClient.post(API.attendancePunchIn);
+            // Get client's local date and timezone offset to ensure correct date is saved
+            const now = new Date();
+            const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const localDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const timezoneOffset = now.getTimezoneOffset(); // Offset in minutes
+            
+            const response = await apiClient.post(API.attendancePunchIn, {
+                localDate: localDateString,
+                timezoneOffset: timezoneOffset,
+                clientTime: now.toISOString() // Send exact client time with milliseconds
+            });
             if (response.data?.success) {
                 await fetchCurrentStatus();
                 showToast('Punched in successfully!', 'success');
