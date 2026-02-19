@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
 import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown, Receipt, Clock, ArrowRight } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
@@ -39,7 +39,14 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
     }
   }, [apiClient, API.inventory, API.customers, showToast]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Only fetch on mount, not when fetchData callback changes
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchData();
+    }
+  }, []); // Empty deps - only run on mount
 
   // Fetch recent sales
   const fetchRecentSales = useCallback(async () => {

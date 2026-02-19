@@ -5,10 +5,11 @@ import {
     MoreVertical, Power, Edit3, Trash2, 
     ArrowUpRight, Building2, ShieldCheck,
     Loader2, X, Save, Mail, Globe, 
-    Receipt, AlertCircle, Search
+    Receipt, AlertCircle, Search, Users
 } from 'lucide-react';
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
+import ConfirmationModal from './ConfirmationModal';
 
 const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage }) => {
     const [outlets, setOutlets] = useState([]);
@@ -31,6 +32,12 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [apiError, setApiError] = useState(null);
     const errorRef = useRef(null);
     const isSwitchingRef = useRef(false);
+    const prevOutletIdRef = useRef(currentOutletId);
+    const isFetchingRef = useRef(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [outletToDelete, setOutletToDelete] = useState(null);
+    const [outletStaff, setOutletStaff] = useState({}); // { outletId: [staff members] }
+    const [loadingStaff, setLoadingStaff] = useState({}); // { outletId: true/false }
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -52,41 +59,137 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         );
     }, [outlets, debouncedSearchTerm]);
 
+    // Fetch staff for a specific outlet
+    const fetchStaffForOutlet = useCallback(async (outletId) => {
+        if (!outletId || loadingStaff[outletId]) return;
+        
+        setLoadingStaff(prev => ({ ...prev, [outletId]: true }));
+        try {
+            // Make API call with outlet-specific header without modifying global defaults
+            const response = await apiClient.get(API.staff, {
+                headers: {
+                    'x-store-id': outletId
+                }
+            });
+            
+            // Handle both array response and object with data property
+            let staffData = [];
+            if (Array.isArray(response.data)) {
+                staffData = response.data;
+            } else if (response.data?.data && Array.isArray(response.data.data)) {
+                staffData = response.data.data;
+            } else if (response.data?.staff && Array.isArray(response.data.staff)) {
+                staffData = response.data.staff;
+            }
+            
+            console.log(`[OutletManager] Fetched ${staffData.length} staff for outlet ${outletId}`);
+            setOutletStaff(prev => ({ ...prev, [outletId]: staffData }));
+        } catch (error) {
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return;
+            }
+            console.error(`[OutletManager] Failed to fetch staff for outlet ${outletId}:`, error);
+            // Set empty array on error
+            setOutletStaff(prev => ({ ...prev, [outletId]: [] }));
+        } finally {
+            setLoadingStaff(prev => ({ ...prev, [outletId]: false }));
+        }
+    }, [apiClient, API, loadingStaff]);
+
     const fetchOutlets = useCallback(async (showLoading = true, preserveOnError = false) => {
+        // Prevent duplicate simultaneous calls
+        if (isFetchingRef.current) {
+            console.log('[OutletManager] Fetch already in progress, skipping duplicate call');
+            return;
+        }
+
+        isFetchingRef.current = true;
         if (showLoading) setIsLoading(true);
         try {
+            console.log('[OutletManager] Fetching outlets, showLoading:', showLoading, 'preserveOnError:', preserveOnError);
             const response = await apiClient.get(API.outlets);
+            console.log('[OutletManager] Outlets API response:', response.data);
             if (response.data.success && Array.isArray(response.data.data)) {
+                // Always update the list with the response data (includes staffCount from API)
+                console.log('[OutletManager] Setting outlets:', response.data.data.length, 'outlets');
                 setOutlets(response.data.data);
+                
+                // Fetch staff details for each active outlet (for displaying staff list)
+                response.data.data.forEach(outlet => {
+                    if (outlet._id && outlet.isActive !== false && outlet.staffCount > 0) {
+                        fetchStaffForOutlet(outlet._id);
+                    }
+                });
             } else if (response.data.success && !Array.isArray(response.data.data)) {
-                // If response is successful but data is not an array, set empty array
-                setOutlets([]);
+                // If response is successful but data is not an array
+                console.warn('[OutletManager] API returned non-array data:', response.data.data);
+                if (!preserveOnError) {
+                    setOutlets([]);
+                }
+            } else {
+                // If response is not successful
+                console.warn('[OutletManager] API response not successful:', response.data);
+                if (!preserveOnError) {
+                    setOutlets([]);
+                }
             }
         } catch (error) {
-            console.error('Failed to fetch outlets:', error);
+            // Handle cancellation errors gracefully (they're expected for duplicate prevention)
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                console.log('[OutletManager] Request cancelled (duplicate prevention), ignoring');
+                // Don't treat cancellation as an error - the finally block will handle cleanup
+                return;
+            }
+            console.error('[OutletManager] Failed to fetch outlets:', error);
             // Only show toast if this is the initial load, not a refetch
             if (showLoading) {
                 showToast('Failed to load store locations.', 'error');
             }
-            // If preserveOnError is true, don't clear the outlets list
+            // If preserveOnError is true, don't clear the outlets list on error
             if (!preserveOnError) {
                 setOutlets([]);
             }
         } finally {
-            if (showLoading) setIsLoading(false);
-        }
-    }, [apiClient, showToast]);
-
-    useEffect(() => {
-        if (isPremium && currentUser) {
-            // Skip refetch if we're in the middle of switching (manual refetch will handle it)
-            if (!isSwitchingRef.current) {
-                fetchOutlets();
-            }
-        } else {
+            // Always reset loading state and fetching flag
+            console.log('[OutletManager] Fetch outlets completed, setting isLoading to false');
             setIsLoading(false);
+            isFetchingRef.current = false;
         }
-    }, [isPremium, currentUser, currentOutletId, fetchOutlets]);
+    }, [apiClient, showToast, fetchStaffForOutlet]);
+
+    // Initial load effect - only run once when component mounts or user changes
+    const hasInitializedRef = useRef(false);
+    useEffect(() => {
+        if (isPremium && currentUser && !hasInitializedRef.current) {
+            hasInitializedRef.current = true;
+            fetchOutlets();
+        } else if (!isPremium || !currentUser) {
+            setIsLoading(false);
+            hasInitializedRef.current = false;
+        }
+    }, [isPremium, currentUser, fetchOutlets]);
+    
+    // Effect for when currentOutletId changes (after switching)
+    useEffect(() => {
+        // Only refetch if currentOutletId actually changed (not on initial mount)
+        if (isPremium && currentUser && currentOutletId && prevOutletIdRef.current !== currentOutletId) {
+            prevOutletIdRef.current = currentOutletId;
+            // Wait a bit to ensure parent state is fully updated, then refetch
+            // Show loading spinner if we're switching, otherwise refetch silently
+            const timer = setTimeout(() => {
+                const shouldShowLoading = isSwitchingRef.current;
+                console.log('Refetching outlets after switch, showLoading:', shouldShowLoading);
+                fetchOutlets(shouldShowLoading, true);
+                if (shouldShowLoading) {
+                    isSwitchingRef.current = false; // Reset the flag after starting fetch
+                }
+            }, 300);
+            return () => clearTimeout(timer);
+        } else if (currentOutletId && !prevOutletIdRef.current) {
+            // Initialize the ref on first mount
+            prevOutletIdRef.current = currentOutletId;
+        }
+    }, [currentOutletId, isPremium, currentUser, fetchOutlets]);
 
     const handleOpenModal = (outlet = null) => {
         if (outlet) {
@@ -201,39 +304,62 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     const handleSwitchOutlet = async (outletId) => {
         setIsSubmitting(true);
-        isSwitchingRef.current = true; // Mark that we're switching
+        isSwitchingRef.current = true; // Set flag to indicate we're switching
         try {
             const response = await apiClient.put(API.switchOutlet(outletId));
             if (response.data.success) {
                 showToast(`Switched to ${response.data.data.outlet.name}`, 'success');
-                // Update parent state first - this will trigger useEffect, but we'll skip it
+                // Update parent state - this will trigger useEffect to refetch outlets
                 if (onOutletSwitch) {
                     onOutletSwitch(response.data.data.outlet);
                 }
-                // Manually refetch immediately to ensure list updates
-                // Don't show loading state during refetch to avoid clearing the list
-                // Preserve existing outlets if refetch fails
-                await fetchOutlets(false, true);
+                // The useEffect will automatically refetch when currentOutletId changes
+                // Loading will be shown during the refetch
+            } else {
+                isSwitchingRef.current = false; // Reset if switch failed
             }
         } catch (error) {
             showToast('Failed to switch outlet.', 'error');
+            isSwitchingRef.current = false; // Reset on error
         } finally {
             setIsSubmitting(false);
-            // Reset switching flag after a short delay to allow useEffect to work normally next time
-            setTimeout(() => {
-                isSwitchingRef.current = false;
-            }, 500);
         }
     };
 
-    const handleDelete = async (outletId) => {
-        if (!window.confirm('Deactivate this branch?')) return;
+    const handleDeleteClick = (outlet) => {
+        setOutletToDelete(outlet);
+        setDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!outletToDelete) return;
         try {
-            await apiClient.delete(API.outletDetails(outletId));
-            showToast('Branch deactivated', 'success');
+            await apiClient.delete(API.outletDetails(outletToDelete._id));
+            showToast('Branch deleted', 'success');
+            setDeleteModalOpen(false);
+            setOutletToDelete(null);
             fetchOutlets();
         } catch (error) {
             showToast('Action failed', 'error');
+            setDeleteModalOpen(false);
+            setOutletToDelete(null);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteModalOpen(false);
+        setOutletToDelete(null);
+    };
+
+    const handleReactivate = async (outletId) => {
+        try {
+            const response = await apiClient.put(API.outletDetails(outletId), { isActive: true });
+            if (response.data.success) {
+                showToast('Branch reactivated successfully', 'success');
+                fetchOutlets();
+            }
+        } catch (error) {
+            showToast('Failed to reactivate branch', 'error');
         }
     };
 
@@ -316,33 +442,43 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                         </div>
                     ) : (
                         filteredOutlets.map((outlet) => {
-                    const isActive = currentOutletId === outlet._id;
+                    const isCurrentActive = currentOutletId === outlet._id;
+                    const isOutletActive = outlet.isActive !== false; // Default to true if not specified
                     return (
                         <article
                             key={outlet._id}
                             className={`group relative p-6 rounded-2xl border transition-all duration-300 ${cardBase} ${
-                                isActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
-                            }`}
+                                isCurrentActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
+                            } ${!isOutletActive ? 'opacity-60 border-slate-700' : ''}`}
                         >
                             <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-3xl ${isActive ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-indigo-400'}`}>
+                                <div className={`p-4 rounded-3xl ${isCurrentActive ? 'bg-indigo-500 text-white' : isOutletActive ? 'bg-slate-800 text-slate-400 group-hover:text-indigo-400' : 'bg-slate-900 text-slate-600'}`}>
                                     <Store size={24} />
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
-                                        <Edit3 size={16} />
-                                    </button>
-                                    {!isActive && (
-                                        <button onClick={() => handleDelete(outlet._id)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all">
+                                    {isOutletActive && (
+                                        <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                                            <Edit3 size={16} />
+                                        </button>
+                                    )}
+                                    {isOutletActive && !isCurrentActive && (
+                                        <button onClick={() => handleDeleteClick(outlet)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all">
                                             <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                    {!isOutletActive && (
+                                        <button onClick={() => handleReactivate(outlet._id)} className="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white transition-all">
+                                            <Power size={16} />
                                         </button>
                                     )}
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-xl font-black tracking-tight mb-2 truncate">{outlet.name}</h3>
-                                <div className="space-y-2">
+                                <h3 className="text-xl font-black tracking-tight mb-4 truncate">{outlet.name}</h3>
+                                
+                                {/* Contact Information */}
+                                <div className="space-y-2 mb-4">
                                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
                                         <MapPin size={14} className="text-indigo-500" />
                                         <span className="truncate">{outlet.address || 'Address not listed'}</span>
@@ -352,13 +488,57 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         <span>{outlet.phone || 'No contact phone'}</span>
                                     </div>
                                 </div>
+
+                                {/* Staff Section - Separate Card Style */}
+                                <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Users size={16} className="text-indigo-500" />
+                                            <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Staff Team</span>
+                                        </div>
+                                        <span className={`text-sm font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                                            {outlet.staffCount || 0}
+                                        </span>
+                                    </div>
+                                    
+                                    {outletStaff[outlet._id] && outletStaff[outlet._id].length > 0 && !loadingStaff[outlet._id] && (
+                                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                                            {outletStaff[outlet._id].slice(0, 4).map((staff) => (
+                                                <div key={staff._id} className="flex items-center gap-2 text-[11px] font-bold">
+                                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${staff.active ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                                                    <span className={`truncate flex-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                        {staff.name || staff.email}
+                                                    </span>
+                                                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
+                                                        {staff.role || 'Staff'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            {outletStaff[outlet._id].length > 4 && (
+                                                <div className={`text-[10px] font-bold pt-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                                                    +{outletStaff[outlet._id].length - 4} more staff members
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {!loadingStaff[outlet._id] && (!outletStaff[outlet._id] || outletStaff[outlet._id].length === 0) && (
+                                        <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            No staff members assigned
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
-                                {isActive ? (
+                                {isCurrentActive ? (
                                     <div className="flex items-center gap-2 text-emerald-500">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                         <span className="text-[10px] font-black tracking-widest uppercase">Currently Active</span>
+                                    </div>
+                                ) : !isOutletActive ? (
+                                    <div className="flex items-center gap-2 text-slate-500">
+                                        <div className="w-2 h-2 rounded-full bg-slate-500" />
+                                        <span className="text-[10px] font-black tracking-widest uppercase">Deactivated</span>
                                     </div>
                                 ) : (
                                     <button
@@ -566,6 +746,18 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteModalOpen && outletToDelete && (
+                <ConfirmationModal
+                    message={`Are you sure you want to delete "${outletToDelete.name}"? This will delete the store and it can't be accessed later.`}
+                    onConfirm={handleDeleteConfirm}
+                    onCancel={handleDeleteCancel}
+                    darkMode={darkMode}
+                    confirmText="Delete Branch"
+                    cancelText="Cancel"
+                />
             )}
         </main>
     );

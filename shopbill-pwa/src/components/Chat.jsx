@@ -211,7 +211,16 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     // Note: Default "All Outlet Staffs" group is automatically created by the server for owners
     // Store-specific groups are no longer created
 
-    useEffect(() => { if (hasChatAccess) fetchChats(); }, [hasChatAccess, fetchChats]);
+    // Only fetch on mount or when access changes
+    const hasFetchedChatsRef = useRef(false);
+    useEffect(() => {
+        if (hasChatAccess && !hasFetchedChatsRef.current) {
+            hasFetchedChatsRef.current = true;
+            fetchChats();
+        } else if (!hasChatAccess) {
+            hasFetchedChatsRef.current = false;
+        }
+    }, [hasChatAccess]);
 
     useEffect(() => {
         if (selectedChat) {

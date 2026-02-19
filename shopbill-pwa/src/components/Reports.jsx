@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Loader, Truck, AlertTriangle, ShoppingCart, Users,
@@ -111,7 +111,15 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
         }
     }, [selectedFilter, customStartDate, customEndDate, viewType, apiClient, API, showToast]);
 
-    useEffect(() => { fetchReportData(); }, [fetchReportData]);
+    // Only fetch when filter/date changes, not when callback changes
+    const hasFetchedRef = useRef(false);
+    useEffect(() => {
+        // Fetch on mount or when filter/date changes
+        if (!hasFetchedRef.current || selectedFilter || customStartDate || customEndDate || viewType) {
+            hasFetchedRef.current = true;
+            fetchReportData();
+        }
+    }, [selectedFilter, customStartDate, customEndDate, viewType]);
 
     const formatCurrency = (amount) => `₹${(amount || 0).toLocaleString('en-IN')}`;
 

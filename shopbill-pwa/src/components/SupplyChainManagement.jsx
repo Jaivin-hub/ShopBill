@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
@@ -80,7 +80,14 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     }
   }, [apiClient, API, showToast]);
 
-  useEffect(() => { fetchSCMData(); }, [fetchSCMData]);
+  // Only fetch on mount, not when callback changes
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchSCMData();
+    }
+  }, []);
 
   const sortedInventory = useMemo(() => {
     let result = inventory.filter(item =>

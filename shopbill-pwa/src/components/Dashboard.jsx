@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import {
     IndianRupee, CreditCard, Users, Package,
     List, Loader2, TrendingUp, Clock, Activity,
@@ -67,12 +67,17 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [userRole, apiClient, API]);
 
+    // Only fetch on mount or when access changes, not on every callback change
+    const hasFetchedRef = useRef(false);
     useEffect(() => {
-        if (hasAccess) {
+        if (hasAccess && !hasFetchedRef.current) {
+            hasFetchedRef.current = true;
             fetchDashboardData();
             fetchAttendanceStatus();
+        } else if (!hasAccess) {
+            hasFetchedRef.current = false;
         }
-    }, [hasAccess, fetchDashboardData, fetchAttendanceStatus]);
+    }, [hasAccess]); // Removed callbacks from dependencies to prevent re-fetches
 
     // Refresh attendance status periodically (every 30 seconds)
     useEffect(() => {

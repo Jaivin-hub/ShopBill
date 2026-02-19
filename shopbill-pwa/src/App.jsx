@@ -517,16 +517,11 @@ const App = () => {
             }
           }
         } else {
+          // After initial restore, just sync currentOutlet from list if missing
           if (!currentOutlet && currentOutletId) {
             const activeOutlet = outletsList.find(o => o._id === currentOutletId);
             if (activeOutlet) {
               setCurrentOutlet(activeOutlet);
-            } else {
-              // If outlet not found in list, fetch it individually
-              const fetchedOutlet = await fetchOutletById(currentOutletId);
-              if (fetchedOutlet) {
-                setCurrentOutlet(fetchedOutlet);
-              }
             }
           }
         }
@@ -538,27 +533,37 @@ const App = () => {
       }
       console.error('Error fetching outlets:', error);
     }
-  }, [currentUser, isPremium, currentOutlet, currentOutletId, fetchOutletById, apiClient, API]);
+  }, [currentUser, isPremium, apiClient, API]);
 
+  // Initial fetch outlets - only when user or premium status changes
+  const hasFetchedOutletsRef = useRef(false);
   useEffect(() => {
-    if (currentUser && isPremium) {
+    if (currentUser && isPremium && !hasFetchedOutletsRef.current) {
+      hasFetchedOutletsRef.current = true;
       fetchOutlets();
-    } else {
+    } else if (!currentUser || !isPremium) {
       setOutlets([]);
       outletRestoredRef.current = false;
+      hasFetchedOutletsRef.current = false;
     }
-  }, [currentUser, isPremium, fetchOutlets]);
+  }, [currentUser?.id, isPremium, fetchOutlets]);
 
-  // Ensure outlet is fetched if we have ID but not the outlet object
+  // Sync currentOutlet from outlets list when it's loaded
   useEffect(() => {
-    if (currentUser && isPremium && currentOutletId && !currentOutlet) {
-      fetchOutletById(currentOutletId).then(outlet => {
-        if (outlet) {
-          setCurrentOutlet(outlet);
-        }
-      });
+    if (currentUser && isPremium && currentOutletId && !currentOutlet && outlets.length > 0) {
+      const foundOutlet = outlets.find(o => o._id === currentOutletId);
+      if (foundOutlet) {
+        setCurrentOutlet(foundOutlet);
+      } else if (apiClient && API) {
+        // Only fetch individually if not in list
+        fetchOutletById(currentOutletId).then(outlet => {
+          if (outlet) {
+            setCurrentOutlet(outlet);
+          }
+        });
+      }
     }
-  }, [currentUser, isPremium, currentOutletId, currentOutlet, fetchOutletById]);
+  }, [outlets, currentOutletId, currentOutlet, currentUser, isPremium, apiClient, API, fetchOutletById]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -1021,6 +1026,7 @@ const App = () => {
             onOutletSwitch={handleOutletSwitch}
             showToast={showToast}
             hasModalOpen={hasModalOpen}
+            outlets={outlets}
           />
         )}
         <div className="flex flex-1 overflow-hidden relative">

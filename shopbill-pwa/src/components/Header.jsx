@@ -21,11 +21,10 @@ const Header = ({
     currentOutletId,
     onOutletSwitch,
     showToast,
-    hasModalOpen = false
+    hasModalOpen = false,
+    outlets = [] // Receive outlets from parent to avoid duplicate fetching
 }) => {
     const [showStoreHub, setShowStoreHub] = useState(false);
-    const [outlets, setOutlets] = useState([]);
-    const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
     const [switchingOutletId, setSwitchingOutletId] = useState(null);
 
@@ -37,9 +36,17 @@ const Header = ({
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
     const hubBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200';
 
-    // Fetch outlet if we have ID but not the outlet object
+    // Fetch outlet if we have ID but not the outlet object (only if not in outlets list)
     useEffect(() => {
         if (isPremium && isOwner && currentOutletId && !currentOutlet && apiClient && API) {
+            // First check if outlet is in the outlets list from parent
+            const outletInList = outlets.find(o => o._id === currentOutletId);
+            if (outletInList) {
+                onOutletSwitch(outletInList);
+                return;
+            }
+            
+            // Only fetch individually if not in list
             const fetchOutlet = async () => {
                 try {
                     const response = await apiClient.get(API.outletDetails(currentOutletId));
@@ -47,33 +54,15 @@ const Header = ({
                         onOutletSwitch(response.data.data);
                     }
                 } catch (error) {
+                    if (error.cancelled || error.message?.includes('cancelled')) {
+                        return; // Ignore cancellation
+                    }
                     console.error('Failed to fetch outlet in Header:', error);
                 }
             };
             fetchOutlet();
         }
-    }, [isPremium, isOwner, currentOutletId, currentOutlet, apiClient, API, onOutletSwitch]);
-
-    // Fetch outlets when Hub is opened
-    useEffect(() => {
-        if (showStoreHub && isPremium) {
-            fetchOutlets();
-        }
-    }, [showStoreHub]);
-
-    const fetchOutlets = async () => {
-        setIsLoadingOutlets(true);
-        try {
-            const response = await apiClient.get(API.outlets);
-            if (response.data.success) {
-                setOutlets(response.data.data || []);
-            }
-        } catch (error) {
-            console.error("Failed to load outlets", error);
-        } finally {
-            setIsLoadingOutlets(false);
-        }
-    };
+    }, [isPremium, isOwner, currentOutletId, currentOutlet, apiClient, API, onOutletSwitch, outlets]);
 
     const handleSwitchOutlet = async (outletId, outletName) => {
         if (outletId === currentOutletId) {
@@ -199,10 +188,9 @@ const Header = ({
                     </div>
                     
                     <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
-                        {isLoadingOutlets ? (
+                        {outlets.length === 0 ? (
                             <div className="flex items-center gap-3 px-4 py-3">
-                                <Loader2 size={14} className="animate-spin text-indigo-500" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase">Loading Stores...</span>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase">No stores available</span>
                             </div>
                         ) : (
                             <>

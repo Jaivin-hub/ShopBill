@@ -6,7 +6,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode, confirmText
     
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
-            <section className={`${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[500px] rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+            <section className={`${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
                 <header className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${isDark ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-red-500/10 rounded-lg text-red-500">
@@ -25,7 +25,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode, confirmText
                         <X className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                 </header>
-                <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                <div className="px-4 sm:px-5 py-3 sm:py-4 custom-scrollbar">
                     <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`} aria-label="Confirmation message">{message}</p>
                 </div>
                 <div className={`p-3 sm:p-4 border-t flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 flex-shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
