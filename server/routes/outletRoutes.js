@@ -3,6 +3,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 const Store = require('../models/Store');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
+const Staff = require('../models/Staff');
 const router = express.Router();
 
 /**
@@ -22,15 +23,53 @@ router.get('/', protect, authorize('owner'), async (req, res) => {
             });
         }
 
-        const outlets = await Store.find({ ownerId: req.user.id, isActive: true })
+        // Return all outlets (both active and inactive) so users can reactivate them
+        const outlets = await Store.find({ ownerId: req.user.id })
             .select('name address phone email isActive createdAt')
             .lean()
             .sort({ createdAt: -1 });
 
+        // Get staff counts for each outlet
+        const outletIds = outlets.map(outlet => outlet._id);
+        const staffCounts = await Staff.aggregate([
+            {
+                $match: {
+                    storeId: { $in: outletIds }
+                }
+            },
+            {
+                $group: {
+                    _id: '$storeId',
+                    count: { $sum: 1 },
+                    activeCount: {
+                        $sum: {
+                            $cond: [{ $eq: ['$active', true] }, 1, 0]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        // Create a map of outletId to staff count
+        const staffCountMap = {};
+        staffCounts.forEach(item => {
+            staffCountMap[item._id.toString()] = {
+                total: item.count,
+                active: item.activeCount
+            };
+        });
+
+        // Add staff count to each outlet
+        const outletsWithStaffCount = outlets.map(outlet => ({
+            ...outlet,
+            staffCount: staffCountMap[outlet._id.toString()]?.total || 0,
+            activeStaffCount: staffCountMap[outlet._id.toString()]?.active || 0
+        }));
+
         res.json({
             success: true,
-            data: outlets,
-            count: outlets.length
+            data: outletsWithStaffCount,
+            count: outletsWithStaffCount.length
         });
     } catch (error) {
         console.error('Get Outlets Error:', error);
