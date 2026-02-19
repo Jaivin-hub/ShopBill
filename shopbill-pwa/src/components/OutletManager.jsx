@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useDebounce } from '../hooks/useDebounce';
 import { 
     Store, Plus, MapPin, Phone, 
-    MoreVertical, Power, Edit3, Trash2, 
-    ArrowUpRight, Building2, ShieldCheck,
-    Loader2, X, Save, Mail, Globe, 
-    Receipt, AlertCircle, Search, Users
+    Edit3, Trash2, 
+    ArrowUpRight, Building2,
+    Loader2, X,
+    AlertCircle, Search, Users
 } from 'lucide-react';
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
@@ -352,17 +352,6 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         setOutletToDelete(null);
     };
 
-    const handleReactivate = async (outletId) => {
-        try {
-            const response = await apiClient.put(API.outletDetails(outletId), { isActive: true });
-            if (response.data.success) {
-                showToast('Branch reactivated successfully', 'success');
-                fetchOutlets();
-            }
-        } catch (error) {
-            showToast('Failed to reactivate branch', 'error');
-        }
-    };
 
     if (!isPremium) {
         return (
@@ -468,32 +457,24 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                     ) : (
                         filteredOutlets.map((outlet) => {
                     const isCurrentActive = currentOutletId === outlet._id;
-                    const isOutletActive = outlet.isActive !== false; // Default to true if not specified
                     return (
                         <article
                             key={outlet._id}
                             className={`group relative p-6 rounded-2xl border transition-all duration-300 ${cardBase} ${
                                 isCurrentActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
-                            } ${!isOutletActive ? 'opacity-60 border-slate-700' : ''}`}
+                            }`}
                         >
                             <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-3xl ${isCurrentActive ? 'bg-indigo-500 text-white' : isOutletActive ? 'bg-slate-800 text-slate-400 group-hover:text-indigo-400' : 'bg-slate-900 text-slate-600'}`}>
+                                <div className={`p-4 rounded-3xl ${isCurrentActive ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-indigo-400'}`}>
                                     <Store size={24} />
                                 </div>
                                 <div className="flex gap-2">
-                                    {isOutletActive && (
-                                        <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
-                                            <Edit3 size={16} />
-                                        </button>
-                                    )}
-                                    {isOutletActive && !isCurrentActive && (
+                                    <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                                        <Edit3 size={16} />
+                                    </button>
+                                    {!isCurrentActive && (
                                         <button onClick={() => handleDeleteClick(outlet)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all">
                                             <Trash2 size={16} />
-                                        </button>
-                                    )}
-                                    {!isOutletActive && (
-                                        <button onClick={() => handleReactivate(outlet._id)} className="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white transition-all">
-                                            <Power size={16} />
                                         </button>
                                     )}
                                 </div>
@@ -559,11 +540,6 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                     <div className="flex items-center gap-2 text-emerald-500">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                         <span className="text-[10px] font-black tracking-widest uppercase">Currently Active</span>
-                                    </div>
-                                ) : !isOutletActive ? (
-                                    <div className="flex items-center gap-2 text-slate-500">
-                                        <div className="w-2 h-2 rounded-full bg-slate-500" />
-                                        <span className="text-[10px] font-black tracking-widest uppercase">Deactivated</span>
                                     </div>
                                 ) : (
                                     <button

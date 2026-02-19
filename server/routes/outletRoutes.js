@@ -4,6 +4,14 @@ const Store = require('../models/Store');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
 const Staff = require('../models/Staff');
+const Attendance = require('../models/Attendance');
+const Sale = require('../models/Sale');
+const Inventory = require('../models/Inventory');
+const Customer = require('../models/Customer');
+const Supplier = require('../models/Supplier');
+const Purchase = require('../models/Purchase');
+const KhataTransaction = require('../models/KhataTransaction');
+const Notification = require('../models/Notification');
 const router = express.Router();
 
 /**
@@ -23,8 +31,11 @@ router.get('/', protect, authorize('owner'), async (req, res) => {
             });
         }
 
-        // Return all outlets (both active and inactive) so users can reactivate them
-        const outlets = await Store.find({ ownerId: req.user.id })
+        // Return only active outlets (inactive stores are deleted, not deactivated)
+        const outlets = await Store.find({ 
+            ownerId: req.user.id,
+            isActive: true 
+        })
             .select('name address phone email isActive createdAt')
             .lean()
             .sort({ createdAt: -1 });
@@ -147,7 +158,7 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
         if (currentStoreCount >= 10) {
             return res.status(403).json({
                 success: false,
-                error: 'Store limit reached. You can create up to 10 stores. Please deactivate an existing store to create a new one.'
+                error: 'Store limit reached. You can create up to 10 stores. Please delete an existing store to create a new one.'
             });
         }
 
@@ -314,7 +325,7 @@ router.put('/:id', protect, authorize('owner'), async (req, res) => {
 
 /**
  * @route DELETE /api/outlets/:id
- * @desc Delete (deactivate) an outlet
+ * @desc Hard delete an outlet and all related data
  * @access Private (Owner with PREMIUM plan)
  */
 router.delete('/:id', protect, authorize('owner'), async (req, res) => {
@@ -340,20 +351,92 @@ router.delete('/:id', protect, authorize('owner'), async (req, res) => {
             });
         }
 
-        // Soft delete: Set isActive to false instead of actually deleting
-        outlet.isActive = false;
-        await outlet.save();
+        // Prevent deleting the currently active store
+        if (owner.activeStoreId && owner.activeStoreId.toString() === req.params.id) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot delete the currently active store. Please switch to another store first.'
+            });
+        }
+
+        const storeId = outlet._id;
+        const storeName = outlet.name;
+
+        // Delete all related data in parallel for better performance
+        // First, get staff members to delete their user accounts
+        const staffMembers = await Staff.find({ storeId });
+        const userIds = staffMembers.map(s => s.userId).filter(Boolean);
+        
+        const deleteResults = await Promise.all([
+            // Delete user accounts for staff (if any)
+            userIds.length > 0 ? User.deleteMany({ _id: { $in: userIds } }) : Promise.resolve({ deletedCount: 0 }),
+            // Delete staff records
+            Staff.deleteMany({ storeId }),
+            // Delete attendance records
+            Attendance.deleteMany({ storeId }),
+            // Delete sales records
+            Sale.deleteMany({ storeId }),
+            // Delete inventory items
+            Inventory.deleteMany({ storeId }),
+            // Delete customers
+            Customer.deleteMany({ storeId }),
+            // Delete suppliers
+            Supplier.deleteMany({ storeId }),
+            // Delete purchase records
+            Purchase.deleteMany({ storeId }),
+            // Delete khata transactions
+            KhataTransaction.deleteMany({ storeId }),
+            // Delete notifications
+            Notification.deleteMany({ storeId }),
+            // Delete chat groups for this outlet
+            Chat.deleteMany({ outletId: storeId })
+        ]);
+
+        // Clear activeStoreId if it was set to this store
+        if (owner.activeStoreId && owner.activeStoreId.toString() === storeId.toString()) {
+            owner.activeStoreId = null;
+            await owner.save();
+        }
+
+        // Finally, delete the store itself
+        await Store.findByIdAndDelete(storeId);
+
+        // Log deletion summary
+        console.log(`Store "${storeName}" (${storeId}) deleted successfully. Cleaned up:`);
+        console.log(`- Staff User Accounts: ${deleteResults[0].deletedCount || 0}`);
+        console.log(`- Staff Records: ${deleteResults[1].deletedCount || 0}`);
+        console.log(`- Attendance: ${deleteResults[2].deletedCount || 0}`);
+        console.log(`- Sales: ${deleteResults[3].deletedCount || 0}`);
+        console.log(`- Inventory: ${deleteResults[4].deletedCount || 0}`);
+        console.log(`- Customers: ${deleteResults[5].deletedCount || 0}`);
+        console.log(`- Suppliers: ${deleteResults[6].deletedCount || 0}`);
+        console.log(`- Purchases: ${deleteResults[7].deletedCount || 0}`);
+        console.log(`- Khata Transactions: ${deleteResults[8].deletedCount || 0}`);
+        console.log(`- Notifications: ${deleteResults[9].deletedCount || 0}`);
+        console.log(`- Chats: ${deleteResults[10].deletedCount || 0}`);
 
         res.json({
             success: true,
-            message: 'Outlet deactivated successfully.',
-            data: outlet
+            message: `Store "${storeName}" and all associated data deleted successfully.`,
+            deletedCounts: {
+                staffUserAccounts: deleteResults[0].deletedCount || 0,
+                staffRecords: deleteResults[1].deletedCount || 0,
+                attendance: deleteResults[2].deletedCount || 0,
+                sales: deleteResults[3].deletedCount || 0,
+                inventory: deleteResults[4].deletedCount || 0,
+                customers: deleteResults[5].deletedCount || 0,
+                suppliers: deleteResults[6].deletedCount || 0,
+                purchases: deleteResults[7].deletedCount || 0,
+                khataTransactions: deleteResults[8].deletedCount || 0,
+                notifications: deleteResults[9].deletedCount || 0,
+                chats: deleteResults[10].deletedCount || 0
+            }
         });
     } catch (error) {
         console.error('Delete Outlet Error:', error);
         res.status(500).json({
             success: false,
-            error: 'Server error deleting outlet.'
+            error: 'Server error deleting outlet. Please try again.'
         });
     }
 });
