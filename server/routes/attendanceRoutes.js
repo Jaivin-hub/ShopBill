@@ -190,6 +190,9 @@ router.post('/punch-in', protect, async (req, res) => {
             attendance = new Attendance(attendanceData);
             await attendance.save();
             
+            // Reload attendance to ensure we have the complete saved document
+            attendance = await Attendance.findById(attendance._id);
+            
             console.log('Attendance created successfully:', attendance._id);
         } catch (createError) {
             console.error('=== ATTENDANCE CREATION ERROR ===');
@@ -236,6 +239,30 @@ router.post('/punch-in', protect, async (req, res) => {
             });
         }
 
+        // Calculate hours worked (should be 0 or minimal for just punched in)
+        const now = new Date();
+        const totalDiff = now - attendance.punchIn;
+        const totalMinutes = Math.round(totalDiff / (1000 * 60));
+        
+        // Calculate total break time (should be 0 for new punch-in)
+        let totalBreakMinutes = 0;
+        if (attendance.breaks && attendance.breaks.length > 0) {
+            attendance.breaks.forEach(breakPeriod => {
+                if (breakPeriod.breakEnd && breakPeriod.breakStart) {
+                    totalBreakMinutes += breakPeriod.breakDuration || 0;
+                } else if (breakPeriod.breakStart && !breakPeriod.breakEnd) {
+                    // Active break - calculate current break time
+                    const breakDiff = now - breakPeriod.breakStart;
+                    totalBreakMinutes += Math.round(breakDiff / (1000 * 60));
+                }
+            });
+        }
+        
+        const minutesWorked = Math.max(0, totalMinutes - totalBreakMinutes);
+        const hours = Math.floor(minutesWorked / 60);
+        const mins = minutesWorked % 60;
+
+        // Return response in the same format as /current endpoint for consistency
         res.status(201).json({
             success: true,
             message: 'Punched in successfully',
@@ -243,7 +270,11 @@ router.post('/punch-in', protect, async (req, res) => {
                 _id: attendance._id,
                 punchIn: attendance.punchIn,
                 status: attendance.status,
-                date: attendance.date
+                onBreak: attendance.onBreak || false,
+                breaks: attendance.breaks || [],
+                totalBreakTime: totalBreakMinutes,
+                minutesWorked,
+                hoursWorked: `${hours}h ${mins}m`
             }
         });
     } catch (error) {
@@ -548,16 +579,29 @@ router.get('/current', protect, async (req, res) => {
         }
 
         // Use UTC to avoid timezone issues
+        // Query for active attendance records from the last 2 days to handle timezone edge cases
         const now = new Date();
         const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const yesterday = new Date(today);
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
         const tomorrow = new Date(today);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-        const attendance = await Attendance.findOne({
+        // First try to find attendance for today
+        let attendance = await Attendance.findOne({
             staffId: staff._id,
             date: { $gte: today, $lt: tomorrow },
             status: 'active'
         });
+
+        // If not found, check yesterday (in case of timezone differences)
+        if (!attendance) {
+            attendance = await Attendance.findOne({
+                staffId: staff._id,
+                date: { $gte: yesterday, $lt: today },
+                status: 'active'
+            });
+        }
 
         if (attendance) {
             // Calculate hours worked so far (excluding breaks)

@@ -78,9 +78,15 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
                 timezoneOffset: timezoneOffset,
                 clientTime: now.toISOString() // Send exact client time with milliseconds
             });
-            if (response.data?.success) {
-                await fetchCurrentStatus();
+            if (response.data?.success && response.data?.attendance) {
+                // Update state directly from response for immediate UI update
+                setCurrentAttendance(response.data.attendance);
+                if (onStatusChange) {
+                    onStatusChange(response.data.attendance);
+                }
                 showToast('Punched in successfully!', 'success');
+                // Fetch from server to ensure we have the latest data and verify sync
+                await fetchCurrentStatus();
                 await fetchMyRecords();
             } else {
                 showToast(response.data?.error || 'Failed to punch in', 'error');
