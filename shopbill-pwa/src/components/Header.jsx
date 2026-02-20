@@ -87,6 +87,7 @@ const Header = ({
     const hubBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200';
 
     // Fetch business name (shopName) from profile if not available in currentUser
+    // This works for all roles: Owner (their own shopName), Manager/Cashier (owner's shopName from profile API)
     useEffect(() => {
         if (!currentUser || !apiClient || !API) return;
         
@@ -97,7 +98,7 @@ const Header = ({
             lastUserIdRef.current = currentUserId;
         }
         
-        // If shopName is already in currentUser, use it immediately
+        // If shopName is already in currentUser, use it immediately (works for all roles)
         if (currentUser.shopName) {
             setBusinessName(currentUser.shopName);
             hasFetchedBusinessNameRef.current = true;
@@ -105,6 +106,7 @@ const Header = ({
         }
         
         // Otherwise, fetch from profile API (only once per user)
+        // Profile API returns owner's shopName for staff members (Manager/Cashier)
         if (!hasFetchedBusinessNameRef.current) {
             hasFetchedBusinessNameRef.current = true;
             const fetchBusinessName = async () => {

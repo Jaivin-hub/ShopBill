@@ -63,6 +63,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                     setCurrentAttendance(null);
                 }
             } catch (error) {
+                // Ignore cancelled errors (duplicate request prevention)
+                if (error.cancelled || error.message?.includes('cancelled')) {
+                    return;
+                }
+                // Only log unexpected errors
                 console.error('Error fetching attendance status:', error);
                 setCurrentAttendance(null);
             }
@@ -222,16 +227,21 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         const ownerNewBillOrder = hasPremiumPlan ? 6 : 5;
         const ownerReportsOrder = hasPremiumPlan ? 7 : 6;
         
+        // Manager order: Basic plan - 1. Add Stock, 2. Ledger, 3. Recent Sales, 4. New Bill
+        // PRO/PREMIUM plan - 1. Add Stock, 2. Ledger, 3. Recent Sales, 4. Supply Chain, 5. New Bill
+        const managerNewBillOrder = hasPremiumPlan ? 5 : 4;
+        const managerSupplyChainOrder = hasPremiumPlan ? 4 : null;
+        
         const allActions = [
             { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 1, manager: null, cashier: null } },
-            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 2, manager: 4, cashier: 3 } },
-            { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 3, cashier: 2 } },
+            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 2, manager: 3, cashier: 3 } },
+            { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 2, cashier: 2 } },
             ...(hasPremiumPlan 
-                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 4, manager: 5, cashier: null } }]
+                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 4, manager: managerSupplyChainOrder, cashier: null } }]
                 : []
             ),
-            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: ownerAddStockOrder, manager: 2, cashier: null } },
-            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: ownerNewBillOrder, manager: 1, cashier: 1 } },
+            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: ownerAddStockOrder, manager: 1, cashier: null } },
+            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: ownerNewBillOrder, manager: managerNewBillOrder, cashier: 1 } },
             { label: 'Reports', icon: BarChart3, color: 'bg-rose-500', page: 'reports', roles: [USER_ROLES.OWNER], order: { owner: ownerReportsOrder, manager: null, cashier: null } },
         ];
         

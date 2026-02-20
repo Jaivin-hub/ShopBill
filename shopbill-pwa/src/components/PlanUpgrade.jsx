@@ -10,24 +10,24 @@ const DEMO_PLANS = [
     {
         id: 'basic',
         name: 'BASIC',
-        price: 499,
-        features: ['Basic Inventory Management', 'Up to 5 Users', 'Email Support'],
-        maxUsers: 5,
+        price: 999,
+        features: ['3 Users (Owner + 2 Staff)', 'Full Inventory Management', 'Digital Khata', 'Basic Reports', 'Email Support'],
+        maxUsers: 3,
         maxInventory: 1000,
     },
     {
         id: 'pro',
         name: 'PRO',
-        price: 799,
-        features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
-        maxUsers: 20,
+        price: 2199,
+        features: ['Unlimited Staff', 'Advanced Inventory', 'Bulk Tools', 'SMS Reminders', 'Priority Support', 'Advanced Reports'],
+        maxUsers: -1,
         maxInventory: 10000,
     },
     {
         id: 'premium',
         name: 'PREMIUM',
-        price: 999,
-        features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
+        price: 4999,
+        features: ['Unlimited Users', 'Supply Chain Management', 'Multi-Store (Up to 10)', 'Advanced Reports', '24/7 Priority Support', 'Dedicated Manager'],
         maxUsers: -1,
         maxInventory: -1,
     }
@@ -347,85 +347,107 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         };
     };
 
-    // --- UPDATED DESIGN: MATCHING SETTINGS HEADER ---
-    const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white/95 border-slate-300 shadow-sm';
+    // --- REDESIGNED HEADER ---
+    const headerBase = darkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-slate-200 shadow-sm';
+    const mainBg = darkMode ? 'bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950' : 'bg-gradient-to-br from-slate-50 via-white to-slate-50';
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
-            {/* UPDATED STICKY HEADER PARTNER */}
-            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
+        <main className={`min-h-screen transition-colors duration-300 ${mainBg} selection:bg-indigo-500/30`}>
+            {/* REDESIGNED STICKY HEADER */}
+            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-xl border-b px-4 md:px-6 py-5`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <button onClick={onBack} className={`p-2 border rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+                        <button 
+                            onClick={onBack} 
+                            className={`p-2.5 rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-gray-900/50 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'}`}
+                        >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                         <div>
-                            <h1 className={`text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
-                                Billing <span className="text-indigo-600">Engine</span>
+                            <h1 className={`text-2xl md:text-3xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                Subscription <span className="text-indigo-600">Management</span>
                             </h1>
-                            <p className={`text-[9px] font-bold tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
-                                Secure Gateway Active
+                            <p className={`text-[9px] font-black tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>
+                                <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                                Secure Payment Gateway
                             </p>
                         </div>
                     </div>
 
-                    <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-full border ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
-                        <ShieldCheck className={`w-3 h-3 ${darkMode ? 'text-indigo-500' : 'text-emerald-600'}`} />
-                        <span className={`text-[9px] font-black tracking-widest ${darkMode ? 'text-indigo-500' : 'text-emerald-600'}`}>PROTECTED BY AES-256</span>
+                    <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-full border ${darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                        <ShieldCheck className={`w-3.5 h-3.5 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                        <span className={`text-[9px] font-black tracking-widest ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>AES-256 ENCRYPTED</span>
                     </div>
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto p-6 md:p-10 pb-32 space-y-8">
-                {/* CURRENT SUBSCRIPTION CARD */}
+            <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 pb-20 space-y-8 md:space-y-10">
+                {/* REDESIGNED CURRENT SUBSCRIPTION CARD */}
                 {currentPlan && (
-                    <section className={`border rounded-[1.25rem] p-6 md:p-8 ${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-300 shadow-md'}`}>
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <section className={`relative overflow-hidden border rounded-2xl md:rounded-3xl p-6 md:p-8 ${darkMode ? 'bg-gradient-to-br from-gray-900/80 to-gray-800/60 border-gray-700/50 shadow-2xl shadow-indigo-500/5' : 'bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-xl'}`}>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div className="flex items-center gap-5">
-                                <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
-                                    <Zap className="w-8 h-8 text-indigo-600" />
+                                <div className={`relative w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center border-2 ${darkMode ? 'bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/20' : 'bg-indigo-50 border-indigo-200 shadow-md'}`}>
+                                    <Zap className={`w-8 h-8 md:w-10 md:h-10 text-indigo-600 ${darkMode ? 'drop-shadow-lg' : ''}`} />
+                                    {!isPlanExpiring && (
+                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+                                    )}
                                 </div>
                                 <div>
-                                    <p className={`text-[10px] font-black tracking-[0.2em] ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Active Tier</p>
-                                    <h2 className={`text-2xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>{currentPlan}</h2>
-                                    <p className={`text-[10px] font-bold mt-1 ${isPlanExpiring ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {isPlanExpiring ? `Terminating on ${formatDate(planDetails.planEndDate)}` : `Next Billing: ${formatDate(planDetails.planEndDate)}`}
-                                    </p>
+                                    <p className={`text-[10px] font-black tracking-[0.2em] uppercase mb-1 ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>Current Plan</p>
+                                    <h2 className={`text-2xl md:text-3xl font-black tracking-tighter mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{currentPlan}</h2>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${isPlanExpiring ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                                        <p className={`text-xs font-bold ${isPlanExpiring ? 'text-red-500' : 'text-emerald-600'}`}>
+                                            {isPlanExpiring ? `Expires ${formatDate(planDetails.planEndDate)}` : `Renews ${formatDate(planDetails.planEndDate)}`}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                             
                             <button
                                 onClick={handlePrepareCancellation}
                                 disabled={isCancelling}
-                                className={`px-8 py-4 border rounded-2xl font-black text-xs tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-gray-950 border-gray-800 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-slate-50 border-slate-300 text-red-600 hover:bg-red-600 hover:text-white'}`}
+                                className={`px-6 md:px-8 py-3 md:py-4 border-2 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all active:scale-95 disabled:opacity-50 ${darkMode ? 'bg-gray-950/50 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50' : 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm'}`}
                             >
-                                {isPlanExpiring ? 'Manage Cancellation' : 'Cancel Subscription'}
+                                {isCancelling ? 'Processing...' : (isPlanExpiring ? 'Manage Cancellation' : 'Cancel Subscription')}
                             </button>
                         </div>
                     </section>
                 )}
 
-                {/* PLAN GRID */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {availablePlans.map((plan) => (
-                        <PlanCard
-                            key={plan.id}
-                            plan={plan}
-                            currentPlanName={currentPlan}
-                            isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
-                            isSamePlanAndCancelled={isSamePlanAndCancelled}
-                            isUpgrade={isUpgrade}
-                            isUpgrading={isUpgrading}
-                            isCancelling={isCancelling}
-                            alreadyInTerminalState={alreadyInTerminalState}
-                            formatCurrency={formatCurrency}
-                            getPlanIcon={getPlanIcon}
-                            getPlanColor={getPlanColor}
-                            getPlanTextColor={getPlanTextColor}
-                            handleUpgradeClick={handleUpgradeClick}
-                            darkMode={darkMode}
-                        />
-                    ))}
+                {/* REDESIGNED PLAN GRID WITH BETTER SPACING */}
+                <div className="space-y-6">
+                    <div className="text-center mb-8">
+                        <h2 className={`text-xl md:text-2xl font-black tracking-tight mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Choose Your Plan
+                        </h2>
+                        <p className={`text-sm font-bold ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
+                            Select the perfect plan for your business needs
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 pt-4">
+                        {availablePlans.map((plan) => (
+                            <PlanCard
+                                key={plan.id}
+                                plan={plan}
+                                currentPlanName={currentPlan}
+                                isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
+                                isSamePlanAndCancelled={isSamePlanAndCancelled}
+                                isUpgrade={isUpgrade}
+                                isUpgrading={isUpgrading}
+                                isCancelling={isCancelling}
+                                alreadyInTerminalState={alreadyInTerminalState}
+                                formatCurrency={formatCurrency}
+                                getPlanIcon={getPlanIcon}
+                                getPlanColor={getPlanColor}
+                                getPlanTextColor={getPlanTextColor}
+                                handleUpgradeClick={handleUpgradeClick}
+                                darkMode={darkMode}
+                            />
+                        ))}
+                    </div>
                 </div>
             </div>
 

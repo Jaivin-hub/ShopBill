@@ -97,9 +97,41 @@ router.post('/punch-in', protect, async (req, res) => {
         });
 
         if (existingAttendance) {
+            // Calculate hours worked so far (excluding breaks) for the response
+            const now = new Date();
+            const totalDiff = now - existingAttendance.punchIn;
+            const totalMinutes = Math.round(totalDiff / (1000 * 60));
+            
+            // Calculate total break time
+            let totalBreakMinutes = 0;
+            if (existingAttendance.breaks && existingAttendance.breaks.length > 0) {
+                existingAttendance.breaks.forEach(breakPeriod => {
+                    if (breakPeriod.breakEnd && breakPeriod.breakStart) {
+                        totalBreakMinutes += breakPeriod.breakDuration || 0;
+                    } else if (breakPeriod.breakStart && !breakPeriod.breakEnd) {
+                        // Active break - calculate current break time
+                        const breakDiff = now - breakPeriod.breakStart;
+                        totalBreakMinutes += Math.round(breakDiff / (1000 * 60));
+                    }
+                });
+            }
+            
+            const minutesWorked = Math.max(0, totalMinutes - totalBreakMinutes);
+            const hours = Math.floor(minutesWorked / 60);
+            const mins = minutesWorked % 60;
+
             return res.status(400).json({ 
                 error: 'You are already punched in. Please punch out first before punching in again.',
-                attendance: existingAttendance
+                attendance: {
+                    _id: existingAttendance._id,
+                    punchIn: existingAttendance.punchIn,
+                    status: existingAttendance.status,
+                    onBreak: existingAttendance.onBreak || false,
+                    breaks: existingAttendance.breaks || [],
+                    totalBreakTime: totalBreakMinutes,
+                    minutesWorked,
+                    hoursWorked: `${hours}h ${mins}m`
+                }
             });
         }
 

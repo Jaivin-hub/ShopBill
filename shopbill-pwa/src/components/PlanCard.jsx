@@ -33,10 +33,16 @@ const PlanCard = ({
     const showRecommended = plan.id === 'premium';
     const buttonDisabled = (isCurrent && !alreadyInTerminalState) || isUpgrading || isCancelling;
 
-    // Theme logic
-    const cardBg = darkMode ? 'bg-gray-800/50' : 'bg-white shadow-md hover:shadow-xl';
-    const titleColor = darkMode ? 'text-white' : 'text-slate-950';
-    const priceColor = darkMode ? 'text-white' : 'text-black';
+    // Enhanced theme logic with gradients
+    const isPremium = plan.id === 'premium';
+    const isPro = plan.id === 'pro';
+    
+    const cardBg = isCurrent
+        ? (darkMode ? 'bg-gradient-to-br from-indigo-900/30 to-indigo-800/20 border-indigo-500/50 shadow-2xl shadow-indigo-500/10' : 'bg-gradient-to-br from-indigo-50 to-white border-indigo-400 shadow-xl')
+        : (darkMode ? 'bg-gradient-to-br from-gray-800/60 to-gray-900/40 border-gray-700/50 hover:border-indigo-400/50' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-lg hover:shadow-xl');
+    
+    const titleColor = darkMode ? 'text-white' : 'text-slate-900';
+    const priceColor = darkMode ? 'text-white' : 'text-slate-900';
     const descColor = darkMode ? 'text-gray-300' : 'text-slate-700';
     const subColor = darkMode ? 'text-gray-400' : 'text-slate-500';
     const borderColor = isCurrent 
@@ -45,63 +51,83 @@ const PlanCard = ({
 
     return (
         <article
-            className={`relative rounded-xl p-6 border-2 transition-all duration-300 flex flex-col ${cardBg} ${borderColor} ${isCurrent ? 'transform scale-[1.02] z-10' : 'hover:border-indigo-400'} mobile:p-4`}
+            className={`relative rounded-2xl md:rounded-3xl p-6 md:p-8 border-2 transition-all duration-300 flex flex-col ${cardBg} ${borderColor} ${isCurrent ? 'transform scale-[1.02] z-10 ring-2 ring-indigo-500/20' : 'hover:scale-[1.01]'} overflow-visible`}
             itemScope
             itemType="https://schema.org/Offer"
         >
+            {/* Background gradient effect */}
+            {isPremium && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+            )}
+            {isPro && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+            )}
+
             {/* Display 'Current Plan' badge */}
             {isCurrent && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                    <span className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
-                        Active Tier
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
+                    <span className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-5 py-2 rounded-full shadow-lg border-2 border-white/20">
+                        Active Plan
                     </span>
                 </div>
             )}
 
-            <div className="flex-grow">
-                <div className="flex items-center justify-between mb-4 mt-2">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-lg ${getPlanColor(plan.id)}`}>
-                            <IconComponent className={`w-6 h-6 ${getPlanTextColor(plan.id)}`} />
+            {/* Recommended badge for Premium */}
+            {showRecommended && !isCurrent && (
+                <div className="absolute -top-3 right-4 z-10">
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg ${darkMode ? 'text-emerald-300 bg-emerald-500/20 border border-emerald-500/30' : 'text-emerald-700 bg-emerald-100 border border-emerald-200'}`}>
+                        Best Value
+                    </span>
+                </div>
+            )}
+
+            <div className="flex-grow relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <div className={`p-3.5 md:p-4 rounded-xl md:rounded-2xl border-2 ${getPlanColor(plan.id)} shadow-lg`}>
+                            <IconComponent className={`w-7 h-7 md:w-8 md:h-8 ${getPlanTextColor(plan.id)}`} />
                         </div>
-                        <h3 className={`text-xl font-black uppercase tracking-tight ${titleColor}`} itemProp="name">
+                        <h3 className={`text-xl md:text-2xl font-black uppercase tracking-tight ${titleColor}`} itemProp="name">
                             {plan.name}
                         </h3>
                     </div>
-                    
-                    {showRecommended && (
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${darkMode ? 'text-green-400 bg-green-500/10' : 'text-green-700 bg-green-100'}`}>
-                            Best Value
+                </div>
+
+                <div className="mb-6">
+                    <div className="flex items-baseline gap-2">
+                        <span className={`text-4xl md:text-5xl font-black tabular-nums tracking-tighter ${priceColor}`}>
+                            {formatCurrency(plan.price)}
                         </span>
+                        <span className={`text-sm font-bold uppercase ${subColor}`}>/month</span>
+                    </div>
+                    {plan.id === 'premium' && (
+                        <p className={`text-xs font-bold mt-2 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Most Popular Choice
+                        </p>
                     )}
                 </div>
 
-                <div className="mb-4">
-                    <span className={`text-3xl font-black tabular-nums tracking-tighter ${priceColor}`}>
-                        {formatCurrency(plan.price)}
-                    </span>
-                    <span className={`text-xs font-bold uppercase ml-2 ${subColor}`}>/month</span>
-                </div>
-
-                <ul className="space-y-3 mb-6">
+                <ul className="space-y-3.5 mb-8">
                     {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                            <CheckCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
-                            <span className={`text-sm font-medium ${descColor}`}>{feature}</span>
+                        <li key={index} className="flex items-start gap-3">
+                            <div className={`mt-0.5 flex-shrink-0 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                <CheckCircle className="w-5 h-5" strokeWidth={2.5} />
+                            </div>
+                            <span className={`text-sm font-bold leading-relaxed ${descColor}`}>{feature}</span>
                         </li>
                     ))}
                     
-                    <div className={`border-t my-4 ${darkMode ? 'border-gray-700/50' : 'border-slate-100'}`} />
+                    <div className={`border-t my-5 ${darkMode ? 'border-gray-700/50' : 'border-slate-200'}`} />
                     
-                    <li className="flex items-start gap-2">
-                        <Users className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
-                        <span className={`text-sm font-bold ${titleColor}`}>
+                    <li className="flex items-center gap-3 p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
+                        <Users className={`w-5 h-5 flex-shrink-0 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                        <span className={`text-sm font-black ${titleColor}`}>
                             {plan.maxUsers === -1 ? 'Unlimited' : `Up to ${plan.maxUsers}`} Users
                         </span>
                     </li>
-                    <li className="flex items-start gap-2">
-                        <Package className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
-                        <span className={`text-sm font-bold ${titleColor}`}>
+                    <li className="flex items-center gap-3 p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
+                        <Package className={`w-5 h-5 flex-shrink-0 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                        <span className={`text-sm font-black ${titleColor}`}>
                             {plan.maxInventory === -1 ? 'Unlimited' : `${plan.maxInventory.toLocaleString('en-IN')}`} Items
                         </span>
                     </li>
@@ -111,11 +137,13 @@ const PlanCard = ({
             <button
                 onClick={() => handleUpgradeClick(plan)}
                 disabled={buttonDisabled}
-                className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-[0.15em] mt-auto transition-all duration-200 shadow-md active:scale-95 ${
+                className={`w-full py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase tracking-[0.15em] mt-auto transition-all duration-200 shadow-lg active:scale-95 ${
                     buttonDisabled
-                        ? (darkMode ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed')
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20'
-                    }`}
+                        ? (darkMode ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed border border-gray-700/50' : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200')
+                        : isCurrent
+                            ? (darkMode ? 'bg-indigo-600/80 text-white shadow-indigo-500/30 border-2 border-indigo-500/50' : 'bg-indigo-600 text-white shadow-indigo-500/30 border-2 border-indigo-500')
+                            : (darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/30 hover:shadow-indigo-500/50 border-2 border-indigo-500/50' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/30 hover:shadow-indigo-500/50 border-2 border-indigo-500')
+                }`}
                 aria-label={`${buttonText} for ${plan.name} plan`}
             >
                 {buttonText}

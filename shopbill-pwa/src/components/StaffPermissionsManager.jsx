@@ -308,7 +308,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
 };
 
 // --- AddStaffModal ---
-const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, error }) => {
+const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, error, onUpgradePlan }) => {
     const [formData, setFormData] = useState({ name: '', email: '', role: 'Cashier' });
 
     const handleChange = (e) => {
@@ -378,11 +378,25 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                 
                 <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                     {error && (
-                        <div className={`flex gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
-                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 shrink-0 mt-0.5" />
-                            <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-rose-200' : 'text-rose-900'}`}>
-                                {error}
-                            </p>
+                        <div className={`flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
+                            <div className="flex gap-2 sm:gap-3">
+                                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 shrink-0 mt-0.5" />
+                                <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed flex-1 ${darkMode ? 'text-rose-200' : 'text-rose-900'}`}>
+                                    {error}
+                                </p>
+                            </div>
+                            {error.includes('Plan Limit Reached') && onUpgradePlan && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onClose();
+                                        onUpgradePlan();
+                                    }}
+                                    className={`w-full mt-2 px-4 py-2.5 rounded-lg text-[10px] sm:text-[11px] font-black tracking-widest transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                                >
+                                    Upgrade Now
+                                </button>
+                            )}
                         </div>
                     )}
                     <div className={`flex gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-indigo-50 border-indigo-100'}`}>
@@ -473,7 +487,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, darkMode }) => {
+const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, darkMode, onUpgradePlan }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -774,6 +788,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 isSubmitting={isProcessing}
                 darkMode={darkMode}
                 error={addStaffError}
+                onUpgradePlan={onUpgradePlan}
             />
 
             <EditRoleModal 

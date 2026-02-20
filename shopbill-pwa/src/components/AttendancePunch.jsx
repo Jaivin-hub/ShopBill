@@ -30,6 +30,11 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
                 }
             }
         } catch (error) {
+            // Ignore cancelled errors (duplicate request prevention)
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return;
+            }
+            // Only log unexpected errors
             console.error('Error fetching attendance status:', error);
             setCurrentAttendance(null);
             if (onStatusChange) {
@@ -59,6 +64,7 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
     }, [isStaff, fetchCurrentStatus, fetchMyRecords, apiClient, API]);
 
     const handlePunchIn = async () => {
+        if (isPunchingIn) return; // Prevent duplicate clicks
         try {
             setIsPunchingIn(true);
             // Get client's local date and timezone offset to ensure correct date is saved
@@ -76,29 +82,60 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
                 await fetchCurrentStatus();
                 showToast('Punched in successfully!', 'success');
                 await fetchMyRecords();
+            } else {
+                showToast(response.data?.error || 'Failed to punch in', 'error');
+                // Refresh status to ensure UI is in sync
+                await fetchCurrentStatus();
             }
         } catch (error) {
-            showToast(error.response?.data?.error || 'Failed to punch in', 'error');
-            await fetchCurrentStatus();
+            // Ignore cancelled errors
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                setIsPunchingIn(false);
+                return;
+            }
+            
+            // Check if error response includes attendance data (already punched in scenario)
+            const errorResponse = error.response?.data;
+            if (errorResponse?.attendance && errorResponse.attendance.status === 'active') {
+                // User is already punched in - refresh status from server to get properly formatted data
+                showToast('You are already punched in', 'info');
+                await fetchCurrentStatus(); // This will properly format and set the attendance data
+                await fetchMyRecords();
+            } else {
+                const errorMessage = errorResponse?.error || error.message || 'Failed to punch in';
+                showToast(errorMessage, 'error');
+                // Refresh status to ensure UI is in sync
+                await fetchCurrentStatus();
+            }
         } finally {
             setIsPunchingIn(false);
         }
     };
 
     const handlePunchOut = async () => {
+        if (isPunchingOut) return; // Prevent duplicate clicks
         try {
             setIsPunchingOut(true);
             const response = await apiClient.post(API.attendancePunchOut);
             if (response.data?.success) {
-                setCurrentAttendance(null);
-                if (onStatusChange) {
-                    onStatusChange(null);
-                }
+                // Refresh status from server to ensure UI is in sync (will return null since punched out)
+                await fetchCurrentStatus();
                 showToast(`Punched out successfully! Worked: ${response.data.attendance.hoursWorked}`, 'success');
                 await fetchMyRecords();
+            } else {
+                showToast(response.data?.error || 'Failed to punch out', 'error');
+                // Refresh status to ensure UI is in sync
+                await fetchCurrentStatus();
             }
         } catch (error) {
-            showToast(error.response?.data?.error || 'Failed to punch out', 'error');
+            // Ignore cancelled errors
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                setIsPunchingOut(false);
+                return;
+            }
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to punch out';
+            showToast(errorMessage, 'error');
+            // Refresh status to ensure UI is in sync
             await fetchCurrentStatus();
         } finally {
             setIsPunchingOut(false);
@@ -106,15 +143,25 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
     };
 
     const handleBreakStart = async () => {
+        if (isStartingBreak) return; // Prevent duplicate clicks
         try {
             setIsStartingBreak(true);
             const response = await apiClient.post(API.attendanceBreakStart);
             if (response.data?.success) {
                 await fetchCurrentStatus();
                 showToast('Break started successfully!', 'success');
+            } else {
+                showToast(response.data?.error || 'Failed to start break', 'error');
+                await fetchCurrentStatus();
             }
         } catch (error) {
-            showToast(error.response?.data?.error || 'Failed to start break', 'error');
+            // Ignore cancelled errors
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                setIsStartingBreak(false);
+                return;
+            }
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to start break';
+            showToast(errorMessage, 'error');
             await fetchCurrentStatus();
         } finally {
             setIsStartingBreak(false);
@@ -122,6 +169,7 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
     };
 
     const handleBreakEnd = async () => {
+        if (isEndingBreak) return; // Prevent duplicate clicks
         try {
             setIsEndingBreak(true);
             const response = await apiClient.post(API.attendanceBreakEnd);
@@ -129,9 +177,18 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
                 await fetchCurrentStatus();
                 const hoursWorked = response.data.attendance?.currentWorkingHours || '0h 0m';
                 showToast(`Break ended. ${hoursWorked} worked so far`, 'success');
+            } else {
+                showToast(response.data?.error || 'Failed to end break', 'error');
+                await fetchCurrentStatus();
             }
         } catch (error) {
-            showToast(error.response?.data?.error || 'Failed to end break', 'error');
+            // Ignore cancelled errors
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                setIsEndingBreak(false);
+                return;
+            }
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to end break';
+            showToast(errorMessage, 'error');
             await fetchCurrentStatus();
         } finally {
             setIsEndingBreak(false);

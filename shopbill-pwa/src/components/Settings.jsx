@@ -222,12 +222,23 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                                     darkMode={darkMode}
                                 />
                             )}
-                            {/* Legacy Store Control (if needed) */}
+                            {/* Subscription & Plan Upgrade */}
                             <SettingItem 
                                 icon={CreditCard} 
                                 title="Subscription & Billing" 
-                                description="Manage enterprise plan and invoices." 
+                                description="Upgrade your plan or manage subscription and invoices." 
                                 onClick={handlePlanUpgradeClick} 
+                                actionComponent={
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePlanUpgradeClick();
+                                        }}
+                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                                    >
+                                        Upgrade Now
+                                    </button>
+                                }
                                 accentColor="text-amber-600"
                                 darkMode={darkMode}
                             />
