@@ -240,7 +240,7 @@ const ToggleSwitch = ({ label, checked, onChange, description }) => {
     );
 };
 
-const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
+const SystemConfig = ({ apiClient, API, showToast, currentUser, darkMode = true }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('plans');
@@ -467,11 +467,20 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser }) => {
     ];
 
     return (
-        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto custom-scrollbar" itemScope itemType="https://schema.org/WebPage">
+    // Theme variables
+    const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textSecondary = darkMode ? 'text-gray-400' : 'text-slate-600';
+    const cardBg = darkMode ? 'bg-gray-800/50 border-gray-700/50' : 'bg-white border-slate-200';
+    const inputBg = darkMode ? 'bg-gray-700/50 border-gray-600/50' : 'bg-slate-100 border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+
+    return (
+        <main className={`p-4 md:p-8 h-full flex flex-col ${mainBg} transition-colors duration-300 overflow-y-auto custom-scrollbar`} itemScope itemType="https://schema.org/WebPage">
             {/* Header */}
             <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                    <h1 className={`text-3xl font-extrabold ${textPrimary} flex items-center gap-3`}>
                         <Settings className="w-8 h-8 text-indigo-400" aria-hidden="true" />
                         System Configuration
                     </h1>

@@ -221,14 +221,14 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                 <section className={`rounded-3xl overflow-hidden border transition-colors ${sectionBg}`}>
                     <div className={`px-6 py-5 border-b flex justify-between items-center transition-colors ${sectionHeaderBg}`}>
                         <h2 className={`text-[10px] font-bold tracking-[0.25em] flex items-center ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
-                            <Shield className="w-4 h-4 mr-3 text-indigo-500" /> Security Credentials
+                            <Shield className="w-4 h-4 mr-3 text-indigo-500" /> Account Information
                         </h2>
-                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded border ${darkMode ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>Encrypted</span>
+                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded border ${darkMode ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>Secure</span>
                     </div>
 
                     <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                         <ProfileInputField 
-                            label="Terminal ID (Primary Email)" 
+                            label="Email Address" 
                             name="email" 
                             value={profile.email} 
                             icon={Mail} 
@@ -240,11 +240,11 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                             setValidationErrors={setValidationErrors}
                         />
                         <ProfileInputField 
-                            label="Verified Communication Line" 
+                            label="Phone Number" 
                             name="phone" 
                             value={profile.phone} 
                             icon={Phone} 
-                            placeholder="10-digit mobile"
+                            placeholder="10-digit mobile number"
                             onChange={handleChange}
                             isEditing={isEditing}
                             darkMode={darkMode}

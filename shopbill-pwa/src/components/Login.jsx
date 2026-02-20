@@ -173,13 +173,13 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                 <div className="space-y-1.5">
                     <label htmlFor="reset-email" className={`text-[9px] font-black ${labelColor}  tracking-widest ml-1 transition-colors duration-300`}>Account Email</label>
                     <div className="relative group">
-                        <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${iconColor} group-focus-within:text-teal-500 transition-colors`} />
+                        <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${iconColor} group-focus-within:text-indigo-500 transition-colors`} />
                         <input
                             id="reset-email"
                             type="email"
                             placeholder="your@email.com"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
-                            className={`w-full pl-11 pr-4 py-3 ${inputBg} border ${emailError ? 'border-red-500' : inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all ${placeholderColor}`}
+                            className={`w-full pl-11 pr-4 py-3 ${inputBg} border ${emailError ? 'border-red-500' : inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => handleEmailChange(e.target.value)}
                             onBlur={handleEmailBlur}
                             value={email}
@@ -191,19 +191,21 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
                 <button
                     type="submit"
                     disabled={loading || !!emailError}
-                    className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-black text-[11px]  tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[11px] tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
                 >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Reset Link"}
                 </button>
             </form>
 
-            <button
-                onClick={() => setView('login')}
-                className="w-full flex items-center justify-center gap-2 text-[9px] font-black text-indigo-500  tracking-widest hover:text-white transition-colors py-1"
-                disabled={loading}
-            >
-                <ArrowLeft className="w-3 h-3" /> Back to Log In
-            </button>
+            <div className="pt-6 space-y-4">
+                <button
+                    onClick={() => setView('login')}
+                    className={`w-full flex items-center justify-center gap-2 text-[10px] font-black ${darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} tracking-widest transition-colors py-3 border ${darkMode ? 'border-indigo-500/30 hover:border-indigo-500/50' : 'border-indigo-200 hover:border-indigo-300'} rounded-xl ${darkMode ? 'bg-indigo-500/10 hover:bg-indigo-500/20' : 'bg-indigo-50 hover:bg-indigo-100'}`}
+                    disabled={loading}
+                >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back to Log In
+                </button>
+            </div>
         </section>
     );
 };
@@ -339,13 +341,13 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                         )}
                     </div>
 
-                    <footer className="pb-6 px-6 text-center">
+                    <footer className="pb-6 px-6 text-center pt-4">
                         <button
                             onClick={onBackToLandingNormal}
-                            className={`inline-flex items-center gap-2 text-[9px] font-black ${footerText}  tracking-widest hover:text-indigo-400 transition-colors`}
+                            className={`inline-flex items-center gap-2 text-[10px] font-black ${footerText} tracking-widest hover:text-indigo-400 transition-colors py-2 px-4 rounded-lg ${darkMode ? 'hover:bg-gray-800/50' : 'hover:bg-slate-100'}`}
                             disabled={loading}
                         >
-                            <ArrowLeft className="w-2.5 h-2.5" /> Back to Landing
+                            <ArrowLeft className="w-3 h-3" /> Back to Landing
                         </button>
                     </footer>
                 </section>

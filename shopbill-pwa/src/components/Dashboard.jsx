@@ -4,7 +4,7 @@ import {
     List, Loader2, TrendingUp, Clock, Activity,
     ShieldCheck, RefreshCw, PlusCircle, ShoppingCart,
     ChevronRight, Inbox, Sparkles, Box, ArrowRight,
-    Store, MapPin, BarChart3, Settings2, Truck, ChevronDown, ChevronUp
+    Store, MapPin, BarChart3, Settings2, Truck, ChevronDown, ChevronUp, AlertCircle, X
 } from 'lucide-react';
 import AttendancePunch from './AttendancePunch';
 
@@ -20,6 +20,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [isLoading, setIsLoading] = useState(true);
     const [isAttendanceExpanded, setIsAttendanceExpanded] = useState(false); // Collapsed by default to save space
     const [currentAttendance, setCurrentAttendance] = useState(null); // Track attendance status for indicator
+    const [isAddressMissing, setIsAddressMissing] = useState(false);
+    const [showAddressReminder, setShowAddressReminder] = useState(true);
 
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
@@ -67,6 +69,22 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [userRole, apiClient, API]);
 
+    // Check if business address is missing
+    const checkAddressStatus = useCallback(async () => {
+        if (userRole === USER_ROLES.OWNER && apiClient && API) {
+            try {
+                const response = await apiClient.get(API.profile);
+                const address = response.data?.user?.address || response.data?.address || '';
+                setIsAddressMissing(!address || address.trim() === '');
+            } catch (error) {
+                console.error('Error checking address status:', error);
+                setIsAddressMissing(false);
+            }
+        } else {
+            setIsAddressMissing(false);
+        }
+    }, [userRole, apiClient, API]);
+
     // Only fetch on mount or when access changes, not on every callback change
     const hasFetchedRef = useRef(false);
     useEffect(() => {
@@ -74,6 +92,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             hasFetchedRef.current = true;
             fetchDashboardData();
             fetchAttendanceStatus();
+            checkAddressStatus();
         } else if (!hasAccess) {
             hasFetchedRef.current = false;
         }
@@ -88,6 +107,17 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             return () => clearInterval(interval);
         }
     }, [userRole, apiClient, API, fetchAttendanceStatus]);
+
+    // Refresh address status when returning to dashboard (e.g., from profile page)
+    useEffect(() => {
+        const handleFocus = () => {
+            if (hasAccess && userRole === USER_ROLES.OWNER) {
+                checkAddressStatus();
+            }
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [hasAccess, userRole, checkAddressStatus]);
 
     // --- Optimized Data Calculations ---
     const today = useMemo(() => {
@@ -276,6 +306,37 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                     </div>
                 </div>
             </header>
+
+            {/* Address Reminder Banner */}
+            {isAddressMissing && showAddressReminder && userRole === USER_ROLES.OWNER && (
+                <div className={`sticky top-[73px] z-[99] mx-4 md:mx-8 mt-4 mb-4 ${darkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'} border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300`}>
+                    <div className={`flex-shrink-0 p-2 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                        <AlertCircle className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-bold mb-1 ${darkMode ? 'text-amber-200' : 'text-amber-900'}`}>
+                            Add Business Address
+                        </h3>
+                        <p className={`text-xs mb-3 leading-relaxed ${darkMode ? 'text-amber-300/80' : 'text-amber-800'}`}>
+                            Your invoices are missing the business address. Add it in your profile to ensure complete invoices for your customers.
+                        </p>
+                        <button
+                            onClick={() => setCurrentPage('profile')}
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-500/30' : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'}`}
+                        >
+                            <MapPin className="w-3.5 h-3.5" />
+                            Go to Profile
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setShowAddressReminder(false)}
+                        className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-amber-500/20 text-amber-400' : 'hover:bg-amber-100 text-amber-600'}`}
+                        aria-label="Dismiss reminder"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
                 <div className="max-w-7xl mx-auto space-y-8 pb-12">

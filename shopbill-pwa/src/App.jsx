@@ -444,7 +444,9 @@ const App = () => {
 
   // Fetch a single outlet by ID
   const fetchOutletById = useCallback(async (outletId) => {
-    if (!outletId || !isPremium) return null;
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isUserPremium = userPlan === 'PREMIUM';
+    if (!outletId || !isUserPremium) return null;
     try {
       const response = await apiClient.get(API.outletDetails(outletId));
       if (response.data?.success) {
@@ -461,14 +463,19 @@ const App = () => {
       console.error('Error fetching outlet by ID:', error);
     }
     return null;
-  }, [apiClient, API, isPremium]);
+  }, [apiClient, API, currentUser?.plan]);
 
   const fetchOutlets = useCallback(async () => {
-    if (!currentUser || !isPremium) {
+    // Only fetch outlets for Premium plan owners
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isUserPremium = userPlan === 'PREMIUM';
+    
+    if (!currentUser || !isUserPremium) {
       setOutlets([]);
       outletRestoredRef.current = false;
       return;
     }
+    
     try {
       const response = await apiClient.get(API.outlets);
       if (response.data?.success) {
@@ -531,26 +538,39 @@ const App = () => {
       if (error.cancelled || error.message?.includes('cancelled')) {
         return;
       }
+      // Silently ignore 403 errors for non-Premium users (expected behavior)
+      if (error.response?.status === 403) {
+        setOutlets([]);
+        outletRestoredRef.current = false;
+        return;
+      }
+      // Only log unexpected errors
       console.error('Error fetching outlets:', error);
     }
-  }, [currentUser, isPremium, apiClient, API]);
+  }, [currentUser, apiClient, API]);
 
   // Initial fetch outlets - only when user or premium status changes
   const hasFetchedOutletsRef = useRef(false);
   useEffect(() => {
-    if (currentUser && isPremium && !hasFetchedOutletsRef.current) {
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isUserPremium = userPlan === 'PREMIUM';
+    
+    if (currentUser && isUserPremium && !hasFetchedOutletsRef.current) {
       hasFetchedOutletsRef.current = true;
       fetchOutlets();
-    } else if (!currentUser || !isPremium) {
+    } else if (!currentUser || !isUserPremium) {
       setOutlets([]);
       outletRestoredRef.current = false;
       hasFetchedOutletsRef.current = false;
     }
-  }, [currentUser?.id, isPremium, fetchOutlets]);
+  }, [currentUser?.id, currentUser?.plan, fetchOutlets]);
 
   // Sync currentOutlet from outlets list when it's loaded
   useEffect(() => {
-    if (currentUser && isPremium && currentOutletId && !currentOutlet && outlets.length > 0) {
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isUserPremium = userPlan === 'PREMIUM';
+    
+    if (currentUser && isUserPremium && currentOutletId && !currentOutlet && outlets.length > 0) {
       const foundOutlet = outlets.find(o => o._id === currentOutletId);
       if (foundOutlet) {
         setCurrentOutlet(foundOutlet);
@@ -563,7 +583,7 @@ const App = () => {
         });
       }
     }
-  }, [outlets, currentOutletId, currentOutlet, currentUser, isPremium, apiClient, API, fetchOutletById]);
+  }, [outlets, currentOutletId, currentOutlet, currentUser?.plan, apiClient, API, fetchOutletById]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -832,6 +852,11 @@ const App = () => {
   // Split nav items into primary (footer) and secondary (more menu) based on role
   const { primaryNavItems, secondaryNavItems } = useMemo(() => {
     const filtered = navItems.filter(item => item.roles.includes(userRole));
+    
+    // For superadmin, all items go to primary (no "more" menu needed)
+    if (userRole === USER_ROLES.SUPERADMIN) {
+      return { primaryNavItems: filtered, secondaryNavItems: [] };
+    }
     
     // Define role-specific primary menu items (displayed first)
     const rolePrimaryMenuIds = {

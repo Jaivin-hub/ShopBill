@@ -83,10 +83,10 @@ router.post('/', protect, async (req, res) => {
         const plan = owner.plan || 'BASIC'; // Fallback to BASIC if null
 
         if (plan === 'BASIC') {
-            // Basic: 1 Owner + 1 Staff total
-            if (currentStaffCount >= 1) {
+            // Basic: 1 Owner + 2 Staff total
+            if (currentStaffCount >= 2) {
                 return res.status(403).json({ 
-                    error: 'Plan Limit Reached: The BASIC plan allows only 1 staff member. Please upgrade to PRO for more seats.' 
+                    error: 'Plan Limit Reached: The BASIC plan allows up to 2 staff members. Please upgrade to PRO for more seats.' 
                 });
             }
         } else if (plan === 'PRO') {
@@ -329,8 +329,8 @@ router.put('/:id/role', protect, async (req, res) => {
                 });
             }
         }
-        // BASIC plan allows 1 staff of any role, so changing the role of the existing 
-        // 1 staff member doesn't break the count limit. 
+        // BASIC plan allows 2 staff of any role, so changing the role of an existing 
+        // staff member doesn't break the count limit. 
         // PREMIUM is unlimited.
 
         // 5. Update both Staff and User records

@@ -318,7 +318,7 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
     );
 };
 
-const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
+const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = true }) => {
     const [shops, setShops] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -389,6 +389,15 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                     : new Date(b.dateSortValue) - new Date(a.dateSortValue);
             }
 
+            if (sortBy.key === 'plan') {
+                // Plan order: BASIC < PRO < PREMIUM
+                const planOrder = { 'BASIC': 1, 'PRO': 2, 'PREMIUM': 3 };
+                const aOrder = planOrder[aValue] || 0;
+                const bOrder = planOrder[bValue] || 0;
+                const result = aOrder - bOrder;
+                return sortBy.direction === 'ascending' ? result : -result;
+            }
+
             const result = String(aValue).toLowerCase().localeCompare(String(bValue).toLowerCase());
             return sortBy.direction === 'ascending' ? result : -result;
         });
@@ -419,50 +428,64 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
     };
 
     const SortIcon = ({ columnKey }) => {
-        if (sortBy.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 text-gray-600" />;
-        return <ArrowUpDown className={`w-3 h-3 ml-1 ${sortBy.direction === 'ascending' ? 'rotate-180 text-indigo-400' : 'text-indigo-400'}`} />;
+        const iconColor = darkMode ? 'text-gray-600' : 'text-slate-500';
+        const activeColor = 'text-indigo-400';
+        if (sortBy.key !== columnKey) return <ArrowUpDown className={`w-3 h-3 ml-1 ${iconColor}`} />;
+        return <ArrowUpDown className={`w-3 h-3 ml-1 ${sortBy.direction === 'ascending' ? 'rotate-180 ' : ''}${activeColor}`} />;
     };
 
+    // Theme variables
+    const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
+    const borderColor = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textSecondary = darkMode ? 'text-gray-400' : 'text-slate-600';
+    const textMuted = darkMode ? 'text-gray-500' : 'text-slate-500';
+    const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
+    const inputBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const buttonBg = darkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-slate-100 hover:bg-slate-200';
+
     return (
-        <main className="h-screen flex flex-col bg-gray-950 transition-colors duration-300 overflow-hidden">
-            <header className="p-4 md:p-6 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-gray-950 z-10">
-                <h1 className="text-xl md:text-2xl font-bold text-white flex items-center">
+        <main className={`h-screen flex flex-col ${mainBg} transition-colors duration-300 overflow-hidden`}>
+            <header className={`p-4 md:p-6 border-b ${borderColor} flex justify-between items-center flex-shrink-0 ${headerBg} z-10`}>
+                <h1 className={`text-xl md:text-2xl font-bold ${textPrimary} flex items-center`}>
                     <Building className="w-6 h-6 mr-2 md:mr-3 text-indigo-400" />
                     <span className="hidden xs:block">Shop Management</span>
                     <span className="xs:hidden">Shops</span>
-                    <button onClick={handleRefresh} disabled={isLoading} className="ml-4 p-2 rounded-lg bg-gray-900 hover:bg-gray-800 transition-all cursor-pointer">
-                        <RotateCw className={`w-4 h-4 text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
+                    <button onClick={handleRefresh} disabled={isLoading} className={`ml-4 p-2 rounded-lg ${buttonBg} transition-all cursor-pointer`}>
+                        <RotateCw className={`w-4 h-4 ${textSecondary} ${isLoading ? 'animate-spin' : ''}`} />
                     </button>
                 </h1>
 
                 <div className="hidden sm:block relative w-64 md:w-80">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textMuted}`} />
                     <input
                         type="text"
                         placeholder="Search shops..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className={`w-full pl-10 pr-4 py-2 ${inputBg} border ${inputBorder} rounded-xl text-sm ${textPrimary} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                     />
                 </div>
             </header>
 
-            <div className="p-4 border-b border-gray-800 sm:hidden flex-shrink-0 bg-gray-950">
+            <div className={`p-4 border-b ${borderColor} sm:hidden flex-shrink-0 ${headerBg}`}>
                 <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textMuted}`} />
                     <input
                         type="text"
                         placeholder="Search name, email, phone..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white"
+                        className={`w-full pl-10 pr-4 py-3 ${inputBg} border ${inputBorder} rounded-xl text-sm ${textPrimary}`}
                     />
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
                 {isLoading && shops.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                    <div className={`h-full flex flex-col items-center justify-center ${textMuted}`}>
                         <Loader className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
                         <p className="animate-pulse">Fetching shop data...</p>
                     </div>
@@ -471,18 +494,21 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                         {/* MOBILE/TABLET VIEW (Cards) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-4">
                             {filteredAndSortedShops.length === 0 ? (
-                                <div className="col-span-full py-20 text-center text-gray-500">No shops found matching your search.</div>
+                                <div className={`col-span-full py-20 text-center ${textMuted}`}>No shops found matching your search.</div>
                             ) : (
-                                filteredAndSortedShops.map((shop) => (
-                                    <div key={shop.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+                                filteredAndSortedShops.map((shop) => {
+                                    const shopCardBg = darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200';
+                                    const innerCardBg = darkMode ? 'bg-gray-950/50 border-gray-800' : 'bg-slate-50 border-slate-200';
+                                    return (
+                                    <div key={shop.id} className={`${shopCardBg} border rounded-2xl p-4 flex flex-col gap-4 shadow-lg`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
                                                     <Store className="w-5 h-5 text-indigo-400" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-white font-bold leading-tight">{shop.name}</h3>
-                                                    <p className="text-[10px] text-gray-500 tracking-widest">Joined {shop.dateJoined}</p>
+                                                    <h3 className={`${textPrimary} font-bold leading-tight`}>{shop.name}</h3>
+                                                    <p className={`text-[10px] ${textMuted} tracking-widest`}>Joined {shop.dateJoined}</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-1">
@@ -496,17 +522,17 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div className="flex flex-col p-2 rounded-lg bg-gray-950/50 border border-gray-800">
-                                                <span className="text-[10px] text-gray-500 mb-1">Due Status</span>
+                                            <div className={`flex flex-col p-2 rounded-lg ${innerCardBg} border`}>
+                                                <span className={`text-[10px] ${textMuted} mb-1`}>Due Status</span>
                                                 <div className="flex items-center gap-1.5">
                                                     <Clock className={`w-3 h-3 ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
-                                                    <span className={`text-xs font-bold ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-white'}`}>
+                                                    <span className={`text-xs font-bold ${shop.dueStatus.isUrgent ? 'text-red-400' : textPrimary}`}>
                                                         {shop.dueStatus.text}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col p-2 rounded-lg bg-gray-950/50 border border-gray-800">
-                                                <span className="text-[10px] text-gray-500 mb-1">Performance</span>
+                                            <div className={`flex flex-col p-2 rounded-lg ${innerCardBg} border`}>
+                                                <span className={`text-[10px] ${textMuted} mb-1`}>Performance</span>
                                                 <PerformanceTrendIndicator performance={shop.performanceTrend} />
                                             </div>
                                         </div>
@@ -514,16 +540,16 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                                             <a
                                                 href={`mailto:${shop.email}`}
-                                                className="flex items-center text-xs text-gray-400 gap-2 hover:text-indigo-400 transition-colors overflow-hidden max-w-[150px] md:max-w-none"
+                                                className={`flex items-center text-xs ${textSecondary} gap-2 hover:text-indigo-400 transition-colors overflow-hidden max-w-[150px] md:max-w-none`}
                                             >
-                                                <Mail className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                                                <Mail className={`w-3.5 h-3.5 ${darkMode ? 'text-gray-600' : 'text-slate-500'} shrink-0`} />
                                                 <span className="truncate">{shop.email}</span>
                                             </a>
                                             <a
                                                 href={`tel:${shop.phone}`}
-                                                className="flex items-center text-xs text-gray-400 gap-2 hover:text-indigo-400 transition-colors shrink-0"
+                                                className={`flex items-center text-xs ${textSecondary} gap-2 hover:text-indigo-400 transition-colors shrink-0`}
                                             >
-                                                <Phone className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                                                <Phone className={`w-3.5 h-3.5 ${darkMode ? 'text-gray-600' : 'text-slate-500'} shrink-0`} />
                                                 <span>{shop.phone}</span>
                                             </a>
                                         </div>
@@ -536,55 +562,60 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                             <SubscriptionStatusBadge status={shop.subscriptionStatus} />
                                         </div>
                                     </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
 
                         {/* DESKTOP VIEW (Table with Horizontal Scroll Protection) */}
                         <div className="hidden lg:block w-full">
-                            <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-gray-900/40 backdrop-blur-sm">
-                                <table className="min-w-full table-auto divide-y divide-gray-800">
-                                    <thead className="bg-gray-800/80 sticky top-0 z-10">
+                            <div className={`overflow-x-auto rounded-2xl border ${borderColor} ${darkMode ? 'bg-gray-900/40' : 'bg-white/50'} backdrop-blur-sm`}>
+                                <table className={`min-w-full table-auto divide-y ${borderColor}`}>
+                                    <thead className={`${darkMode ? 'bg-gray-800/80' : 'bg-slate-100/80'} sticky top-0 z-10`}>
                                         <tr>
-                                            <th onClick={() => handleSort('name')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider cursor-pointer hover:text-white transition-colors">
+                                            <th onClick={() => handleSort('name')} className={`px-6 py-4 text-left text-xs font-semibold ${textSecondary} tracking-wider cursor-pointer hover:${textPrimary} transition-colors`}>
                                                 <div className="flex items-center">Shop <SortIcon columnKey="name" /></div>
                                             </th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider">Contact Details</th>
-                                            <th onClick={() => handleSort('dateJoined')} className="px-6 py-4 text-left text-xs font-semibold text-gray-400 tracking-wider cursor-pointer hover:text-white transition-colors">
+                                            <th className={`px-6 py-4 text-left text-xs font-semibold ${textSecondary} tracking-wider`}>Contact Details</th>
+                                            <th onClick={() => handleSort('dateJoined')} className={`px-6 py-4 text-left text-xs font-semibold ${textSecondary} tracking-wider cursor-pointer hover:${textPrimary} transition-colors`}>
                                                 <div className="flex items-center">Joined <SortIcon columnKey="dateJoined" /></div>
                                             </th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Plan / Due</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Staffing</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Growth</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Subscription</th>
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 tracking-wider">Actions</th>
+                                            <th onClick={() => handleSort('plan')} className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider cursor-pointer hover:${textPrimary} transition-colors`}>
+                                                <div className="flex items-center justify-center">Plan / Due <SortIcon columnKey="plan" /></div>
+                                            </th>
+                                            <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Staffing</th>
+                                            <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Growth</th>
+                                            <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Subscription</th>
+                                            <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-800">
+                                    <tbody className={`divide-y ${borderColor}`}>
                                         {filteredAndSortedShops.length === 0 ? (
                                             <tr>
-                                                <td colSpan="8" className="px-6 py-20 text-center text-gray-500">No shops found matching your search.</td>
+                                                <td colSpan="8" className={`px-6 py-20 text-center ${textMuted}`}>No shops found matching your search.</td>
                                             </tr>
                                         ) : (
-                                            filteredAndSortedShops.map((shop) => (
-                                                <tr key={shop.id} className="hover:bg-gray-800/30 transition-colors group">
+                                            filteredAndSortedShops.map((shop) => {
+                                                const rowHover = darkMode ? 'hover:bg-gray-800/30' : 'hover:bg-slate-50';
+                                                return (
+                                                <tr key={shop.id} className={`${rowHover} transition-colors group`}>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0"><Store className="w-4 h-4 text-indigo-400" /></div>
-                                                            <span className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors truncate max-w-[150px]">{shop.name}</span>
+                                                            <span className={`text-sm font-semibold ${textPrimary} group-hover:text-indigo-400 transition-colors truncate max-w-[150px]`}>{shop.name}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-xs text-gray-300 truncate max-w-[180px]">{shop.email}</div>
-                                                        <div className="text-[10px] text-gray-500 font-mono tracking-tighter">{shop.phone}</div>
+                                                        <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-slate-700'} truncate max-w-[180px]`}>{shop.email}</div>
+                                                        <div className={`text-[10px] ${textMuted} font-mono tracking-tighter`}>{shop.phone}</div>
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">{shop.dateJoined}</td>
+                                                    <td className={`px-6 py-4 whitespace-nowrap text-xs ${textSecondary} font-medium`}>{shop.dateJoined}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         <div className="flex flex-col items-center gap-1">
                                                             <span className={`px-2.5 py-1 rounded-md text-[10px] font-black tracking-tighter border ${getPlanStyles(shop.plan)}`}>
                                                                 {shop.plan}
                                                             </span>
-                                                            <span className={`text-[10px] flex items-center gap-1 ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-gray-500'}`}>
+                                                            <span className={`text-[10px] flex items-center gap-1 ${shop.dueStatus.isUrgent ? 'text-red-400' : textMuted}`}>
                                                                 <Clock className="w-3 h-3" /> {shop.dueStatus.text}
                                                             </span>
                                                         </div>
@@ -599,7 +630,8 @@ const UserManagement = ({ apiClient, API, showToast, currentUser }) => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </tbody>
                                 </table>

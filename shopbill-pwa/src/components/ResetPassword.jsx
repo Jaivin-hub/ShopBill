@@ -152,7 +152,9 @@ const ResetPassword = () => {
                 {/* Header */}
                 <header className="text-center mb-8" itemProp="headline">
                     <h1 className="text-3xl font-extrabold text-white">New Password</h1>
-                    <p className="text-gray-400 mt-2" itemProp="description">Set a strong password for your Pocket POS account. Minimum 8 characters required.</p>
+                    {status?.type !== 'success' && (
+                        <p className="text-gray-400 mt-2" itemProp="description">Set a strong password for your Pocket POS account. Minimum 8 characters required.</p>
+                    )}
                 </header>
                 
                 {/* Status Message (for API/Token errors) */}

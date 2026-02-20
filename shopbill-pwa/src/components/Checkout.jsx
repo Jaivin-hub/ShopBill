@@ -12,7 +12,7 @@ const PLAN_DETAILS = {
     BASIC: {
         name: 'Basic Plan',
         price: 499,
-        features: ['2 Users (Owner + 1 Staff)', 'Full Inventory', 'Digital Khata'],
+        features: ['3 Users (Owner + 2 Staff)', 'Full Inventory', 'Digital Khata'],
         interval: 'monthly',
         color: 'from-indigo-600 to-blue-600',
     },

@@ -185,7 +185,7 @@ const MetricCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, 
     );
 };
 
-const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
+const GlobalReport = ({ apiClient, API, showToast, currentUser, darkMode = true }) => {
     const [selectedFilter, setSelectedFilter] = useState('30d');
     const [customStartDate, setCustomStartDate] = useState(getDateXDaysAgo(30));
     const [customEndDate, setCustomEndDate] = useState(getTodayDateString());
@@ -225,11 +225,16 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
         }
     }, [fetchGlobalReportData, currentUser]);
     
+    const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textSecondary = darkMode ? 'text-gray-400' : 'text-slate-600';
+    const textMuted = darkMode ? 'text-gray-300' : 'text-slate-500';
+
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full min-h-screen p-8 text-gray-400 bg-gray-950 transition-colors duration-300" aria-busy="true" aria-live="polite">
+            <div className={`flex flex-col items-center justify-center h-full min-h-screen p-8 ${textSecondary} ${mainBg} transition-colors duration-300`} aria-busy="true" aria-live="polite">
                 <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
-                <p className='mt-3 text-gray-300'>Loading global reports...</p>
+                <p className={`mt-3 ${textMuted}`}>Loading global reports...</p>
             </div>
         );
     }
@@ -247,18 +252,18 @@ const GlobalReport = ({ apiClient, API, showToast, currentUser }) => {
     const maxRevenue = Math.max(...chartData.map(d => d.revenue));
     
     return (
-        <main className="p-4 md:p-8 h-full flex flex-col bg-gray-950 transition-colors duration-300 overflow-y-auto custom-scrollbar" itemScope itemType="https://schema.org/Report">
+        <main className={`p-4 md:p-8 h-full flex flex-col ${mainBg} transition-colors duration-300 overflow-y-auto custom-scrollbar`} itemScope itemType="https://schema.org/Report">
             {/* Header */}
             <header className="mb-6" itemProp="headline">
                 <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                    <h1 className={`text-3xl font-extrabold ${textPrimary} flex items-center gap-3`}>
                         <BarChart3 className="w-8 h-8 text-indigo-400" aria-hidden="true" />
                         Global Reports
                     </h1>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={fetchGlobalReportData}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-all duration-200 cursor-pointer"
+                            className={`flex items-center gap-2 px-4 py-2 ${darkMode ? 'bg-gray-800 hover:bg-gray-700 text-gray-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'} rounded-lg transition-all duration-200 cursor-pointer`}
                         >
                             <RefreshCw className="w-4 h-4" />
                             Refresh
