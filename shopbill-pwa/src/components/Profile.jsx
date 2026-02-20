@@ -53,7 +53,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
     </div>
 );
 
-function Profile({ apiClient, showToast, darkMode }) {
+function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
     const [profile, setProfile] = useState({
         email: '',
         phone: '',
@@ -75,6 +75,10 @@ function Profile({ apiClient, showToast, darkMode }) {
             const data = response.data.user || response.data.data || response.data;
             setProfile(data);
         } catch (error) {
+            // Ignore cancellation errors
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return;
+            }
             showToast('Error synchronizing profile data.', 'error');
         } finally {
             setIsLoading(false);
@@ -83,7 +87,7 @@ function Profile({ apiClient, showToast, darkMode }) {
 
     useEffect(() => {
         fetchProfileData();
-    }, [fetchProfileData]);
+    }, [fetchProfileData, currentOutletId]); // Refetch when outlet changes
 
     const handleSave = async () => {
         // Validate all fields

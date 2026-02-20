@@ -11,7 +11,7 @@ import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import ConfirmationModal from './ConfirmationModal';
 
-const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage }) => {
+const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage, onOutletsChange }) => {
     const [outlets, setOutlets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,6 +39,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [outletToDelete, setOutletToDelete] = useState(null);
     const [outletStaff, setOutletStaff] = useState({}); // { outletId: [staff members] }
     const [loadingStaff, setLoadingStaff] = useState({}); // { outletId: true/false }
+    const fetchingStaffRef = useRef(new Set()); // Track which outlets are currently being fetched
 
     const isPremium = currentUser?.plan === 'PREMIUM';
 
@@ -62,14 +63,23 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     // Fetch staff for a specific outlet
     const fetchStaffForOutlet = useCallback(async (outletId) => {
-        if (!outletId || loadingStaff[outletId]) return;
+        if (!outletId) return;
         
-        setLoadingStaff(prev => ({ ...prev, [outletId]: true }));
+        // Use ref to prevent race conditions - check and set atomically
+        const outletIdStr = String(outletId);
+        if (fetchingStaffRef.current.has(outletIdStr)) {
+            console.log(`[OutletManager] Already fetching staff for outlet ${outletIdStr}, skipping`);
+            return;
+        }
+        
+        fetchingStaffRef.current.add(outletIdStr);
+        setLoadingStaff(prev => ({ ...prev, [outletIdStr]: true }));
+        
         try {
             // Make API call with outlet-specific header without modifying global defaults
             const response = await apiClient.get(API.staff, {
                 headers: {
-                    'x-store-id': outletId
+                    'x-store-id': outletIdStr
                 }
             });
             
@@ -83,19 +93,41 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 staffData = response.data.staff;
             }
             
-            console.log(`[OutletManager] Fetched ${staffData.length} staff for outlet ${outletId}`);
-            setOutletStaff(prev => ({ ...prev, [outletId]: staffData }));
+            // Sort staff by name for consistent display
+            staffData.sort((a, b) => {
+                const nameA = (a.name || a.email || '').toLowerCase();
+                const nameB = (b.name || b.email || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            
+            console.log(`[OutletManager] Fetched ${staffData.length} staff for outlet ${outletIdStr}`);
+            
+            // Use functional update to ensure we're updating the correct outlet
+            setOutletStaff(prev => {
+                const updated = { ...prev };
+                updated[outletIdStr] = staffData;
+                return updated;
+            });
         } catch (error) {
             if (error.cancelled || error.message?.includes('cancelled')) {
                 return;
             }
-            console.error(`[OutletManager] Failed to fetch staff for outlet ${outletId}:`, error);
+            console.error(`[OutletManager] Failed to fetch staff for outlet ${outletIdStr}:`, error);
             // Set empty array on error
-            setOutletStaff(prev => ({ ...prev, [outletId]: [] }));
+            setOutletStaff(prev => {
+                const updated = { ...prev };
+                updated[outletIdStr] = [];
+                return updated;
+            });
         } finally {
-            setLoadingStaff(prev => ({ ...prev, [outletId]: false }));
+            fetchingStaffRef.current.delete(outletIdStr);
+            setLoadingStaff(prev => {
+                const updated = { ...prev };
+                updated[outletIdStr] = false;
+                return updated;
+            });
         }
-    }, [apiClient, API, loadingStaff]);
+    }, [apiClient, API]);
 
     const fetchOutlets = useCallback(async (showLoading = true, preserveOnError = false) => {
         // Prevent duplicate simultaneous calls
@@ -113,14 +145,27 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             if (response.data.success && Array.isArray(response.data.data)) {
                 // Always update the list with the response data (includes staffCount from API)
                 console.log('[OutletManager] Setting outlets:', response.data.data.length, 'outlets');
+                
+                // Clear old staff data for outlets that no longer exist
+                const newOutletIds = new Set(response.data.data.map(o => String(o._id)));
+                setOutletStaff(prev => {
+                    const updated = { ...prev };
+                    // Remove staff data for outlets that are no longer in the list
+                    Object.keys(updated).forEach(outletId => {
+                        if (!newOutletIds.has(outletId)) {
+                            delete updated[outletId];
+                        }
+                    });
+                    return updated;
+                });
+                
                 setOutlets(response.data.data);
                 
-                // Fetch staff details for each active outlet (for displaying staff list)
-                response.data.data.forEach(outlet => {
-                    if (outlet._id && outlet.isActive !== false && outlet.staffCount > 0) {
-                        fetchStaffForOutlet(outlet._id);
-                    }
-                });
+                // Fetch staff details only for the currently active outlet (for displaying staff list)
+                const activeOutlet = response.data.data.find(o => String(o._id) === String(currentOutletId));
+                if (activeOutlet && activeOutlet._id && activeOutlet.isActive !== false && activeOutlet.staffCount > 0) {
+                    fetchStaffForOutlet(activeOutlet._id);
+                }
             } else if (response.data.success && !Array.isArray(response.data.data)) {
                 // If response is successful but data is not an array
                 console.warn('[OutletManager] API returned non-array data:', response.data.data);
@@ -191,6 +236,17 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             prevOutletIdRef.current = currentOutletId;
         }
     }, [currentOutletId, isPremium, currentUser, fetchOutlets]);
+
+    // Fetch staff details when currentOutletId changes (only for active outlet)
+    useEffect(() => {
+        if (isPremium && currentUser && currentOutletId) {
+            // Find the outlet in the current list
+            const activeOutlet = outlets.find(o => String(o._id) === String(currentOutletId));
+            if (activeOutlet && activeOutlet.staffCount > 0) {
+                fetchStaffForOutlet(currentOutletId);
+            }
+        }
+    }, [currentOutletId, outlets, isPremium, currentUser, fetchStaffForOutlet]);
 
     const handleOpenModal = (outlet = null) => {
         if (outlet) {
@@ -270,7 +326,13 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             const response = await apiCall;
             if (response.data.success) {
                 showToast(`Store ${editingOutlet ? 'updated' : 'created'} successfully!`, 'success');
-                fetchOutlets();
+                await fetchOutlets();
+                
+                // Notify parent to refetch outlets (for Header component)
+                if (onOutletsChange) {
+                    onOutletsChange();
+                }
+                
                 handleCloseModal();
                 setValidationErrors({});
                 setApiError(null);
@@ -334,12 +396,47 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     const handleDeleteConfirm = async () => {
         if (!outletToDelete) return;
+        const deletedOutletId = outletToDelete._id;
+        const wasCurrentOutlet = deletedOutletId === currentOutletId;
+        
         try {
-            await apiClient.delete(API.outletDetails(outletToDelete._id));
+            await apiClient.delete(API.outletDetails(deletedOutletId));
             showToast('Branch deleted', 'success');
             setDeleteModalOpen(false);
             setOutletToDelete(null);
-            fetchOutlets();
+            
+            // Update local outlets list
+            await fetchOutlets();
+            
+            // Notify parent to refetch outlets (for Header component)
+            if (onOutletsChange) {
+                await onOutletsChange();
+            }
+            
+            // If the deleted outlet was the current one, switch to first available
+            if (wasCurrentOutlet) {
+                // Wait a bit for outlets to be fetched, then switch
+                setTimeout(async () => {
+                    try {
+                        const response = await apiClient.get(API.outlets);
+                        if (response.data?.success && Array.isArray(response.data.data) && response.data.data.length > 0) {
+                            const firstOutlet = response.data.data[0];
+                            // Switch to the first outlet
+                            const switchResponse = await apiClient.put(API.switchOutlet(firstOutlet._id));
+                            if (switchResponse.data?.success && onOutletSwitch) {
+                                onOutletSwitch(switchResponse.data.data.outlet);
+                            }
+                        } else {
+                            // No outlets left, clear current outlet
+                            if (onOutletSwitch) {
+                                onOutletSwitch(null);
+                            }
+                        }
+                    } catch (switchError) {
+                        console.error('Failed to switch outlet after deletion:', switchError);
+                    }
+                }, 300);
+            }
         } catch (error) {
             showToast('Action failed', 'error');
             setDeleteModalOpen(false);
@@ -385,36 +482,34 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             <header className={`sticky top-0 z-[50] ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
                 <div className="p-4 md:p-6">
                     <div className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between gap-4">
-                                <div className="flex-1">
-                                    <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                        STORE NETWORK
-                                    </h1>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setShowSearch(!showSearch);
-                                        if (showSearch) {
-                                            setSearchTerm(''); // Clear search when hiding
-                                        }
-                                    }}
-                                    className={`p-3 rounded-xl border transition-all active:scale-95 shrink-0 ${
-                                        showSearch 
-                                            ? darkMode 
-                                                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400' 
-                                                : 'bg-indigo-50 border-indigo-500/50 text-indigo-600'
-                                            : darkMode 
-                                                ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400' 
-                                                : 'bg-white border-slate-200 hover:border-indigo-500/50 text-slate-600 hover:text-indigo-600'
-                                    }`}
-                                >
-                                    <Search size={18} />
-                                </button>
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                                <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    STORE NETWORK
+                                </h1>
+                                <p className={`text-xs font-bold tracking-wide opacity-70 mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Managing {outlets.length} active branches across your enterprise
+                                </p>
                             </div>
-                            <p className={`text-xs font-bold tracking-wide opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Managing {outlets.length} active branches across your enterprise
-                            </p>
+                            <button
+                                onClick={() => {
+                                    setShowSearch(!showSearch);
+                                    if (showSearch) {
+                                        setSearchTerm(''); // Clear search when hiding
+                                    }
+                                }}
+                                className={`p-3 rounded-xl border transition-all active:scale-95 shrink-0 ${
+                                    showSearch 
+                                        ? darkMode 
+                                            ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400' 
+                                            : 'bg-indigo-50 border-indigo-500/50 text-indigo-600'
+                                        : darkMode 
+                                            ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400' 
+                                            : 'bg-white border-slate-200 hover:border-indigo-500/50 text-slate-600 hover:text-indigo-600'
+                                }`}
+                            >
+                                <Search size={18} />
+                            </button>
                         </div>
                         
                         {/* Search Bar - Only show when showSearch is true */}
@@ -507,31 +602,53 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                         </span>
                                     </div>
                                     
-                                    {outletStaff[outlet._id] && outletStaff[outlet._id].length > 0 && !loadingStaff[outlet._id] && (
-                                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                                            {outletStaff[outlet._id].slice(0, 4).map((staff) => (
-                                                <div key={staff._id} className="flex items-center gap-2 text-[11px] font-bold">
-                                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${staff.active ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                                                    <span className={`truncate flex-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                        {staff.name || staff.email}
-                                                    </span>
-                                                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
-                                                        {staff.role || 'Staff'}
-                                                    </span>
+                                    {/* Only show staff details for the currently active outlet */}
+                                    {isCurrentActive && (() => {
+                                        const outletIdStr = String(outlet._id);
+                                        const staffList = outletStaff[outletIdStr];
+                                        const isLoading = loadingStaff[outletIdStr];
+                                        
+                                        if (staffList && staffList.length > 0 && !isLoading) {
+                                            return (
+                                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                                    {staffList.slice(0, 4).map((staff) => (
+                                                        <div key={staff._id || staff.email || Math.random()} className="flex items-center gap-2 text-[11px] font-bold">
+                                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${staff.active ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                                                            <span className={`truncate flex-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                                {staff.name || staff.email}
+                                                            </span>
+                                                            <span className={`text-[10px] uppercase px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
+                                                                {staff.role || 'Staff'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {staffList.length > 4 && (
+                                                        <div className={`text-[10px] font-bold pt-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                                                            +{staffList.length - 4} more staff members
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
-                                            {outletStaff[outlet._id].length > 4 && (
-                                                <div className={`text-[10px] font-bold pt-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                                    +{outletStaff[outlet._id].length - 4} more staff members
+                                            );
+                                        }
+                                        
+                                        if (!isLoading && (!staffList || staffList.length === 0) && (outlet.staffCount === 0 || !outlet.staffCount)) {
+                                            return (
+                                                <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                    No staff members assigned
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    {!loadingStaff[outlet._id] && (!outletStaff[outlet._id] || outletStaff[outlet._id].length === 0) && (
-                                        <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            No staff members assigned
-                                        </div>
-                                    )}
+                                            );
+                                        }
+                                        
+                                        if (isLoading && outlet.staffCount > 0) {
+                                            return (
+                                                <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                    Loading staff details...
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        return null;
+                                    })()}
                                 </div>
                             </div>
 

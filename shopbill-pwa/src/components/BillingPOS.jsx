@@ -681,8 +681,88 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
       {/* Bill Modal - Reusing from SalesActivityPage */}
       {selectedSale && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }}>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              @page {
+                size: A4;
+                margin: 15mm;
+              }
+              /* Hide everything on the page */
+              body * {
+                visibility: hidden;
+              }
+              /* Show only the invoice content and its children */
+              .print-content {
+                visibility: visible !important;
+                display: block !important;
+              }
+              .print-content * {
+                visibility: visible !important;
+              }
+              /* Hide backdrop but keep print-content visible */
+              body > div.fixed.inset-0 {
+                background: transparent !important;
+                backdrop-filter: none !important;
+                position: static !important;
+                display: block !important;
+              }
+              body { 
+                background: white !important; 
+                color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .print-content { 
+                box-shadow: none !important; 
+                border: 1px solid #000 !important; 
+                width: 210mm !important;
+                max-width: 210mm !important;
+                min-width: 210mm !important;
+                margin: 0 auto !important;
+                padding: 15mm !important;
+                position: relative !important;
+                left: auto !important;
+                top: auto !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                page-break-inside: avoid !important;
+                background: white !important;
+                color: black !important;
+              }
+              /* Convert all colors to black and white */
+              .print-content * {
+                color: black !important;
+                background: white !important;
+                border-color: #000 !important;
+              }
+              /* Keep borders visible but in black */
+              .print-content .border,
+              .print-content [class*="border"] {
+                border-color: #000 !important;
+              }
+              .print-content > * {
+                page-break-inside: avoid !important;
+                overflow: visible !important;
+              }
+              .print-content div {
+                page-break-inside: avoid !important;
+              }
+              .custom-scroll {
+                overflow: visible !important;
+                max-height: none !important;
+                height: auto !important;
+              }
+              /* Hide icons, buttons, and decorative elements */
+              .print-content svg,
+              .print-content [class*="lucide"],
+              .print-content button {
+                display: none !important;
+              }
+            }
+          `}} />
           <div 
-            className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl h-[85vh] sm:h-[80vh] max-h-[600px] flex flex-col`}
+            className={`print-content ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl h-[85vh] sm:h-[80vh] max-h-[600px] flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             {isFetchingSaleDetail ? (

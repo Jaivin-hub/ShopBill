@@ -71,19 +71,98 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                     border-radius: 10px; 
                 }
                 @media print {
-                    .no-print { display: none !important; }
-                    body { background: white !important; color: black !important; }
+                    @page {
+                        size: A4;
+                        margin: 15mm;
+                    }
+                    /* Hide everything on the page */
+                    body * {
+                        visibility: hidden;
+                    }
+                    /* Show only the invoice content and its children */
+                    .print-content {
+                        visibility: visible !important;
+                        display: block !important;
+                    }
+                    .print-content * {
+                        visibility: visible !important;
+                    }
+                    /* Hide backdrop but keep print-content visible */
+                    body > div.fixed.inset-0 {
+                        background: transparent !important;
+                        backdrop-filter: none !important;
+                        position: static !important;
+                        display: block !important;
+                    }
+                    body { 
+                        background: white !important; 
+                        color: black !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
                     .print-content { 
                         box-shadow: none !important; 
-                        border: none !important; 
-                        width: 100% !important; 
-                        max-width: none !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
+                        border: 1px solid #000 !important; 
+                        width: 210mm !important;
+                        max-width: 210mm !important;
+                        min-width: 210mm !important;
+                        margin: 0 auto !important;
+                        padding: 15mm !important;
+                        position: relative !important;
+                        left: auto !important;
+                        top: auto !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        page-break-inside: avoid !important;
+                        background: white !important;
+                        color: black !important;
                     }
-                    .print-text { color: black !important; }
-                    .print-bg { background: white !important; border-bottom: 1px solid #eee !important; }
+                    /* Convert all colors to black and white */
+                    .print-content * {
+                        color: black !important;
+                        background: white !important;
+                        border-color: #000 !important;
+                    }
+                    /* Keep borders visible but in black */
+                    .print-content .border,
+                    .print-content [class*="border"] {
+                        border-color: #000 !important;
+                    }
+                    .print-text { 
+                        color: black !important; 
+                    }
+                    .print-bg { 
+                        background: white !important; 
+                        border-bottom: 1px solid #000 !important; 
+                    }
+                    .bill-scroll {
+                        overflow: visible !important;
+                        max-height: none !important;
+                        height: auto !important;
+                    }
+                    /* Ensure all items are visible */
+                    .print-content > * {
+                        page-break-inside: avoid !important;
+                        overflow: visible !important;
+                    }
+                    /* Prevent items from being cut off */
+                    .print-content div {
+                        page-break-inside: avoid !important;
+                    }
+                    /* Ensure line items are fully visible */
+                    .print-content .space-y-3,
+                    .print-content .space-y-4,
+                    .print-content .space-y-5 {
+                        page-break-inside: avoid !important;
+                    }
+                    /* Hide icons, buttons, and decorative elements */
+                    .print-content svg,
+                    .print-content [class*="lucide"],
+                    .print-content .no-print,
+                    .print-content button {
+                        display: none !important;
+                    }
                 }
             `}} />
 

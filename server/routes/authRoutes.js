@@ -227,7 +227,7 @@ router.post('/signup', async (req, res) => {
 
 /**
  * @route   GET /api/profile
- * @desc    Get current user profile data
+ * @desc    Get current user profile data (outlet-specific for business details)
  * @access  Private
  */
 router.get('/profile', protect, async (req, res) => {
@@ -239,11 +239,41 @@ router.get('/profile', protect, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // If the user is staff, we might want to return the owner's shop details
-        // so the frontend displays the correct business information.
-        let businessDetails = user;
-        if (user.role !== 'owner' && user.role !== 'superadmin') {
-            businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+        // Check if we have an active outlet/store context
+        const storeId = req.user.storeId || req.user.activeStoreId;
+        let shopName = '';
+        let taxId = '';
+        let address = '';
+        let currency = 'INR';
+        let profileImageUrl = user.profileImageUrl;
+
+        if (storeId && (user.role === 'owner' || user.role === 'superadmin')) {
+            // Fetch outlet-specific business details
+            const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
+            if (store) {
+                shopName = store.name || '';
+                taxId = store.taxId || '';
+                address = store.address || '';
+                // Currency and timezone come from user (owner-level settings)
+                currency = user.currency || 'INR';
+            } else {
+                // Fallback to user-level business details if store not found
+                shopName = user.shopName || '';
+                taxId = user.taxId || '';
+                address = user.address || '';
+                currency = user.currency || 'INR';
+            }
+        } else {
+            // For staff or when no outlet context, use owner's or user's business details
+            let businessDetails = user;
+            if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
+                businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+            }
+            shopName = businessDetails.shopName || '';
+            taxId = businessDetails.taxId || '';
+            address = businessDetails.address || '';
+            currency = businessDetails.currency || 'INR';
+            profileImageUrl = businessDetails.profileImageUrl || user.profileImageUrl;
         }
 
         res.json({
@@ -253,12 +283,12 @@ router.get('/profile', protect, async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
-                // Business Details (either their own or their owner's)
-                shopName: businessDetails.shopName,
-                taxId: businessDetails.taxId,
-                address: businessDetails.address,
-                currency: businessDetails.currency,
-                profileImageUrl: businessDetails.profileImageUrl,
+                // Business Details (outlet-specific for owners, user-level for others)
+                shopName: shopName,
+                taxId: taxId,
+                address: address,
+                currency: currency,
+                profileImageUrl: profileImageUrl,
                 timezone: user.timezone,
                 plan: user.plan,
                 planEndDate: user.planEndDate
@@ -272,7 +302,7 @@ router.get('/profile', protect, async (req, res) => {
 
 /**
  * @route   PUT /api/profile
- * @desc    Update user profile and business settings
+ * @desc    Update user profile and business settings (outlet-specific for business details)
  * @access  Private
  */
 router.put('/profile', protect, async (req, res) => {
@@ -292,14 +322,46 @@ router.put('/profile', protect, async (req, res) => {
         }
 
         // 1. Update Personal Fields (Allowed for everyone)
-        if (phone) user.phone = phone;
+        if (phone !== undefined) user.phone = phone;
         if (profileImageUrl) user.profileImageUrl = profileImageUrl;
 
-        // 2. Update Business Fields (Restricted to 'owner' or 'superadmin')
+        // 2. Update Business Fields
+        const storeId = req.user.storeId || req.user.activeStoreId;
+        
+        if (storeId && (user.role === 'owner' || user.role === 'superadmin')) {
+            // Update outlet-specific business details
+            const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
+            if (store) {
+                if (shopName !== undefined) store.name = shopName;
+                if (taxId !== undefined) store.taxId = taxId;
+                if (address !== undefined) store.address = address;
+                await store.save();
+                
+                // Return outlet-specific data
+                return res.json({
+                    success: true,
+                    message: 'Profile updated successfully',
+                    user: {
+                        id: user._id,
+                        email: user.email,
+                        phone: user.phone,
+                        shopName: store.name,
+                        taxId: store.taxId,
+                        address: store.address,
+                        profileImageUrl: user.profileImageUrl,
+                        role: user.role,
+                        currency: user.currency,
+                        timezone: user.timezone,
+                    }
+                });
+            }
+        }
+
+        // Fallback: Update user-level business fields (for staff or when no outlet context)
         if (user.role === 'owner' || user.role === 'superadmin') {
-            if (shopName) user.shopName = shopName;
-            if (taxId) user.taxId = taxId;
-            if (address) user.address = address;
+            if (shopName !== undefined) user.shopName = shopName;
+            if (taxId !== undefined) user.taxId = taxId;
+            if (address !== undefined) user.address = address;
             // Currency and Timezone remain read-only for safety as per your UI
         }
 

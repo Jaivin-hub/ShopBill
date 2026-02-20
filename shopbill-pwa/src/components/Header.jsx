@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     User, Bell, Sun, Moon, 
     CreditCard, LayoutGrid, Store, Plus, ChevronRight,
@@ -27,10 +27,57 @@ const Header = ({
     const [showStoreHub, setShowStoreHub] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
     const [switchingOutletId, setSwitchingOutletId] = useState(null);
+    const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
+    const [localOutlets, setLocalOutlets] = useState(outlets || []);
+    const hasFetchedRef = useRef(false);
 
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
     const isOwner = userRole?.toLowerCase() === 'owner';
+
+    // Sync local outlets with prop (always update when prop changes)
+    useEffect(() => {
+        if (outlets && Array.isArray(outlets)) {
+            setLocalOutlets(outlets);
+            // Reset fetch flag when outlets are provided from parent
+            if (outlets.length > 0) {
+                hasFetchedRef.current = true;
+            }
+        }
+    }, [outlets]);
+
+    // Fetch outlets when dropdown opens if they're empty
+    useEffect(() => {
+        if (showStoreHub && isPremium && isOwner && apiClient && API) {
+            // Only fetch if outlets are empty and we haven't fetched yet
+            if (localOutlets.length === 0 && !isLoadingOutlets && !hasFetchedRef.current) {
+                hasFetchedRef.current = true;
+                fetchOutletsInHeader();
+            }
+        } else if (!showStoreHub) {
+            // Reset fetch flag when dropdown closes so we can fetch again if needed
+            hasFetchedRef.current = false;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showStoreHub, isPremium, isOwner, apiClient, API]);
+
+    const fetchOutletsInHeader = async () => {
+        if (!apiClient || !API) return;
+        setIsLoadingOutlets(true);
+        try {
+            const response = await apiClient.get(API.outlets);
+            if (response.data?.success && Array.isArray(response.data.data)) {
+                setLocalOutlets(response.data.data);
+            }
+        } catch (error) {
+            if (error.cancelled || error.message?.includes('cancelled')) {
+                return;
+            }
+            console.error('Failed to fetch outlets in Header:', error);
+        } finally {
+            setIsLoadingOutlets(false);
+        }
+    };
 
     const headerBg = darkMode ? 'bg-slate-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
@@ -188,13 +235,18 @@ const Header = ({
                     </div>
                     
                     <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x">
-                        {outlets.length === 0 ? (
+                        {isLoadingOutlets ? (
+                            <div className="flex items-center gap-3 px-4 py-3">
+                                <Loader2 size={14} className="animate-spin text-indigo-500" />
+                                <span className="text-[10px] font-bold text-slate-500 uppercase">Loading stores...</span>
+                            </div>
+                        ) : localOutlets.length === 0 ? (
                             <div className="flex items-center gap-3 px-4 py-3">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase">No stores available</span>
                             </div>
                         ) : (
                             <>
-                                {outlets.map((outlet) => {
+                                {localOutlets.map((outlet) => {
                                     const isActive = currentOutletId === outlet._id;
                                     const isSwitchingToThis = switchingOutletId === outlet._id;
                                     return (

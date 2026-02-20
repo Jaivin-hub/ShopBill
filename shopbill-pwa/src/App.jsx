@@ -974,10 +974,10 @@ const App = () => {
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
             case 'settings': return <SettingsPage key={componentKey} {...commonProps} />;
-            case 'profile': return <Profile key={componentKey} {...commonProps} />;
+            case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} />;
             case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
-            case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} />;
+            case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => setCurrentPage('dashboard')} />;
             case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={() => setCurrentPage('staffPermissions')} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
