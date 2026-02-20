@@ -578,29 +578,39 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
-        // Use UTC to avoid timezone issues
-        // Query for active attendance records from the last 2 days to handle timezone edge cases
+        // Query for the most recent active attendance record for this staff member
+        // Use a time-based approach (last 48 hours from punchIn) instead of date-based
+        // This handles timezone differences where the saved date might differ from server UTC date
         const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const yesterday = new Date(today);
-        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
 
-        // First try to find attendance for today
+        // First, try to find any active attendance that was punched in within the last 48 hours
+        // This is more reliable than date-based queries due to timezone differences
         let attendance = await Attendance.findOne({
             staffId: staff._id,
-            date: { $gte: today, $lt: tomorrow },
-            status: 'active'
-        });
+            status: 'active',
+            punchOut: null, // Ensure it hasn't been punched out
+            punchIn: { $gte: fortyEightHoursAgo } // Punched in within last 48 hours
+        }).sort({ punchIn: -1 }); // Get the most recent one
 
-        // If not found, check yesterday (in case of timezone differences)
+        // If not found with time-based query, fall back to date-based query
+        // This covers edge cases where punch-in was more than 48 hours ago but still active
         if (!attendance) {
+            const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const yesterday = new Date(today);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const dayAfterTomorrow = new Date(today);
+            dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+
             attendance = await Attendance.findOne({
                 staffId: staff._id,
-                date: { $gte: yesterday, $lt: today },
-                status: 'active'
-            });
+                date: { 
+                    $gte: yesterday, 
+                    $lt: dayAfterTomorrow 
+                },
+                status: 'active',
+                punchOut: null
+            }).sort({ date: -1, punchIn: -1 });
         }
 
         if (attendance) {
