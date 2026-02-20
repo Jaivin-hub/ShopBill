@@ -21,16 +21,34 @@ apiClient.interceptors.request.use(
 );
 
 // --- Sub-Component: Login Form ---
-const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError, onBackToLanding, setCurrentPage }) => {
+const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError, onBackToLanding, setCurrentPage, darkMode = true }) => {
     const [showPassword, setShowPassword] = useState(false);
+
+    // Color variables for LoginForm
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const inputBg = darkMode ? 'bg-gray-900/50' : 'bg-slate-50';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+    const placeholderColor = darkMode ? 'placeholder:text-gray-700' : 'placeholder:text-slate-400';
+    const iconColor = darkMode ? 'text-gray-600' : 'text-slate-500';
+    const buttonBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+    const buttonBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const buttonHover = darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200';
+    const buttonText = darkMode ? 'text-white' : 'text-slate-900';
+    const errorBg = darkMode ? 'bg-red-500/10' : 'bg-red-50';
+    const errorBorder = darkMode ? 'border-red-500/20' : 'border-red-200';
+    const errorText = darkMode ? 'text-red-200/80' : 'text-red-700';
+    const successBg = darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50';
+    const successBorder = darkMode ? 'border-emerald-500/20' : 'border-emerald-200';
+    const successText = darkMode ? 'text-emerald-200/80' : 'text-emerald-700';
 
     return (
         <section aria-labelledby="login-form" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {authError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 items-center justify-between" role="alert">
+                <div className={`${errorBg} border ${errorBorder} rounded-xl p-3 flex gap-2 items-center justify-between transition-colors duration-300`} role="alert">
                     <div className="flex gap-2 items-center">
                         <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                        <p className="text-[10px] font-bold text-red-200/80  tracking-wide">
+                        <p className={`text-[10px] font-bold ${errorText}  tracking-wide`}>
                             {authError}
                         </p>
                     </div>
@@ -47,15 +65,15 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 
             <form className="space-y-3" onSubmit={handleAuth}>
                 <div className="space-y-1.5">
-                    <label htmlFor="identifier" className="text-[9px] font-black text-gray-500  tracking-widest ml-1">Identity</label>
+                    <label htmlFor="identifier" className={`text-[9px] font-black ${labelColor}  tracking-widest ml-1 transition-colors duration-300`}>Identity</label>
                     <div className="relative group">
-                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
+                        <Smartphone className={`absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${iconColor} group-focus-within:text-indigo-500 transition-colors`} />
                         <input
                             id="identifier"
                             type="text"
                             placeholder="Email or Phone"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
-                            className="w-full pl-11 pr-4 py-3 bg-gray-900/50 border border-gray-800 text-white text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            className={`w-full pl-11 pr-4 py-3 ${inputBg} border ${inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => setIdentifier(e.target.value)}
                             value={identifier}
                             required
@@ -65,23 +83,23 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center px-1">
-                        <label htmlFor="password" className="text-[9px] font-black text-gray-500  tracking-widest">Password</label>
+                        <label htmlFor="password" className={`text-[9px] font-black ${labelColor}  tracking-widest transition-colors duration-300`}>Password</label>
                         <button
                             type="button"
                             onClick={() => setView('forgotPassword')}
-                            className="text-[9px] font-black text-indigo-500  tracking-widest hover:text-white transition-colors"
+                            className="text-[9px] font-black text-indigo-500  tracking-widest hover:text-indigo-600 transition-colors"
                         >
                             Forgot Password?
                         </button>
                     </div>
                     <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-indigo-500 transition-colors" />
+                        <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${iconColor} group-focus-within:text-indigo-500 transition-colors`} />
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder="••••••••"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
-                            className="w-full pl-11 pr-11 py-3 bg-gray-900/50 border border-gray-800 text-white text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all placeholder:text-gray-700"
+                            className={`w-full pl-11 pr-11 py-3 ${inputBg} border ${inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => setPassword(e.target.value)}
                             value={password}
                             required
@@ -89,7 +107,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-indigo-400"
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 ${iconColor} hover:text-indigo-400 transition-colors`}
                         >
                             {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
@@ -109,11 +127,11 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                 </button>
             </form>
 
-            <div className="pt-4 border-t border-gray-800/50 text-center">
-                <p className="text-[9px] font-bold text-gray-500  tracking-widest mb-2">New User?</p>
+            <div className={`pt-4 border-t ${darkMode ? 'border-gray-800/50' : 'border-slate-200'} text-center transition-colors duration-300`}>
+                <p className={`text-[9px] font-bold ${labelColor}  tracking-widest mb-2 transition-colors duration-300`}>New User?</p>
                 <button
                     onClick={onBackToLanding}
-                    className="w-full py-3 bg-gray-900 border border-gray-800 text-white rounded-xl font-black text-[10px]  tracking-widest hover:bg-gray-800 transition-all active:scale-[0.98]"
+                    className={`w-full py-3 ${buttonBg} border ${buttonBorder} ${buttonText} rounded-xl font-black text-[10px]  tracking-widest ${buttonHover} transition-all active:scale-[0.98]`}
                 >
                     Create Account
                 </button>
@@ -123,33 +141,45 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
 };
 
 // --- Sub-Component: Forgot Password Form ---
-const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailChange, handleEmailBlur, loading, setView, resetMessage, emailError }) => {
+const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailChange, handleEmailBlur, loading, setView, resetMessage, emailError, darkMode = true }) => {
+    // Color variables for ForgotPasswordForm
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const inputBg = darkMode ? 'bg-gray-900/50' : 'bg-slate-50';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+    const placeholderColor = darkMode ? 'placeholder:text-gray-700' : 'placeholder:text-slate-400';
+    const iconColor = darkMode ? 'text-gray-600' : 'text-slate-500';
+    const titleColor = darkMode ? 'text-white' : 'text-slate-900';
+    const successBg = darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50';
+    const successBorder = darkMode ? 'border-emerald-500/20' : 'border-emerald-200';
+    const successText = darkMode ? 'text-emerald-200/80' : 'text-emerald-700';
+
     return (
         <section aria-labelledby="reset-heading" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="text-center">
-                <h2 id="reset-heading" className="text-lg font-black text-white  tracking-tighter">
+                <h2 id="reset-heading" className={`text-lg font-black ${titleColor}  tracking-tighter`}>
                     Reset Access
                 </h2>
             </div>
 
             {resetMessage?.success && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-2 text-center" role="status">
+                <div className={`${successBg} border ${successBorder} rounded-xl p-3 flex items-center gap-2 text-center transition-colors duration-300`} role="status">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <p className="text-[10px] font-bold text-emerald-200/80  tracking-wide">{resetMessage.success}</p>
+                    <p className={`text-[10px] font-bold ${successText}  tracking-wide`}>{resetMessage.success}</p>
                 </div>
             )}
 
             <form className="space-y-4" onSubmit={handleForgotPasswordRequest}>
                 <div className="space-y-1.5">
-                    <label htmlFor="reset-email" className="text-[9px] font-black text-gray-500  tracking-widest ml-1">Account Email</label>
+                    <label htmlFor="reset-email" className={`text-[9px] font-black ${labelColor}  tracking-widest ml-1 transition-colors duration-300`}>Account Email</label>
                     <div className="relative group">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-teal-500 transition-colors" />
+                        <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${iconColor} group-focus-within:text-teal-500 transition-colors`} />
                         <input
                             id="reset-email"
                             type="email"
                             placeholder="your@email.com"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
-                            className={`w-full pl-11 pr-4 py-3 bg-gray-900/50 border ${emailError ? 'border-red-500' : 'border-gray-800'} text-white text-base md:text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all placeholder:text-gray-700`}
+                            className={`w-full pl-11 pr-4 py-3 ${inputBg} border ${emailError ? 'border-red-500' : inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-teal-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => handleEmailChange(e.target.value)}
                             onBlur={handleEmailBlur}
                             value={email}
@@ -178,7 +208,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
     );
 };
 
-const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage }) => {
+const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage, darkMode = true }) => {
     const [view, setView] = useState('login');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -240,19 +270,43 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
         }
     };
 
+    const bgColor = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const cardBg = darkMode ? 'bg-gray-950' : 'bg-white';
+    const cardBorder = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const headerBg = darkMode ? 'bg-gray-900/20' : 'bg-slate-50';
+    const headerBorder = darkMode ? 'border-gray-800/50' : 'border-slate-200';
+    const titleColor = darkMode ? 'text-white' : 'text-slate-900';
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const inputBg = darkMode ? 'bg-gray-900/50' : 'bg-slate-50';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+    const placeholderColor = darkMode ? 'placeholder:text-gray-700' : 'placeholder:text-slate-400';
+    const iconColor = darkMode ? 'text-gray-600' : 'text-slate-500';
+    const footerText = darkMode ? 'text-gray-600' : 'text-slate-600';
+    const buttonBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+    const buttonBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const buttonHover = darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200';
+    const buttonText = darkMode ? 'text-white' : 'text-slate-900';
+    const errorBg = darkMode ? 'bg-red-500/10' : 'bg-red-50';
+    const errorBorder = darkMode ? 'border-red-500/20' : 'border-red-200';
+    const errorText = darkMode ? 'text-red-200/80' : 'text-red-700';
+    const successBg = darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50';
+    const successBorder = darkMode ? 'border-emerald-500/20' : 'border-emerald-200';
+    const successText = darkMode ? 'text-emerald-200/80' : 'text-emerald-700';
+
     return (
-        <main className="h-screen w-full flex items-center justify-center bg-gray-950 p-4 sm:p-6 overflow-hidden">
+        <main className={`h-screen w-full flex items-center justify-center ${bgColor} p-4 sm:p-6 overflow-hidden transition-colors duration-300`}>
             <div className="w-full max-w-[380px] flex flex-col relative">
 
-                <div className="absolute -inset-10 bg-indigo-500/5 blur-[80px] -z-10 rounded-full" />
+                <div className={`absolute -inset-10 ${darkMode ? 'bg-indigo-500/5' : 'bg-indigo-100/30'} blur-[80px] -z-10 rounded-full`} />
 
-                <section className="bg-gray-950 border border-gray-800 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col">
+                <section className={`${cardBg} border ${cardBorder} rounded-[2rem] shadow-2xl overflow-hidden flex flex-col transition-colors duration-300`}>
 
-                    <header className="pt-6 pb-4 px-6 text-center bg-gray-900/20 border-b border-gray-800/50">
+                    <header className={`pt-6 pb-4 px-6 text-center ${headerBg} border-b ${headerBorder} transition-colors duration-300`}>
                         <div className="inline-flex items-center justify-center w-11 h-11 bg-indigo-500/10 rounded-xl mb-2 border border-indigo-500/20">
                             <DollarSign className="w-5 h-5 text-indigo-500" />
                         </div>
-                        <h1 className="text-base font-black text-white tracking-[0.2em] ">Pocket <span className="text-indigo-500">POS</span></h1>
+                        <h1 className={`text-base font-black ${titleColor} tracking-[0.2em] transition-colors duration-300`}>Pocket <span className="text-indigo-500">POS</span></h1>
                     </header>
 
                     <div className="p-6 sm:p-8">
@@ -266,6 +320,7 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                                 email={identifier}
                                 handleEmailChange={handleEmailChange}
                                 handleEmailBlur={handleEmailBlur}
+                                darkMode={darkMode}
                             />
                         ) : (
                             <LoginForm
@@ -279,6 +334,7 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                                 setView={setView}
                                 onBackToLanding={onBackToLanding}
                                 setCurrentPage={setCurrentPage}
+                                darkMode={darkMode}
                             />
                         )}
                     </div>
@@ -286,7 +342,7 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                     <footer className="pb-6 px-6 text-center">
                         <button
                             onClick={onBackToLandingNormal}
-                            className="inline-flex items-center gap-2 text-[9px] font-black text-gray-600  tracking-widest hover:text-indigo-400 transition-colors"
+                            className={`inline-flex items-center gap-2 text-[9px] font-black ${footerText}  tracking-widest hover:text-indigo-400 transition-colors`}
                             disabled={loading}
                         >
                             <ArrowLeft className="w-2.5 h-2.5" /> Back to Landing

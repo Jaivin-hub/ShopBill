@@ -10,9 +10,28 @@ import ConfirmationModal from './ConfirmationModal';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
-    owner: ['Full Dashboard', 'Billing', 'Inventory', 'Khata', 'Reports', 'Settings', 'Staff Management'],
-    Manager: ['Standard Dashboard', 'Billing', 'Inventory Management', 'Khata Management'],
-    Cashier: ['Limited Dashboard', 'Billing (Point of Sale)', 'Khata Transaction Logging'],
+    owner: [
+        'Full Dashboard Access',
+        'Billing & POS',
+        'Inventory Management',
+        'Ledger (Khata)',
+        'Supply Chain Management',
+        'Reports & Analytics',
+        'Team Management',
+        'Store Network (Outlets)'
+    ],
+    Manager: [
+        'Dashboard Access',
+        'Billing & POS',
+        'Inventory Management',
+        'Ledger (Khata)',
+        'Supply Chain Management'
+    ],
+    Cashier: [
+        'Dashboard Access',
+        'Billing & POS',
+        'Ledger (Khata)'
+    ],
 };
 
 // Helper function for role styles
@@ -143,7 +162,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         <div className="min-w-0 flex-1">
                             <h3 className={`text-base md:text-lg font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
                             <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
-                            {staff.role !== 'owner' && (
+                            {staff.role !== 'owner' && !isPendingActivation && (
                                 <div className="flex items-center gap-2 mt-2">
                                     <div className={`flex items-center gap-1.5 ${isCurrentlyActive 
                                         ? (isOnBreak 
@@ -265,7 +284,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         )}
                     </div>
                 </div>
-                {staff.role !== 'owner' && (
+                {staff.role !== 'owner' && !isPendingActivation && (
                     <button
                         onClick={() => setShowAttendance(!showAttendance)}
                         className={`w-full mt-4 py-2 px-4 rounded-lg text-xs font-black transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}

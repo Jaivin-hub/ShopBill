@@ -183,16 +183,26 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
     // Role-based quick actions
     const quickActions = useMemo(() => {
+        const hasPremiumPlan = currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO';
+        
+        // Calculate owner order based on plan
+        // Basic: 1. Team Management, 2. Recent Sales, 3. Ledger, 4. Add Stock, 5. New Bill, 6. Reports
+        // PRO/PREMIUM: 1. Team Management, 2. Recent Sales, 3. Ledger, 4. Supply Chain, 5. Add Stock, 6. New Bill, 7. Reports
+        const ownerAddStockOrder = hasPremiumPlan ? 5 : 4;
+        const ownerNewBillOrder = hasPremiumPlan ? 6 : 5;
+        const ownerReportsOrder = hasPremiumPlan ? 7 : 6;
+        
         const allActions = [
-            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 1, manager: 1, cashier: 1 } },
-            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 2, manager: 2, cashier: null } },
+            { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 1, manager: null, cashier: null } },
+            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 2, manager: 4, cashier: 3 } },
             { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 3, cashier: 2 } },
-            { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 4, manager: 4, cashier: 3 } },
-            { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 5, manager: null, cashier: null } },
-            ...(currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO' 
-                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 6, manager: 5, cashier: null } }]
+            ...(hasPremiumPlan 
+                ? [{ label: 'Supply Chain', icon: Truck, color: 'bg-purple-500', page: 'scm', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 4, manager: 5, cashier: null } }]
                 : []
-            )
+            ),
+            { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: ownerAddStockOrder, manager: 2, cashier: null } },
+            { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: ownerNewBillOrder, manager: 1, cashier: 1 } },
+            { label: 'Reports', icon: BarChart3, color: 'bg-rose-500', page: 'reports', roles: [USER_ROLES.OWNER], order: { owner: ownerReportsOrder, manager: null, cashier: null } },
         ];
         
         // Filter by role and sort by order

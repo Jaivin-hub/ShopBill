@@ -29,7 +29,10 @@ const Header = ({
     const [switchingOutletId, setSwitchingOutletId] = useState(null);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
     const [localOutlets, setLocalOutlets] = useState(outlets || []);
+    const [businessName, setBusinessName] = useState(currentUser?.shopName || '');
     const hasFetchedRef = useRef(false);
+    const hasFetchedBusinessNameRef = useRef(false);
+    const lastUserIdRef = useRef(null);
 
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
@@ -82,6 +85,53 @@ const Header = ({
     const headerBg = darkMode ? 'bg-slate-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
     const hubBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200';
+
+    // Fetch business name (shopName) from profile if not available in currentUser
+    useEffect(() => {
+        if (!currentUser || !apiClient || !API) return;
+        
+        // Reset fetch flag if user changed
+        const currentUserId = currentUser.id || currentUser._id;
+        if (lastUserIdRef.current !== currentUserId) {
+            hasFetchedBusinessNameRef.current = false;
+            lastUserIdRef.current = currentUserId;
+        }
+        
+        // If shopName is already in currentUser, use it immediately
+        if (currentUser.shopName) {
+            setBusinessName(currentUser.shopName);
+            hasFetchedBusinessNameRef.current = true;
+            return;
+        }
+        
+        // Otherwise, fetch from profile API (only once per user)
+        if (!hasFetchedBusinessNameRef.current) {
+            hasFetchedBusinessNameRef.current = true;
+            const fetchBusinessName = async () => {
+                try {
+                    const response = await apiClient.get(API.profile);
+                    const data = response.data.user || response.data.data || response.data;
+                    if (data.shopName) {
+                        setBusinessName(data.shopName);
+                    }
+                } catch (error) {
+                    if (error.cancelled || error.message?.includes('cancelled')) {
+                        return; // Ignore cancellation
+                    }
+                    console.error('Failed to fetch business name in Header:', error);
+                    hasFetchedBusinessNameRef.current = false; // Reset on error to allow retry
+                }
+            };
+            fetchBusinessName();
+        }
+    }, [currentUser, apiClient, API]);
+
+    // Update business name when currentUser.shopName changes (e.g., after profile update)
+    useEffect(() => {
+        if (currentUser?.shopName && currentUser.shopName !== businessName) {
+            setBusinessName(currentUser.shopName);
+        }
+    }, [currentUser?.shopName, businessName]);
 
     // Fetch outlet if we have ID but not the outlet object (only if not in outlets list)
     useEffect(() => {
@@ -172,9 +222,9 @@ const Header = ({
                         <h1 className={`text-lg font-bold tracking-tight truncate leading-tight ${logoText}`}>
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
-                        {isPremium && isOwner && currentOutlet?.name && (
+                        {businessName && (
                             <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
-                                {currentOutlet.name}
+                                {businessName}
                             </p>
                         )}
                     </div>

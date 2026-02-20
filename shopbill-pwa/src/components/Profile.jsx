@@ -73,7 +73,16 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
         try {
             const response = await apiClient.get(API.profile);
             const data = response.data.user || response.data.data || response.data;
-            setProfile(data);
+            // Ensure shopName is properly extracted from the response
+            setProfile({
+                email: data.email || '',
+                phone: data.phone || '',
+                shopName: data.shopName || '',
+                taxId: data.taxId || '',
+                address: data.address || '',
+                currency: data.currency || 'INR',
+                timezone: data.timezone || 'Asia/Kolkata'
+            });
         } catch (error) {
             // Ignore cancellation errors
             if (error.cancelled || error.message?.includes('cancelled')) {

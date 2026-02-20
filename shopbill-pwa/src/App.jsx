@@ -909,6 +909,7 @@ const App = () => {
           plan={selectedPlan}
           onPaymentSuccess={handleRegistrationComplete}
           onBackToDashboard={() => setCurrentPage('dashboard')}
+          darkMode={darkMode}
         />
       );
     }
@@ -924,6 +925,7 @@ const App = () => {
             setScrollToPricing(true);
           }}
           onBackToLandingNormal={() => setIsViewingLogin(false)} 
+          darkMode={darkMode}
         /> :
         <LandingPage
           onStartApp={() => {
@@ -939,6 +941,7 @@ const App = () => {
           onViewPolicy={() => { setPageOrigin('landing'); setCurrentPage('policy'); }}
           onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
           onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
+          darkMode={darkMode}
         />
     }
 
@@ -973,7 +976,7 @@ const App = () => {
             case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
-            case 'settings': return <SettingsPage key={componentKey} {...commonProps} />;
+            case 'settings': return <SettingsPage key={componentKey} {...commonProps} setDarkMode={setDarkMode} />;
             case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} />;
             case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;

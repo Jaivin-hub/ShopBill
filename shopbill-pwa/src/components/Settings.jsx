@@ -5,7 +5,7 @@ import {
     Gift, ShieldCheck, Activity, Settings as SettingsIcon,
     ChevronRight, CreditCard, ExternalLink, ShieldAlert,
     Building2, Store, MapPin, Plus, Edit3, ArrowUpRight,
-    ArrowLeft
+    ArrowLeft, Sun, Moon
 } from 'lucide-react'; 
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
@@ -120,7 +120,7 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
     </div>
 );
 
-function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, currentUser, currentOutletId, onOutletSwitch }) { 
+function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, setDarkMode, currentUser, currentOutletId, onOutletSwitch }) { 
     const [currentView, setCurrentView] = useState(() => {
         const target = localStorage.getItem('settings_target_view');
         if (target) {
@@ -267,6 +267,14 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             description="Real-time toast notifications." 
                             actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} darkMode={darkMode} />} 
                             accentColor="text-sky-600" 
+                            darkMode={darkMode}
+                        />
+                        <SettingItem 
+                            icon={darkMode ? Sun : Moon} 
+                            title="Theme" 
+                            description={darkMode ? "Switch to light mode" : "Switch to dark mode"} 
+                            actionComponent={<ToggleSwitch checked={darkMode} onChange={() => setDarkMode(!darkMode)} darkMode={darkMode} />} 
+                            accentColor={darkMode ? "text-amber-500" : "text-indigo-500"} 
                             darkMode={darkMode}
                         />
                     </div>

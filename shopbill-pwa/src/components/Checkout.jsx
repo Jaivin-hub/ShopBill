@@ -64,7 +64,7 @@ const loadRazorpayScript = (src) => {
     });
 };
 
-const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast }) => {
+const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast, darkMode = true }) => {
     const plan = useMemo(() => PLAN_DETAILS[planKey] || PLAN_DETAILS.BASIC, [planKey]);
     
     const [email, setEmail] = useState('');
@@ -199,14 +199,45 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
         }
     }, [plan, planKey, email, phone, password, shopName, showToast]);
 
+    const bgColor = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const textColor = darkMode ? 'text-white' : 'text-slate-900';
+    const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
+    const cardBorder = darkMode ? 'border-emerald-500/30' : 'border-emerald-300';
+    const descColor = darkMode ? 'text-gray-400' : 'text-slate-600';
+    const sectionBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const sectionCardBg = darkMode ? 'bg-gray-900/50' : 'bg-white';
+    const sectionBorder = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const inputBg = darkMode ? 'bg-gray-950' : 'bg-white';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+    const placeholderColor = darkMode ? 'placeholder:text-gray-700' : 'placeholder:text-slate-400';
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const dropdownBg = darkMode ? 'bg-gray-900' : 'bg-white';
+    const dropdownBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const dropdownText = darkMode ? 'text-gray-200' : 'text-slate-700';
+    const dropdownSearchBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const dropdownSearchBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const dropdownSearchText = darkMode ? 'text-white' : 'text-slate-900';
+    const dropdownHover = darkMode ? 'hover:bg-indigo-600' : 'hover:bg-indigo-50';
+    const infoBg = darkMode ? 'bg-gray-900/50' : 'bg-slate-100';
+    const infoBorder = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const infoText = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const phoneButtonBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+    const phoneButtonText = darkMode ? 'text-gray-300' : 'text-slate-700';
+    const phoneButtonHover = darkMode ? 'hover:bg-gray-900' : 'hover:bg-slate-200';
+    const phoneInputBg = darkMode ? 'bg-transparent' : 'bg-transparent';
+    const phoneInputText = darkMode ? 'text-white' : 'text-slate-900';
+    const phoneBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const phoneBorderFocus = darkMode ? 'focus-within:border-indigo-500' : 'focus-within:border-indigo-500';
+
     if (paymentSuccess) return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6 text-white">
-            <div className="max-w-md w-full bg-gray-900 p-8 rounded-3xl border border-emerald-500/30 text-center shadow-2xl">
+        <div className={`min-h-screen ${bgColor} flex items-center justify-center p-6 ${textColor} transition-colors duration-300`}>
+            <div className={`max-w-md w-full ${cardBg} p-8 rounded-3xl border ${cardBorder} text-center shadow-2xl transition-colors duration-300`}>
                 <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-8 h-8 text-emerald-500 animate-pulse" />
                 </div>
-                <h2 className="text-2xl font-black tracking-tighter mb-4">You're All Set!</h2>
-                <p className="text-gray-400 font-bold leading-relaxed mb-6">Account created. Your 30-day trial has started.</p>
+                <h2 className={`text-2xl font-black tracking-tighter mb-4 ${textColor} transition-colors duration-300`}>You're All Set!</h2>
+                <p className={`${descColor} font-bold leading-relaxed mb-6 transition-colors duration-300`}>Account created. Your 30-day trial has started.</p>
                 <div className="flex items-center justify-center space-x-2 text-indigo-400 font-bold">
                     <Loader className="w-4 h-4 animate-spin" />
                     <span className="text-xs">Redirecting to Login...</span>
@@ -216,12 +247,12 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
     );
 
     return (
-        <main className="min-h-screen bg-gray-950 flex items-center justify-center p-0 sm:p-6 lg:p-8 font-sans">
-            <section className="max-w-5xl w-full bg-gray-950 sm:bg-gray-900/50 sm:backdrop-blur-xl sm:rounded-[2rem] sm:border sm:border-gray-800 shadow-2xl overflow-hidden">
+        <main className={`min-h-screen ${bgColor} flex items-center justify-center p-0 sm:p-6 lg:p-8 font-sans transition-colors duration-300`}>
+            <section className={`max-w-5xl w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-xl sm:rounded-[2rem] sm:border sm:${sectionBorder} shadow-2xl overflow-hidden transition-colors duration-300`}>
                 <div className="flex flex-col lg:grid lg:grid-cols-12">
                     
                     {/* Compact Summary Side (Top on Mobile) */}
-                    <div className="lg:col-span-4 bg-gray-950 sm:bg-gray-900/50 p-4 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-gray-800">
+                    <div className={`lg:col-span-4 ${sectionBg} sm:${sectionCardBg} p-4 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r ${sectionBorder} transition-colors duration-300`}>
                         <div className={`p-5 lg:p-8 rounded-2xl lg:rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-xl`}>
                             <div className="absolute -top-2 -right-2 p-4 opacity-10 lg:opacity-20 hidden sm:block">
                                 <ShoppingCart size={60} className="lg:w-20 lg:h-20" />
@@ -254,11 +285,11 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                             </div>
                         </div>
                         
-                        <div className="mt-4 lg:mt-8 p-4 bg-gray-900/50 rounded-xl border border-gray-800 hidden lg:block">
-                            <h4 className="text-[10px] font-black text-white tracking-widest mb-2 flex items-center uppercase">
+                        <div className={`mt-4 lg:mt-8 p-4 ${infoBg} rounded-xl border ${infoBorder} hidden lg:block transition-colors duration-300`}>
+                            <h4 className={`text-[10px] font-black ${textColor} tracking-widest mb-2 flex items-center uppercase transition-colors duration-300`}>
                                 <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
                             </h4>
-                            <p className="text-[10px] font-bold text-gray-500 leading-relaxed tracking-tighter">Encrypted by Razorpay. Cancel anytime via dashboard.</p>
+                            <p className={`text-[10px] font-bold ${infoText} leading-relaxed tracking-tighter transition-colors duration-300`}>Encrypted by Razorpay. Cancel anytime via dashboard.</p>
                         </div>
                     </div>
 
@@ -269,7 +300,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 <Zap className="w-3 h-3 text-indigo-400" />
                                 <span className="text-[9px] lg:text-[10px] font-black text-indigo-400 tracking-widest uppercase">30-Day Free Trial</span>
                             </div>
-                            <h1 className="text-2xl lg:text-4xl font-black text-white tracking-tighter">Create Your Business Account</h1>
+                            <h1 className={`text-2xl lg:text-4xl font-black ${textColor} tracking-tighter transition-colors duration-300`}>Create Your Business Account</h1>
                         </header>
 
                         <form onSubmit={handlePaymentSubmit} className="space-y-5 lg:space-y-6">
@@ -277,26 +308,26 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
                                 <div className="md:col-span-2">
-                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} />
+                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} darkMode={darkMode} />
                                 </div>
-                                <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} />
+                                <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
                                 
                                 <div className="relative" ref={dropdownRef}>
-                                    <label className="text-[10px] font-black text-gray-500 tracking-widest mb-2 block uppercase">Mobile Number</label>
-                                    <div className={`flex bg-gray-950 rounded-2xl border transition-all ${phoneError ? 'border-red-500' : 'border-gray-800 focus-within:border-indigo-500'}`}>
-                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-3 border-r border-gray-800 flex items-center space-x-1 text-sm font-bold text-gray-300 hover:bg-gray-900 rounded-l-2xl transition-colors min-w-[80px]">
+                                    <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>Mobile Number</label>
+                                    <div className={`flex ${inputBg} rounded-2xl border transition-all ${phoneError ? 'border-red-500' : `${phoneBorder} ${phoneBorderFocus}`}`}>
+                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`px-3 border-r ${phoneBorder} flex items-center space-x-1 text-sm font-bold ${phoneButtonText} ${phoneButtonHover} rounded-l-2xl transition-colors min-w-[80px]`}>
                                             <span>{selectedCountry.flag}</span>
                                             <span>{selectedCountry.code}</span>
                                         </button>
-                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className="flex-1 bg-transparent px-4 py-3 text-sm text-white focus:outline-none font-bold" placeholder="98765 43210" disabled={isProcessing} />
+                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className={`flex-1 ${phoneInputBg} px-4 py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="98765 43210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
-                                        <div className="absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-2 left-0 top-full">
-                                            <input type="text" placeholder="Search country..." className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white mb-2 outline-none focus:border-indigo-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                        <div className={`absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar ${dropdownBg} border ${dropdownBorder} rounded-2xl shadow-2xl p-2 left-0 top-full transition-colors duration-300`}>
+                                            <input type="text" placeholder="Search country..." className={`w-full ${dropdownSearchBg} border ${dropdownSearchBorder} rounded-xl px-3 py-2 text-xs ${dropdownSearchText} mb-2 outline-none focus:border-indigo-500 transition-colors duration-300`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                                             {filteredCodes.map(c => (
-                                                <div key={c.code} onClick={() => handleSelectCountry(c.code)} className="flex justify-between p-2 hover:bg-indigo-600 rounded-lg cursor-pointer text-xs font-bold text-gray-200">
+                                                <div key={c.code} onClick={() => handleSelectCountry(c.code)} className={`flex justify-between p-2 ${dropdownHover} rounded-lg cursor-pointer text-xs font-bold ${dropdownText} transition-colors duration-300`}>
                                                     <span>{c.flag} {c.name}</span>
-                                                    <span className="text-gray-500">{c.code}</span>
+                                                    <span className={darkMode ? 'text-gray-500' : 'text-slate-500'}>{c.code}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -305,19 +336,19 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
                                 </div>
 
                                 <div className="relative md:col-span-2">
-                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={setPassword} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-9 text-gray-500 hover:text-white transition-colors">
+                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={setPassword} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} darkMode={darkMode} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className={`absolute right-4 top-9 ${iconColor} hover:text-indigo-400 transition-colors`}>
                                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="pt-4 lg:pt-6 border-t border-gray-800">
+                            <div className={`pt-4 lg:pt-6 border-t ${sectionBorder} transition-colors duration-300`}>
                                 <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
                                     {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
                                 </button>
-                                <p className="text-[9px] text-gray-600 text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase">By proceeding, you authorize a ₹1 verification charge.</p>
-                                <button type="button" onClick={onBackToDashboard} className="w-full text-center text-[10px] font-black text-gray-500 mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase">
+                                <p className={`text-[9px] ${infoText} text-center mt-4 font-bold leading-relaxed tracking-tighter uppercase transition-colors duration-300`}>By proceeding, you authorize a ₹1 verification charge.</p>
+                                <button type="button" onClick={onBackToDashboard} className={`w-full text-center text-[10px] font-black ${labelColor} mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase`}>
                                     <ArrowLeft size={12} className="mr-1" /> Back to Plans
                                 </button>
                             </div>
@@ -329,11 +360,18 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToDashboard, showToast 
     );
 };
 
-const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon }) => (
+const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon, darkMode = true }) => {
+    const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
+    const inputBg = darkMode ? 'bg-gray-950' : 'bg-white';
+    const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const inputText = darkMode ? 'text-white' : 'text-slate-900';
+    const placeholderColor = darkMode ? 'placeholder:text-gray-700' : 'placeholder:text-slate-400';
+    const iconColor = darkMode ? 'text-gray-500' : 'text-slate-500';
+    return (
     <div className="group w-full">
-        <label htmlFor={id} className="text-[10px] font-black text-gray-500 tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400 uppercase">{label}</label>
+        <label htmlFor={id} className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block transition-colors group-focus-within:text-indigo-400 uppercase`}>{label}</label>
         <div className="relative">
-            {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400">{icon}</div>}
+            {icon && <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColor} group-focus-within:text-indigo-400 transition-colors`}>{icon}</div>}
             <input 
                 id={id} 
                 type={type} 
@@ -341,11 +379,12 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 onChange={(e) => onChange(e.target.value)} 
                 disabled={disabled}
                 placeholder={placeholder}
-                className={`w-full bg-gray-950 border ${error ? 'border-red-500' : 'border-gray-800 group-focus-within:border-indigo-500'} rounded-2xl px-5 py-3 text-sm font-bold text-white placeholder-gray-700 outline-none transition-all ${icon ? 'pl-11' : ''}`}
+                className={`w-full ${inputBg} border ${error ? 'border-red-500' : `${inputBorder} group-focus-within:border-indigo-500`} rounded-2xl px-5 py-3 text-sm font-bold ${inputText} ${placeholderColor} outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>
         {error && <p className="text-red-500 text-[9px] mt-1 font-bold tracking-tight">{error}</p>}
     </div>
-);
+    );
+};
 
 export default Checkout;

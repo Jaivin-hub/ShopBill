@@ -130,6 +130,13 @@ router.post('/login', async (req, res) => {
             }
 
             const token = generateToken(user._id, tokenShopId || user._id, user.role);
+            
+            // Get shopName - for owners use their own, for staff use owner's
+            let shopName = user.shopName || '';
+            if (user.role !== 'owner' && user.role !== 'superadmin' && ownerAccount) {
+                shopName = ownerAccount.shopName || '';
+            }
+            
             res.json({
                 token,
                 user: {
@@ -138,7 +145,8 @@ router.post('/login', async (req, res) => {
                     role: user.role,
                     shopId: tokenShopId || user._id,
                     phone: user.phone,
-                    plan: effectivePlan // Return effective plan (owner's plan for staff)
+                    plan: effectivePlan, // Return effective plan (owner's plan for staff)
+                    shopName: shopName // Include registered business name
                 }
             });
         } else {
@@ -239,41 +247,42 @@ router.get('/profile', protect, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Check if we have an active outlet/store context
-        const storeId = req.user.storeId || req.user.activeStoreId;
-        let shopName = '';
-        let taxId = '';
-        let address = '';
-        let currency = 'INR';
+        // ALWAYS prioritize user.shopName (registered business name from checkout) over store names
+        // This ensures Basic, Pro, and Premium plans all show the registered business name
+        let shopName = user.shopName || '';
+        let taxId = user.taxId || '';
+        let address = user.address || '';
+        let currency = user.currency || 'INR';
         let profileImageUrl = user.profileImageUrl;
 
+        // Check if we have an active outlet/store context (for Premium plans)
+        const storeId = req.user.storeId || req.user.activeStoreId;
+        
         if (storeId && (user.role === 'owner' || user.role === 'superadmin')) {
-            // Fetch outlet-specific business details
+            // Fetch outlet-specific business details for additional fields
             const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
-            if (store) {
+            
+            // shopName is already set from user.shopName above (registered business name)
+            // Only use store.name as fallback if user.shopName doesn't exist
+            if (!shopName && store) {
                 shopName = store.name || '';
-                taxId = store.taxId || '';
-                address = store.address || '';
-                // Currency and timezone come from user (owner-level settings)
-                currency = user.currency || 'INR';
-            } else {
-                // Fallback to user-level business details if store not found
-                shopName = user.shopName || '';
-                taxId = user.taxId || '';
-                address = user.address || '';
-                currency = user.currency || 'INR';
             }
-        } else {
-            // For staff or when no outlet context, use owner's or user's business details
-            let businessDetails = user;
-            if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
-                businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+            
+            // For taxId and address, prefer store values if available, but fallback to user values
+            if (store) {
+                taxId = store.taxId || user.taxId || '';
+                address = store.address || user.address || '';
             }
-            shopName = businessDetails.shopName || '';
-            taxId = businessDetails.taxId || '';
-            address = businessDetails.address || '';
-            currency = businessDetails.currency || 'INR';
-            profileImageUrl = businessDetails.profileImageUrl || user.profileImageUrl;
+        } else if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
+            // For staff members, get business details from owner
+            const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+            if (businessDetails) {
+                shopName = businessDetails.shopName || shopName;
+                taxId = businessDetails.taxId || taxId;
+                address = businessDetails.address || address;
+                currency = businessDetails.currency || currency;
+                profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
+            }
         }
 
         res.json({
