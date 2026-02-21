@@ -10,6 +10,19 @@ const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
 
+// IST = UTC+5:30. Interpret calendar date (YYYY-MM-DD) as that day in India and return UTC bounds.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+function getISTDayBounds(dateStr) {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    const day = d.getUTCDate();
+    const startUTC = new Date(Date.UTC(y, m, day, 0, 0, 0, 0) - IST_OFFSET_MS);
+    const endUTC = new Date(Date.UTC(y, m, day, 23, 59, 59, 999) - IST_OFFSET_MS);
+    return { startUTC, endUTC };
+}
+
 // GET all sales for the shop (LIST VIEW)
 router.get('/', protect, async (req, res) => {
     const { startDate, endDate } = req.query;
@@ -17,11 +30,19 @@ router.get('/', protect, async (req, res) => {
         return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
     }
     const filter = { storeId: req.user.storeId };
-    
+
     if (startDate || endDate) {
         filter.timestamp = {};
-        if (startDate) filter.timestamp.$gte = new Date(startDate);
-        if (endDate) filter.timestamp.$lte = new Date(endDate);
+        if (startDate) {
+            const bounds = getISTDayBounds(startDate);
+            if (bounds) filter.timestamp.$gte = bounds.startUTC;
+            else filter.timestamp.$gte = new Date(startDate);
+        }
+        if (endDate) {
+            const bounds = getISTDayBounds(endDate);
+            if (bounds) filter.timestamp.$lte = bounds.endUTC;
+            else filter.timestamp.$lte = new Date(endDate);
+        }
     }
 
     try {
