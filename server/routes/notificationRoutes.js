@@ -145,24 +145,33 @@ const emitAlert = async (req, storeId, type, data) => {
         if (io) {
             // Smart notification targeting: Only send to relevant users, excluding the actor
             try {
-                // Get all managers and cashiers for this store
+                const actorIdStr = actorId.toString();
+                const actorRole = req.user.role || null; // 'owner', 'Manager', 'Cashier'
+
+                // Ledger payment: role-based targeting — who reported decides who gets notified
+                const isLedgerPayment = type === 'ledger_payment';
+                const managerReported = isLedgerPayment && actorRole === 'Manager';
+                const cashierReported = isLedgerPayment && actorRole === 'Cashier';
+
+                // Get all managers and cashiers for this store (needed for default and cashier-reported)
                 const staffMembers = await Staff.find({
                     storeId: storeIdStr,
                     role: { $in: ['Manager', 'Cashier'] },
                     active: true
-                }).select('userId').lean();
+                }).select('userId role').lean();
 
                 const targetUserIds = new Set();
 
-                // ALWAYS add owner if they exist and are not the actor
-                // Owner should receive ALL notifications from their stores
+                // Owner: for ledger_payment when Manager reported → only owner; otherwise owner gets it if not actor
                 if (store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
-                    const actorIdStr = actorId.toString();
-                    // Owner gets notification unless they performed the action themselves
                     if (ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
-                        console.log(`📢 Owner ${ownerIdStr} will receive notification (actor: ${actorIdStr})`);
+                        if (managerReported) {
+                            console.log(`📢 Ledger payment (Manager reported): Owner ${ownerIdStr} will receive notification (paid amount in message).`);
+                        } else {
+                            console.log(`📢 Owner ${ownerIdStr} will receive notification (actor: ${actorIdStr})`);
+                        }
                     } else {
                         console.log(`📢 Owner ${ownerIdStr} is the actor, skipping self-notification`);
                     }
@@ -170,17 +179,22 @@ const emitAlert = async (req, storeId, type, data) => {
                     console.warn(`⚠️ Store ${storeIdStr} has no ownerId, owner will not receive notification`);
                 }
 
-                // Add staff members (managers and cashiers) excluding the actor
-                staffMembers.forEach(staff => {
-                    if (staff.userId) {
-                        const staffUserIdStr = staff.userId.toString();
-                        const actorIdStr = actorId.toString();
-                        // Only add if not the actor
-                        if (staffUserIdStr !== actorIdStr) {
-                            targetUserIds.add(staffUserIdStr);
+                // Staff: for Manager-reported ledger payment, do NOT notify any staff (owner only)
+                if (!managerReported) {
+                    // Add staff members (managers and cashiers) excluding the actor
+                    // Cashier reported → manager + cashier; Owner reported → manager + cashier
+                    staffMembers.forEach(staff => {
+                        if (staff.userId) {
+                            const staffUserIdStr = staff.userId.toString();
+                            if (staffUserIdStr !== actorIdStr) {
+                                targetUserIds.add(staffUserIdStr);
+                            }
                         }
+                    });
+                    if (cashierReported) {
+                        console.log(`📢 Ledger payment (Cashier reported): Manager(s) and Cashier(s) will receive notification (paid amount in message).`);
                     }
-                });
+                }
 
                 // Prepare notification data with store name
                 const notificationData = { 
