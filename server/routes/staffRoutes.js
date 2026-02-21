@@ -110,7 +110,10 @@ router.post('/', protect, async (req, res) => {
         // PREMIUM plan allows unlimited, so no check needed here.
 
         // --- 1. Email uniqueness is per shop only (same email can be staff in different shops) ---
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!normalizedEmail || !normalizedEmail.includes('@')) {
+            return res.status(400).json({ error: 'Please provide a valid email address.' });
+        }
         const existingStaffInThisShop = await Staff.findOne({ storeId: req.user.storeId, email: normalizedEmail });
         if (existingStaffInThisShop) {
             return res.status(409).json({
@@ -120,6 +123,9 @@ router.post('/', protect, async (req, res) => {
 
         const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) {
+            if (existingUser._id.toString() === req.user.id.toString()) {
+                return res.status(400).json({ error: 'You cannot add yourself as staff. Use a different email.' });
+            }
             // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
             const newStaff = await Staff.create({
                 storeId: req.user.storeId,
@@ -205,7 +211,11 @@ router.post('/', protect, async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Staff POST error:', error.message);
+        console.error('Staff POST error:', error.message, error);
+        if (error.code === 11000) {
+            const field = error.keyValue ? Object.keys(error.keyValue)[0] : 'email';
+            return res.status(409).json({ error: `This ${field} is already in use in your shop. Please use a different value.` });
+        }
         res.status(500).json({ error: 'Internal Server Error.' });
     }
 });
