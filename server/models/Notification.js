@@ -55,6 +55,12 @@ const NotificationSchema = new mongoose.Schema({
         ref: 'User',
         index: true
     }],
+    // User dismissed = remove from their alert center permanently (per user)
+    dismissedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true
+    }],
 
     metadata: { 
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', index: true },

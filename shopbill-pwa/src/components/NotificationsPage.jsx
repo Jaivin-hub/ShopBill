@@ -129,8 +129,18 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
         }
     };
 
-    const dismissNotification = (id) => {
-        setNotifications(prev => prev.filter(n => (n._id || n.id) !== id));
+    const dismissNotification = async (id) => {
+        const stringId = (id || '').toString();
+        const isMongoId = /^[a-fA-F0-9]{24}$/.test(stringId);
+        if (isMongoId) {
+            try {
+                await apiClient.put(Api.notificationDismiss(stringId));
+            } catch (err) {
+                console.error('Failed to dismiss notification:', err);
+                return;
+            }
+        }
+        setNotifications(prev => prev.filter(n => (n._id || n.id || '').toString() !== stringId));
     };
     
     const formatTime = (timestamp) => {

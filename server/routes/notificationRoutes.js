@@ -301,10 +301,10 @@ router.get('/alerts', protect, async (req, res) => {
             return res.json({ count: 0, alerts: [] });
         }
         
-        const filter = req.user.role === 'owner' 
-            ? { ownerId: req.user._id }
-            : { storeId: req.user.storeId };
-        
+        const filter = req.user.role === 'owner'
+            ? { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } }
+            : { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+
         // Get notifications - for owners, we'll fetch store names separately
         const notifications = await Notification.find(filter)
             .select('type category title message metadata storeId ownerId actorId readBy createdAt')
@@ -362,6 +362,31 @@ router.get('/alerts', protect, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch notifications.' });
+    }
+});
+
+/**
+ * PUT /alerts/:id/dismiss
+ * Removes the alert from the current user's account (adds user to dismissedBy).
+ * Revisiting the page will not show this notification again for this user.
+ */
+router.put('/alerts/:id/dismiss', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const filter = req.user.role === 'owner'
+            ? { _id: id, ownerId: req.user._id }
+            : { _id: id, storeId: req.user.storeId };
+        const doc = await Notification.findOneAndUpdate(
+            filter,
+            { $addToSet: { dismissedBy: req.user._id } },
+            { new: true }
+        );
+        if (!doc) {
+            return res.status(404).json({ error: 'Notification not found or access denied.' });
+        }
+        res.json({ message: 'Dismissed', _id: doc._id });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to dismiss notification.' });
     }
 });
 
