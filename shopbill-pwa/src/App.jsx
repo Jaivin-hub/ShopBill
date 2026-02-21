@@ -1060,11 +1060,20 @@ useEffect(() => {
         <div className="flex flex-1 overflow-hidden relative">
         {showAppUI && (
             <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
-              <div className="p-8 font-black text-2xl tracking-tighter flex items-center gap-2">
-                <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50">
+              <div className="p-8 flex items-start gap-2">
+                <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50 shrink-0">
                   <Smartphone className="w-6 h-6 text-white" />
                 </div>
-                <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="font-black text-2xl tracking-tighter leading-tight">
+                    <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
+                  </div>
+                  {currentUser?.shopName && (
+                    <p className={`text-[9px] font-black uppercase tracking-widest truncate ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} title={currentUser.shopName}>
+                      {currentUser.shopName}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {isPremium && userRole === USER_ROLES.OWNER && (

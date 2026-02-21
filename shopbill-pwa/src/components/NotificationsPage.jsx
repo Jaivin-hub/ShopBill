@@ -264,22 +264,6 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                     </div>
                 )}
             </div>
-
-            {/* --- PERSISTENT FOOTER STATUS --- */}
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
-                 <div className={`px-5 py-2.5 backdrop-blur-xl border rounded-full shadow-2xl flex items-center gap-4 ${darkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-slate-200'}`}>
-                    <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em]">Monitor Active</span>
-                    </div>
-                    {notifications.length > 0 && (
-                        <>
-                            <div className={`h-3 w-px ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
-                            <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-[0.2em]">{notifications.length} Live Signals</span>
-                        </>
-                    )}
-                 </div>
-            </div>
         </main>
     );
 };

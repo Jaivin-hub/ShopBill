@@ -274,7 +274,7 @@ router.get('/profile', protect, async (req, res) => {
                 address = store.address || user.address || '';
             }
         } else if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
-            // For staff members, get business details from owner
+            // For staff members, get business details from owner (and from store so GST/address show)
             const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
             if (businessDetails) {
                 shopName = businessDetails.shopName || shopName;
@@ -282,6 +282,16 @@ router.get('/profile', protect, async (req, res) => {
                 address = businessDetails.address || address;
                 currency = businessDetails.currency || currency;
                 profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
+            }
+            // Staff work in a store: use store's taxId/address so they see same as owner for that outlet
+            const staffStoreId = req.user.storeId || req.user.activeStoreId;
+            if (staffStoreId) {
+                const store = await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).lean();
+                if (store) {
+                    if (store.taxId) taxId = store.taxId;
+                    if (store.address) address = store.address;
+                    if (store.name && !shopName) shopName = store.name;
+                }
             }
         }
 

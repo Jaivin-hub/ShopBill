@@ -53,7 +53,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
     </div>
 );
 
-function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
+function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) {
     const [profile, setProfile] = useState({
         email: '',
         phone: '',
@@ -254,7 +254,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                     </div>
                 </section>
 
-                {/* 2. Business Entity Configuration */}
+                {/* 2. Business Entity Configuration - cashier can view but not edit */}
                 <section className={`rounded-3xl overflow-hidden border transition-colors ${sectionBg}`}>
                     <div className={`px-6 py-5 border-b transition-colors ${sectionHeaderBg}`}>
                         <h2 className={`text-[10px] font-bold tracking-[0.25em] flex items-center ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
@@ -270,7 +270,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                             icon={Activity} 
                             placeholder="e.g., ShopBill Retail"
                             onChange={handleChange}
-                            isEditing={isEditing}
+                            isEditing={userRole?.toLowerCase() === 'cashier' ? false : isEditing}
                             darkMode={darkMode}
                             validationErrors={validationErrors}
                             setValidationErrors={setValidationErrors}
@@ -284,7 +284,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                                 icon={Check} 
                                 placeholder="GSTIN-00XXXXX"
                                 onChange={handleChange}
-                                isEditing={isEditing}
+                                isEditing={userRole?.toLowerCase() === 'cashier' ? false : isEditing}
                                 darkMode={darkMode}
                                 validationErrors={validationErrors}
                                 setValidationErrors={setValidationErrors}
@@ -296,7 +296,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                                 icon={MapPin} 
                                 placeholder="Physical Address"
                                 onChange={handleChange}
-                                isEditing={isEditing}
+                                isEditing={userRole?.toLowerCase() === 'cashier' ? false : isEditing}
                                 darkMode={darkMode}
                                 validationErrors={validationErrors}
                                 setValidationErrors={setValidationErrors}
@@ -311,7 +311,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                                 icon={IndianRupee} 
                                 readOnly={true}
                                 onChange={handleChange}
-                                isEditing={isEditing}
+                                isEditing={userRole?.toLowerCase() === 'cashier' ? false : isEditing}
                                 darkMode={darkMode}
                                 validationErrors={validationErrors}
                                 setValidationErrors={setValidationErrors}
@@ -323,7 +323,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId }) {
                                 icon={Globe} 
                                 readOnly={true}
                                 onChange={handleChange}
-                                isEditing={isEditing}
+                                isEditing={userRole?.toLowerCase() === 'cashier' ? false : isEditing}
                                 darkMode={darkMode}
                                 validationErrors={validationErrors}
                                 setValidationErrors={setValidationErrors}
