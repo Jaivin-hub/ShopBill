@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const crypto = require('crypto'); // REQUIRED: For secure token generation
 const Staff = require('../models/Staff');
 const User = require('../models/User'); // REQUIRED: To create a login account
@@ -75,12 +76,12 @@ router.post('/', protect, async (req, res) => {
 
     try {
         // --- 0. PLAN LIMIT VALIDATION ---
-        // Fetch owner details to get the latest plan info
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
+        const storeIdObj = new mongoose.Types.ObjectId(req.user.storeId);
         const owner = await User.findById(req.user.id);
-        const currentStaffCount = await Staff.countDocuments({ storeId: req.user.storeId });
+        const currentStaffCount = await Staff.countDocuments({ storeId: storeIdObj });
 
         const plan = owner.plan || 'BASIC'; // Fallback to BASIC if null
 
@@ -100,7 +101,7 @@ router.post('/', protect, async (req, res) => {
             }
             
             // Optional: Strict check if you want exactly one of each for PRO
-            const existingRoleCount = await Staff.countDocuments({ storeId: req.user.storeId, role: role });
+            const existingRoleCount = await Staff.countDocuments({ storeId: storeIdObj, role: role });
             if (existingRoleCount >= 1) {
                 return res.status(403).json({ 
                     error: `Plan Limit Reached: The PRO plan allows only one ${role}.` 
@@ -114,7 +115,7 @@ router.post('/', protect, async (req, res) => {
         if (!normalizedEmail || !normalizedEmail.includes('@')) {
             return res.status(400).json({ error: 'Please provide a valid email address.' });
         }
-        const existingStaffInThisShop = await Staff.findOne({ storeId: req.user.storeId, email: normalizedEmail });
+        const existingStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail });
         if (existingStaffInThisShop) {
             return res.status(409).json({
                 error: `The email ${normalizedEmail} is already added in your shop. Please use a different email.`
@@ -128,7 +129,7 @@ router.post('/', protect, async (req, res) => {
             }
             // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
             const newStaff = await Staff.create({
-                storeId: req.user.storeId,
+                storeId: storeIdObj,
                 userId: existingUser._id,
                 name,
                 email: normalizedEmail,
@@ -156,15 +157,15 @@ router.post('/', protect, async (req, res) => {
             email: normalizedEmail,
             phone: phone || null,
             role,
-            shopName: `staff-temp-${req.user.storeId}-${normalizedEmail}`,
+            shopName: `staff-temp-${storeIdObj}-${normalizedEmail}`,
             isActive: true,
-            activeStoreId: req.user.storeId,
+            activeStoreId: storeIdObj,
             shopId: ownerId // Set shopId to owner's ID for token generation and owner lookup
         });
 
         // --- 3. Create the Staff record ---
         const newStaff = await Staff.create({
-            storeId: req.user.storeId,
+            storeId: storeIdObj,
             userId: newUser._id,
             name,
             email: normalizedEmail,
@@ -213,8 +214,9 @@ router.post('/', protect, async (req, res) => {
     } catch (error) {
         console.error('Staff POST error:', error.message, error);
         if (error.code === 11000) {
-            const field = error.keyValue ? Object.keys(error.keyValue)[0] : 'email';
-            return res.status(409).json({ error: `This ${field} is already in use in your shop. Please use a different value.` });
+            return res.status(409).json({
+                error: 'The email is already added in your shop. Please use a different email.'
+            });
         }
         res.status(500).json({ error: 'Internal Server Error.' });
     }
