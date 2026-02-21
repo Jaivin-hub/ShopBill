@@ -309,28 +309,66 @@ router.post('/punch-out', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        // Find staff record
-        const staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
+        // Find staff record (same fallback as punch-in for ObjectId compatibility)
+        let staff = await Staff.findOne({
+            userId: req.user._id,
+            storeId: req.user.storeId
         });
+        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
+            staff = await Staff.findOne({
+                userId: new mongoose.Types.ObjectId(req.user._id),
+                storeId: new mongoose.Types.ObjectId(req.user.storeId)
+            });
+        }
 
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
         }
 
-        // Find today's active attendance
-        // Use UTC to avoid timezone issues
-        const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        let attendance = null;
 
-        const attendance = await Attendance.findOne({
-            staffId: staff._id,
-            date: { $gte: today, $lt: tomorrow },
-            status: 'active'
-        });
+        // If client sends the attendance id (from GET /current), use it so we always punch out the same record shown on dashboard
+        const attendanceId = body.attendanceId || body._id;
+        if (attendanceId && mongoose.Types.ObjectId.isValid(attendanceId)) {
+            const byId = await Attendance.findById(attendanceId);
+            if (byId && byId.staffId && byId.staffId.toString() === staff._id.toString() && byId.status === 'active' && !byId.punchOut) {
+                attendance = byId;
+            }
+        }
+
+        // Otherwise find active attendance: same approach as GET /current
+        if (!attendance) {
+            const now = new Date();
+            const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+            attendance = await Attendance.findOne({
+                staffId: staff._id,
+                status: 'active',
+                punchOut: null,
+                punchIn: { $gte: fortyEightHoursAgo }
+            }).sort({ punchIn: -1 });
+
+            if (!attendance) {
+                const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+                const yesterday = new Date(today);
+                yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+                const dayAfterTomorrow = new Date(today);
+                dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+                attendance = await Attendance.findOne({
+                    staffId: staff._id,
+                    date: { $gte: yesterday, $lt: dayAfterTomorrow },
+                    status: 'active',
+                    punchOut: null
+                }).sort({ date: -1, punchIn: -1 });
+            }
+
+            if (!attendance) {
+                attendance = await Attendance.findOne({
+                    staffId: staff._id,
+                    status: 'active',
+                    punchOut: null
+                }).sort({ punchIn: -1 });
+            }
+        }
 
         if (!attendance) {
             return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
@@ -401,28 +439,38 @@ router.post('/break-start', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        // Find staff record
-        const staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
-        });
-
+        let staff = await Staff.findOne({ userId: req.user._id, storeId: req.user.storeId });
+        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
+            staff = await Staff.findOne({
+                userId: new mongoose.Types.ObjectId(req.user._id),
+                storeId: new mongoose.Types.ObjectId(req.user.storeId)
+            });
+        }
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
         }
 
-        // Find today's active attendance
         const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-
-        const attendance = await Attendance.findOne({
+        const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+        let attendance = await Attendance.findOne({
             staffId: staff._id,
-            date: { $gte: today, $lt: tomorrow },
-            status: 'active'
-        });
-
+            status: 'active',
+            punchOut: null,
+            punchIn: { $gte: fortyEightHoursAgo }
+        }).sort({ punchIn: -1 });
+        if (!attendance) {
+            const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const yesterday = new Date(today);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const dayAfterTomorrow = new Date(today);
+            dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+            attendance = await Attendance.findOne({
+                staffId: staff._id,
+                date: { $gte: yesterday, $lt: dayAfterTomorrow },
+                status: 'active',
+                punchOut: null
+            }).sort({ date: -1, punchIn: -1 });
+        }
         if (!attendance) {
             return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
         }
@@ -476,28 +524,38 @@ router.post('/break-end', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        // Find staff record
-        const staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
-        });
-
+        let staff = await Staff.findOne({ userId: req.user._id, storeId: req.user.storeId });
+        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
+            staff = await Staff.findOne({
+                userId: new mongoose.Types.ObjectId(req.user._id),
+                storeId: new mongoose.Types.ObjectId(req.user.storeId)
+            });
+        }
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
         }
 
-        // Find today's active attendance
         const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-
-        const attendance = await Attendance.findOne({
+        const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+        let attendance = await Attendance.findOne({
             staffId: staff._id,
-            date: { $gte: today, $lt: tomorrow },
-            status: 'active'
-        });
-
+            status: 'active',
+            punchOut: null,
+            punchIn: { $gte: fortyEightHoursAgo }
+        }).sort({ punchIn: -1 });
+        if (!attendance) {
+            const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const yesterday = new Date(today);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const dayAfterTomorrow = new Date(today);
+            dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+            attendance = await Attendance.findOne({
+                staffId: staff._id,
+                date: { $gte: yesterday, $lt: dayAfterTomorrow },
+                status: 'active',
+                punchOut: null
+            }).sort({ date: -1, punchIn: -1 });
+        }
         if (!attendance) {
             return res.status(400).json({ error: 'No active punch-in found. Please punch in first.' });
         }
@@ -569,11 +627,16 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
-        const staff = await Staff.findOne({ 
+        let staff = await Staff.findOne({ 
             userId: req.user._id, 
             storeId: req.user.storeId 
         });
-
+        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
+            staff = await Staff.findOne({
+                userId: new mongoose.Types.ObjectId(req.user._id),
+                storeId: new mongoose.Types.ObjectId(req.user.storeId)
+            });
+        }
         if (!staff) {
             return res.json({ success: true, attendance: null });
         }

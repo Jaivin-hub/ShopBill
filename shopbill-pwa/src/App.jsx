@@ -869,29 +869,33 @@ useEffect(() => {
     return standardNav.filter(item => item.roles.includes(userRole));
   }, [userRole, isPremium, currentUser]);
 
-  // Split nav items into primary (footer) and secondary (more menu) based on role
+  // Split nav items into primary (footer) and secondary (more menu) based on role and plan
   const { primaryNavItems, secondaryNavItems } = useMemo(() => {
     const filtered = navItems.filter(item => item.roles.includes(userRole));
-    
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isBasicManager = userRole === USER_ROLES.MANAGER && userPlan !== 'PREMIUM' && userPlan !== 'PRO';
+
     // For superadmin, all items go to primary (no "more" menu needed)
     if (userRole === USER_ROLES.SUPERADMIN) {
       return { primaryNavItems: filtered, secondaryNavItems: [] };
     }
-    
-    // Define role-specific primary menu items (displayed first)
+
+    // Basic plan manager: footer only Dashboard, Inventory, Ledger, Billing (settings/profile/notifications in header)
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
-      [USER_ROLES.MANAGER]: ['dashboard', 'inventory', 'scm', 'khata', 'chat'], // Dashboard, Inventory, Supply Chain, Ledger, Messages
+      [USER_ROLES.MANAGER]: isBasicManager
+        ? ['dashboard', 'inventory', 'khata', 'billing'] // Basic: only these four in footer
+        : ['dashboard', 'inventory', 'scm', 'khata', 'chat'], // Premium/Pro: Dashboard, Inventory, Supply Chain, Ledger, Messages
       [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
-    
+
     // Define role-specific secondary menu order (for More menu)
     const roleSecondaryMenuOrder = {
       [USER_ROLES.OWNER]: ['scm', 'inventory', 'billing'], // Supply Chain, Inventory, Billing
       [USER_ROLES.MANAGER]: [],
       [USER_ROLES.CASHIER]: [],
     };
-    
+
     const primaryMenuIds = rolePrimaryMenuIds[userRole] || [];
     
     // Get primary items in the specified order
@@ -911,9 +915,13 @@ useEffect(() => {
       .concat(secondary.filter(item => !secondaryOrder.includes(item.id)));
     
     return { primaryNavItems: primary, secondaryNavItems: sortedSecondary };
-  }, [navItems, userRole]);
+  }, [navItems, userRole, currentUser?.plan]);
 
   const utilityNavItems = useMemo(() => {
+    const userPlan = currentUser?.plan?.toUpperCase();
+    const isBasicManager = userRole === USER_ROLES.MANAGER && userPlan !== 'PREMIUM' && userPlan !== 'PRO';
+    // Basic plan manager: no Settings/Profile/Notifications in footer (they are in header only)
+    if (isBasicManager) return [];
     const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
     // Sort by priority (lower number = higher priority), then by name
     return filtered.sort((a, b) => {
@@ -922,7 +930,7 @@ useEffect(() => {
       if (priorityA !== priorityB) return priorityA - priorityB;
       return a.name.localeCompare(b.name);
     });
-  }, [userRole]);
+  }, [userRole, currentUser?.plan]);
 
   const handleBackToOrigin = () => {
     setCurrentPage(pageOrigin || 'dashboard');
@@ -941,7 +949,7 @@ useEffect(() => {
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} />;
     if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
     if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} />;
-    if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
+    if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} onLogout={logout} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {
          return (
@@ -1206,8 +1214,8 @@ useEffect(() => {
                   </div>
                 </button>
               ))}
-              {/* Cashier: direct Settings icon only. Owner/Manager: More button when they have secondary/utility items */}
-              {userRole === USER_ROLES.CASHIER ? (
+              {/* Cashier or Basic plan Manager: direct Settings icon in footer. Owner / Premium-Pro Manager: More button when they have secondary/utility items */}
+              {(userRole === USER_ROLES.CASHIER || (userRole === USER_ROLES.MANAGER && currentUser?.plan?.toUpperCase() !== 'PREMIUM' && currentUser?.plan?.toUpperCase() !== 'PRO')) ? (
                 <button
                   onClick={() => setCurrentPage('settings')}
                   className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === 'settings' ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}

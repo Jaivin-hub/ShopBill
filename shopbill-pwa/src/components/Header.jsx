@@ -256,8 +256,8 @@ const Header = ({
                         )}
                     </button>
 
-                    {/* Settings in header for Manager only; Cashier uses footer (More) menu */}
-                    {!isOwner && userRole?.toLowerCase() === 'manager' && (
+                    {/* Settings in header for Premium/Pro Manager only; Basic plan Manager and Cashier use footer */}
+                    {!isOwner && userRole?.toLowerCase() === 'manager' && (currentUser?.plan?.toUpperCase() === 'PREMIUM' || currentUser?.plan?.toUpperCase() === 'PRO') && (
                         <button 
                             onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
                             className={getButtonClasses('settings')}

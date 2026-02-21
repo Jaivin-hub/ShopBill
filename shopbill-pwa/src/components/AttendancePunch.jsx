@@ -120,7 +120,8 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
         if (isPunchingOut) return; // Prevent duplicate clicks
         try {
             setIsPunchingOut(true);
-            const response = await apiClient.post(API.attendancePunchOut);
+            const payload = currentAttendance?._id ? { attendanceId: currentAttendance._id } : {};
+            const response = await apiClient.post(API.attendancePunchOut, payload);
             if (response.data?.success) {
                 setCurrentAttendance(null);
                 if (onStatusChange) onStatusChange(null); // Update Dashboard caption instantly
