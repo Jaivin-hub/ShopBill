@@ -62,6 +62,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       const response = await apiClient.get(`${API.sales}?limit=10`);
       setRecentSales(response.data?.sales || []);
     } catch (error) {
+      if (error?.cancelled || error?.message?.includes?.('cancelled')) return; // Duplicate request cancelled by apiClient, ignore
       console.error('Error fetching recent sales:', error);
       showToast('Failed to load recent sales', 'error');
     } finally {

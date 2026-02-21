@@ -9,6 +9,7 @@ import CustomerList from './CustomerList';
 import { 
   PaymentModal, 
   AddCustomerModal, 
+  EditCustomerModal,
   HistoryModal, 
   RemindModal 
 } from './LedgerModals';
@@ -334,10 +335,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                 sortBy={sortBy}
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
+                openEditModal={(c) => { setSelectedCustomer(c); setActiveModal('edit'); }}
                 openRemindModal={openRemindModal}
                 showRemindOption={showRemindOption}
                 isProcessing={isProcessing}
-                setActiveModal={setActiveModal}
                 darkMode={darkMode}
                 sentReminders={sentReminders}
               />
@@ -384,12 +385,27 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
           validationErrors={validationErrors}
         />
       )}
+      {activeModal === 'edit' && selectedCustomer && (
+        <EditCustomerModal
+          customer={selectedCustomer}
+          onClose={() => setActiveModal(null)}
+          onSave={(updated) => {
+            setCustomers(prev => prev.map(c => c._id === updated._id ? { ...c, ...updated } : c));
+            setActiveModal(null);
+          }}
+          apiClient={apiClient}
+          API={API}
+          showToast={showToast}
+          darkMode={darkMode}
+        />
+      )}
       {activeModal === 'history' && (
         <HistoryModal
           customer={selectedCustomer}
           onClose={() => setActiveModal(null)}
           fetchCustomerHistory={fetchCustomerHistory}
           darkMode={darkMode}
+          showReminderTab={showRemindOption}
         />
       )}
       {activeModal === 'remind' && (

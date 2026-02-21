@@ -107,15 +107,20 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                 initialDue: 0
             };
             const response = await apiClient.post(API.customers, dataToSend);
-            if (response.data?.customer) {
-                const newC = response.data.customer;
+            const data = response?.data;
+            const newC = data?.customer ?? (data?._id && data?.name ? data : null);
+            if (newC) {
+                const customerForSelect = { ...newC, id: newC._id || newC.id };
                 showToast(`Customer "${newC.name}" added!`, 'success');
-                setLocalSelectedCustomer(newC);
+                setLocalSelectedCustomer(customerForSelect);
                 setPaymentType('Credit');
-                onAddNewCustomer(newC);
+                onAddNewCustomer?.(customerForSelect);
                 setIsNewCustomerFormOpen(false);
+            } else {
+                showToast('Customer created but invalid response.', 'error');
             }
         } catch (error) {
+            if (error?.cancelled || error?.message?.includes?.('cancelled')) return;
             showToast(error.response?.data?.message || 'Failed to add customer', 'error');
         } finally { setIsSubmitting(false); }
     };
@@ -150,7 +155,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     if (isNewCustomerFormOpen) {
         return (
             <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm">
-                <div className={`${theme.bg} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}>
+                <div className={`${theme.bg} w-full max-w-md rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
                     <div className="px-4 sm:px-5 py-3 sm:py-4 border-b flex justify-between items-center bg-inherit flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <UserPlus className="w-4 h-4 text-emerald-500" />
@@ -160,7 +165,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <X className="w-4 h-4 text-slate-500" />
                         </button>
                     </div>
-                    <form onSubmit={handleAddNewCustomerSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                    <form onSubmit={handleAddNewCustomerSubmit} className="p-4 sm:p-5 space-y-4 flex-shrink-0">
                         <div>
                             <label className={theme.muted}>Full Name</label>
                             <input type="text" value={newCustomerName} placeholder="Customer Name"
@@ -188,7 +193,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             </div>
                         </div>
                         <button type="submit" disabled={isSubmitting}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]">
+                            className="w-full py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]">
                             {isSubmitting ? 'Creating...' : 'Save & Select Customer'}
                         </button>
                     </form>

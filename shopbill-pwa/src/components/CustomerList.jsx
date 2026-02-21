@@ -2,7 +2,7 @@ import React, { useMemo, memo } from 'react';
 import { 
     IndianRupee, History, Phone, Search, 
     ShieldAlert, CheckCircle2, UserCircle2, BellRing,
-    AlertCircle, Wallet, ChevronRight
+    AlertCircle, Wallet, ChevronRight, Pencil
 } from 'lucide-react';
 
 const CustomerList = ({ 
@@ -12,10 +12,11 @@ const CustomerList = ({
     openPaymentModal, 
     isProcessing,
     openHistoryModal,
+    openEditModal,
     darkMode,
     openRemindModal,
     showRemindOption = true,
-    sentReminders // Added this prop to track cooldowns
+    sentReminders
 }) => {
     const processedCustomers = useMemo(() => {
         let result = [...(customersList || [])];
@@ -131,6 +132,19 @@ const CustomerList = ({
                         <p className={`text-sm font-black tracking-tight tabular-nums ${isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500'}`}>
                             ₹{outstandingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
+                    )}
+                    {openEditModal && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(customer);
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-500 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'}`}
+                            title="Edit customer"
+                            aria-label="Edit name, phone, or limit"
+                        >
+                            <Pencil size={16} strokeWidth={2} />
+                        </button>
                     )}
                     <button
                         onClick={(e) => {

@@ -245,6 +245,59 @@ router.put('/:customerId/credit', protect, async (req, res) => {
     }
 });
 
+// --- UPDATE CUSTOMER (name, phone, creditLimit) ---
+router.put('/:customerId', protect, async (req, res) => {
+    const { customerId } = req.params;
+    const { name, phone, creditLimit } = req.body;
+
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected.' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid Customer ID.' });
+    }
+
+    const updates = {};
+    if (name !== undefined) {
+        const trimmed = (name || '').trim();
+        if (!trimmed.length) return res.status(400).json({ error: 'Customer name is required.', field: 'name' });
+        updates.name = trimmed;
+    }
+    if (phone !== undefined) {
+        const trimmed = String(phone || '').trim().replace(/\D/g, '');
+        if (trimmed.length < 10) return res.status(400).json({ error: 'Valid 10-digit phone is required.', field: 'phone' });
+        const existing = await Customer.findOne({ storeId: req.user.storeId, phone: trimmed, _id: { $ne: customerId } });
+        if (existing) {
+            return res.status(400).json({ error: `Phone already used by ${existing.name}`, field: 'phone' });
+        }
+        updates.phone = trimmed;
+    }
+    if (creditLimit !== undefined) {
+        const num = parseFloat(creditLimit);
+        if (isNaN(num) || num < 0) return res.status(400).json({ error: 'Credit limit must be a non-negative number.', field: 'creditLimit' });
+        updates.creditLimit = num;
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No valid fields to update (name, phone, or creditLimit).' });
+    }
+
+    try {
+        const updated = await Customer.findOneAndUpdate(
+            { _id: customerId, storeId: req.user.storeId },
+            { $set: updates },
+            { new: true }
+        ).select('name phone outstandingCredit creditLimit storeId createdAt updatedAt');
+        if (!updated) {
+            return res.status(404).json({ error: 'Customer not found or does not belong to this shop.' });
+        }
+        res.json({ message: 'Customer updated successfully', customer: updated });
+    } catch (error) {
+        console.error('Customer PUT Error:', error);
+        res.status(500).json({ error: 'Failed to update customer.' });
+    }
+});
+
 // --- SEND REMINDER (WHATSAPP + SMS) ---
 // MAKE SURE THIS IS AT THE TOP OF YOUR FILE:
 // const User = require('../models/User'); 

@@ -4,7 +4,7 @@ import {
   History, Info, AlertTriangle, ArrowUp, ArrowDown, 
   DollarSign, Repeat, XCircle, Phone, ShieldAlert, Calendar,
   MessageSquare, Send, Sparkles, RefreshCcw, MessageCircle,
-  BellRing, AlertCircle
+  BellRing, AlertCircle, Pencil
 } from 'lucide-react';
 
 // --- UPDATED: Added reminder_sent to styles ---
@@ -254,8 +254,99 @@ export const AddCustomerModal = ({
     </div>
   );
 };
+
+// --- Edit Customer Modal (name, phone, credit limit) ---
+export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, showToast, darkMode }) => {
+  const [name, setName] = React.useState(customer?.name ?? '');
+  const [phone, setPhone] = React.useState(customer?.phone ?? '');
+  const [creditLimit, setCreditLimit] = React.useState(customer?.creditLimit ?? '');
+  const [errors, setErrors] = React.useState({});
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (customer) {
+      setName(customer.name ?? '');
+      setPhone(customer.phone ?? '');
+      setCreditLimit(customer.creditLimit ?? '');
+    }
+  }, [customer]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const err = {};
+    if (!name.trim()) err.name = 'Required';
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 10) err.phone = 'Valid 10-digit phone required';
+    const num = parseFloat(creditLimit);
+    if (creditLimit !== '' && (isNaN(num) || num < 0)) err.creditLimit = 'Invalid limit';
+    setErrors(err);
+    if (Object.keys(err).length > 0) return;
+
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.put(`${API.customers}/${customer._id}`, {
+        name: name.trim(),
+        phone: phone.trim().replace(/\D/g, ''),
+        creditLimit: creditLimit === '' ? 0 : parseFloat(creditLimit)
+      });
+      const updated = response.data?.customer ?? response.data;
+      if (updated) {
+        showToast?.('Customer updated', 'success');
+        onSave?.(updated);
+        onClose();
+      }
+    } catch (error) {
+      if (error?.cancelled || error?.message?.includes?.('cancelled')) return;
+      const msg = error.response?.data?.error || error.response?.data?.message || 'Update failed';
+      const field = error.response?.data?.field;
+      if (field) setErrors(prev => ({ ...prev, [field]: msg }));
+      else showToast?.(msg, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!customer) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="edit-customer-title"
+    >
+      <div className="flex min-h-0 w-full max-w-md flex-shrink-0 items-center justify-center py-4 sm:py-6">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className={`w-full max-h-[90vh] flex flex-col rounded-xl sm:rounded-2xl shadow-2xl border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+        >
+          <div className={`flex shrink-0 justify-between items-center gap-3 p-3 sm:p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
+            <h2 id="edit-customer-title" className={`text-sm sm:text-base font-black tracking-widest flex items-center gap-2 min-w-0 truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              <Pencil className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 shrink-0" /> Edit Account
+            </h2>
+            <button type="button" onClick={onClose} className={`p-2 rounded-xl transition-colors shrink-0 ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`} aria-label="Close">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4 sm:p-5 space-y-4 flex-shrink-0">
+            <InputField label="Customer Full Name" name="name" type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: undefined })); }} placeholder="John Doe" error={errors.name} darkMode={darkMode} />
+            <InputField label="Phone Number" name="phone" type="tel" icon={Phone} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '')); setErrors(prev => ({ ...prev, phone: undefined })); }} placeholder="10-digit mobile" maxLength="10" error={errors.phone} darkMode={darkMode} />
+            <InputField label="Credit Limit (₹)" name="creditLimit" type="number" icon={ShieldAlert} value={creditLimit} onChange={(e) => { setCreditLimit(e.target.value); setErrors(prev => ({ ...prev, creditLimit: undefined })); }} placeholder="5000" error={errors.creditLimit} darkMode={darkMode} />
+          </div>
+          <div className={`shrink-0 p-3 sm:p-4 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+            <button type="submit" disabled={isProcessing} className="w-full py-3 sm:py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-amber-600/20 text-xs sm:text-sm">
+              {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+              Update Account
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // --- UPDATED: HistoryModal with Reminder Logs ---
-export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode }) => {
+export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode, showReminderTab = true }) => {
     const [history, setHistory] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState('ledger'); // 'ledger' or 'reminders'
@@ -313,20 +404,22 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                         </div>
                     </div>
 
-                    {/* Tab Switcher */}
+                    {/* Tab Switcher - hide Reminders tab for Basic plan */}
                     <div className={`flex p-1 rounded-xl sm:rounded-2xl border mb-3 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-100 shadow-inner'}`}>
                         <button 
                             onClick={() => setActiveTab('ledger')}
-                            className={`${tabBtnBase} ${activeTab === 'ledger' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`${tabBtnBase} ${activeTab === 'ledger' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-600'} ${!showReminderTab ? 'flex-1' : ''}`}
                         >
                             <DollarSign size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">FINANCIALS</span><span className="sm:hidden">FIN</span>
                         </button>
-                        <button 
-                            onClick={() => setActiveTab('reminders')}
-                            className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDERS</span><span className="sm:hidden">REM</span>
-                        </button>
+                        {showReminderTab && (
+                            <button 
+                                onClick={() => setActiveTab('reminders')}
+                                className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDERS</span><span className="sm:hidden">REM</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -338,7 +431,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                 <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
                                 <p className="text-[10px] font-black tracking-widest uppercase">Syncing Records...</p>
                             </div>
-                        ) : activeTab === 'ledger' ? (
+                        ) : (activeTab === 'ledger' || !showReminderTab) ? (
                             ledgerEntries.length === 0 ? (
                                 <EmptyState message="No transactions found" darkMode={darkMode} />
                             ) : (
@@ -361,7 +454,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                     )
                                 })
                             )
-                        ) : (
+                        ) : (activeTab === 'reminders' && showReminderTab) ? (
                             reminderEntries.length === 0 ? (
                                 <EmptyState message="No reminders sent yet" darkMode={darkMode} />
                             ) : (
@@ -384,7 +477,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                     </div>
                                 ))
                             )
-                        )}
+                        ) : null}
                     </div>
                 </div>
 
