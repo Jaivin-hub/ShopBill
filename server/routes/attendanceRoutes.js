@@ -240,8 +240,8 @@ router.post('/punch-in', protect, async (req, res) => {
         }
 
         // Calculate hours worked (should be 0 or minimal for just punched in)
-        const now = new Date();
-        const totalDiff = now - attendance.punchIn;
+        const nowTime = new Date();
+        const totalDiff = nowTime - attendance.punchIn;
         const totalMinutes = Math.round(totalDiff / (1000 * 60));
         
         // Calculate total break time (should be 0 for new punch-in)
@@ -252,7 +252,7 @@ router.post('/punch-in', protect, async (req, res) => {
                     totalBreakMinutes += breakPeriod.breakDuration || 0;
                 } else if (breakPeriod.breakStart && !breakPeriod.breakEnd) {
                     // Active break - calculate current break time
-                    const breakDiff = now - breakPeriod.breakStart;
+                    const breakDiff = nowTime - breakPeriod.breakStart;
                     totalBreakMinutes += Math.round(breakDiff / (1000 * 60));
                 }
             });
@@ -907,7 +907,6 @@ router.get('/active-status', protect, async (req, res) => {
         .populate('staffId', 'name email')
         .lean();
 
-        const now = new Date();
         // Return array of staff IDs who are currently active and their punch in / break info
         const activeStaffMap = {};
         activeAttendance.forEach(record => {
