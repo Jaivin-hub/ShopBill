@@ -4,7 +4,7 @@ import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
 
-const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
+const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef }) => {
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
@@ -68,6 +68,23 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
       setIsLoadingSales(false);
     }
   }, [apiClient, API.sales, showToast]);
+
+  // Fetch recent sales on mount so the sales history count badge shows on billing page load
+  const hasFetchedRecentSalesRef = useRef(false);
+  useEffect(() => {
+    if (!hasFetchedRecentSalesRef.current && apiClient && API?.sales) {
+      hasFetchedRecentSalesRef.current = true;
+      fetchRecentSales();
+    }
+  }, [apiClient, API, fetchRecentSales]);
+
+  // Register refresh with App so socket 'new_sale' can trigger immediate count update on billing page
+  useEffect(() => {
+    if (refreshRecentSalesRef) refreshRecentSalesRef.current = fetchRecentSales;
+    return () => {
+      if (refreshRecentSalesRef) refreshRecentSalesRef.current = null;
+    };
+  }, [refreshRecentSalesRef, fetchRecentSales]);
 
   // Fetch shop info for bill display
   useEffect(() => {
@@ -226,16 +243,18 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
 
   const removeItemFromCart = useCallback((itemId, variantId = null) => {
     setCart(prevCart => {
-      if (variantId) {
-        const cartItemId = `${itemId}_${variantId}`;
+      const norm = (id) => (id == null ? '' : String(id));
+      if (variantId != null && variantId !== '') {
+        const cartItemId = `${norm(itemId)}_${norm(variantId)}`;
         return prevCart.filter(item => {
-          const iId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
-          return iId !== cartItemId;
+          const iId = item.variantId != null ? `${norm(item._id)}_${norm(item.variantId)}` : norm(item._id);
+          return iId !== cartItemId; // keep items that are NOT the one to remove
         });
       }
+      // Non-variant: remove the one matching itemId; keep all others (and all variant items)
       return prevCart.filter(item => {
-        // Only remove if it doesn't have a variant (to avoid removing variant items)
-        return item._id === itemId && !item.variantId;
+        const isMatch = norm(item._id) === norm(itemId) && (item.variantId == null || item.variantId === '');
+        return !isMatch;
       });
     });
   }, []);
@@ -286,12 +305,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
       setCart([]);
       setIsPaymentModalOpen(false);
       fetchData(); // Refresh inventory and customer balances
-      fetchRecentSales(); // Refresh recent sales
+      await fetchRecentSales(); // Refresh recent sales so badge count updates immediately
     } catch (error) {
       // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
       throw error; 
     }
-  }, [totalAmount, cart, apiClient, API.sales, fetchData, showToast])
+  }, [totalAmount, cart, apiClient, API.sales, fetchData, fetchRecentSales, showToast])
 
   const handlePhysicalScannerInput = (e) => {
     if (e.key === 'Enter' && searchTerm) {

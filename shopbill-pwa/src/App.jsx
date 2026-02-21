@@ -368,6 +368,7 @@ const App = () => {
   const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
   const outletRestoredRef = useRef(false);
+  const billingRefreshRef = useRef(null); // BillingPOS sets this to fetchRecentSales so we can refresh on new_sale
 
   const [currentOutlet, setCurrentOutlet] = useState(null);
   const [outlets, setOutlets] = useState([]);
@@ -654,7 +655,9 @@ useEffect(() => {
       
       // Filter out notifications where the current user is the actor
       // Users don't need to see notifications about their own actions
-      if (newAlert.actorId && currentUser && newAlert.actorId.toString() === currentUser._id.toString()) {
+      const actorIdStr = newAlert?.actorId != null ? String(newAlert.actorId) : null;
+      const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
+      if (actorIdStr && userIdStr && actorIdStr === userIdStr) {
         console.log('🚫 Filtered out notification (user is actor)');
         return; // Don't add notification if user is the actor
       }
@@ -696,9 +699,13 @@ useEffect(() => {
       updateChatUnreadCount();
     };
     
+    const handleNewSale = () => {
+      if (billingRefreshRef.current) billingRefreshRef.current();
+    };
     socket.on('connect', handleConnect);
     socket.on('new_notification', handleNewNotification);
     socket.on('new_message', handleNewMessage);
+    socket.on('new_sale', handleNewSale);
     
     // If already connected, trigger initial fetch
     if (socket.connected) {
@@ -723,6 +730,7 @@ useEffect(() => {
         socket.off('connect', handleConnect);
         socket.off('new_notification', handleNewNotification);
         socket.off('new_message', handleNewMessage);
+        socket.off('new_sale', handleNewSale);
         socket.disconnect();
       }
       clearInterval(notificationInterval);
@@ -1007,7 +1015,7 @@ useEffect(() => {
         {(() => {
           switch (currentPage) {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
-            case 'billing': return <BillingPOS key={componentKey} {...commonProps} />;
+            case 'billing': return <BillingPOS key={componentKey} {...commonProps} refreshRecentSalesRef={billingRefreshRef} />;
             case 'khata': return <Ledger key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
             case 'inventory': return <InventoryManager key={componentKey} {...commonProps} initialSortOption={showLowStockFilter ? 'low-stock' : null} onSortOptionSet={() => setShowLowStockFilter(false)} />;
             case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;

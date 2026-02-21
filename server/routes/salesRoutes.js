@@ -280,6 +280,17 @@ router.post('/', protect, async (req, res) => {
             }
         }
 
+        // Notify connected clients (billing page) so sales history count updates immediately
+        try {
+            const io = req.app.get('socketio');
+            if (io) {
+                const storeIdStr = storeId.toString();
+                io.to(storeIdStr).emit('new_sale', { storeId: storeIdStr });
+            }
+        } catch (e) {
+            console.error('Socket emit new_sale:', e.message);
+        }
+
         res.status(200).json({ message: 'Sale recorded successfully.', newSale });
 
     } catch (error) {
