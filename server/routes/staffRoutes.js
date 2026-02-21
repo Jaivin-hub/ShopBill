@@ -110,12 +110,18 @@ router.post('/', protect, async (req, res) => {
         } 
         // PREMIUM plan allows unlimited, so no check needed here.
 
-        // --- 1. Email uniqueness per shop: only block if this email is already an *active* staff in this shop ---
+        // --- 1. Email uniqueness per shop: only block if this email is already staff in THIS shop ---
         const normalizedEmail = String(email || '').trim().toLowerCase();
         if (!normalizedEmail || !normalizedEmail.includes('@')) {
             return res.status(400).json({ error: 'Please provide a valid email address.' });
         }
-        const existingActiveStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail, active: true });
+        // Use exact same storeId as GET /api/staff (req.user.storeId) so we only see staff for this shop
+        const storeIdForStaff = req.user.storeId;
+        const existingActiveStaffInThisShop = await Staff.findOne({
+            storeId: storeIdForStaff,
+            email: normalizedEmail,
+            active: true,
+        });
         if (existingActiveStaffInThisShop) {
             return res.status(409).json({
                 error: `The email ${normalizedEmail} is already added in your shop. Please use a different email.`
@@ -123,7 +129,11 @@ router.post('/', protect, async (req, res) => {
         }
 
         // If same email exists in this shop but inactive, reactivate and update instead of creating duplicate
-        const existingInactiveStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail, active: false });
+        const existingInactiveStaffInThisShop = await Staff.findOne({
+            storeId: storeIdForStaff,
+            email: normalizedEmail,
+            active: false,
+        });
         if (existingInactiveStaffInThisShop) {
             const linkedUser = await User.findById(existingInactiveStaffInThisShop.userId);
             if (linkedUser) {
@@ -154,7 +164,7 @@ router.post('/', protect, async (req, res) => {
             }
             // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
             const newStaff = await Staff.create({
-                storeId: storeIdObj,
+                storeId: storeIdForStaff,
                 userId: existingUser._id,
                 name,
                 email: normalizedEmail,
@@ -190,7 +200,7 @@ router.post('/', protect, async (req, res) => {
 
         // --- 3. Create the Staff record ---
         const newStaff = await Staff.create({
-            storeId: storeIdObj,
+            storeId: storeIdForStaff,
             userId: newUser._id,
             name,
             email: normalizedEmail,
