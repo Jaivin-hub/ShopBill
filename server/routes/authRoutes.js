@@ -346,17 +346,15 @@ router.put('/profile', protect, async (req, res) => {
 
         // 2. Update Business Fields
         const storeId = req.user.storeId || req.user.activeStoreId;
-        
+
+        // Owner/Superadmin: update store they own
         if (storeId && (user.role === 'owner' || user.role === 'superadmin')) {
-            // Update outlet-specific business details
             const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
             if (store) {
                 if (shopName !== undefined) store.name = shopName;
                 if (taxId !== undefined) store.taxId = taxId;
                 if (address !== undefined) store.address = address;
                 await store.save();
-                
-                // Return outlet-specific data
                 return res.json({
                     success: true,
                     message: 'Profile updated successfully',
@@ -376,7 +374,35 @@ router.put('/profile', protect, async (req, res) => {
             }
         }
 
-        // Fallback: Update user-level business fields (for staff or when no outlet context)
+        // Manager: update the store they work in (store's owner = user.shopId)
+        if (storeId && user.role === 'Manager' && user.shopId) {
+            const store = await Store.findOne({ _id: storeId, ownerId: user.shopId, isActive: true });
+            if (store) {
+                if (shopName !== undefined) store.name = shopName;
+                if (taxId !== undefined) store.taxId = taxId;
+                if (address !== undefined) store.address = address;
+                await store.save();
+                const ownerUser = await User.findById(user.shopId).select('currency timezone').lean();
+                return res.json({
+                    success: true,
+                    message: 'Profile updated successfully',
+                    user: {
+                        id: user._id,
+                        email: user.email,
+                        phone: user.phone,
+                        shopName: store.name,
+                        taxId: store.taxId,
+                        address: store.address,
+                        profileImageUrl: user.profileImageUrl,
+                        role: user.role,
+                        currency: (ownerUser && ownerUser.currency) || user.currency || 'INR',
+                        timezone: (ownerUser && ownerUser.timezone) || user.timezone || 'Asia/Kolkata',
+                    }
+                });
+            }
+        }
+
+        // Fallback: Update user-level business fields (owner/superadmin when no outlet context)
         if (user.role === 'owner' || user.role === 'superadmin') {
             if (shopName !== undefined) user.shopName = shopName;
             if (taxId !== undefined) user.taxId = taxId;
