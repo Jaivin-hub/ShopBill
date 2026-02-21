@@ -261,7 +261,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         } disabled:opacity-20`}
                     >
                         <Power className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                        {staff.active ? 'Deactivate Account' : isPendingActivation ? 'Pending Activation' : 'Activate Account'}
+                        {staff.active ? 'Deactivate Account' : isPendingActivation ? 'Pending Activation' : 'Reactivate Account'}
                     </button>
                     {isPendingActivation && (
                         <>
@@ -299,11 +299,12 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                         
-                        {/* Only show delete button for deactivated staff */}
-                        {!staff.active && (
+                        {/* Delete option only for deactivated staff: permanently removes account and all data */}
+                        {!staff.active && !isPendingActivation && (
                             <button
                                 onClick={() => onRemove(staff)}
-                                disabled={isActionDisabled} 
+                                disabled={isActionDisabled}
+                                title="Delete permanently – removes all data; staff cannot log in again"
                                 className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
                             >
                                 <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
@@ -650,7 +651,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         // If deactivating, show confirmation modal
         const showModal = externalSetConfirmModal || setConfirmModal;
         showModal({
-            message: `Are you sure you want to deactivate ${staffMember.name}? The staff member will not be able to access your store. The staff's store account will be deactivated.`,
+            message: `Deactivate ${staffMember.name}? They will be logged out immediately and cannot access the store until you reactivate their account. You can reactivate or delete them later from this list.`,
             confirmText: 'Deactivate Account',
             cancelText: 'Cancel',
             onConfirm: async () => {
@@ -682,7 +683,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
         const showModal = externalSetConfirmModal || setConfirmModal;
         showModal({
-            message: `CRITICAL: Proceed with permanent removal of ${staffMember.name}? This terminates all access credentials immediately.`,
+            message: `Permanently delete ${staffMember.name}? All their data (attendance, etc.) will be removed from the database and they will not be able to log in again. This cannot be undone.`,
             onConfirm: async () => {
                 if (externalSetConfirmModal) {
                     externalSetConfirmModal(null);

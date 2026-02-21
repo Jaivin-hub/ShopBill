@@ -45,10 +45,18 @@ const protect = async (req, res, next) => {
             } else {
                 // STAFF LOGIC
                 const staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
-                
+
                 if (!staffRecord || !staffRecord.storeId) {
                     console.error(`DEBUG: [403] Staff user ${user._id} has no linked store record.`);
                     return res.status(403).json({ error: 'Staff member is not assigned to any store.' });
+                }
+
+                if (staffRecord.active === false || user.isActive === false) {
+                    return res.status(403).json({
+                        error: 'Account deactivated',
+                        message: 'Your account has been deactivated by the owner. Please contact your shop owner to reactivate.',
+                        code: 'ACCOUNT_DEACTIVATED'
+                    });
                 }
 
                 ownerAccount = await User.findById(staffRecord.storeId.ownerId);

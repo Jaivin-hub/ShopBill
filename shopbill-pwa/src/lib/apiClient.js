@@ -176,9 +176,23 @@ apiClient.interceptors.response.use(
 
     // Handle 401 - Unauthorized
     if (error.response?.status === 401) {
-      // localStorage.removeItem('userToken');
+      localStorage.removeItem('userToken');
       localStorage.removeItem('currentUser');
       window.location.href = '/';
+      return Promise.reject(error);
+    }
+
+    // Handle 403 - Account deactivated: force logout so staff cannot continue using the app
+    if (error.response?.status === 403) {
+      const data = error.response?.data || {};
+      const isDeactivated = data.code === 'ACCOUNT_DEACTIVATED' ||
+        (typeof data.error === 'string' && data.error.toLowerCase().includes('account deactivated'));
+      if (isDeactivated) {
+        localStorage.removeItem('userToken');
+        localStorage.removeItem('currentUser');
+        window.location.href = '/';
+        return Promise.reject(error);
+      }
     }
 
     return Promise.reject(error);

@@ -1,8 +1,10 @@
 const express = require('express');
 const crypto = require('crypto'); // REQUIRED: For secure token generation
-const Staff = require('../models/Staff'); 
+const Staff = require('../models/Staff');
 const User = require('../models/User'); // REQUIRED: To create a login account
-const { protect } = require('../middleware/authMiddleware'); 
+const Attendance = require('../models/Attendance');
+const Chat = require('../models/Chat');
+const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activation link
 
 const router = express.Router();
@@ -268,15 +270,28 @@ router.delete('/:id', protect, async (req, res) => {
             return res.status(400).json({ error: 'Cannot remove the primary owner account.' });
         }
 
-        // CRITICAL: Delete the linked User record first
-        if (staffMember.userId) {
-            await User.findByIdAndDelete(staffMember.userId);
+        const userId = staffMember.userId;
+
+        // 1. Delete all attendance records for this staff
+        await Attendance.deleteMany({ staffId });
+
+        // 2. Remove this user from all chat participants (so chats don't reference deleted user)
+        if (userId) {
+            await Chat.updateMany(
+                { participants: userId },
+                { $pull: { participants: userId } }
+            );
         }
 
-        // Delete the Staff entry
+        // 3. Delete the linked User record (staff cannot log in again)
+        if (userId) {
+            await User.findByIdAndDelete(userId);
+        }
+
+        // 4. Delete the Staff entry
         await Staff.findByIdAndDelete(staffId);
 
-        res.json({ message: `${staffMember.name} successfully removed.` });
+        res.json({ message: `${staffMember.name} permanently removed. All data deleted; they cannot log in again.` });
 
     } catch (error) {
         console.error('Staff DELETE error:', error.message);

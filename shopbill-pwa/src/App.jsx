@@ -803,35 +803,47 @@ useEffect(() => {
     setIsLoadingAuth(false);
   }, [logout, currentPage]);
 
-  // Fetch effective plan for staff members to ensure chat access is correct
+  // Sync current user from server (role, plan, etc.) so staff see updated role after owner changes it in Team Management
   useEffect(() => {
-    const fetchEffectivePlan = async () => {
-      if (!currentUser) return;
-      
-      // For staff members, fetch the effective plan (owner's plan)
-      if (currentUser.role !== 'owner' && currentUser.role !== 'superadmin') {
-        try {
-          const response = await apiClient.get(API.currentPlan);
-          if (response.data?.success && response.data?.plan) {
-            const effectivePlan = response.data.plan.toUpperCase();
-            // Update currentUser with effective plan if it's different
-            if (currentUser.plan?.toUpperCase() !== effectivePlan) {
-              const updatedUser = { ...currentUser, plan: effectivePlan };
-              localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-              setCurrentUser(updatedUser);
-            }
+    const syncUserFromProfile = async () => {
+      if (!currentUser || !apiClient || !API?.profile) return;
+      try {
+        const response = await apiClient.get(API.profile);
+        if (response.data?.success && response.data?.user) {
+          const serverUser = response.data.user;
+          let updatedUser = {
+            ...currentUser,
+            role: serverUser.role ?? currentUser.role,
+            plan: serverUser.plan ?? currentUser.plan,
+            shopName: serverUser.shopName ?? currentUser.shopName,
+            id: serverUser.id ?? currentUser.id,
+            _id: serverUser.id ?? currentUser._id,
+          };
+          // For staff, effective plan comes from owner (current-plan API)
+          if (updatedUser.role !== 'owner' && updatedUser.role !== 'superadmin') {
+            try {
+              const planRes = await apiClient.get(API.currentPlan);
+              if (planRes.data?.success && planRes.data?.plan) {
+                updatedUser = { ...updatedUser, plan: planRes.data.plan };
+              }
+            } catch (_) { /* ignore */ }
           }
-        } catch (error) {
-          console.error('Failed to fetch effective plan:', error);
+          const roleChanged = (currentUser.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
+          if (roleChanged || updatedUser.plan !== currentUser.plan || updatedUser.shopName !== currentUser.shopName) {
+            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+            setCurrentUser(updatedUser);
+          }
         }
+      } catch (error) {
+        console.error('Failed to sync user profile:', error);
       }
     };
 
-    if (currentUser && apiClient) {
-      fetchEffectivePlan();
+    if (currentUser?.id && apiClient) {
+      syncUserFromProfile();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]); // Only run when user ID changes (after login)
+  }, [currentUser?.id]); // Run when user ID changes (after login) so staff get latest role/plan from server
 
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
