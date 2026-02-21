@@ -110,15 +110,40 @@ router.post('/', protect, async (req, res) => {
         } 
         // PREMIUM plan allows unlimited, so no check needed here.
 
-        // --- 1. Email uniqueness is per shop only (same email can be staff in different shops) ---
+        // --- 1. Email uniqueness per shop: only block if this email is already an *active* staff in this shop ---
         const normalizedEmail = String(email || '').trim().toLowerCase();
         if (!normalizedEmail || !normalizedEmail.includes('@')) {
             return res.status(400).json({ error: 'Please provide a valid email address.' });
         }
-        const existingStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail });
-        if (existingStaffInThisShop) {
+        const existingActiveStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail, active: true });
+        if (existingActiveStaffInThisShop) {
             return res.status(409).json({
                 error: `The email ${normalizedEmail} is already added in your shop. Please use a different email.`
+            });
+        }
+
+        // If same email exists in this shop but inactive, reactivate and update instead of creating duplicate
+        const existingInactiveStaffInThisShop = await Staff.findOne({ storeId: storeIdObj, email: normalizedEmail, active: false });
+        if (existingInactiveStaffInThisShop) {
+            const linkedUser = await User.findById(existingInactiveStaffInThisShop.userId);
+            if (linkedUser) {
+                await User.findByIdAndUpdate(linkedUser._id, { isActive: true });
+            }
+            const updated = await Staff.findByIdAndUpdate(
+                existingInactiveStaffInThisShop._id,
+                { active: true, name, role },
+                { new: true }
+            );
+            try {
+                await sendEmail({
+                    to: normalizedEmail,
+                    subject: 'Reactivated – Pocket POS',
+                    html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
+                });
+            } catch (_) { /* non-fatal */ }
+            return res.status(201).json({
+                message: `Staff member ${updated.name} reactivated successfully.`,
+                staff: updated,
             });
         }
 
