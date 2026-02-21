@@ -121,7 +121,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
     const handleConfirmPayment = async (force = false) => {
         if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
-            return showToast(`Select a customer for Credit.`, 'error');
+            return showToast('Select a credit customer from the dropdown to finalize.', 'error');
         }
         setIsSubmitting(true);
         try {
@@ -325,7 +325,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                         </div>
                     </div>
 
-                    {/* Payment Selector */}
+                    {/* Payment Selector - Credit is always selectable; user must pick a credit customer from dropdown before finalizing */}
                     <div className="space-y-1.5">
                         <label className={theme.muted}>Settlement Method</label>
                         <div className={`grid grid-cols-4 gap-1.5 p-1.5 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
@@ -336,19 +336,24 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 { id: 'Credit', icon: Receipt, color: 'text-rose-500' }
                             ].map((m) => (
                                 <button key={m.id} 
-                                    disabled={m.id === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id}
                                     onClick={() => { setPaymentType(m.id); setCreditError(null); }}
                                     className={`flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg text-[9px] font-black transition-all ${
                                         paymentType === m.id 
                                         ? 'bg-white shadow-md text-indigo-600 scale-[1.02]' 
                                         : 'opacity-40 hover:opacity-100 grayscale hover:grayscale-0'
-                                    } ${darkMode && paymentType === m.id ? 'bg-slate-800 text-indigo-400' : ''} disabled:opacity-20 disabled:scale-100 disabled:grayscale`}
+                                    } ${darkMode && paymentType === m.id ? 'bg-slate-800 text-indigo-400' : ''}`}
                                 >
                                     <m.icon className={`w-3.5 h-3.5 ${m.color}`} /> 
                                     <span className="uppercase tracking-widest">{m.id}</span>
                                 </button>
                             ))}
                         </div>
+                        {paymentType === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id && (
+                            <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 pt-1">
+                                <Info className="w-3.5 h-3.5 shrink-0" />
+                                Select a credit customer from the dropdown above to finalize.
+                            </p>
+                        )}
                     </div>
 
                     {/* Received Input */}
@@ -411,7 +416,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     
                     <button 
                         onClick={() => handleConfirmPayment(!!creditError)} 
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || (paymentType === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
                         className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-[0.97] shadow-xl ${
                             creditError 
                                 ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20' 

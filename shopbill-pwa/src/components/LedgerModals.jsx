@@ -151,92 +151,106 @@ export const AddCustomerModal = ({
   if (!data) return null;
 
   return (
-    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-      <form onSubmit={onConfirm} noValidate className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
-        <div className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
-          <h2 className={`text-sm font-black tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            <UserPlus className="w-4 h-4 text-indigo-500" /> New Account
-          </h2>
-          <button type="button" onClick={onClose} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`}>
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-          {/* --- API ERROR FEEDBACK --- */}
-          {errorMessage && (
-            <div className={`p-4 rounded-xl border flex items-start gap-3 animate-in shake duration-300 ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-100'}`}>
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none">Registration Error</p>
-                <p className={`text-xs font-bold leading-tight ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>
-                  {errorMessage}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <InputField 
-            label="Customer Full Name" 
-            name="name" 
-            type="text" 
-            value={data.name} 
-            onChange={onChange} 
-            placeholder="John Doe"
-            error={validationErrors.name}
-            darkMode={darkMode}
-          />
-          <InputField 
-            label="Phone Number" 
-            name="phone" 
-            type="tel" 
-            icon={Phone}
-            value={data.phone} 
-            onChange={onChange} 
-            placeholder="10-digit mobile (6–9)"
-            maxLength="10"
-            error={validationErrors.phone}
-            darkMode={darkMode}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <InputField 
-              label="Initial Due (₹) (optional)" 
-              name="initialDue" 
-              type="number" 
-              value={data.initialDue} 
-              onChange={onChange} 
-              placeholder="0"
-              error={validationErrors.initialDue}
-              darkMode={darkMode}
-            />
-            <InputField 
-              label="Credit Limit (₹)" 
-              name="creditLimit" 
-              type="number" 
-              icon={ShieldAlert}
-              value={data.creditLimit} 
-              onChange={onChange} 
-              placeholder="5000"
-              error={validationErrors.creditLimit}
-              darkMode={darkMode}
-            />
+    <div 
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
+      style={{ WebkitBackdropFilter: 'blur(24px)' }}
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="new-account-title"
+    >
+      <div className="flex min-h-0 w-full max-w-md flex-shrink-0 items-center justify-center py-4 sm:py-6">
+        <form 
+          onSubmit={onConfirm} 
+          noValidate 
+          className={`w-full max-h-[90vh] sm:max-h-[85vh] min-h-0 flex flex-col rounded-xl sm:rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+        >
+          {/* Header */}
+          <div className={`flex shrink-0 justify-between items-center gap-3 p-3 sm:p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
+            <h2 id="new-account-title" className={`text-sm sm:text-base font-black tracking-widest flex items-center gap-2 min-w-0 truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 shrink-0" /> New Account
+            </h2>
+            <button type="button" onClick={onClose} className={`p-2 rounded-xl transition-colors shrink-0 ${darkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-slate-100 text-slate-400'}`} aria-label="Close">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        </div>
 
-        <div className={`p-3 sm:p-4 border-t shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
-          <button 
-            type="submit" 
-            className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20 text-xs sm:text-sm" 
-            disabled={isProcessing || !isValid}
-          >
-            {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-            Create Account
-          </button>
-          {!isValid && !isProcessing && (
-            <p className={`text-center text-[10px] font-bold mt-3 sm:mt-4 tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
-          )}
-        </div>
-      </form>
+          {/* Scrollable body */}
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4 custom-scrollbar">
+            {errorMessage && (
+              <div className={`p-3 sm:p-4 rounded-xl border flex items-start gap-3 animate-in shake duration-300 shrink-0 ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-100'}`}>
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                  <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none">Registration Error</p>
+                  <p className={`text-xs font-bold leading-tight ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <InputField 
+              label="Customer Full Name" 
+              name="name" 
+              type="text" 
+              value={data.name} 
+              onChange={onChange} 
+              placeholder="John Doe"
+              error={validationErrors.name}
+              darkMode={darkMode}
+            />
+            <InputField 
+              label="Phone Number" 
+              name="phone" 
+              type="tel" 
+              icon={Phone}
+              value={data.phone} 
+              onChange={onChange} 
+              placeholder="10-digit mobile (6–9)"
+              maxLength="10"
+              error={validationErrors.phone}
+              darkMode={darkMode}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InputField 
+                label="Initial Due (₹) (optional)" 
+                name="initialDue" 
+                type="number" 
+                value={data.initialDue} 
+                onChange={onChange} 
+                placeholder="0"
+                error={validationErrors.initialDue}
+                darkMode={darkMode}
+              />
+              <InputField 
+                label="Credit Limit (₹)" 
+                name="creditLimit" 
+                type="number" 
+                icon={ShieldAlert}
+                value={data.creditLimit} 
+                onChange={onChange} 
+                placeholder="5000"
+                error={validationErrors.creditLimit}
+                darkMode={darkMode}
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className={`shrink-0 p-3 sm:p-4 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+            <button 
+              type="submit" 
+              className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20 text-xs sm:text-sm" 
+              disabled={isProcessing || !isValid}
+            >
+              {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+              Create Account
+            </button>
+            {!isValid && !isProcessing && (
+              <p className={`text-center text-[10px] font-bold mt-3 sm:mt-4 tracking-widest ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>All mandatory fields required</p>
+            )}
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

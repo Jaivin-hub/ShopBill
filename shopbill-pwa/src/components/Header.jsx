@@ -212,10 +212,10 @@ const Header = ({
 
     return (
         <>
-            <header className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] p-4 flex justify-between items-center backdrop-blur-md ${headerBg} ${hasModalOpen ? 'opacity-30 pointer-events-none' : ''} transition-opacity duration-300`}>
-                {hasModalOpen && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md -z-10" />
-                )}
+            <header 
+                className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] p-4 flex justify-between items-center backdrop-blur-md ${headerBg} transition-all duration-300 ${hasModalOpen ? 'opacity-0 pointer-events-none invisible' : ''}`}
+                aria-hidden={hasModalOpen}
+            >
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setCurrentPage('dashboard'); setShowStoreHub(false); }}>
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
                         <CreditCard className="w-5 h-5 text-white" />
@@ -273,8 +273,8 @@ const Header = ({
                 </div>
             </header>
 
-            {/* Expansion Panel (Store Hub) */}
-            {isPremium && isOwner && showStoreHub && (
+            {/* Expansion Panel (Store Hub) - hidden when a modal is open so modal has focus */}
+            {isPremium && isOwner && showStoreHub && !hasModalOpen && (
                 <div className={`fixed top-[73px] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-[10px] font-black tracking-widest opacity-50 uppercase">Select Active Branch</span>
@@ -337,7 +337,7 @@ const Header = ({
             )}
 
             {/* Backdrop for Hub */}
-            {showStoreHub && (
+            {showStoreHub && !hasModalOpen && (
                 <div 
                     className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[2px]" 
                     onClick={() => setShowStoreHub(false)}

@@ -86,6 +86,16 @@ const emitAlert = async (req, storeId, type, data) => {
                 transactionId: data.transactionId || null
             };
             break;
+        case 'credit_sale':
+            title = 'Credit Sale';
+            category = 'Info';
+            message = data.message || `Credit sale of ₹${(data.amount || 0).toFixed(2)} to ${data.customerName || 'Customer'}.`;
+            metadata = { 
+                customerId: data.customerId || null,
+                saleId: data.saleId || data.transactionId || null,
+                amount: data.amount || null
+            };
+            break;
         case 'success':
             title = 'Stock Updated';
             category = 'Info';
@@ -152,6 +162,8 @@ const emitAlert = async (req, storeId, type, data) => {
                 const isLedgerPayment = type === 'ledger_payment';
                 const managerReported = isLedgerPayment && actorRole === 'Manager';
                 const cashierReported = isLedgerPayment && actorRole === 'Cashier';
+                // Credit sale: notify only owner and manager(s), not cashiers
+                const isCreditSale = type === 'credit_sale';
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
                 const staffMembers = await Staff.find({
@@ -169,6 +181,8 @@ const emitAlert = async (req, storeId, type, data) => {
                         targetUserIds.add(ownerIdStr);
                         if (managerReported) {
                             console.log(`📢 Ledger payment (Manager reported): Owner ${ownerIdStr} will receive notification (paid amount in message).`);
+                        } else if (isCreditSale) {
+                            console.log(`📢 Credit sale: Owner ${ownerIdStr} will receive notification.`);
                         } else {
                             console.log(`📢 Owner ${ownerIdStr} will receive notification (actor: ${actorIdStr})`);
                         }
@@ -180,19 +194,26 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Staff: for Manager-reported ledger payment, do NOT notify any staff (owner only)
+                // For credit_sale, notify only managers (not cashiers)
                 if (!managerReported) {
-                    // Add staff members (managers and cashiers) excluding the actor
-                    // Cashier reported → manager + cashier; Owner reported → manager + cashier
                     staffMembers.forEach(staff => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();
                             if (staffUserIdStr !== actorIdStr) {
-                                targetUserIds.add(staffUserIdStr);
+                                // Credit sale: only add managers, not cashiers
+                                if (isCreditSale) {
+                                    if (staff.role === 'Manager') targetUserIds.add(staffUserIdStr);
+                                } else {
+                                    targetUserIds.add(staffUserIdStr);
+                                }
                             }
                         }
                     });
                     if (cashierReported) {
                         console.log(`📢 Ledger payment (Cashier reported): Manager(s) and Cashier(s) will receive notification (paid amount in message).`);
+                    }
+                    if (isCreditSale) {
+                        console.log(`📢 Credit sale: Manager(s) will receive notification.`);
                     }
                 }
 
