@@ -943,7 +943,8 @@ router.get('/all', protect, async (req, res) => {
  */
 router.get('/active-status', protect, async (req, res) => {
     try {
-        if (req.user.role !== 'owner' && req.user.role !== 'Manager') {
+        const role = (req.user.role || '').toLowerCase();
+        if (role !== 'owner' && role !== 'manager') {
             return res.status(403).json({ error: 'Access denied. Only owners and managers can view active attendance status.' });
         }
 
@@ -951,24 +952,47 @@ router.get('/active-status', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected.' });
         }
 
-        // Get today's date range - Use UTC to avoid timezone issues
         const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
 
-        // Find all active attendance records for today (include breaks for break-start display)
-        const activeAttendance = await Attendance.find({
+        // Find active attendance by status (same approach as GET /current) so timezone/date doesn't hide staff
+        let activeAttendance = await Attendance.find({
             storeId: req.user.storeId,
-            date: { 
-                $gte: today, 
-                $lt: tomorrow 
-            },
-            status: 'active'
+            status: 'active',
+            punchOut: null,
+            punchIn: { $gte: fortyEightHoursAgo }
         })
         .select('staffId punchIn onBreak breaks')
         .populate('staffId', 'name email')
         .lean();
+
+        if (activeAttendance.length === 0) {
+            const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const yesterday = new Date(today);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const dayAfterTomorrow = new Date(today);
+            dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+            activeAttendance = await Attendance.find({
+                storeId: req.user.storeId,
+                date: { $gte: yesterday, $lt: dayAfterTomorrow },
+                status: 'active',
+                punchOut: null
+            })
+            .select('staffId punchIn onBreak breaks')
+            .populate('staffId', 'name email')
+            .lean();
+        }
+
+        if (activeAttendance.length === 0) {
+            activeAttendance = await Attendance.find({
+                storeId: req.user.storeId,
+                status: 'active',
+                punchOut: null
+            })
+            .select('staffId punchIn onBreak breaks')
+            .populate('staffId', 'name email')
+            .lean();
+        }
 
         // Return array of staff IDs who are currently active and their punch in / break info
         const activeStaffMap = {};

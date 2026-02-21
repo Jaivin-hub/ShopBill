@@ -565,8 +565,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 if (response.data?.activeAttendance) {
                     const map = {};
                     response.data.activeAttendance.forEach(item => {
-                        if (item.staffId && item.punchIn) {
-                            map[item.staffId] = { 
+                        if (item.staffId != null && item.punchIn) {
+                            const key = String(item.staffId);
+                            map[key] = {
                                 punchIn: item.punchIn,
                                 onBreak: item.onBreak || false,
                                 breakStart: item.breakStart || null,
@@ -767,8 +768,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                             staff.map((s) => {
                                 const isActionDisabled = !hasWriteAccess || s.role === 'owner';
                                 const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
-                                const isCurrentlyActive = activeStaffIds.has(s._id);
-                                const att = activeStaffMap[s._id];
+                                const staffIdKey = s._id != null ? String(s._id) : '';
+                                const isCurrentlyActive = staffIdKey ? activeStaffIds.has(staffIdKey) : false;
+                                const att = staffIdKey ? activeStaffMap[staffIdKey] : null;
                                 const punchInTime = att?.punchIn;
                                 const isOnBreak = att?.onBreak || false;
                                 const breakStart = att?.breakStart || null;
