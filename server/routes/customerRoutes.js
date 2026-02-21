@@ -154,7 +154,7 @@ router.post('/', protect, async (req, res) => {
         try {
             const actorLabel = await getActorNameWithRole(req);
             await emitAlert(req, req.user.storeId, 'customer_added', {
-                message: `Customer "${customer.name}" was added by ${actorLabel}.`,
+                message: `Customer "${customer.name}" was added to ledger by ${actorLabel}.`,
                 customerId: customer._id,
             });
         } catch (notifErr) {

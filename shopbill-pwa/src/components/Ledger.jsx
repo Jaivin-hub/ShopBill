@@ -36,7 +36,8 @@ const scrollbarStyles = `
 
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
 
-const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => {
+const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, currentUser }) => {
+  const showRemindOption = ['PRO', 'PREMIUM'].includes((currentUser?.plan || '').toUpperCase());
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -129,8 +130,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => 
     const creditLimitError = validateCreditLimit(newCustomerData.creditLimit);
     if (creditLimitError) errors.creditLimit = creditLimitError;
     
-    const initialDueError = validatePositiveNumber(newCustomerData.initialDue, 'Initial due');
-    if (initialDueError) errors.initialDue = initialDueError;
+    // Initial Due is optional; validate only when provided (must be non-negative number)
+    if (newCustomerData.initialDue !== '' && newCustomerData.initialDue != null && String(newCustomerData.initialDue).trim() !== '') {
+      const initialDueError = validatePositiveNumber(newCustomerData.initialDue, 'Initial due');
+      if (initialDueError) errors.initialDue = initialDueError;
+    }
     
     setValidationErrors(errors);
     
@@ -331,6 +335,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => 
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
                 openRemindModal={openRemindModal}
+                showRemindOption={showRemindOption}
                 isProcessing={isProcessing}
                 setActiveModal={setActiveModal}
                 darkMode={darkMode}
@@ -368,13 +373,15 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => 
           onChange={(e) => {
             setAddCustomerError(null);
             setNewCustomerData({ ...newCustomerData, [e.target.name]: e.target.value });
+            setValidationErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
           }}
-          onClose={() => { setActiveModal(null); setAddCustomerError(null); }}
+          onClose={() => { setActiveModal(null); setAddCustomerError(null); setValidationErrors({}); }}
           onConfirm={handleAddCustomer}
           isProcessing={isProcessing}
           isValid={!!newCustomerData.name}
           darkMode={darkMode}
           errorMessage={addCustomerError}
+          validationErrors={validationErrors}
         />
       )}
       {activeModal === 'history' && (

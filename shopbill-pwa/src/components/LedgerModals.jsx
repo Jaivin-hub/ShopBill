@@ -152,7 +152,7 @@ export const AddCustomerModal = ({
 
   return (
     <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-      <form onSubmit={onConfirm} className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
+      <form onSubmit={onConfirm} noValidate className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl shadow-2xl border animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
         <div className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'}`}>
           <h2 className={`text-sm font-black tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
             <UserPlus className="w-4 h-4 text-indigo-500" /> New Account
@@ -185,7 +185,6 @@ export const AddCustomerModal = ({
             placeholder="John Doe"
             error={validationErrors.name}
             darkMode={darkMode}
-            required 
           />
           <InputField 
             label="Phone Number" 
@@ -198,11 +197,10 @@ export const AddCustomerModal = ({
             maxLength="10"
             error={validationErrors.phone}
             darkMode={darkMode}
-            required
           />
           <div className="grid grid-cols-2 gap-4">
             <InputField 
-              label="Initial Due (₹)" 
+              label="Initial Due (₹) (optional)" 
               name="initialDue" 
               type="number" 
               value={data.initialDue} 
@@ -221,7 +219,6 @@ export const AddCustomerModal = ({
               placeholder="5000"
               error={validationErrors.creditLimit}
               darkMode={darkMode}
-              required
             />
           </div>
         </div>

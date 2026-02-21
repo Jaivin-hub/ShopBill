@@ -14,6 +14,7 @@ const CustomerList = ({
     openHistoryModal,
     darkMode,
     openRemindModal,
+    showRemindOption = true,
     sentReminders // Added this prop to track cooldowns
 }) => {
     const processedCustomers = useMemo(() => {
@@ -142,7 +143,7 @@ const CustomerList = ({
                     >
                         <History size={16} strokeWidth={2} />
                     </button>
-                    {outstandingAmount > 0 && (
+                    {showRemindOption && outstandingAmount > 0 && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();

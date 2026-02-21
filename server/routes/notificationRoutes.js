@@ -3,6 +3,7 @@ const { protect } = require('../middleware/authMiddleware');
 const Notification = require('../models/Notification');
 const Staff = require('../models/Staff');
 const Store = require('../models/Store');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -119,11 +120,12 @@ const emitAlert = async (req, storeId, type, data) => {
         
         const storeName = store.name || 'Store';
         const ownerId = store.ownerId; // Always use ownerId from store (most accurate)
-        
-        // Update message to include store name for owners
+
+        // Only prefix [Store Name] for Premium plan (multiple outlets); Basic/Pro have one store, no need to specify
         let finalMessage = message;
-        if (storeName && storeName !== 'Store') {
-            // For owners, include store name in the message
+        const owner = await User.findById(ownerId).select('plan').lean();
+        const isPremium = (owner?.plan || '').toUpperCase() === 'PREMIUM';
+        if (isPremium && storeName && storeName !== 'Store') {
             finalMessage = `[${storeName}] ${message}`;
         }
         
