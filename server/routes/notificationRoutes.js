@@ -91,6 +91,12 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || 'Operation successful.';
             metadata = data._id ? { itemId: data._id } : {};
             break;
+        case 'profile_updated':
+            title = 'Business Info Updated';
+            category = 'Info';
+            message = data.message || 'Store business information was updated by a manager.';
+            metadata = data.storeId ? { storeId: data.storeId } : {};
+            break;
         default:
             title = 'System Notification';
             category = 'Info';

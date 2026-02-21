@@ -8,6 +8,7 @@ const Staff = require('../models/Staff');
 const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
+const { emitAlert } = require('./notificationRoutes');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -382,6 +383,16 @@ router.put('/profile', protect, async (req, res) => {
                 if (taxId !== undefined) store.taxId = taxId;
                 if (address !== undefined) store.address = address;
                 await store.save();
+                // Notify owner that a manager updated business information
+                try {
+                    const staffRecord = await Staff.findOne({ userId: user._id, storeId }).select('name').lean();
+                    const managerName = staffRecord?.name || user.email || 'Manager';
+                    await emitAlert(req, storeId, 'profile_updated', {
+                        message: `Business information (name, GST, or address) was updated by ${managerName} (Manager).`
+                    });
+                } catch (notifErr) {
+                    console.error('Error sending profile-updated notification:', notifErr);
+                }
                 const ownerUser = await User.findById(user.shopId).select('currency timezone').lean();
                 return res.json({
                     success: true,

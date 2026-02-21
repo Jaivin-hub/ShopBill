@@ -35,7 +35,8 @@ const NotificationSchema = new mongoose.Schema({
             'credit_exceeded', 
             'system', 
             'success', 
-            'system_update'
+            'system_update',
+            'profile_updated'
         ], 
         required: true 
     },
