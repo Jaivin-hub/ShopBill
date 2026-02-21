@@ -244,7 +244,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         setIsProcessing(true);
         try {
             await apiClient.delete(`${API.inventory}/${itemId}`);
-            showToast(`Entry Purged: ${itemName}`, 'success');
+            showToast(`Deleted: ${itemName}`, 'success');
             await fetchInventory(true);
         } catch (error) {
             showToast('Deletion protocol failed.', 'error');

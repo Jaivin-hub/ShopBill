@@ -46,6 +46,15 @@ const getNotificationTypeDetails = (type) => {
                 glow: 'shadow-orange-500/5',
                 label: 'INVENTORY DELETED'
             };
+        case 'inventory_bulk_upload':
+            return { 
+                icon: Layers, 
+                color: 'text-violet-500', 
+                bgColor: 'bg-violet-500/10', 
+                borderColor: 'border-violet-500/20',
+                glow: 'shadow-violet-500/5',
+                label: 'BULK UPLOAD'
+            };
         case 'purchase_recorded':
             return { 
                 icon: CheckCircle, 

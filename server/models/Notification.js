@@ -37,7 +37,8 @@ const NotificationSchema = new mongoose.Schema({
             'success', 
             'system_update',
             'profile_updated',
-            'customer_added'
+            'customer_added',
+            'inventory_bulk_upload'
         ], 
         required: true 
     },

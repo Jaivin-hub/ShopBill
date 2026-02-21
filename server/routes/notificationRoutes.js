@@ -114,6 +114,12 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || 'A new customer was added to the ledger.';
             metadata = data.customerId ? { customerId: data.customerId } : {};
             break;
+        case 'inventory_bulk_upload':
+            title = 'Inventory Bulk Upload';
+            category = 'Info';
+            message = data.message || `${data.count ?? 0} items were added to inventory via bulk upload.`;
+            metadata = data.count != null ? { count: data.count } : {};
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -164,6 +170,8 @@ const emitAlert = async (req, storeId, type, data) => {
                 const cashierReported = isLedgerPayment && actorRole === 'Cashier';
                 // Credit sale: notify only owner and manager(s), not cashiers
                 const isCreditSale = type === 'credit_sale';
+                const isBulkUpload = type === 'inventory_bulk_upload';
+                const actorRoleLower = (actorRole || '').toLowerCase();
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
                 const staffMembers = await Staff.find({
@@ -174,8 +182,20 @@ const emitAlert = async (req, storeId, type, data) => {
 
                 const targetUserIds = new Set();
 
+                // Bulk upload: Manager/Cashier → notify owner only; Owner → notify managers and cashiers
+                if (isBulkUpload) {
+                    const ownerIdStr = store?.ownerId?.toString();
+                    if (actorRoleLower === 'owner') {
+                        staffMembers.forEach(staff => {
+                            if (staff.userId) targetUserIds.add(staff.userId.toString());
+                        });
+                    } else {
+                        if (ownerIdStr && ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
+                    }
+                }
+
                 // Owner: for ledger_payment when Manager reported → only owner; otherwise owner gets it if not actor
-                if (store && store.ownerId) {
+                if (!isBulkUpload && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     if (ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
@@ -194,8 +214,8 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Staff: for Manager-reported ledger payment, do NOT notify any staff (owner only)
-                // For credit_sale, notify only managers (not cashiers)
-                if (!managerReported) {
+                // For credit_sale, notify only managers (not cashiers). Skip for bulk upload (handled above).
+                if (!isBulkUpload && !managerReported) {
                     staffMembers.forEach(staff => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();

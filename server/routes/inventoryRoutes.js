@@ -340,10 +340,17 @@ router.post('/bulk', protect, async (req, res) => {
             reorderLevel: parseInt(item.reorderLevel) || 5,
         })).filter(item => item.name);
 
-        const result = await Inventory.insertMany(cleanedItems, { ordered: false }); 
-        
+        const result = await Inventory.insertMany(cleanedItems, { ordered: false });
+
         // This will clear alerts for any items in the bulk list that have sufficient stock
         await Promise.all(result.map(item => checkAndNotifyLowStock(req, item)));
+
+        // Notify: if Manager/Cashier did bulk upload → notify Owner; if Owner did → notify Managers and Cashiers
+        try {
+            await emitAlert(req, storeId, 'inventory_bulk_upload', { count: result.length });
+        } catch (notifyErr) {
+            console.error('Bulk upload notification error:', notifyErr);
+        }
 
         res.status(201).json({ 
             message: `${result.length} items added successfully.`,
