@@ -281,9 +281,9 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                             <div className="absolute inset-0 bg-emerald-500/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                             <ShieldCheck className={`w-10 h-10 transition-colors group-hover:text-emerald-500/50 ${darkMode ? 'text-gray-800' : 'text-slate-200'}`} />
                         </div>
-                        <h3 className={`text-sm font-bold uppercase tracking-widest ${darkMode ? 'text-white' : 'text-slate-800'}`}>Status Nominal</h3>
+                        <h3 className={`text-sm font-bold uppercase tracking-widest ${darkMode ? 'text-white' : 'text-slate-800'}`}>You're all caught up</h3>
                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-2">
-                            No high-priority alerts in the active buffer
+                            No notifications right now. New alerts will show here.
                         </p>
                     </div>
                 )}

@@ -150,7 +150,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                         </button>
                         <div>
                             <h1 className={`text-2xl md:text-lg font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-950'}`}>
-                                Update <span className="text-indigo-600">Access</span>
+                                Change <span className="text-indigo-600">Password</span>
                             </h1>
                             <p className={`text-[9px] font-black tracking-widest leading-none mt-1 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
                                 SECURE CREDENTIAL SYNCHRONIZATION

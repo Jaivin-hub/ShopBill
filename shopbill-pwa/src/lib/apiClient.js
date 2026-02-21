@@ -174,11 +174,14 @@ apiClient.interceptors.response.use(
       activeRequests.delete(error.config.__cacheKey);
     }
 
-    // Handle 401 - Unauthorized
+    // Handle 401 - Unauthorized (skip logout for password-change so wrong current password doesn't log user out)
     if (error.response?.status === 401) {
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/';
+      const isPasswordChangeRequest = error.config?.url?.includes('password/change') ?? false;
+      if (!isPasswordChangeRequest) {
+        localStorage.removeItem('userToken');
+        localStorage.removeItem('currentUser');
+        window.location.href = '/';
+      }
       return Promise.reject(error);
     }
 

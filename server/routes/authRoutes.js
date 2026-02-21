@@ -731,9 +731,9 @@ router.put('/password/change', protect,
                 return res.status(404).json({ error: 'User not found.' });
             }
 
-            // 1. Verify current password
+            // 1. Verify current password (400 = bad request; do not use 401 so client does not log user out)
             if (!(await user.matchPassword(currentPassword))) {
-                return res.status(401).json({ error: 'Invalid current password.' });
+                return res.status(400).json({ error: 'Invalid current password.' });
             }
             // 2. Check if new password is too short (or add other validation)
             if (newPassword.length < 8) {
