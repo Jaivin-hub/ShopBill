@@ -97,6 +97,12 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || 'Store business information was updated by a manager.';
             metadata = data.storeId ? { storeId: data.storeId } : {};
             break;
+        case 'customer_added':
+            title = 'New Customer Added';
+            category = 'Info';
+            message = data.message || 'A new customer was added to the ledger.';
+            metadata = data.customerId ? { customerId: data.customerId } : {};
+            break;
         default:
             title = 'System Notification';
             category = 'Info';

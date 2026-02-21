@@ -36,7 +36,8 @@ const NotificationSchema = new mongoose.Schema({
             'system', 
             'success', 
             'system_update',
-            'profile_updated'
+            'profile_updated',
+            'customer_added'
         ], 
         required: true 
     },

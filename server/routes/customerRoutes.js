@@ -135,6 +135,17 @@ router.post('/', protect, async (req, res) => {
                 details: 'Starting balance recorded upon customer creation.',
             });
         }
+
+        // Notify owner and staff (excluding actor): cashier → owner+manager; manager → owner+cashier; owner → manager+cashier
+        try {
+            const actorLabel = await getActorNameWithRole(req);
+            await emitAlert(req, req.user.storeId, 'customer_added', {
+                message: `Customer "${customer.name}" was added by ${actorLabel}.`,
+                customerId: customer._id,
+            });
+        } catch (notifErr) {
+            console.error('Error sending customer_added notification:', notifErr);
+        }
         
         res.status(201).json({ message: 'Customer added successfully', customer });
     } catch (error) {
