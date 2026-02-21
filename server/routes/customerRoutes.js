@@ -83,44 +83,58 @@ router.get('/:id/history', protect, async (req, res) => {
 // --- CREATE CUSTOMER ---
 router.post('/', protect, async (req, res) => {
     const { name, phone, creditLimit, initialDue } = req.body;
-    
-    if (!name || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Customer name is required.' });
+
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
     }
     
-    const rawInitialDue = initialDue === undefined || initialDue === null || initialDue === '' 
+    if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Customer name is required.', field: 'name' });
+    }
+
+    // Phone is mandatory – Indian standard: exactly 10 digits, starting with 6, 7, 8, or 9
+    const trimmedPhone = phone != null ? String(phone).trim() : '';
+    if (!trimmedPhone) {
+        return res.status(400).json({ error: 'Phone number is required.', field: 'phone' });
+    }
+    const digitsOnly = trimmedPhone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+        return res.status(400).json({ error: 'Phone number must be exactly 10 digits.', field: 'phone' });
+    }
+    if (!/^[6-9]/.test(digitsOnly)) {
+        return res.status(400).json({ error: 'Phone number must start with 6, 7, 8, or 9.', field: 'phone' });
+    }
+
+    const rawInitialDue = initialDue === undefined || initialDue === null || initialDue === ''
                           ? 0 : initialDue;
-    
+
     const parsedInitialDue = parseFloat(rawInitialDue);
 
     if (isNaN(parsedInitialDue) || parsedInitialDue < 0) {
         return res.status(400).json({ error: 'Initial Due must be a non-negative number.', field: 'initialDue' });
     }
-    
+
     const parsedCreditLimit = Math.max(0, parseFloat(creditLimit) || 0);
-    const trimmedPhone = phone ? String(phone).trim() : '';
 
-    if (trimmedPhone) {
-        const existingCustomer = await Customer.findOne({ 
-            phone: trimmedPhone, 
-            storeId: req.user.storeId
+    const existingCustomer = await Customer.findOne({
+        phone: digitsOnly,
+        storeId: req.user.storeId
+    });
+
+    if (existingCustomer) {
+        return res.status(400).json({
+            error: `Phone number is already associated with customer: ${existingCustomer.name}`,
+            field: 'phone',
+            existingCustomerName: existingCustomer.name
         });
-
-        if (existingCustomer) {
-            return res.status(400).json({ 
-                error: `Phone number is already associated with customer: ${existingCustomer.name}`,
-                field: 'phone',
-                existingCustomerName: existingCustomer.name
-            });
-        }
     }
     
     try {
         const newCustomerData = {
             name: name.trim(),
-            phone: trimmedPhone, 
-            creditLimit: parsedCreditLimit, 
-            outstandingCredit: parsedInitialDue, 
+            phone: digitsOnly,
+            creditLimit: parsedCreditLimit,
+            outstandingCredit: parsedInitialDue,
             storeId: req.user.storeId,
         };
         

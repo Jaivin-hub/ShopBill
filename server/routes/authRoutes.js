@@ -137,7 +137,14 @@ router.post('/login', async (req, res) => {
             if (user.role !== 'owner' && user.role !== 'superadmin' && ownerAccount) {
                 shopName = ownerAccount.shopName || '';
             }
-            
+
+            // For staff, ensure activeStoreId is in the response so client can send x-store-id and use store context
+            let activeStoreId = user.activeStoreId || null;
+            if ((user.role === 'Manager' || user.role === 'Cashier') && !activeStoreId) {
+                const staffRecord = await Staff.findOne({ userId: user._id }).select('storeId').lean();
+                if (staffRecord?.storeId) activeStoreId = staffRecord.storeId;
+            }
+
             res.json({
                 token,
                 user: {
@@ -147,7 +154,8 @@ router.post('/login', async (req, res) => {
                     shopId: tokenShopId || user._id,
                     phone: user.phone,
                     plan: effectivePlan, // Return effective plan (owner's plan for staff)
-                    shopName: shopName // Include registered business name
+                    shopName: shopName, // Include registered business name
+                    activeStoreId: activeStoreId || undefined
                 }
             });
         } else {

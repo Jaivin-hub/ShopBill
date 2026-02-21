@@ -122,7 +122,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => 
     const errors = {};
     const nameError = validateName(newCustomerData.name, 'Customer name');
     if (nameError) errors.name = nameError;
-    
+
     const phoneError = validatePhoneNumber(newCustomerData.phone);
     if (phoneError) errors.phone = phoneError;
     
@@ -143,7 +143,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange }) => 
     try {
       await apiClient.post(API.customers, {
         ...newCustomerData,
-        phone: newCustomerData.phone.replace(/\D/g, ''),
+        phone: (newCustomerData.phone || '').replace(/\D/g, ''),
         creditLimit: parseFloat(newCustomerData.creditLimit) || 0,
         initialDue: parseFloat(newCustomerData.initialDue) || 0
       });
