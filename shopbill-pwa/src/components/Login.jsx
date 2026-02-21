@@ -45,21 +45,22 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
     return (
         <section aria-labelledby="login-form" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {authError && (
-                <div className={`${errorBg} border ${errorBorder} rounded-xl p-3 flex gap-2 items-center justify-between transition-colors duration-300`} role="alert">
-                    <div className="flex gap-2 items-center">
+                <div className={`${errorBg} border ${errorBorder} rounded-xl p-3 flex gap-2 items-center ${authError.includes('shop owner') ? 'justify-start' : 'justify-between'} transition-colors duration-300`} role="alert">
+                    <div className="flex gap-2 items-center min-w-0">
                         <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                         <p className={`text-[10px] font-bold ${errorText}  tracking-wide`}>
                             {authError}
                         </p>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setCurrentPage('support')}
-                        className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline  tracking-tighter transition-colors"
-                    >
-                        Contact Support
-                    </button>
+                    {!authError.includes('shop owner') && (
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage('support')}
+                            className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline shrink-0 tracking-tighter transition-colors"
+                        >
+                            Contact Support
+                        </button>
+                    )}
                 </div>
             )}
 

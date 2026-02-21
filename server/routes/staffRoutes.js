@@ -109,23 +109,48 @@ router.post('/', protect, async (req, res) => {
         } 
         // PREMIUM plan allows unlimited, so no check needed here.
 
-        // --- 1. Check for Existing Staff/User ---
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(409).json({ 
-                error: `The email ${email} is already registered. Please use a different email.` 
+        // --- 1. Email uniqueness is per shop only (same email can be staff in different shops) ---
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingStaffInThisShop = await Staff.findOne({ storeId: req.user.storeId, email: normalizedEmail });
+        if (existingStaffInThisShop) {
+            return res.status(409).json({
+                error: `The email ${normalizedEmail} is already added in your shop. Please use a different email.`
             });
         }
-        
-        // --- 2. Create the User Login Record ---
+
+        const existingUser = await User.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
+            const newStaff = await Staff.create({
+                storeId: req.user.storeId,
+                userId: existingUser._id,
+                name,
+                email: normalizedEmail,
+                role,
+                active: false,
+            });
+            try {
+                await sendEmail({
+                    to: normalizedEmail,
+                    subject: 'Added to a new shop – Pocket POS',
+                    html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
+                });
+            } catch (_) { /* non-fatal */ }
+            return res.status(201).json({
+                message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
+                staff: newStaff,
+            });
+        }
+
+        // --- 2. Create the User Login Record (new email) ---
         // Get the owner's ID (req.user.id is the owner who is creating the staff)
         const ownerId = req.user.id;
         
         const newUser = await User.create({
-            email,
+            email: normalizedEmail,
             phone: phone || null,
-            role, 
-            shopName: `staff-temp-${req.user.storeId}-${email}`,
+            role,
+            shopName: `staff-temp-${req.user.storeId}-${normalizedEmail}`,
             isActive: true,
             activeStoreId: req.user.storeId,
             shopId: ownerId // Set shopId to owner's ID for token generation and owner lookup
@@ -136,7 +161,7 @@ router.post('/', protect, async (req, res) => {
             storeId: req.user.storeId,
             userId: newUser._id,
             name,
-            email,
+            email: normalizedEmail,
             role,
             active: false // Staff starts as inactive until they set their password
         });

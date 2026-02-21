@@ -43,8 +43,13 @@ const protect = async (req, res, next) => {
             if (user.role === 'owner') {
                 ownerAccount = user;
             } else {
-                // STAFF LOGIC
-                const staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
+                // STAFF LOGIC (user may have multiple Staff records for different shops – prefer activeStoreId)
+                let staffRecord = user.activeStoreId
+                    ? await Staff.findOne({ userId: user._id, storeId: user.activeStoreId }).populate('storeId')
+                    : null;
+                if (!staffRecord) {
+                    staffRecord = await Staff.findOne({ userId: user._id }).populate('storeId');
+                }
 
                 if (!staffRecord || !staffRecord.storeId) {
                     console.error(`DEBUG: [403] Staff user ${user._id} has no linked store record.`);
