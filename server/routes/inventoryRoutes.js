@@ -92,17 +92,10 @@ const checkAndNotifyLowStock = async (req, item) => {
         } else {
             // --- CASE 2: STOCK IS REPLENISHED (GOOD) ---
             try {
-                // 1. Remove any existing "Low Stock" notifications for this specific item
+                // Remove any existing "Low Stock" notifications for this specific item.
+                // Do not send a separate "Stock replenished" notification here; the update
+                // handler sends a single combined "inventory_updated" notification instead.
                 await resolveLowStockAlert(req, storeIdString, item._id);
-
-                // 2. (Optional) Only send a "Success" notification if this was an update or bulk add
-                // We don't want to spam "Success" during every single sale interaction
-                if (req.method === 'PUT' || req.originalUrl.includes('/bulk')) {
-                    await emitAlert(req, storeIdString, 'success', {
-                        message: `Stock replenished for ${item.name} (Now: ${currentQty})`,
-                        _id: item._id
-                    });
-                }
             } catch (err) {
                 console.error("❌ Error resolving notification:", err);
             }
@@ -266,13 +259,15 @@ router.put('/:id', protect, async (req, res) => {
             // This will now clear the "Low Stock" alert if quantity was increased
             await checkAndNotifyLowStock(req, updatedItem);
             
-            // Check if stock (quantity) was actually changed
+            // Check if stock (quantity) was actually changed and get old/new for message
             let stockChanged = false;
-            
+            let oldQty = 0;
+            let newQty = 0;
+
             // Check regular quantity (for items without variants)
             if (!oldItem.variants || oldItem.variants.length === 0) {
-                const oldQty = Number(oldItem.quantity) || 0;
-                const newQty = Number(updatedItem.quantity) || 0;
+                oldQty = Number(oldItem.quantity) || 0;
+                newQty = Number(updatedItem.quantity) || 0;
                 if (oldQty !== newQty) {
                     stockChanged = true;
                 }
@@ -289,25 +284,27 @@ router.put('/:id', protect, async (req, res) => {
                             const newVariantQty = Number(newVariant.quantity) || 0;
                             if (oldVariantQty !== newVariantQty) {
                                 stockChanged = true;
+                                oldQty = oldVariantQty;
+                                newQty = newVariantQty;
                                 break;
                             }
                         } else if (newVariant.quantity && Number(newVariant.quantity) > 0) {
-                            // New variant with quantity
                             stockChanged = true;
+                            newQty = Number(newVariant.quantity) || 0;
                             break;
                         }
                     }
                 }
             }
-            
-            // Only send notification if stock (quantity) was actually changed
+
+            // Single notification when stock changed: "Item name stock updated by Actor (old - Now: new)"
             if (stockChanged) {
                 try {
                     const actorNameWithRole = await getActorNameWithRole(req);
                     await emitAlert(req, req.user.storeId, 'inventory_updated', {
                         _id: updatedItem._id,
                         name: updatedItem.name,
-                        message: `${updatedItem.name} stock updated by ${actorNameWithRole}`
+                        message: `${updatedItem.name} stock updated by ${actorNameWithRole} (${oldQty} - Now: ${newQty})`
                     });
                 } catch (err) {
                     console.error("❌ Error sending inventory stock updated notification:", err);

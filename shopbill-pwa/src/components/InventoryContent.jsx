@@ -127,7 +127,7 @@ const InputField = ({ label, darkMode, ...props }) => (
     </div>
 );
 
-const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode }) => {
+const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode, readOnly = false }) => {
     const [showVariants, setShowVariants] = useState(false);
     const hasVariants = item.variants && item.variants.length > 0;
     
@@ -196,6 +196,8 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                     <ChevronDown className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'} transition-transform ${showVariants ? 'rotate-180' : ''}`} />
                                 </button>
                             )}
+                            {!readOnly && (
+                            <>
                             <button 
                                 onClick={() => handleEditClick(item)} 
                                 className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg text-indigo-500 transition-all active:scale-90`}
@@ -209,6 +211,8 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                            </>
+                            )}
                         </div>
                     </div>
                     
@@ -325,6 +329,8 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                 <ChevronDown className={`w-4 h-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'} transition-transform ${showVariants ? 'rotate-180' : ''}`} />
                             </button>
                         )}
+                        {!readOnly && (
+                        <>
                         <button 
                             onClick={() => handleEditClick(item)} 
                             className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-indigo-600' : 'bg-slate-100 hover:bg-indigo-600'} rounded-lg text-indigo-500 hover:text-white transition-all active:scale-90`}
@@ -340,6 +346,8 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
+                        </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -434,12 +442,13 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
         prevProps.item.reorderLevel === nextProps.item.reorderLevel &&
         prevProps.loading === nextProps.loading &&
         prevProps.darkMode === nextProps.darkMode &&
+        prevProps.readOnly === nextProps.readOnly &&
         JSON.stringify(prevProps.item.variants || []) === JSON.stringify(nextProps.item.variants || [])
     );
 });
 
 const InventoryContent = ({
-    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, darkMode
+    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, darkMode, readOnly = false
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -551,12 +560,15 @@ const InventoryContent = ({
                                 <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Inventory <span className="text-indigo-500">Vault</span></h1>
                                 <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]  mt-1">Asset Management Interface</p>
                             </div>
+                            {!readOnly && (
                             <div className="flex md:hidden items-center gap-2">
                                 <button onClick={openBulkUploadModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border text-emerald-500 rounded-xl active:scale-90`}><Upload className="w-5 h-5" /></button>
                                 <button onClick={openScannerModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border text-indigo-500 rounded-xl active:scale-90`}><ScanLine className="w-5 h-5" /></button>
                                 <button onClick={openAddModal} className="p-3 bg-indigo-600 text-white rounded-xl active:scale-90 shadow-lg shadow-indigo-600/20"><Plus className="w-5 h-5" /></button>
                             </div>
+                            )}
                         </div>
+                        {!readOnly && (
                         <div className="hidden md:flex items-center gap-3">
                             <button onClick={openScannerModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all`}><ScanLine className="w-5 h-5" /></button>
                             <button onClick={openBulkUploadModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-500'} border text-emerald-500 rounded-xl transition-all`}><Upload className="w-5 h-5" /></button>
@@ -564,6 +576,7 @@ const InventoryContent = ({
                                 <Plus className="w-4 h-4" /> Add Asset
                             </button>
                         </div>
+                        )}
                     </div>
                 </header>
 
@@ -615,7 +628,7 @@ const InventoryContent = ({
                             </div>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} />)}
                             {inventory.length === 0 && (
                                 <div className={`col-span-full text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
@@ -628,7 +641,7 @@ const InventoryContent = ({
                     {/* Mobile: Compact Card Layout */}
                     <section className="md:hidden pb-20">
                         <div className="grid grid-cols-1 gap-4">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} />)}
                             {inventory.length === 0 && (
                                 <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />

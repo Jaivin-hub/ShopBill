@@ -160,17 +160,16 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     const statusCaption = (() => {
         if (!isCurrentlyActive) return null;
         if (isOnBreak) {
-            // Use API duration or compute from breakStart so we always show ongoing time when possible
+            if (breakStart != null) {
+                return `Break started ${formatTimeAgo(breakStart)}`;
+            }
+            // Use duration only when we don't have breakStart (fallback)
             const minutesOnBreak = breakDurationMinutes != null && breakDurationMinutes >= 0
                 ? breakDurationMinutes
-                : (breakStart ? Math.floor((new Date() - new Date(breakStart)) / (1000 * 60)) : null);
-            const hasDuration = minutesOnBreak != null;
-            const durationText = hasDuration ? `${formatBreakDuration(minutesOnBreak)} on break` : '';
-            if (breakStart != null && hasDuration) {
-                return `Break started ${formatTimeAgo(breakStart)} · ${durationText}`;
+                : null;
+            if (minutesOnBreak != null) {
+                return `${formatBreakDuration(minutesOnBreak)} on break`;
             }
-            if (hasDuration) return durationText; // e.g. "12m on break"
-            if (breakStart != null) return `Break started ${formatTimeAgo(breakStart)}`;
             return 'On break';
         }
         if (punchInTime) return formatTimeAgo(punchInTime);

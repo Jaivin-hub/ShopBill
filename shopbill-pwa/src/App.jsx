@@ -1177,10 +1177,21 @@ useEffect(() => {
                   </div>
                 </button>
               ))}
-              {secondaryNavItems.length > 0 && (
+              {/* Cashier: direct Settings icon only. Owner/Manager: More button when they have secondary/utility items */}
+              {userRole === USER_ROLES.CASHIER ? (
+                <button
+                  onClick={() => setCurrentPage('settings')}
+                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === 'settings' ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                >
+                  {currentPage === 'settings' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
+                  <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === 'settings' ? 'bg-indigo-500/10' : ''}`}>
+                    <Settings className={`w-7 h-7 ${currentPage === 'settings' ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+                  </div>
+                </button>
+              ) : (secondaryNavItems.length > 0 || utilityNavItems.length > 0) && (
                 <button 
                   onClick={() => setShowMoreMenu(!showMoreMenu)} 
-                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative ${showMoreMenu ? 'flex-1' : 'flex-1'} ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
                   {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
                   <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
@@ -1212,21 +1223,21 @@ useEffect(() => {
                     </div>
                   </div>
                   <div className="px-2 pt-2 pb-4 pb-safe">
-                    {/* Team Management first (for owners) */}
-                    {utilityNavItems.filter(item => item.id === 'staffPermissions').map(item => (
-                        <button
-                            key={item.id}
+                    {/* All utility items (Team Management, Settings, Profile, Notifications) for mobile */}
+                    {utilityNavItems.map(item => (
+                      <button
+                        key={item.id}
                         onClick={() => {
                           setCurrentPage(item.id);
                           setShowMoreMenu(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
                           currentPage === item.id
                             ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
                             : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                            }`}
-                        >
-                            <item.icon className="w-5 h-5" />
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
                         <span className="text-sm font-bold">{item.name}</span>
                       </button>
                     ))}
@@ -1252,24 +1263,6 @@ useEffect(() => {
                           </span>
                         )}
                       </button>
-                    ))}
-                    {/* Settings last */}
-                    {utilityNavItems.filter(item => item.id === 'settings').map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setCurrentPage(item.id);
-                          setShowMoreMenu(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 ${
-                          currentPage === item.id
-                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="text-sm font-bold">{item.name}</span>
-                        </button>
                     ))}
                 </div>
                 </div>

@@ -256,8 +256,8 @@ const Header = ({
                         )}
                     </button>
 
-                    {/* Settings button for managers and cashiers - after notifications */}
-                    {!isOwner && (
+                    {/* Settings in header for Manager only; Cashier uses footer (More) menu */}
+                    {!isOwner && userRole?.toLowerCase() === 'manager' && (
                         <button 
                             onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
                             className={getButtonClasses('settings')}

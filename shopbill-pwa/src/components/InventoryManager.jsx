@@ -22,7 +22,7 @@ const initialItemState = {
 
 // Added darkMode to props
 const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet }) => {
-    // Permission Logic
+    // Permission: Owner and Manager only; Cashiers do not have access
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
 
@@ -325,7 +325,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             handleFormSubmit={handleFormSubmit}
             confirmDeleteItem={confirmDeleteItem}
             setIsConfirmModalOpen={setIsConfirmModalOpen}
-            darkMode={darkMode} // Successfully passing darkMode down
+            darkMode={darkMode}
         />
     );
 };
