@@ -366,6 +366,25 @@ router.get('/alerts', protect, async (req, res) => {
 });
 
 /**
+ * PUT /alerts/dismiss-all
+ * Adds current user to dismissedBy for all their notifications so they never see them again.
+ */
+router.put('/alerts/dismiss-all', protect, async (req, res) => {
+    try {
+        const filter = req.user.role === 'owner'
+            ? { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } }
+            : { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+        const result = await Notification.updateMany(
+            filter,
+            { $addToSet: { dismissedBy: req.user._id } }
+        );
+        res.json({ message: 'Success', updatedCount: result.modifiedCount });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to dismiss all notifications.' });
+    }
+});
+
+/**
  * PUT /alerts/:id/dismiss
  * Removes the alert from the current user's account (adds user to dismissedBy).
  * Revisiting the page will not show this notification again for this user.

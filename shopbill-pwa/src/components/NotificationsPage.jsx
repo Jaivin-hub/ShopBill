@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
     AlertTriangle, CheckCircle, Info, X, BellOff, 
     ShieldAlert, Sparkles, Trash2, Clock, Activity,
     ShieldCheck, Zap, Layers, Bell, CreditCard, DollarSign, ArrowDown, ArrowUp
 } from 'lucide-react';
 import apiClient from '../lib/apiClient';
-import Api from '../config/api'
+import Api from '../config/api';
+import ConfirmationModal from './ConfirmationModal';
 
 const getNotificationTypeDetails = (type) => {
     switch (type) {
@@ -103,7 +104,8 @@ const getNotificationTypeDetails = (type) => {
 };
 
 const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
-    
+    const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+
     useEffect(() => {
         const markAsReadOnMount = async () => {
             const hasUnread = notifications.some(n => n.isRead === false);
@@ -119,10 +121,12 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
         markAsReadOnMount();
     }, [notifications.length, setNotifications]); 
 
-    const handleClearAll = async () => {
-        if (!window.confirm("Purge all notification signals?")) return;
+    const handleClearAllClick = () => setShowClearAllConfirm(true);
+
+    const handleClearAllConfirm = async () => {
+        setShowClearAllConfirm(false);
         try {
-            await apiClient.put(Api.notificationreadall);
+            await apiClient.put(Api.notificationDismissAll);
             setNotifications([]);
         } catch (error) {
             console.error("Failed to clear notifications:", error);
@@ -160,6 +164,16 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
 
     return (
         <main className={`min-h-screen ${themeBase} transition-colors duration-200`}>
+            {showClearAllConfirm && (
+                <ConfirmationModal
+                    message="Delete all notifications? This will clear your full notifications."
+                    onConfirm={handleClearAllConfirm}
+                    onCancel={() => setShowClearAllConfirm(false)}
+                    darkMode={darkMode}
+                    confirmText="Delete All"
+                    cancelText="Cancel"
+                />
+            )}
             <style>{`
                 .notif-scroll::-webkit-scrollbar { width: 4px; }
                 .notif-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -187,7 +201,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                         </div>
                         {notifications.length > 0 && (
                             <button 
-                                onClick={handleClearAll}
+                                onClick={handleClearAllClick}
                                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95 ${
                                     darkMode 
                                     ? 'bg-gray-900 border-gray-800 text-gray-500 hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-500' 

@@ -42,6 +42,7 @@ const API = {
     notificationalert: API_BASE_URL + '/notifications/alerts',
     notificationreadall: API_BASE_URL + '/notifications/read-all',
     notificationDismiss: (id) => `${API_BASE_URL}/notifications/alerts/${id}/dismiss`,
+    notificationDismissAll: API_BASE_URL + '/notifications/alerts/dismiss-all',
 
     // 🚛 NEW: SUPPLY CHAIN MANAGEMENT (SCM) ENDPOINTS 🚛
     scmSuppliers: API_BASE_URL + '/scm/suppliers',    // GET (All Suppliers), POST (Add Supplier)
