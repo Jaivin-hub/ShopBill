@@ -17,6 +17,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
   const [isRecentSalesOpen, setIsRecentSalesOpen] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
+  const [recentSalesCountSeen, setRecentSalesCountSeen] = useState(0); // when user closes modal, mark current count as seen so badge resets
   const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [isFetchingSaleDetail, setIsFetchingSaleDetail] = useState(false);
@@ -47,6 +48,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
       fetchData();
     }
   }, []); // Empty deps - only run on mount
+
+  // When user closes Recent Sales modal, mark current count as seen so badge resets until new sales arrive
+  const handleCloseRecentSales = useCallback(() => {
+    setRecentSalesCountSeen(recentSales.length);
+    setIsRecentSalesOpen(false);
+  }, [recentSales.length]);
 
   // Fetch recent sales
   const fetchRecentSales = useCallback(async () => {
@@ -346,11 +353,14 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
                   className={`p-2.5 border rounded-xl transition-all active:scale-90 relative ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}
                 >
                   <Receipt className="w-5 h-5" />
-                  {recentSales.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full">
-                      {recentSales.length > 9 ? '9+' : recentSales.length}
-                    </span>
-                  )}
+                  {(() => {
+                    const unseenCount = Math.max(0, recentSales.length - recentSalesCountSeen);
+                    return unseenCount > 0 ? (
+                      <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full">
+                        {unseenCount > 9 ? '9+' : unseenCount}
+                      </span>
+                    ) : null;
+                  })()}
                 </button>
                 <button onClick={() => setIsCameraScannerOpen(true)} className={`p-2.5 border rounded-xl transition-all active:scale-90 ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}>
                   <ScanLine className="w-5 h-5" />
@@ -560,7 +570,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
 
       {/* Recent Sales Modal */}
       {isRecentSalesOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4" onClick={() => setIsRecentSalesOpen(false)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4" onClick={handleCloseRecentSales}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div 
             className={`relative w-full max-w-xl md:max-w-2xl h-[85vh] sm:h-[80vh] max-h-[600px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}
@@ -579,7 +589,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
                 </div>
               </div>
               <button
-                onClick={() => setIsRecentSalesOpen(false)}
+                onClick={handleCloseRecentSales}
                 className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-all"
               >
                 <X className="w-5 h-5" />
@@ -680,7 +690,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
 
       {/* Bill Modal - Reusing from SalesActivityPage */}
       {selectedSale && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }}>
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {
               @page {
@@ -783,7 +793,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
                     </h3>
                   </div>
                   <button 
-                    onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }} 
+                    onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }} 
                     className={`p-2 rounded-lg transition-all ${darkMode ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-200 text-slate-400'}`}
                   >
                     <X className="w-5 h-5" />
@@ -880,7 +890,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast }) => {
                       <Printer className="w-4 h-4" /> Print Receipt
                     </button>
                     <button 
-                      onClick={() => { setSelectedSale(null); setIsRecentSalesOpen(false); }} 
+                      onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }} 
                       className={`flex-1 py-3 text-[11px] font-bold tracking-wider rounded-lg border transition-all active:scale-[0.98] ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                     >
                       Close
