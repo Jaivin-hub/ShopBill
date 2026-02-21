@@ -27,16 +27,17 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState('');
     const [formErrors, setFormErrors] = useState({});
 
+    // Only set defaults when modal opens. Do NOT re-run when user selects a customer—otherwise partial pay (Cash/UPI/Card + 200) would get overwritten to Credit + full amount.
     useEffect(() => {
         if (isOpen) {
             setAmountPaidInput(totalAmount.toString());
-            setPaymentType(localSelectedCustomer.id !== WALK_IN_CUSTOMER.id ? 'Credit' : 'UPI');
+            setPaymentType('UPI');
             setSearchTerm(''); 
             setCreditError(null); 
             setIsNewCustomerFormOpen(false);
             setFormErrors({});
         }
-    }, [isOpen, totalAmount, localSelectedCustomer.id]);
+    }, [isOpen, totalAmount]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -294,7 +295,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                                     onClick={() => {
                                                         setLocalSelectedCustomer(c);
                                                         setIsDropdownOpen(false);
-                                                        setPaymentType(c.id === WALK_IN_CUSTOMER.id ? 'UPI' : 'Credit');
+                                                        // Only switch to UPI when selecting Walk-in (invalid to have Credit + Walk-in). Do NOT force Credit when selecting a credit customer—keep user's chosen method (e.g. Cash with partial pay).
+                                                        if (c.id === WALK_IN_CUSTOMER.id) setPaymentType('UPI');
                                                     }}
                                                     className={`w-full px-4 py-2.5 flex items-center justify-between group transition-all hover:bg-indigo-500/5 ${localSelectedCustomer.id === c.id ? 'bg-indigo-500/10' : ''}`}
                                                 >
@@ -348,15 +350,16 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 </button>
                             ))}
                         </div>
-                        {paymentType === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id && (
+                        {/* When Credit selected without customer, or partial pay (missed amount) without customer */}
+                        {(paymentType === 'Credit' || amountCredited > 0.01) && localSelectedCustomer.id === WALK_IN_CUSTOMER.id && (
                             <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 pt-1">
                                 <Info className="w-3.5 h-3.5 shrink-0" />
-                                Select a credit customer from the dropdown above to finalize.
+                                Select a credit customer from the dropdown above to finalize. {amountCredited > 0.01 ? `Remaining ₹${amountCredited.toFixed(0)} will be added to their ledger.` : ''}
                             </p>
                         )}
                     </div>
 
-                    {/* Received Input */}
+                    {/* Payment Amount: pay full or partial; remaining goes to customer ledger (missed payment) */}
                     {paymentType !== 'Credit' && (
                         <div className="space-y-1.5">
                             <label className={theme.muted}>Payment Amount</label>
@@ -370,6 +373,10 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                     style={{ fontSize: '16px' }}
                                 />
                             </div>
+                            <p className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
+                                <Info className="w-3 h-3 shrink-0" />
+                                Pay what you can; remaining will be added to the customer&apos;s ledger. Select a customer above for partial payment.
+                            </p>
                         </div>
                     )}
 
@@ -416,7 +423,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     
                     <button 
                         onClick={() => handleConfirmPayment(!!creditError)} 
-                        disabled={isSubmitting || (paymentType === 'Credit' && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
+                        disabled={isSubmitting || (amountCredited > 0.01 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
                         className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-[0.97] shadow-xl ${
                             creditError 
                                 ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20' 
