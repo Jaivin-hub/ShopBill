@@ -894,7 +894,7 @@ router.get('/active-status', protect, async (req, res) => {
         const tomorrow = new Date(today);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-        // Find all active attendance records for today
+        // Find all active attendance records for today (include breaks for break-start display)
         const activeAttendance = await Attendance.find({
             storeId: req.user.storeId,
             date: { 
@@ -903,19 +903,32 @@ router.get('/active-status', protect, async (req, res) => {
             },
             status: 'active'
         })
-        .select('staffId punchIn onBreak')
+        .select('staffId punchIn onBreak breaks')
         .populate('staffId', 'name email')
         .lean();
 
-        // Return array of staff IDs who are currently active and their punch in times
+        const now = new Date();
+        // Return array of staff IDs who are currently active and their punch in / break info
         const activeStaffMap = {};
         activeAttendance.forEach(record => {
             const staffId = record.staffId?._id?.toString();
             if (staffId) {
+                const onBreak = record.onBreak || false;
+                let breakStart = null;
+                let breakDurationMinutes = 0;
+                if (onBreak && record.breaks && record.breaks.length > 0) {
+                    const activeBreak = record.breaks.find(b => !b.breakEnd);
+                    if (activeBreak && activeBreak.breakStart) {
+                        breakStart = activeBreak.breakStart;
+                        breakDurationMinutes = Math.floor((now - new Date(activeBreak.breakStart)) / (1000 * 60));
+                    }
+                }
                 activeStaffMap[staffId] = {
                     punchIn: record.punchIn,
                     staffName: record.staffId?.name,
-                    onBreak: record.onBreak || false
+                    onBreak,
+                    breakStart: breakStart || undefined,
+                    breakDurationMinutes: breakDurationMinutes || undefined
                 };
             }
         });
@@ -927,7 +940,9 @@ router.get('/active-status', protect, async (req, res) => {
                 staffId,
                 staffName: data.staffName,
                 punchIn: data.punchIn,
-                onBreak: data.onBreak
+                onBreak: data.onBreak,
+                breakStart: data.breakStart,
+                breakDurationMinutes: data.breakDurationMinutes
             })),
             activeStaffMap // Include map for easy lookup
         });

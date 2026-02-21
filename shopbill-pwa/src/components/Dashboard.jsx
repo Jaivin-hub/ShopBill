@@ -74,6 +74,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [userRole, apiClient, API]);
 
+    // Update attendance caption instantly when child reports a change (no API call)
+    const handleAttendanceStatusUpdate = useCallback((attendance) => {
+        setCurrentAttendance(attendance);
+    }, []);
+
     // Check if business address is missing
     const checkAddressStatus = useCallback(async () => {
         if (userRole === USER_ROLES.OWNER && apiClient && API) {
@@ -402,7 +407,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                         showToast={showToast}
                                         darkMode={darkMode}
                                         currentUser={currentUser}
-                                        onStatusChange={fetchAttendanceStatus} // Callback to update status when attendance changes
+                                        onStatusChange={handleAttendanceStatusUpdate}
                                     />
                                 </div>
                             )}

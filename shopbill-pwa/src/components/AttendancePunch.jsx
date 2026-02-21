@@ -79,10 +79,9 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
                 clientTime: now.toISOString() // Send exact client time with milliseconds
             });
             if (response.data?.success && response.data?.attendance) {
-                // Update state directly from response for immediate UI update
-                setCurrentAttendance(response.data.attendance);
-                // Don't call onStatusChange here - it triggers fetchAttendanceStatus in Dashboard
-                // which makes another API call. The Dashboard's periodic refresh will pick up the change.
+                const attendance = response.data.attendance;
+                setCurrentAttendance(attendance);
+                if (onStatusChange) onStatusChange(attendance); // Update Dashboard caption instantly
                 showToast('Punched in successfully!', 'success');
                 // Fetch records only - no need to call fetchCurrentStatus since we already have the data
                 await fetchMyRecords();
@@ -101,10 +100,9 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
             // Check if error response includes attendance data (already punched in scenario)
             const errorResponse = error.response?.data;
             if (errorResponse?.attendance && errorResponse.attendance.status === 'active') {
-                // User is already punched in - use the attendance data from error response
-                setCurrentAttendance(errorResponse.attendance);
-                // Don't call onStatusChange here - it triggers fetchAttendanceStatus in Dashboard
-                // which makes another API call. The Dashboard's periodic refresh will pick up the change.
+                const attendance = errorResponse.attendance;
+                setCurrentAttendance(attendance);
+                if (onStatusChange) onStatusChange(attendance); // Update Dashboard caption instantly
                 showToast('You are already punched in', 'info');
                 await fetchMyRecords();
             } else {
@@ -124,10 +122,11 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
             setIsPunchingOut(true);
             const response = await apiClient.post(API.attendancePunchOut);
             if (response.data?.success) {
-                // Refresh status from server to ensure UI is in sync (will return null since punched out)
-                await fetchCurrentStatus();
+                setCurrentAttendance(null);
+                if (onStatusChange) onStatusChange(null); // Update Dashboard caption instantly
                 showToast(`Punched out successfully! Worked: ${response.data.attendance.hoursWorked}`, 'success');
                 await fetchMyRecords();
+                await fetchCurrentStatus(); // Keep local state in sync
             } else {
                 showToast(response.data?.error || 'Failed to punch out', 'error');
                 // Refresh status to ensure UI is in sync
@@ -154,7 +153,13 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
             setIsStartingBreak(true);
             const response = await apiClient.post(API.attendanceBreakStart);
             if (response.data?.success) {
-                await fetchCurrentStatus();
+                const attendance = response.data?.attendance;
+                if (attendance) {
+                    setCurrentAttendance(attendance);
+                    if (onStatusChange) onStatusChange(attendance);
+                } else {
+                    await fetchCurrentStatus();
+                }
                 showToast('Break started successfully!', 'success');
             } else {
                 showToast(response.data?.error || 'Failed to start break', 'error');
@@ -180,8 +185,14 @@ const AttendancePunch = ({ apiClient, API, showToast, darkMode, currentUser, onS
             setIsEndingBreak(true);
             const response = await apiClient.post(API.attendanceBreakEnd);
             if (response.data?.success) {
-                await fetchCurrentStatus();
-                const hoursWorked = response.data.attendance?.currentWorkingHours || '0h 0m';
+                const attendance = response.data?.attendance;
+                if (attendance) {
+                    setCurrentAttendance(attendance);
+                    if (onStatusChange) onStatusChange(attendance);
+                } else {
+                    await fetchCurrentStatus();
+                }
+                const hoursWorked = attendance?.currentWorkingHours || response.data.attendance?.currentWorkingHours || '0h 0m';
                 showToast(`Break ended. ${hoursWorked} worked so far`, 'success');
             } else {
                 showToast(response.data?.error || 'Failed to end break', 'error');

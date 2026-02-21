@@ -129,25 +129,53 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
 
-    // Format punch in time
-    const formatPunchInTime = (punchIn) => {
-        if (!punchIn) return '';
-        const date = new Date(punchIn);
+    // Format "time ago" for punch in (working) or break start (on break)
+    const formatTimeAgo = (dateOrIso) => {
+        if (!dateOrIso) return '';
+        const date = new Date(dateOrIso);
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMins / 60);
-        
         if (diffMins < 1) return 'Just now';
         if (diffMins < 60) return `${diffMins}m ago`;
         if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m ago`;
-        
         return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     };
+
+    // Format break duration for display (e.g. "12m on break")
+    const formatBreakDuration = (minutes) => {
+        if (minutes == null || minutes < 0) return '';
+        if (minutes < 60) return `${minutes}m`;
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return m ? `${h}h ${m}m` : `${h}h`;
+    };
+
+    // Caption: when working show punch-in ago; when on break show ongoing break time
+    const statusCaption = (() => {
+        if (!isCurrentlyActive) return null;
+        if (isOnBreak) {
+            // Use API duration or compute from breakStart so we always show ongoing time when possible
+            const minutesOnBreak = breakDurationMinutes != null && breakDurationMinutes >= 0
+                ? breakDurationMinutes
+                : (breakStart ? Math.floor((new Date() - new Date(breakStart)) / (1000 * 60)) : null);
+            const hasDuration = minutesOnBreak != null;
+            const durationText = hasDuration ? `${formatBreakDuration(minutesOnBreak)} on break` : '';
+            if (breakStart != null && hasDuration) {
+                return `Break started ${formatTimeAgo(breakStart)} · ${durationText}`;
+            }
+            if (hasDuration) return durationText; // e.g. "12m on break"
+            if (breakStart != null) return `Break started ${formatTimeAgo(breakStart)}`;
+            return 'On break';
+        }
+        if (punchInTime) return formatTimeAgo(punchInTime);
+        return null;
+    })();
 
     return (
         <div className="space-y-3">
@@ -187,9 +215,9 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                                 : 'Not Working'}
                                         </span>
                                     </div>
-                                    {isCurrentlyActive && punchInTime && (
+                                    {isCurrentlyActive && statusCaption && (
                                         <span className={`text-[9px] md:text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            • {formatPunchInTime(punchInTime)}
+                                            • {statusCaption}
                                         </span>
                                     )}
                                 </div>
@@ -533,14 +561,16 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 if (response.data?.activeStaffIds) {
                     setActiveStaffIds(new Set(response.data.activeStaffIds));
                 }
-                // Store punch in times and break status for display
+                // Store punch in times, break status, and break start/duration for display
                 if (response.data?.activeAttendance) {
                     const map = {};
                     response.data.activeAttendance.forEach(item => {
                         if (item.staffId && item.punchIn) {
                             map[item.staffId] = { 
                                 punchIn: item.punchIn,
-                                onBreak: item.onBreak || false
+                                onBreak: item.onBreak || false,
+                                breakStart: item.breakStart || null,
+                                breakDurationMinutes: item.breakDurationMinutes ?? 0
                             };
                         }
                     });
@@ -738,8 +768,11 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 const isActionDisabled = !hasWriteAccess || s.role === 'owner';
                                 const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
                                 const isCurrentlyActive = activeStaffIds.has(s._id);
-                                const punchInTime = activeStaffMap[s._id]?.punchIn;
-                                const isOnBreak = activeStaffMap[s._id]?.onBreak || false;
+                                const att = activeStaffMap[s._id];
+                                const punchInTime = att?.punchIn;
+                                const isOnBreak = att?.onBreak || false;
+                                const breakStart = att?.breakStart || null;
+                                const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
                                 return (
                                     <StaffStatusButton
                                         key={s._id}
@@ -761,6 +794,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         isCurrentlyActive={isCurrentlyActive}
                                         punchInTime={punchInTime}
                                         isOnBreak={isOnBreak}
+                                        breakStart={breakStart}
+                                        breakDurationMinutes={breakDurationMinutes}
                                     />
                                 );
                             })
