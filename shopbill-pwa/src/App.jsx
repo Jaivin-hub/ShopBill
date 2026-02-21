@@ -309,28 +309,28 @@ const UpdatePrompt = () => {
 };
 
 const UTILITY_NAV_ITEMS_CONFIG = [
-  { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
   { id: 'staffPermissions', name: 'Team Management', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
   { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 },
-  { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
+    { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
 const SUPERADMIN_NAV_ITEMS = [
-  { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
-  { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
 const checkDeepLinkPath = () => {
-  const path = window.location.pathname;
-  if (path.startsWith('/staff-setup/')) {
-    return 'staffSetPassword';
-  }
-  if (path.startsWith('/reset-password/')) {
-    return 'resetPassword';
-  }
-  return null;
+    const path = window.location.pathname;
+    if (path.startsWith('/staff-setup/')) {
+        return 'staffSetPassword'; 
+    }
+    if (path.startsWith('/reset-password/')) {
+        return 'resetPassword'; 
+    }
+    return null; 
 };
 
 const App = () => {
@@ -393,7 +393,7 @@ const App = () => {
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  }, []);
+}, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
   const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
@@ -414,7 +414,7 @@ const App = () => {
     setShowLowStockFilter(true);
     setCurrentPage('inventory');
   }, []);
-
+  
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser || !apiClient || !API) {
       console.log('⚠️ Cannot fetch notifications: missing currentUser, apiClient, or API');
@@ -430,7 +430,7 @@ const App = () => {
         setNotifications(alerts);
         const unreadCount = alerts.filter(a => !a.isRead).length;
         console.log(`📬 Fetched ${alerts.length} notifications (${unreadCount} unread)`);
-      } else {
+    } else {
         console.warn('⚠️ Notification API returned no data');
         setNotifications([]);
       }
@@ -517,7 +517,7 @@ const App = () => {
                 setCurrentOutletId(targetOutletId);
                 localStorage.setItem('lastSelectedOutletId', targetOutletId);
               }
-            } else {
+    } else {
               setCurrentOutlet(targetOutlet);
               setCurrentOutletId(targetOutletId);
               localStorage.setItem('lastSelectedOutletId', targetOutletId);
@@ -566,7 +566,7 @@ const App = () => {
   }, [currentUser?.id, currentUser?.plan, fetchOutlets]);
 
   // Sync currentOutlet from outlets list when it's loaded
-  useEffect(() => {
+useEffect(() => {
     const userPlan = currentUser?.plan?.toUpperCase();
     const isUserPremium = userPlan === 'PREMIUM';
     
@@ -741,7 +741,7 @@ const App = () => {
     setCurrentPage('dashboard');
     setIsViewingLogin(false);
     outletRestoredRef.current = false;
-  }, []);
+  }, []); 
 
   const handleLoginSuccess = useCallback(async (user, token) => {
     const normalizedUser = { ...user, role: user.role.toLowerCase() };
@@ -759,7 +759,7 @@ const App = () => {
         if (outlet.data?.success && outlet.data.data) {
           setCurrentOutlet(outlet.data.data);
         }
-      } catch (error) {
+    } catch (error) {
         // Silently fail - fetchOutlets will handle it
         console.error('Failed to fetch outlet on login:', error);
       }
@@ -924,7 +924,7 @@ const App = () => {
     if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {
-      return (
+         return (
         <Checkout
           currentUser={currentUser}
           userRole={userRole}
@@ -942,17 +942,17 @@ const App = () => {
     if (!currentUser) {
       return isViewingLogin ?
         <Login 
-          onLogin={handleLoginSuccess} 
-          showToast={showToast} 
+                onLogin={handleLoginSuccess} 
+                showToast={showToast} 
           setCurrentPage={setCurrentPage} 
-          onBackToLanding={() => {
-            setIsViewingLogin(false);
+                onBackToLanding={() => {
+                    setIsViewingLogin(false);
             setScrollToPricing(true);
           }}
           onBackToLandingNormal={() => setIsViewingLogin(false)} 
           darkMode={darkMode}
         /> :
-        <LandingPage
+            <LandingPage 
           onStartApp={() => {
             setIsViewingLogin(true);
             setScrollToPricing(false);
@@ -969,12 +969,12 @@ const App = () => {
           darkMode={darkMode}
         />
     }
-
-    const commonProps = { 
+    
+    const commonProps = {
       darkMode, 
       currentUser, 
-      userRole, 
-      showToast, 
+      userRole,
+      showToast,
       apiClient, 
       API, 
       onLogout: logout, 
@@ -1035,17 +1035,17 @@ const App = () => {
       <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
         {showAppUI && !isChatSelected && (
-          <Header 
-            companyName="Pocket POS" 
+            <Header
+                companyName="Pocket POS"
             userRole={userRole.toUpperCase()} 
-            setCurrentPage={setCurrentPage} 
+                setCurrentPage={setCurrentPage}
             currentPage={currentPage} 
             notifications={notifications} 
             unreadCount={unreadCount} 
-            onLogout={logout} 
-            apiClient={apiClient} 
-            API={API} 
-            utilityNavItems={utilityNavItems}
+                onLogout={logout}
+                apiClient={apiClient}
+                API={API}
+                utilityNavItems={utilityNavItems}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
             currentUser={currentUser}
@@ -1058,7 +1058,7 @@ const App = () => {
           />
         )}
         <div className="flex flex-1 overflow-hidden relative">
-          {showAppUI && (
+        {showAppUI && (
             <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
               <div className="p-8 font-black text-2xl tracking-tighter flex items-center gap-2">
                 <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50">
@@ -1076,7 +1076,7 @@ const App = () => {
                     onOutletSwitch={handleOutletSwitch}
                     showToast={showToast}
                   />
-                  <button
+                        <button
                     onClick={() => setCurrentPage('outlets')}
                     className={`w-full mt-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                       currentPage === 'outlets'
@@ -1087,7 +1087,7 @@ const App = () => {
                     }`}
                   >
                     Manage Outlets
-                  </button>
+                        </button>
                 </div>
               )}
 
@@ -1123,19 +1123,19 @@ const App = () => {
                 )}
                 <div className={`pt-6 mt-6 border-t space-y-1.5 ${darkMode ? 'border-gray-900' : 'border-slate-100'}`}>
                   <p className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 mb-2 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Account</p>
-                  {utilityNavItems.map(item => (
+                            {utilityNavItems.map(item => (
                     <button key={item.id} onClick={() => setCurrentPage(item.id)} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group ${currentPage === item.id ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : `border border-transparent ${navText}`}`}>
-                      <item.icon className="w-5 h-5 mr-3" />
+                                    <item.icon className="w-5 h-5 mr-3" />
                       <span className="text-sm font-bold tracking-tight">{item.name}</span>
                       {item.id === 'notifications' && unreadCount > 0 && (
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
                           {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
-                    </button>
-                  ))}
-                </div>
-              </nav>
+                                </button>
+                            ))}
+                        </div>
+                </nav>
               <div className="p-4 space-y-2 border-t border-inherit">
                 <button 
                   onClick={() => setDarkMode(!darkMode)} 
@@ -1145,21 +1145,21 @@ const App = () => {
                   <span className="text-sm font-bold">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
                 </button>
                 
-                <button 
-                  onClick={logout} 
+                    <button
+                        onClick={logout}
                   className="w-full flex items-center px-4 py-3 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all group border border-transparent"
-                >
+                    >
                   <LogOut className="w-5 h-5 mr-3 group-hover:rotate-12 transition-transform" />
                   <span className="text-sm font-bold">Logout</span>
-                </button>
-              </div>
+                    </button>
+                </div>
             </aside>
           )}
           <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
             <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : (currentPage === 'chat' ? 'h-full' : 'max-w-7xl mx-auto min-h-full')} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
-              {renderContent()}
+            {renderContent()}
             </div>
-          </main>
+        </main>
         </div>
         {showAppUI && !isChatSelected && (
           <>
@@ -1214,8 +1214,8 @@ const App = () => {
                   <div className="px-2 pt-2 pb-4 pb-safe">
                     {/* Team Management first (for owners) */}
                     {utilityNavItems.filter(item => item.id === 'staffPermissions').map(item => (
-                      <button
-                        key={item.id}
+                        <button
+                            key={item.id}
                         onClick={() => {
                           setCurrentPage(item.id);
                           setShowMoreMenu(false);
@@ -1224,9 +1224,9 @@ const App = () => {
                           currentPage === item.id
                             ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
                             : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5" />
+                            }`}
+                        >
+                            <item.icon className="w-5 h-5" />
                         <span className="text-sm font-bold">{item.name}</span>
                       </button>
                     ))}
@@ -1269,9 +1269,9 @@ const App = () => {
                       >
                         <item.icon className="w-5 h-5" />
                         <span className="text-sm font-bold">{item.name}</span>
-                      </button>
+                        </button>
                     ))}
-                  </div>
+                </div>
                 </div>
               </div>
             )}
