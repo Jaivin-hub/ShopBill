@@ -918,19 +918,15 @@ useEffect(() => {
   }, [navItems, userRole, currentUser?.plan]);
 
   const utilityNavItems = useMemo(() => {
-    const userPlan = currentUser?.plan?.toUpperCase();
-    const isBasicManager = userRole === USER_ROLES.MANAGER && userPlan !== 'PREMIUM' && userPlan !== 'PRO';
-    // Basic plan manager: no Settings/Profile/Notifications in footer (they are in header only)
-    if (isBasicManager) return [];
     const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
-    // Sort by priority (lower number = higher priority), then by name
+    // Sort by priority (lower number = higher priority), then by name. Always show for sidebar (Account); footer uses direct Settings for Basic manager.
     return filtered.sort((a, b) => {
       const priorityA = a.priority ?? 999;
       const priorityB = b.priority ?? 999;
       if (priorityA !== priorityB) return priorityA - priorityB;
       return a.name.localeCompare(b.name);
     });
-  }, [userRole, currentUser?.plan]);
+  }, [userRole]);
 
   const handleBackToOrigin = () => {
     setCurrentPage(pageOrigin || 'dashboard');

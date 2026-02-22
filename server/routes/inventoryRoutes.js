@@ -121,12 +121,37 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
+// Helper: check if a name already exists in the store (case-insensitive)
+const existsByName = async (storeId, name) => {
+    if (!name || !String(name).trim()) return false;
+    const trimmed = String(name).trim();
+    const existing = await Inventory.findOne({
+        storeId,
+        name: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    }).select('_id').lean();
+    return !!existing;
+};
+
+// Helper: find one item by storeId and name (case-insensitive), for update-or-insert
+const findByName = async (storeId, name) => {
+    if (!name || !String(name).trim()) return null;
+    const trimmed = String(name).trim();
+    return Inventory.findOne({
+        storeId,
+        name: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
+};
+
 // 2. POST New Inventory Item
 router.post('/', protect, async (req, res) => {
     try {
         // Clean the request body
         const cleanedData = { ...req.body };
-        
+        if (!cleanedData.name || !String(cleanedData.name).trim()) {
+            return res.status(400).json({ error: 'Item name is required.' });
+        }
+        cleanedData.name = String(cleanedData.name).trim();
+
         // Remove _id from variants (frontend React keys)
         if (cleanedData.variants && Array.isArray(cleanedData.variants)) {
             cleanedData.variants = cleanedData.variants.map(v => {
@@ -153,13 +178,37 @@ router.post('/', protect, async (req, res) => {
             cleanedData.price = parseFloat(cleanedData.price) || 0;
             cleanedData.quantity = parseInt(cleanedData.quantity) || 0;
         }
-        
-        const item = await Inventory.create({ 
-            ...cleanedData, 
-            storeId: req.user.storeId 
+
+        // Same name (case-insensitive): update existing item instead of creating duplicate
+        const existingItem = await findByName(req.user.storeId, cleanedData.name);
+        let item;
+        if (existingItem) {
+            existingItem.price = cleanedData.price;
+            existingItem.reorderLevel = cleanedData.reorderLevel != null ? cleanedData.reorderLevel : existingItem.reorderLevel;
+            existingItem.quantity = (Number(existingItem.quantity) || 0) + (Number(cleanedData.quantity) || 0);
+            if (cleanedData.hsn != null) existingItem.hsn = cleanedData.hsn;
+            await existingItem.save();
+            item = existingItem;
+            await checkAndNotifyLowStock(req, item);
+            try {
+                const actorNameWithRole = await getActorNameWithRole(req);
+                await emitAlert(req, req.user.storeId, 'inventory_updated', {
+                    _id: item._id,
+                    name: item.name,
+                    message: `"${item.name}" already existed; quantity and details updated by ${actorNameWithRole}.`
+                });
+            } catch (err) {
+                console.error("❌ Error sending notification:", err);
+            }
+            return res.status(200).json({ message: 'Item already exists; quantity and details updated.', item });
+        }
+
+        item = await Inventory.create({
+            ...cleanedData,
+            storeId: req.user.storeId
         });
         await checkAndNotifyLowStock(req, item);
-        
+
         // Send notification for inventory addition
         try {
             const actorNameWithRole = await getActorNameWithRole(req);
@@ -321,9 +370,9 @@ router.put('/:id', protect, async (req, res) => {
     }
 });
 
-// 5. POST Bulk Upload
+// 5. POST Bulk Upload (same name = update existing, no duplicates)
 router.post('/bulk', protect, async (req, res) => {
-    const items = req.body; 
+    const items = req.body;
     const storeId = req.user.storeId;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -340,25 +389,58 @@ router.post('/bulk', protect, async (req, res) => {
             reorderLevel: parseInt(item.reorderLevel) || 5,
         })).filter(item => item.name);
 
-        const result = await Inventory.insertMany(cleanedItems, { ordered: false });
+        const result = [];
+        let insertedCount = 0;
+        let updatedCount = 0;
 
-        // This will clear alerts for any items in the bulk list that have sufficient stock
+        for (const row of cleanedItems) {
+            const existing = await findByName(storeId, row.name);
+            if (existing) {
+                existing.price = row.price;
+                existing.reorderLevel = row.reorderLevel;
+                existing.quantity = (Number(existing.quantity) || 0) + (Number(row.quantity) || 0);
+                if (row.hsn != null) existing.hsn = row.hsn;
+                await existing.save();
+                result.push(existing);
+                updatedCount++;
+            } else {
+                const newItem = await Inventory.create({
+                    storeId: row.storeId,
+                    name: row.name,
+                    price: row.price,
+                    quantity: row.quantity,
+                    reorderLevel: row.reorderLevel,
+                    hsn: row.hsn != null ? row.hsn : '',
+                });
+                result.push(newItem);
+                insertedCount++;
+            }
+        }
+
         await Promise.all(result.map(item => checkAndNotifyLowStock(req, item)));
 
-        // Notify: if Manager/Cashier did bulk upload → notify Owner; if Owner did → notify Managers and Cashiers
         try {
-            await emitAlert(req, storeId, 'inventory_bulk_upload', { count: result.length });
+            await emitAlert(req, storeId, 'inventory_bulk_upload', {
+                count: result.length,
+                message: `${insertedCount} item(s) added, ${updatedCount} existing item(s) updated. Same-name products are not duplicated.`
+            });
         } catch (notifyErr) {
             console.error('Bulk upload notification error:', notifyErr);
         }
 
-        res.status(201).json({ 
-            message: `${result.length} items added successfully.`,
-            insertedCount: result.length,
+        res.status(201).json({
+            message: insertedCount > 0 && updatedCount > 0
+                ? `${insertedCount} item(s) added, ${updatedCount} existing item(s) updated.`
+                : updatedCount > 0
+                    ? `${updatedCount} existing item(s) updated. No duplicates added.`
+                    : `${insertedCount} items added successfully.`,
+            insertedCount,
+            updatedCount,
             items: result
         });
 
     } catch (error) {
+        console.error('Bulk upload error:', error);
         res.status(500).json({ error: 'Failed to process bulk upload.' });
     }
 });
