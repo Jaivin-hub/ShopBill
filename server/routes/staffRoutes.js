@@ -89,26 +89,11 @@ router.post('/', protect, async (req, res) => {
             // Basic: 1 Owner + 2 Staff total
             if (currentStaffCount >= 2) {
                 return res.status(403).json({ 
-                    error: 'Plan Limit Reached: The BASIC plan allows up to 2 staff members. Please upgrade to PRO for more seats.' 
+                    error: 'Plan Limit Reached: The BASIC plan allows up to 2 staff members. Please upgrade to PRO for unlimited staff.' 
                 });
             }
-        } else if (plan === 'PRO') {
-            // Pro: 1 Owner + 1 Manager + 1 Cashier (Total 2 staff)
-            if (currentStaffCount >= 2) {
-                return res.status(403).json({ 
-                    error: 'Plan Limit Reached: The PRO plan allows 2 staff members (1 Manager & 1 Cashier). Upgrade to PREMIUM for unlimited staff.' 
-                });
-            }
-            
-            // Optional: Strict check if you want exactly one of each for PRO
-            const existingRoleCount = await Staff.countDocuments({ storeId: storeIdObj, role: role });
-            if (existingRoleCount >= 1) {
-                return res.status(403).json({ 
-                    error: `Plan Limit Reached: The PRO plan allows only one ${role}.` 
-                });
-            }
-        } 
-        // PREMIUM plan allows unlimited, so no check needed here.
+        }
+        // PRO and PREMIUM plans allow unlimited staff; no further check needed.
 
         // --- 1. Email uniqueness per shop: only block if this email is already staff in THIS shop ---
         const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -399,26 +384,7 @@ router.put('/:id/role', protect, async (req, res) => {
             return res.json({ message: 'Role updated (no change).', staff: staffMember });
         }
 
-        // 4. PLAN LIMIT VALIDATION (Logic similar to POST route)
-        const owner = await User.findById(req.user.id);
-        const plan = owner.plan || 'BASIC';
-
-        if (plan === 'PRO') {
-            // Check if they already have a staff member with this specific role
-            const roleCount = await Staff.countDocuments({ 
-                storeId: req.user.storeId, 
-                role: newRole 
-            });
-
-            if (roleCount >= 1) {
-                return res.status(403).json({ 
-                    error: `Plan Limit: Your PRO plan only allows one ${newRole}. Upgrade to PREMIUM for more.` 
-                });
-            }
-        }
-        // BASIC plan allows 2 staff of any role, so changing the role of an existing 
-        // staff member doesn't break the count limit. 
-        // PREMIUM is unlimited.
+        // 4. PLAN LIMIT: Only BASIC has staff limits. PRO and PREMIUM allow unlimited staff and any role mix.
 
         // 5. Update both Staff and User records
         const updatedStaff = await Staff.findByIdAndUpdate(

@@ -448,7 +448,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
 });
 
 const InventoryContent = ({
-    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, darkMode, readOnly = false
+    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -962,12 +962,21 @@ const InventoryContent = ({
             {isConfirmModalOpen && (
                 <section className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[210] p-4">
                     <div className={`${darkMode ? 'bg-slate-900 border-red-500/20' : 'bg-white border-slate-200'} w-full max-w-sm rounded-2xl border p-8 text-center space-y-6 shadow-2xl`}>
-                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-                        <div><h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>Confirm Delete</h2><p className="text-[10px] font-bold text-slate-500  tracking-widest mt-3 leading-relaxed">Permanently delete <span className={darkMode ? 'text-white' : 'text-indigo-600'}>{itemToDelete?.name}</span>? This cannot be undone.</p></div>
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={() => setIsConfirmModalOpen(false)} className={`flex-1 py-3.5 ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'} text-[9px] font-black  tracking-widest rounded-xl`}>Cancel</button>
-                            <button onClick={confirmDeleteItem} className="flex-1 py-3.5 bg-red-600 text-white text-[9px] font-black  tracking-widest rounded-xl shadow-lg shadow-red-500/20">Delete</button>
-                        </div>
+                        {isDeleting ? (
+                            <div className="flex flex-col items-center gap-4 py-4">
+                                <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+                                <p className={`text-[10px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Deleting...</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
+                                <div><h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>Confirm Delete</h2><p className="text-[10px] font-bold text-slate-500  tracking-widest mt-3 leading-relaxed">Permanently delete <span className={darkMode ? 'text-white' : 'text-indigo-600'}>{itemToDelete?.name}</span>? This cannot be undone.</p></div>
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setIsConfirmModalOpen(false)} className={`flex-1 py-3.5 ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'} text-[9px] font-black  tracking-widest rounded-xl`}>Cancel</button>
+                                    <button type="button" onClick={confirmDeleteItem} className="flex-1 py-3.5 bg-red-600 text-white text-[9px] font-black  tracking-widest rounded-xl shadow-lg shadow-red-500/20">Delete</button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </section>
             )}
@@ -990,7 +999,7 @@ const InventoryContent = ({
                 }}
                 darkMode={darkMode} 
             />
-            <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={loading} darkMode={darkMode} />
+            <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={isBulkUploading} darkMode={darkMode} />
         </div>
     );
 };

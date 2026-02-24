@@ -20,7 +20,8 @@ const ChatListSidebar = ({
     formatTime,
     currentUser,
     darkMode,
-    staffUnreadMap = {}
+    staffUnreadMap = {},
+    showOutletInfo = false
 }) => {
     const [viewMode, setViewMode] = useState('chats');
 
@@ -36,25 +37,7 @@ const ChatListSidebar = ({
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {/* Sticky Header Area - Title, Description, Toggle, and Search */}
                 <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg`}>
-                    {/* Title and Description */}
                     <div className="p-4 md:p-6 pb-3 md:pb-4">
-                        <div className="flex items-center justify-between mb-3 md:mb-4">
-                            <div className="flex-1 min-w-0">
-                                <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    Network <span className="text-indigo-500">Comms</span>
-                                </h1>
-                                <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 md:mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Real-time team communication and coordination.
-                                </p>
-                            </div>
-                            <button
-                                onClick={onNewGroupClick}
-                                className="p-2 md:p-2.5 rounded-xl bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/20 flex-shrink-0 ml-2"
-                            >
-                                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                            </button>
-                        </div>
-
                         {/* Toggle */}
                         <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                             <button
@@ -107,6 +90,7 @@ const ChatListSidebar = ({
                             currentUser={currentUser}
                             staffUnreadMap={staffUnreadMap}
                             chats={chats}
+                            showOutletInfo={showOutletInfo}
                         />
                     ) : (
                         <ChatListView
@@ -119,6 +103,7 @@ const ChatListSidebar = ({
                             formatTime={formatTime}
                             currentUser={currentUser}
                             darkMode={darkMode}
+                            showOutletInfo={showOutletInfo}
                         />
                     )}
                 </div>
@@ -136,7 +121,7 @@ const ChatListSidebar = ({
     );
 };
 
-const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {}, chats = [] }) => {
+const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {}, chats = [], showOutletInfo = false }) => {
     if (isLoadingStaff) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -214,7 +199,7 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
                             <span className="text-[8px] font-black tracking-widest text-indigo-500 uppercase">
                                 {staff.role}
                             </span>
-                            {staff.outletName && (
+                            {showOutletInfo && staff.outletName && (
                                 <span className={`text-[8px] font-bold truncate uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
                                     • {staff.outletName}
                                 </span>
@@ -235,7 +220,7 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
     );
 };
 
-const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading, getChatDisplayName, formatTime, currentUser, darkMode }) => {
+const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading, getChatDisplayName, formatTime, currentUser, darkMode, showOutletInfo = false }) => {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -393,7 +378,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                     
                                     {/* Action/Meta Indicators */}
                                     <div className="flex items-center gap-2">
-                                        {chat.outletId?.name && !isSelected && (
+                                        {showOutletInfo && chat.outletId?.name && !isSelected && (
                                             <span className={`text-[7px] font-black px-1 rounded uppercase tracking-tighter ${darkMode ? 'text-slate-400 border-slate-700' : 'text-slate-600 border-slate-300'} border`}>
                                                 {chat.outletId.name.split(' ')[0]}
                                             </span>

@@ -397,7 +397,9 @@ const App = () => {
 }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
-  const isPremium = currentUser?.plan?.toLowerCase() === 'premium';
+  const planUpper = currentUser?.plan?.toUpperCase();
+  const isPremium = planUpper === 'PREMIUM';
+  const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
 
   // Calculate unread count - updates in real-time when notifications change via Socket.IO
   const unreadCount = useMemo(() => {
@@ -862,12 +864,12 @@ useEffect(() => {
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
       { id: 'inventory', name: 'Inventory', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
-      ...(isPremium ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: null, cashier: null } }] : []),
+      ...(hasSupplyChainAccess ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: null, cashier: null } }] : []),
       { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER], displayOrder: { owner: 4, manager: null, cashier: null } },
       ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 3, manager: null, cashier: null } }] : []),
     ];
     return standardNav.filter(item => item.roles.includes(userRole));
-  }, [userRole, isPremium, currentUser]);
+  }, [userRole, hasSupplyChainAccess, currentUser]);
 
   // Split nav items into primary (footer) and secondary (more menu) based on role and plan
   const { primaryNavItems, secondaryNavItems } = useMemo(() => {
@@ -919,7 +921,6 @@ useEffect(() => {
 
   const utilityNavItems = useMemo(() => {
     const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
-    // Sort by priority (lower number = higher priority), then by name. Always show for sidebar (Account); footer uses direct Settings for Basic manager.
     return filtered.sort((a, b) => {
       const priorityA = a.priority ?? 999;
       const priorityB = b.priority ?? 999;
@@ -927,6 +928,34 @@ useEffect(() => {
       return a.name.localeCompare(b.name);
     });
   }, [userRole]);
+
+  // Footer More menu: for owner exclude Notifications & Profile (in header); Settings always last
+  const moreMenuUtilityItems = useMemo(() => {
+    let items = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
+    if (userRole === USER_ROLES.OWNER) {
+      items = items.filter(item => item.id !== 'notifications' && item.id !== 'profile');
+    }
+    return items.sort((a, b) => {
+      if (a.id === 'settings') return 1;
+      if (b.id === 'settings') return -1;
+      const priorityA = a.priority ?? 999;
+      const priorityB = b.priority ?? 999;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return a.name.localeCompare(b.name);
+    });
+  }, [userRole]);
+
+  // Owner footer More menu: Team management, Supply chain, Inventory, Billing, Settings (Pro/Premium order)
+  const footerMoreMenuItems = useMemo(() => {
+    if (userRole !== USER_ROLES.OWNER) return null;
+    const order = ['staffPermissions', 'scm', 'inventory', 'billing', 'settings'];
+    const utility = moreMenuUtilityItems; // Team Management, Settings (no notifications/profile)
+    const secondary = secondaryNavItems;  // e.g. scm, inventory, billing
+    const byId = new Map();
+    utility.forEach(item => byId.set(item.id, item));
+    secondary.forEach(item => byId.set(item.id, item));
+    return order.map(id => byId.get(id)).filter(Boolean);
+  }, [userRole, moreMenuUtilityItems, secondaryNavItems]);
 
   const handleBackToOrigin = () => {
     setCurrentPage(pageOrigin || 'dashboard');
@@ -1188,7 +1217,7 @@ useEffect(() => {
                 </div>
             </aside>
           )}
-          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 overflow-hidden' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
+          <main className={`flex-1 transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-16 md:pt-0 overflow-hidden pb-24 md:pb-6' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
             <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : (currentPage === 'chat' ? 'h-full' : 'max-w-7xl mx-auto min-h-full')} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
             {renderContent()}
             </div>
@@ -1256,48 +1285,69 @@ useEffect(() => {
                     </div>
                   </div>
                   <div className="px-2 pt-2 pb-4 pb-safe">
-                    {/* All utility items (Team Management, Settings, Profile, Notifications) for mobile */}
-                    {utilityNavItems.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setCurrentPage(item.id);
-                          setShowMoreMenu(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
-                          currentPage === item.id
-                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="text-sm font-bold">{item.name}</span>
-                      </button>
-                    ))}
-                    {/* Secondary nav items (Supply Chain, Inventory, Billing for owners) */}
-                    {secondaryNavItems.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setCurrentPage(item.id);
-                          setShowMoreMenu(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
-                          currentPage === item.id
-                            ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                            : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="text-sm font-bold">{item.name}</span>
-                        {item.id === 'chat' && chatUnreadCount > 0 && (
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
-                            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                </div>
+                    {/* Owner: Team management, Inventory, Billing, [Supply Chain], Settings. Others: utility then secondary */}
+                    {footerMoreMenuItems ? (
+                      footerMoreMenuItems.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setCurrentPage(item.id);
+                            setShowMoreMenu(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
+                            currentPage === item.id
+                              ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                              : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          <span className="text-sm font-bold">{item.name}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <>
+                        {moreMenuUtilityItems.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setCurrentPage(item.id);
+                              setShowMoreMenu(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
+                              currentPage === item.id
+                                ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                                : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-sm font-bold">{item.name}</span>
+                          </button>
+                        ))}
+                        {secondaryNavItems.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setCurrentPage(item.id);
+                              setShowMoreMenu(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
+                              currentPage === item.id
+                                ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                                : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-sm font-bold">{item.name}</span>
+                            {item.id === 'chat' && chatUnreadCount > 0 && (
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                                {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

@@ -45,7 +45,7 @@ const getFilterDateStrings = (filterId, startStr, endStr) => {
     return getFilterDateStrings('7d', null, null);
 };
 
-const Reports = ({ apiClient, API, showToast, darkMode }) => {
+const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole }) => {
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
     const [chartYAxis, setChartYAxis] = useState('revenue');
@@ -153,6 +153,9 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
         revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
         topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
     };
+
+    const plan = currentUser?.plan?.toUpperCase();
+    const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
 
     return (
         <div className={`min-h-screen ${themeBase} transition-colors duration-200`}>
@@ -275,7 +278,8 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
 
                 {/* SECONDARY INSIGHTS */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* PROCUREMENT INSIGHTS */}
+                    {/* PROCUREMENT INSIGHTS — hidden for basic plan owner */}
+                    {!isBasicPlanOwner && (
                     <div className={`lg:col-span-2 ${cardBase} rounded-xl p-6`}>
                         <div className="flex items-center justify-between mb-8">
                             <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
@@ -323,8 +327,9 @@ const Reports = ({ apiClient, API, showToast, darkMode }) => {
                             )}
                         </div>
                     </div>
+                    )}
 
-                    <div className="flex flex-col gap-6">
+                    <div className={`flex flex-col gap-6 ${isBasicPlanOwner ? 'lg:col-span-3' : ''}`}>
                         {/* TOP ITEMS */}
                         <div className={`${cardBase} rounded-xl p-6`}>
                             <div className="flex items-center justify-between mb-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { MessageCircle, Loader2, ShieldCheck, Plus } from 'lucide-react';
 import { io } from 'socket.io-client';
 import API from '../config/api';
 import ChatListSidebar from './chat/ChatListSidebar';
@@ -75,6 +75,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
     const isPremium = currentUser?.plan?.toUpperCase() === 'PREMIUM';
     const hasChatAccess = isPro || isPremium;
+    const showOutletInfo = isPremium; // Multi-store (outlet labels) only for Premium; Pro has single store
 
     // Initialize Socket.IO connection
     useEffect(() => {
@@ -1181,20 +1182,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 currentUser={currentUser}
                 staffUnreadMap={staffUnreadMap}
                 darkMode={darkMode}
+                showOutletInfo={showOutletInfo}
             />
 
             {/* Main Chat Interface */}
-            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full overflow-hidden`}>
-                {!selectedChat && (
-                    <div className={`sticky top-0 z-50 p-6 border-b ${darkMode ? 'border-slate-800 bg-slate-950/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'} shrink-0`}>
-                        <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Network <span className="text-indigo-500">Comms</span>
-                        </h1>
-                        <p className={`text-[9px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Real-time team communication and coordination.
-                        </p>
-                    </div>
-                )}
+            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full overflow-hidden relative`}>
                 {selectedChat ? (
                     <div className="flex flex-col h-full overflow-hidden">
                         {/* Fixed Header */}
@@ -1210,6 +1202,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 staffList={staffList}
                                 onNavigateToStaffPermissions={onNavigateToStaffPermissions}
                                 onDeleteChat={handleDeleteChat}
+                                showOutletInfo={showOutletInfo}
                             />
                         </div>
 
@@ -1263,6 +1256,17 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 )}
             </div>
 
+            {/* Floating Add button - only on groups list, not when inside a chat */}
+            {!selectedChat && (
+                <button
+                    onClick={() => { setShowNewChatModal(true); setNewChatType('group'); }}
+                    className="fixed bottom-24 right-4 md:right-6 z-50 p-4 rounded-full bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
+                    aria-label="New chat"
+                >
+                    <Plus className="w-6 h-6" />
+                </button>
+            )}
+
             <NewChatModal
                 show={showNewChatModal}
                 onClose={() => {
@@ -1284,6 +1288,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 darkMode={darkMode}
                 setSelectedUsers={setSelectedUsers}
                 isCreatingChat={isCreatingChat}
+                showOutletInfo={showOutletInfo}
             />
 
             <style dangerouslySetInnerHTML={{

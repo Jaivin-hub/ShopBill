@@ -15,6 +15,11 @@ const getActorNameWithRole = async (req) => {
     let actorName = req.user.name || req.user.email;
     let actorRole = req.user.role || 'User';
     
+    // For owner: show only role, not email/name
+    if (req.user.role === 'owner') {
+        return '(Owner)';
+    }
+    
     // For staff (Manager/Cashier), get name from Staff model and use their role
     if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
         const staffRecord = await Staff.findOne({ userId: req.user._id });
@@ -24,12 +29,7 @@ const getActorNameWithRole = async (req) => {
         }
     }
     
-    // Format role for display
-    const roleDisplay = actorRole === 'owner' ? 'Owner' : 
-                       actorRole === 'Manager' ? 'Manager' : 
-                       actorRole === 'Cashier' ? 'Cashier' : 
-                       actorRole;
-    
+    const roleDisplay = actorRole === 'Manager' ? 'Manager' : actorRole === 'Cashier' ? 'Cashier' : actorRole;
     return `${actorName} (${roleDisplay})`;
 };
 

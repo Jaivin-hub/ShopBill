@@ -250,9 +250,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             { label: 'Reports', icon: BarChart3, color: 'bg-rose-500', page: 'reports', roles: [USER_ROLES.OWNER], order: { owner: ownerReportsOrder, manager: null, cashier: null } },
         ];
         
-        // Filter by role and sort by order
+        // Filter by role; for Pro plan owner, hide New Bill quick button
+        const isProOwner = userRole === USER_ROLES.OWNER && currentUser?.plan?.toUpperCase() === 'PRO';
         return allActions
             .filter(action => action.roles.includes(userRole))
+            .filter(action => !(isProOwner && action.page === 'billing'))
             .sort((a, b) => {
                 const orderA = a.order[userRole];
                 const orderB = b.order[userRole];
@@ -322,10 +324,10 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 </div>
             </header>
 
-            {/* Address Reminder Banner */}
+            {/* Address Reminder Banner - opaque background so content behind does not show through */}
             {isAddressMissing && showAddressReminder && userRole === USER_ROLES.OWNER && (
-                <div className={`sticky top-[73px] z-[99] mx-4 md:mx-8 mt-4 mb-4 ${darkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'} border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300`}>
-                    <div className={`flex-shrink-0 p-2 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                <div className={`sticky top-[73px] z-[99] mx-4 md:mx-8 mt-4 mb-4 border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${darkMode ? 'bg-slate-900 border-amber-500/50' : 'bg-amber-50 border-amber-200'}`}>
+                    <div className={`flex-shrink-0 p-2 rounded-lg ${darkMode ? 'bg-amber-900' : 'bg-amber-100'}`}>
                         <AlertCircle className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -353,7 +355,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 </div>
             )}
 
-            <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
+            <main className={`flex-1 px-4 md:px-8 py-6 overflow-x-hidden ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
                 <div className="max-w-7xl mx-auto space-y-8 pb-12">
 
                     {/* ATTENDANCE PUNCH (For Staff Only) - Before Today's Sales */}

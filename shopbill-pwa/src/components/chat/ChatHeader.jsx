@@ -17,7 +17,8 @@ const ChatHeader = ({
     currentUser,
     staffList = [],
     onNavigateToStaffPermissions,
-    onDeleteChat
+    onDeleteChat,
+    showOutletInfo = false
 }) => {
     const [internalShowInfo, setInternalShowInfo] = useState(false);
     const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
@@ -285,9 +286,9 @@ const ChatHeader = ({
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-2 opacity-50 mt-0.5">
-                                                            <Store size={10} className="text-indigo-500" />
+                                                            {showOutletInfo && <Store size={10} className="text-indigo-500" />}
                                                             <p className={`text-[9px] font-black uppercase tracking-tighter truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                                {member.outletName || 'HQ'} • {member.role || 'Personnel'}
+                                                                {showOutletInfo ? `${member.outletName || 'HQ'} • ${member.role || 'Personnel'}` : (member.role || 'Personnel')}
                                                             </p>
                                                         </div>
                                                     </div>

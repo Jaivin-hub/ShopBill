@@ -16,7 +16,8 @@ const NewChatModal = ({
     onCreateChat,
     darkMode,
     setSelectedUsers,
-    isCreatingChat = false
+    isCreatingChat = false,
+    showOutletInfo = false
 }) => {
     if (!show) return null;
 
@@ -186,7 +187,7 @@ const NewChatModal = ({
                                                             {user.name || user.email}
                                                         </p>
                                                         <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                            {user.role} {user.outletName && `• ${user.outletName}`}
+                                                            {user.role}{showOutletInfo && user.outletName && ` • ${user.outletName}`}
                                                         </p>
                                                     </div>
                                                     {isSelected && (

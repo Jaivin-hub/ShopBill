@@ -37,6 +37,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isBulkUploading, setIsBulkUploading] = useState(false);
     const [formData, setFormData] = useState(initialItemState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -140,16 +142,19 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     const closeBulkUploadModal = () => setIsBulkUploadModalOpen(false);
 
     const handleBulkUpload = async (items) => {
-        closeBulkUploadModal();
-        setIsProcessing(true);
+        setIsBulkUploading(true);
         try {
             const response = await apiClient.post(`${API.inventory}/bulk`, items);
-            showToast(`Batch Processed: ${response.data.insertedCount} items integrated.`, 'success');
+            const msg = response.data.updatedCount > 0
+                ? `${response.data.insertedCount} added, ${response.data.updatedCount} updated.`
+                : `${response.data.insertedCount} items integrated.`;
+            showToast(`Batch processed: ${msg}`, 'success');
             await fetchInventory(true);
+            closeBulkUploadModal();
         } catch (error) {
             showToast(error.response?.data?.error || 'Batch integration failed.', 'error');
         } finally {
-            setIsProcessing(false);
+            setIsBulkUploading(false);
         }
     };
 
@@ -240,17 +245,17 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     const confirmDeleteItem = async () => {
         if (!itemToDelete) return;
         const { id: itemId, name: itemName } = itemToDelete;
-        setIsConfirmModalOpen(false);
-        setIsProcessing(true);
+        setIsDeleting(true);
         try {
             await apiClient.delete(`${API.inventory}/${itemId}`);
             showToast(`Deleted: ${itemName}`, 'success');
             await fetchInventory(true);
+            setIsConfirmModalOpen(false);
+            setItemToDelete(null);
         } catch (error) {
             showToast('Deletion protocol failed.', 'error');
         } finally {
-            setIsProcessing(false);
-            setItemToDelete(null);
+            setIsDeleting(false);
         }
     };
 
@@ -325,6 +330,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             handleFormSubmit={handleFormSubmit}
             confirmDeleteItem={confirmDeleteItem}
             setIsConfirmModalOpen={setIsConfirmModalOpen}
+            isDeleting={isDeleting}
+            isBulkUploading={isBulkUploading}
             darkMode={darkMode}
         />
     );
