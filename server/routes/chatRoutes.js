@@ -139,9 +139,13 @@ router.get('/chats', protect, async (req, res) => {
         // Auto-create default groups for owners if they don't exist
         if (user.role === 'owner') {
             const stores = await Store.find({ ownerId: user._id, isActive: true });
+            const plan = (user.plan || '').toUpperCase();
 
-            // Create individual store groups for each outlet
+            // Create individual store groups for each outlet (Pro: skip "Main Store" so only one group)
             for (const store of stores) {
+                if (plan === 'PRO' && store.name && store.name.trim().toLowerCase() === 'main store') {
+                    continue; // Pro plan: single store - do not create "Main Store Group"
+                }
                 const storeGroupName = `${store.name} Group`;
                 let storeGroup = await Chat.findOne({ 
                     name: storeGroupName, 
@@ -364,7 +368,13 @@ router.get('/chats', protect, async (req, res) => {
             };
         }));
 
-        res.json({ success: true, data: enrichedChats });
+        // Pro plan: hide "Main Store Group" (single store – show only the shop-named group)
+        const effectivePlan = await getEffectivePlan(req.user);
+        const filteredChats = effectivePlan === 'PRO'
+            ? enrichedChats.filter(c => !(c.isDefault && c.name && c.name.trim().toLowerCase() === 'main store group'))
+            : enrichedChats;
+
+        res.json({ success: true, data: filteredChats });
     } catch (error) {
         console.error('Get Chats Error:', error);
         res.status(500).json({ error: 'Failed to fetch chats' });

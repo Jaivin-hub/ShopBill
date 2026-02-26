@@ -73,10 +73,15 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
         try {
             const response = await apiClient.get(API.profile);
             const data = response.data.user || response.data.data || response.data;
-            // Ensure shopName is properly extracted from the response
+            // Normalize phone: strip +91 / 91 prefix so we show only 10-digit number
+            const rawPhone = (data.phone || '').trim();
+            const phoneDigits = rawPhone.replace(/\D/g, '');
+            const phone = phoneDigits.length > 10 && (rawPhone.startsWith('+91') || rawPhone.startsWith('91'))
+                ? phoneDigits.slice(-10)
+                : phoneDigits.slice(0, 10);
             setProfile({
                 email: data.email || '',
-                phone: data.phone || '',
+                phone,
                 shopName: data.shopName || '',
                 taxId: data.taxId || '',
                 address: data.address || '',
@@ -153,6 +158,11 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (name === 'phone') {
+            const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+            setProfile(prev => ({ ...prev, [name]: digitsOnly }));
+            return;
+        }
         setProfile(prev => ({ ...prev, [name]: value }));
     };
 
