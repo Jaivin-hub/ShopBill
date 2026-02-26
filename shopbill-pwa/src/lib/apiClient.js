@@ -63,8 +63,14 @@ apiClient.interceptors.request.use(
     */
     // --- CACHING LOGIC DISABLED END ---
 
-    // Cancel previous identical request if still pending
-    if (activeRequests.has(cacheKey)) {
+    // Skip duplicate-request cancellation for payment/auth endpoints (critical side effects)
+    const url = config.url || '';
+    const isPaymentOrSignup = /\/payment\/(create-subscription|verify-subscription|verify-plan-change)/.test(url) ||
+      /\/auth\/signup/.test(url);
+    const skipDuplicateCancel = isPaymentOrSignup;
+
+    // Cancel previous identical request if still pending (skip for payment/signup)
+    if (!skipDuplicateCancel && activeRequests.has(cacheKey)) {
       activeRequests.get(cacheKey).cancel('Duplicate request cancelled');
     }
 

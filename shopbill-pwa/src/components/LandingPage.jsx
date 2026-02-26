@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { 
     CreditCard, Receipt, Package, Users, LineChart, 
-    UserCog, Cloud, Truck, ChevronRight, CheckCircle2 
+    UserCog, Cloud, Truck, ChevronRight, CheckCircle2, 
+    MessageCircle, ClipboardList
 } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
 
@@ -28,6 +29,10 @@ const content = {
     reportsDesc: "See your daily profit and top items with one tap. Understand your busy hours and make better choices for your business.",
     cloudSync: "Safe & Always Ready",
     cloudSyncDesc: "Your data is backed up safely in the cloud. If you switch phones, your data is right there waiting for you. 100% secure.",
+    teamManagement: "Team Management & Attendance Tracker",
+    teamManagementDesc: "Manage your staff efficiently. Track check-ins, shifts, and attendance in real time. Assign roles and monitor performance—all in one place.",
+    realTimeChat: "Real-Time Chat System",
+    realTimeChatDesc: "Connect instantly with your team. Send announcements, discuss orders, and coordinate shifts—no more missed calls or scattered WhatsApp groups.",
 
     testimonialQuote: "\"Pocket POS saved me hours every week. Managing my credit accounts (Khata) used to be a headache, now it's just a tap away. It’s the best help my shop ever had.\"",
     testimonialAuthor: "Ravi Sharma",
@@ -143,7 +148,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 }
             `}} />
 
-            <nav className={`sticky top-0 z-50 ${navBg} backdrop-blur-md border-b ${navBorder} transition-colors duration-300`}>
+            <nav className={`fixed top-0 left-0 right-0 z-50 ${navBg} backdrop-blur-md border-b ${navBorder} transition-colors duration-300`}>
                 <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
                     <div className="flex items-center space-x-2">
                         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
@@ -157,7 +162,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 </div>
             </nav>
 
-            <main>
+            <main className="pt-16">
                 {/* Hero */}
                 <section className="relative py-10 md:py-28 overflow-hidden">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent -z-10" />
@@ -188,7 +193,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 </section>
 
                 {/* Features */}
-                <section id="features" className={`py-24 ${bgColor} transition-colors duration-300`}>
+                <section id="features" className={`pt-24 pb-12 ${bgColor} transition-colors duration-300`}>
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="text-center mb-20">
                             <h2 className={`text-3xl md:text-5xl font-black ${titleColor}  tracking-tighter mb-4 transition-colors duration-300`}>{content.featuresTitle}</h2>
@@ -201,12 +206,14 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
                             <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
                             <FeatureItem icon={<Cloud />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
+                            <FeatureItem icon={<ClipboardList />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
+                            <FeatureItem icon={<MessageCircle />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="cyan" darkMode={darkMode} />
                         </div>
                     </div>
                 </section>
 
                 {/* Pricing - Using Suggested Strategy */}
-                <section id="pricing" className="py-24">
+                <section id="pricing" className="pt-12 pb-24">
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="text-center mb-16">
                             <h2 className={`text-3xl md:text-5xl font-black ${titleColor}  tracking-tighter mb-4 transition-colors duration-300`}>{content.pricingTitle}</h2>

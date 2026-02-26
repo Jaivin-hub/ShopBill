@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Match body/html background to app theme - prevents white bar below content on checkout/login */
+html.dark, html.dark body, html.dark #root {
+  background-color: #030712;
+}
+html:not(.dark) body, html:not(.dark) #root {
+  background-color: #f8fafc;
+}
+
 /* 1. Target the main country selector wrapper */
 .PhoneInputCountry {
     /* **CRITICAL FIX:** Use Flexbox to ensure vertical centering */

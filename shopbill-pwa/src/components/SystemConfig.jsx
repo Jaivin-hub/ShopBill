@@ -466,7 +466,6 @@ const SystemConfig = ({ apiClient, API, showToast, currentUser, darkMode = true 
         { id: 'maintenance', name: 'Maintenance', icon: Server },
     ];
 
-    return (
     // Theme variables
     const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
