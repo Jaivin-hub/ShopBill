@@ -39,6 +39,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
     }, [isOpen, totalAmount]);
 
+    // Clear API credit error when user changes customer or payment (they may have fixed it)
+    useEffect(() => {
+        setCreditError(null);
+    }, [localSelectedCustomer?.id, amountPaidInput, paymentType]);
+
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsDropdownOpen(false);
@@ -72,6 +77,24 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
         return { amountCredited: amtCred, changeDue: chgDue, backendMethod: finalMethod, effectiveAmountPaid: effPaid };
     }, [amountPaidInput, totalAmount, paymentType]);
+
+    // Proactive credit limit check for credit customers (before they click Finalize)
+    const creditLimitExceeded = useMemo(() => {
+        if (amountCredited <= 0 || localSelectedCustomer.id === WALK_IN_CUSTOMER.id) return null;
+        const due = parseFloat(localSelectedCustomer.outstandingCredit) || 0;
+        const limit = parseFloat(localSelectedCustomer.creditLimit) || 0;
+        if (limit <= 0) return null; // No limit set
+        const newTotal = due + amountCredited;
+        if (newTotal > limit) {
+            return {
+                message: `Credit limit reached (₹${limit.toLocaleString()}). Current due: ₹${due.toLocaleString()}. Reduce products or pay more to complete billing.`,
+                limit,
+                due,
+                amountCredited
+            };
+        }
+        return null;
+    }, [localSelectedCustomer, amountCredited]);
 
     const filteredOptions = useMemo(() => {
         const options = [
@@ -416,21 +439,23 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
                 {/* Footer Action */}
                 <div className="px-4 sm:px-5 pb-3 sm:pb-4 pt-2 flex-shrink-0">
-                    {creditError && (
-                        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex gap-3 items-start animate-pulse">
+                    {(creditError || creditLimitExceeded) && (
+                        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex gap-3 items-start">
                             <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                             <div className="flex flex-col">
-                                <p className="text-[9px] font-black text-rose-500 uppercase leading-none">Credit Limit Blocked</p>
-                                <p className="text-[8px] text-rose-400 uppercase mt-1.5 leading-relaxed">{creditError.message}</p>
+                                <p className="text-[9px] font-black text-rose-500 uppercase leading-none">Credit Limit Reached</p>
+                                <p className="text-[8px] text-rose-400 uppercase mt-1.5 leading-relaxed">
+                                    {(creditError || creditLimitExceeded)?.message || 'Reduce products or pay more to complete billing.'}
+                                </p>
                             </div>
                         </div>
                     )}
                     
                     <button 
-                        onClick={() => handleConfirmPayment(!!creditError)} 
+                        onClick={() => handleConfirmPayment(!!(creditError || creditLimitExceeded))} 
                         disabled={isSubmitting || (amountCredited > 0.01 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
                         className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-[0.97] shadow-xl ${
-                            creditError 
+                            (creditError || creditLimitExceeded) 
                                 ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20' 
                                 : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
                         } text-white disabled:opacity-50`}
@@ -439,8 +464,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
-                                <span className="hidden sm:inline">{creditError ? 'Bypass & Process' : 'Finalize Transaction'}</span>
-                                <span className="sm:hidden">{creditError ? 'Bypass' : 'Finalize'}</span>
+                                <span className="hidden sm:inline">{(creditError || creditLimitExceeded) ? 'Bypass & Process' : 'Finalize Transaction'}</span>
+                                <span className="sm:hidden">{(creditError || creditLimitExceeded) ? 'Bypass' : 'Finalize'}</span>
                                 <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                             </>
                         )}

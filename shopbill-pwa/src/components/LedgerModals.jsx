@@ -27,9 +27,11 @@ const formatDate = (dateString) => {
   } catch (e) { return 'Invalid Date'; }
 };
 
-const InputField = ({ label, name, type, value, onChange, error, disabled, icon: Icon, darkMode, ...props }) => (
+const InputField = ({ label, name, type, value, onChange, error, disabled, icon: Icon, darkMode, required, ...props }) => (
   <div className="space-y-1.5">
-    <label htmlFor={name} className={`text-[10px] font-black  tracking-widest ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>{label}</label>
+    <label htmlFor={name} className={`text-[10px] font-black  tracking-widest ml-1 ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
+      {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+    </label>
     <div className="relative group">
       {Icon && <Icon className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-gray-500 group-focus-within:text-indigo-400' : 'text-slate-400 group-focus-within:text-indigo-600'}`} />}
       <input
@@ -197,6 +199,7 @@ export const AddCustomerModal = ({
               placeholder="John Doe"
               error={validationErrors.name}
               darkMode={darkMode}
+              required
             />
             <InputField 
               label="Phone Number" 
@@ -209,6 +212,7 @@ export const AddCustomerModal = ({
               maxLength="10"
               error={validationErrors.phone}
               darkMode={darkMode}
+              required
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InputField 
@@ -231,6 +235,7 @@ export const AddCustomerModal = ({
                 placeholder="5000"
                 error={validationErrors.creditLimit}
                 darkMode={darkMode}
+                required
               />
             </div>
           </div>
@@ -329,9 +334,9 @@ export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, s
             </button>
           </div>
           <div className="p-4 sm:p-5 space-y-4 flex-shrink-0">
-            <InputField label="Customer Full Name" name="name" type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: undefined })); }} placeholder="John Doe" error={errors.name} darkMode={darkMode} />
-            <InputField label="Phone Number" name="phone" type="tel" icon={Phone} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '')); setErrors(prev => ({ ...prev, phone: undefined })); }} placeholder="10-digit mobile" maxLength="10" error={errors.phone} darkMode={darkMode} />
-            <InputField label="Credit Limit (₹)" name="creditLimit" type="number" icon={ShieldAlert} value={creditLimit} onChange={(e) => { setCreditLimit(e.target.value); setErrors(prev => ({ ...prev, creditLimit: undefined })); }} placeholder="5000" error={errors.creditLimit} darkMode={darkMode} />
+            <InputField label="Customer Full Name" name="name" type="text" value={name} onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: undefined })); }} placeholder="John Doe" error={errors.name} darkMode={darkMode} required />
+            <InputField label="Phone Number" name="phone" type="tel" icon={Phone} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '')); setErrors(prev => ({ ...prev, phone: undefined })); }} placeholder="10-digit mobile" maxLength="10" error={errors.phone} darkMode={darkMode} required />
+            <InputField label="Credit Limit (₹)" name="creditLimit" type="number" icon={ShieldAlert} value={creditLimit} onChange={(e) => { setCreditLimit(e.target.value); setErrors(prev => ({ ...prev, creditLimit: undefined })); }} placeholder="5000" error={errors.creditLimit} darkMode={darkMode} required />
           </div>
           <div className={`shrink-0 p-3 sm:p-4 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
             <button type="submit" disabled={isProcessing} className="w-full py-3 sm:py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-amber-600/20 text-xs sm:text-sm">

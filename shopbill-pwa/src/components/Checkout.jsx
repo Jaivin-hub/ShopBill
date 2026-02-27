@@ -49,10 +49,10 @@ const validateEmail = (email) => {
     return null;
 };
 
-const validatePhoneNumber = (phone) => {
-    if (!phone) return 'Phone number is required.';
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(phone)) return 'Use international format (e.g., +919876543210).';
+const validatePhoneNumber = (localNumber) => {
+    if (!localNumber || localNumber.trim() === '') return 'Mobile number is required.';
+    const digits = localNumber.replace(/\D/g, '');
+    if (digits.length !== 10) return 'Mobile number must be 10 digits.';
     return null;
 };
 
@@ -155,26 +155,37 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
 
     const handleProceedToPlanSelection = (e) => {
         e.preventDefault();
-        setPaymentError(null); setEmailError(null); setPhoneError(null); setPasswordError(null); setShopNameError(null);
-        const emailV = validateEmail(email); if (emailV) return setEmailError(emailV);
-        const phoneV = validatePhoneNumber(phone); if (phoneV) return setPhoneError(phoneV);
-        const shopV = validateShopName(shopName); if (shopV) return setShopNameError(shopV);
-        if (!password || password.length < 8) return setPasswordError('Password must be 8+ characters.');
+        setPaymentError(null);
+        const emailV = validateEmail(email);
+        const phoneV = validatePhoneNumber(localNumber);
+        const shopV = validateShopName(shopName);
+        const pwdV = (!password || password.length < 8) ? 'Password must be 8+ characters.' : null;
+        setEmailError(emailV);
+        setPhoneError(phoneV);
+        setShopNameError(shopV);
+        setPasswordError(pwdV);
+        if (emailV || phoneV || shopV || pwdV) return;
         setDetailsComplete(true);
     };
 
     const handleNumberChange = (e) => {
-        setLocalNumber(e.target.value.replace(/\D/g, ''));
+        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+        setLocalNumber(digits);
         setPhoneError(null);
     };
 
     const handlePaymentSubmit = useCallback(async (e) => {
         e.preventDefault();
-        setPaymentError(null); setEmailError(null); setPhoneError(null); setPasswordError(null); setShopNameError(null);
-        const emailV = validateEmail(email); if (emailV) return setEmailError(emailV);
-        const phoneV = validatePhoneNumber(phone); if (phoneV) return setPhoneError(phoneV);
-        const shopV = validateShopName(shopName); if (shopV) return setShopNameError(shopV);
-        if (!password || password.length < 8) return setPasswordError('Password must be 8+ characters.');
+        setPaymentError(null);
+        const emailV = validateEmail(email);
+        const phoneV = validatePhoneNumber(localNumber);
+        const shopV = validateShopName(shopName);
+        const pwdV = (!password || password.length < 8) ? 'Password must be 8+ characters.' : null;
+        setEmailError(emailV);
+        setPhoneError(phoneV);
+        setShopNameError(shopV);
+        setPasswordError(pwdV);
+        if (emailV || phoneV || shopV || pwdV) return;
 
         setIsProcessing(true);
         try {
@@ -221,7 +232,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
             setPaymentError(error.response?.data?.error || "Connection failed.");
             setIsProcessing(false);
         }
-    }, [plan, effectivePlanKey, email, phone, password, shopName, showToast]);
+    }, [plan, effectivePlanKey, email, phone, password, shopName, showToast, localNumber]);
 
     const bgColor = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const textColor = darkMode ? 'text-white' : 'text-slate-900';
@@ -418,14 +429,14 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                             <h1 className={`text-2xl lg:text-4xl font-black ${textColor} tracking-tighter transition-colors duration-300`}>Create Your Business Account</h1>
                         </header>
 
-                        <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} className="space-y-5 lg:space-y-6">
+                        <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-5 lg:space-y-6">
                             {paymentError && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold">{paymentError}</div>}
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
                                 <div className="md:col-span-2">
-                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={setShopName} placeholder="Ex: Sharma Stores" disabled={isProcessing} darkMode={darkMode} />
+                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={(v) => { setShopName(v); setShopNameError(null); }} placeholder="Ex: Sharma Stores" disabled={isProcessing} darkMode={darkMode} />
                                 </div>
-                                <InputField label="Email Address" id="email" type="email" value={email} error={emailError} onChange={setEmail} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
+                                <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
                                 
                                 <div className="relative" ref={dropdownRef}>
                                     <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>Mobile Number</label>
@@ -434,7 +445,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                             <span>{selectedCountry.flag}</span>
                                             <span>{selectedCountry.code}</span>
                                         </button>
-                                        <input type="tel" value={localNumber} onChange={handleNumberChange} className={`flex-1 ${phoneInputBg} px-4 py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="98765 43210" disabled={isProcessing} />
+                                        <input type="tel" inputMode="numeric" maxLength={10} value={localNumber} onChange={handleNumberChange} className={`flex-1 ${phoneInputBg} px-4 py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="9876543210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
                                         <div className={`absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar ${dropdownBg} border ${dropdownBorder} rounded-2xl shadow-2xl p-2 left-0 top-full transition-colors duration-300`}>
@@ -451,7 +462,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                 </div>
 
                                 <div className="relative md:col-span-2">
-                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={setPassword} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} darkMode={darkMode} />
+                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={(v) => { setPassword(v); setPasswordError(null); }} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} darkMode={darkMode} />
                                     <button type="button" onClick={() => setShowPassword(!showPassword)} className={`absolute right-4 top-9 ${iconColor} hover:text-indigo-400 transition-colors`}>
                                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
@@ -493,7 +504,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     );
 };
 
-const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon, darkMode = true }) => {
+const InputField = ({ label, id, type = 'text', value, onChange, placeholder, error, disabled, icon, darkMode = true, inputMode }) => {
     const labelColor = darkMode ? 'text-gray-500' : 'text-slate-600';
     const inputBg = darkMode ? 'bg-gray-950' : 'bg-white';
     const inputBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
@@ -512,6 +523,7 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 onChange={(e) => onChange(e.target.value)} 
                 disabled={disabled}
                 placeholder={placeholder}
+                inputMode={inputMode}
                 className={`w-full ${inputBg} border ${error ? 'border-red-500' : `${inputBorder} group-focus-within:border-indigo-500`} rounded-2xl px-5 py-3 text-sm font-bold ${inputText} ${placeholderColor} outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>

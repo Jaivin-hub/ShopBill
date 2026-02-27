@@ -3,9 +3,21 @@ const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
 const Inventory = require('../models/Inventory'); 
 const Customer = require('../models/Customer');
+const Staff = require('../models/Staff');
 const mongoose = require('mongoose');
-// IMPORT the notification utilities
-const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes'); 
+const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
+
+const getActorNameWithRole = async (req) => {
+    if (req.user.role === 'owner') return '(Owner)';
+    if (req.user.role === 'Manager' || req.user.role === 'Cashier') {
+        const staffRecord = await Staff.findOne({ userId: req.user._id });
+        if (staffRecord) {
+            const name = staffRecord.name || req.user.name || req.user.email;
+            return `${name} (${staffRecord.role})`;
+        }
+    }
+    return req.user.name || req.user.email || 'User';
+};
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const router = express.Router();
@@ -95,8 +107,9 @@ router.get('/:id', protect, async (req, res) => {
 
 // POST a new sale
 router.post('/', protect, async (req, res) => {
-    // Added forceProceed from req.body
-    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed } = req.body; 
+    // Accept forceProceed or forceOverride (frontend may send either)
+    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed: fp, forceOverride: fo } = req.body;
+    const forceProceed = !!(fp || fo);
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
     if (!req.user.storeId) {
@@ -148,8 +161,22 @@ router.post('/', protect, async (req, res) => {
 
                 // Only throw error if forceProceed is false
                 if (khataDue + saleAmountCredited > creditLimit && !forceProceed) {
-                    // We throw a specific string that the catch block will handle
-                    throw new Error(`Credit limit of ₹${creditLimit} exceeded!`);
+                    try {
+                        const actorName = await getActorNameWithRole(req);
+                        await emitAlert(req, storeId, 'credit_exceeded', {
+                            _id: targetCustomer._id,
+                            customerId: targetCustomer._id,
+                            customerName: targetCustomer.name,
+                            name: targetCustomer.name,
+                            message: `${targetCustomer.name} reached credit limit. Attempted: ₹${saleAmountCredited.toLocaleString()}, Limit: ₹${creditLimit.toLocaleString()}, Due: ₹${khataDue.toLocaleString()}. Billing attempted by ${actorName}.`
+                        });
+                    } catch (notifyErr) {
+                        console.error('❌ Error sending credit limit notification:', notifyErr);
+                    }
+                    throw new Error(
+                        `Credit limit reached. Customer limit: ₹${creditLimit.toLocaleString()}. Current due: ₹${khataDue.toLocaleString()}. ` +
+                        `Reduce products or pay more to complete billing.`
+                    );
                 }
             }
         }
@@ -320,15 +347,14 @@ router.post('/', protect, async (req, res) => {
         // --- KEY CHANGE HERE ---
         // If it's a credit limit error, return 200 with the error object 
         // so the frontend modal can catch it and show the bypass button.
-        if (error.message.includes('limit') || error.message.includes('exceeded')) {
-            return res.status(200).json({ 
+        if (error.message.toLowerCase().includes('limit') || error.message.toLowerCase().includes('credit')) {
+            return res.status(400).json({ 
                 error: error.message,
-                isWarning: true,
                 type: 'CREDIT_LIMIT'
             });
         }
 
-        // For actual server crashes or other errors, keep 400/500
+        // For stock/validation errors use 400; actual server errors use 500
         const status = error.message.includes('stock') ? 400 : 500;
         res.status(status).json({ error: error.message || 'Failed to record sale.' });
     }

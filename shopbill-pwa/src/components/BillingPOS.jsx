@@ -297,6 +297,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // Ensure these are numbers
       amountPaid: parseFloat(amountPaid) || 0,
       amountCredited: parseFloat(amountCredited) || 0,
+      forceProceed: force,
       forceOverride: force 
     };
 

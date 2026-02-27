@@ -72,7 +72,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         <input
                             id="identifier"
                             type="text"
-                            placeholder="Email or Phone"
+                            placeholder="Email"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
                             className={`w-full pl-11 pr-4 py-3 ${inputBg} border ${inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => setIdentifier(e.target.value)}

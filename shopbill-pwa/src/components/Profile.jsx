@@ -210,7 +210,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                                     onClick={handleSave}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all"
                                 >
-                                    <Save className="w-3.5 h-3.5" /> Save Changes
+                                    <Save className="w-3.5 h-3.5" /> Save
                                 </button>
                             </>
                         ) : (
@@ -218,7 +218,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                                 onClick={() => setIsEditing(true)}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 border ${darkMode ? 'bg-gray-900 border-gray-800 text-indigo-400 hover:bg-gray-800' : 'bg-white border-slate-200 text-indigo-600 hover:bg-slate-50 shadow-sm'}`}
                             >
-                                <Edit className="w-3.5 h-3.5" /> Modify Identity
+                                <Edit className="w-3.5 h-3.5" /> Edit
                             </button>
                         )}
                     </div>

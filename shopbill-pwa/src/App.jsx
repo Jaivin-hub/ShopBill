@@ -1093,7 +1093,7 @@ useEffect(() => {
     <ApiProvider>
       {/* Scrollbar styles are now handled globally in index.css */}
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
-      <div className={`min-h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
+      <div className={`h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
         {showAppUI && !isChatSelected && (
             <Header
@@ -1118,7 +1118,7 @@ useEffect(() => {
             outlets={outlets}
           />
         )}
-        <div className="flex flex-1 overflow-hidden relative">
+        <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {showAppUI && (
             <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
               <div className="p-8 flex items-start gap-2">
@@ -1225,7 +1225,7 @@ useEffect(() => {
                 </div>
             </aside>
           )}
-          <main className={`${showAppUI ? 'flex-1' : 'flex-initial min-h-0'} transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-16 md:pt-0 overflow-hidden pb-24 md:pb-6' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
+          <main className={`${showAppUI ? 'flex-1 min-h-0' : 'flex-initial min-h-0'} transition-all duration-300 ${containerBg} ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-16 md:pt-0 overflow-hidden pb-24 md:pb-6' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-y-auto custom-scrollbar')) : 'w-full overflow-y-auto custom-scrollbar'}`}>
             <div className={`${currentPage === 'chat' && isChatSelected ? 'h-full' : (currentPage === 'chat' ? 'h-full' : `max-w-7xl mx-auto ${showAppUI ? 'min-h-full' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'}`}>
             {renderContent()}
             </div>

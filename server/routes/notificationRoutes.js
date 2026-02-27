@@ -36,10 +36,10 @@ const emitAlert = async (req, storeId, type, data) => {
             };
             break;
         case 'credit_exceeded':
-            title = 'Credit Limit Exceeded';
+            title = 'Credit Limit Reached';
             category = 'Urgent';
-            message = `${data.name} has exceeded their credit limit.`;
-            metadata = { customerId: data._id };
+            message = data.message || `${data.customerName || data.name || 'Customer'} has reached their credit limit.`;
+            metadata = { customerId: data._id || data.customerId };
             break;
         case 'inventory_added':
             title = 'Inventory Added';
