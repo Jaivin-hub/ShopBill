@@ -172,9 +172,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         try {
             const response = await apiClient.get(API.chatList);
             if (response.data?.success) {
-                const fetchedChats = response.data.data || [];
+                const raw = response.data.data;
+                const fetchedChats = Array.isArray(raw) ? raw : [];
                 setChats(fetchedChats);
-                // Calculate total unread count
                 const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
                 // Map unread counts for direct chats by staff user id
                 const currentUserId = currentUser?._id || currentUser?.id;
@@ -205,9 +205,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         try {
             const response = await apiClient.get(API.chatMessages(chatId));
             if (response.data.success) {
-                setMessages(response.data.data?.messages || response.data.data || []);
-                setChatLastReadBy(response.data.data?.lastReadBy || {});
-                setChatParticipants(response.data.data?.participants || []);
+                const payload = response.data.data;
+                const msgList = Array.isArray(payload?.messages) ? payload.messages : (Array.isArray(payload) ? payload : []);
+                setMessages(msgList);
+                setChatLastReadBy(payload && typeof payload.lastReadBy === 'object' && !Array.isArray(payload.lastReadBy) ? payload.lastReadBy : {});
+                setChatParticipants(Array.isArray(payload?.participants) ? payload.participants : []);
                 setTimeout(() => scrollToBottom(), 100);
                 fetchChats();
             }
@@ -966,18 +968,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     const toggleAudio = (messageId, audioSrc) => {
         const audio = audioRefs.current[messageId];
-        if (!audio) {
-            console.error('[toggleAudio] Audio element not found for message:', messageId);
-            return;
-        }
+        if (!audio) return;
+        if (audio.error) return; // Skip if source failed to load
+        if (!audioSrc) return;
         
-        // Ensure audio source is set
-        if (audioSrc && audio.src !== audioSrc) {
-            // Reset audio element for better compatibility
+        if (audio.src !== audioSrc) {
             audio.pause();
             audio.currentTime = 0;
             audio.src = audioSrc;
-            // Force reload for iOS
             audio.load();
         }
         
@@ -1003,14 +1001,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         setPlayingAudioId(messageId);
                     })
                     .catch(error => {
-                        console.error('[toggleAudio] Error playing audio:', error);
-                        // Try to provide more specific error messages
                         if (error.name === 'NotAllowedError') {
-                            showToast('Audio playback blocked. Please allow audio in your browser settings.', 'error');
-                        } else if (error.name === 'NotSupportedError') {
-                            showToast('Audio format not supported. Please try a different device.', 'error');
+                            showToast('Audio playback blocked. Allow audio in browser settings.', 'error');
+                        } else if (error.name === 'NotSupportedError' || error.name === 'NotAllowedError') {
+                            showToast('Audio unavailable or format not supported.', 'error');
                         } else {
-                            showToast('Failed to play audio. Please check your connection and try again.', 'error');
+                            showToast('Unable to play audio.', 'error');
                         }
                         setPlayingAudioId(null);
                     });

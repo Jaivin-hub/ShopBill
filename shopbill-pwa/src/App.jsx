@@ -614,12 +614,13 @@ useEffect(() => {
     try {
       const response = await apiClient.get(API.chatList);
       if (response.data?.success) {
-        const fetchedChats = response.data.data || [];
+        const raw = response.data.data;
+        const fetchedChats = Array.isArray(raw) ? raw : [];
         const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
         setChatUnreadCount(totalUnread);
       }
     } catch (error) {
-      // Silently fail - chat might not be accessible
+      if (error?.cancelled) return; // Duplicate request cancelled, ignore
       console.error('Failed to fetch chat unread count:', error);
     }
   }, [currentUser, apiClient, API]);

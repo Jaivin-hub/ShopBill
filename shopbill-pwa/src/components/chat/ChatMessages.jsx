@@ -24,7 +24,8 @@ const ChatMessages = ({
         );
     }
 
-    if (messages.length === 0) {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    if (safeMessages.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 opacity-30">
                 <div className="relative mb-4">
@@ -37,9 +38,35 @@ const ChatMessages = ({
         );
     }
 
+    const safeParticipants = Array.isArray(participants) ? participants : [];
+    const currentUserId = (currentUser?._id || currentUser?.id)?.toString();
+
+    // Compute seenBy only for the LAST message each participant has seen (one bubble per user)
+    const seenByForMessage = {};
+    if (currentUserId) {
+        safeParticipants.forEach(p => {
+            const pid = (p._id || p.id || p)?.toString();
+            if (!pid || pid === currentUserId) return;
+            const readAt = lastReadBy && lastReadBy[pid] ? new Date(lastReadBy[pid]).getTime() : 0;
+            if (!readAt) return;
+            let lastSeenMsg = null;
+            safeMessages.forEach(m => {
+                const sid = m.senderId?._id || m.senderId?.id || m.senderId;
+                if (!sid || String(sid) !== currentUserId) return;
+                const mt = m.timestamp ? new Date(m.timestamp).getTime() : 0;
+                if (mt <= readAt && (!lastSeenMsg || mt > new Date(lastSeenMsg.timestamp).getTime())) lastSeenMsg = m;
+            });
+            if (lastSeenMsg) {
+                const mid = lastSeenMsg._id;
+                if (!seenByForMessage[mid]) seenByForMessage[mid] = [];
+                seenByForMessage[mid].push(p);
+            }
+        });
+    }
+
     return (
         <div className="flex flex-col w-full space-y-2 py-4 px-2 md:px-4">
-            {messages.map((msg, idx) => {
+            {safeMessages.map((msg, idx) => {
                 // Check if message is from current user - handle multiple possible structures
                 let senderId = null;
                 if (msg.senderId) {
@@ -63,7 +90,7 @@ const ChatMessages = ({
                     if (idx === 0) {
                         showSenderInfo = true;
                     } else {
-                        const prevMsg = messages[idx - 1];
+                        const prevMsg = safeMessages[idx - 1];
                         let prevSenderId = null;
                         if (prevMsg.senderId) {
                             if (typeof prevMsg.senderId === 'object' && prevMsg.senderId !== null) {
@@ -92,8 +119,7 @@ const ChatMessages = ({
                             formatRecordingTime={formatRecordingTime}
                             audioRefs={audioRefs}
                             showSenderInfo={showSenderInfo}
-                            lastReadBy={lastReadBy}
-                            participants={participants}
+                            seenBy={seenByForMessage[msg._id] || []}
                         />
                     </div>
                 );

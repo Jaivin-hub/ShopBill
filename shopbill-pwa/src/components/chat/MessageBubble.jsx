@@ -10,22 +10,12 @@ const MessageBubble = ({
     formatRecordingTime,
     audioRefs,
     showSenderInfo = true,
-    lastReadBy = {},
-    participants = []
+    seenBy = []
 }) => {
+    const [audioError, setAudioError] = React.useState(false);
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
     const isFileMessage = msg.messageType === 'file' || msg.fileUrl;
-
-    // Compute who has seen this message (for sender only): other participants whose lastReadBy >= message timestamp
-    const senderIdStr = msg.senderId ? (msg.senderId._id || msg.senderId.id || msg.senderId).toString() : '';
-    const msgTime = msg.timestamp ? new Date(msg.timestamp).getTime() : 0;
-    const seenBy = isOwn && msgTime > 0 ? participants.filter(p => {
-        const pid = (p._id || p.id || p).toString();
-        if (pid === senderIdStr) return false; // exclude sender
-        const readAt = lastReadBy[pid];
-        if (!readAt) return false;
-        return new Date(readAt).getTime() >= msgTime;
-    }) : [];
+    const safeSeenBy = Array.isArray(seenBy) ? seenBy : [];
     
     // Logic for Audio Source
     let audioSrc = null;
@@ -33,27 +23,21 @@ const MessageBubble = ({
         if (msg.audioUrl.startsWith('http') || msg.audioUrl.startsWith('blob:')) {
             audioSrc = msg.audioUrl;
         } else {
-            // Server serves files at /uploads/audio, not /api/uploads/audio
-            // So we need to remove /api from the base URL for file access
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
-            const serverBaseUrl = baseUrl.replace('/api', ''); // Remove /api to get server base
-            audioSrc = msg.audioUrl.startsWith('/uploads/') ? `${serverBaseUrl}${msg.audioUrl}` : 
-                       `${serverBaseUrl}/uploads/audio/${msg.audioUrl}`;
+            const pathPart = msg.audioUrl.startsWith('/uploads/') ? msg.audioUrl : `/uploads/audio/${msg.audioUrl}`;
+            audioSrc = `${baseUrl.replace(/\/api\/?$/, '')}/api${pathPart}`;
         }
     }
 
     // Logic for File Source
     let fileSrc = null;
-    if (msg.fileUrl) {
+        if (msg.fileUrl) {
         if (msg.fileUrl.startsWith('http') || msg.fileUrl.startsWith('blob:')) {
             fileSrc = msg.fileUrl;
         } else {
-            // Server serves files at /uploads/files, not /api/uploads/files
-            // So we need to remove /api from the base URL for file access
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
-            const serverBaseUrl = baseUrl.replace('/api', ''); // Remove /api to get server base
-            fileSrc = msg.fileUrl.startsWith('/uploads/') ? `${serverBaseUrl}${msg.fileUrl}` : 
-                      `${serverBaseUrl}/uploads/files/${msg.fileUrl}`;
+            const pathPart = msg.fileUrl.startsWith('/uploads/') ? msg.fileUrl : `/uploads/files/${msg.fileUrl}`;
+            fileSrc = `${baseUrl.replace(/\/api\/?$/, '')}/api${pathPart}`;
         }
     }
 
@@ -103,6 +87,13 @@ const MessageBubble = ({
             >
                 {isVoiceMessage && audioSrc ? (
                     <div className="flex items-center gap-4 min-w-[200px]">
+                        {audioError ? (
+                            <div className={`flex items-center gap-2 py-2 px-3 rounded-xl text-[10px] font-bold ${isOwn ? 'bg-white/10 text-white/80' : 'bg-slate-700/50 text-slate-400'}`}>
+                                <Mic size={14} className="opacity-60" />
+                                <span>Audio unavailable</span>
+                            </div>
+                        ) : (
+                        <>
                         <button
                             onClick={() => onToggleAudio(msg._id, audioSrc)}
                             className={`p-2 rounded-xl transition-transform active:scale-95 ${isOwn ? 'bg-white/20' : 'bg-slate-800'}`}
@@ -131,13 +122,9 @@ const MessageBubble = ({
                                     el.preload = 'metadata';
                                     el.crossOrigin = 'anonymous';
                                     // Add error handler
-                                    el.onerror = (e) => {
-                                        console.error('[MessageBubble] Audio error:', e, 'for message:', msg._id);
-                                    };
+                                    el.onerror = () => setAudioError(true);
                                     // Add loaded event handler
-                                    el.onloadedmetadata = () => {
-                                        console.log('[MessageBubble] Audio metadata loaded for message:', msg._id);
-                                    };
+                                    el.onloadedmetadata = () => {};
                                 }
                             }}
                             src={audioSrc}
@@ -145,6 +132,8 @@ const MessageBubble = ({
                             preload="metadata"
                             crossOrigin="anonymous"
                         />
+                        </>
+                        )}
                     </div>
                 ) : isFileMessage && fileSrc ? (
                     <div className="flex flex-col gap-2 min-w-[200px] max-w-[300px]">
@@ -201,20 +190,23 @@ const MessageBubble = ({
                     {new Date(msg.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                 </p>
             </div>
-            {/* Seen by - small circles with initials (sender only) */}
-            {isOwn && seenBy.length > 0 && (
-                <div className="flex items-center justify-end gap-0.5 mt-1 px-1" title={`Seen by ${seenBy.map(p => p.name).join(', ')}`}>
-                    {seenBy.slice(0, 5).map(p => (
+            {/* Seen by - one row below the last message that user saw, with falling animation */}
+            {isOwn && safeSeenBy.length > 0 && (
+                <div 
+                    className="flex items-center justify-end gap-0.5 mt-1 px-1 animate-in slide-in-from-top-2 fade-in duration-300"
+                    title={`Seen by ${safeSeenBy.map(p => p?.name || '?').join(', ')}`}
+                >
+                    {safeSeenBy.slice(0, 5).map((p, i) => (
                         <div
-                            key={p._id || p.id}
+                            key={p?._id || p?.id || `seen-${i}`}
                             className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border-2 ${darkMode ? 'bg-slate-800 border-slate-700 text-indigo-300' : 'bg-indigo-100 border-indigo-200 text-indigo-600'}`}
-                            title={p.name}
+                            title={p?.name}
                         >
-                            {(p.name || '?')[0].toUpperCase()}
+                            {((p?.name) || '?')[0].toUpperCase()}
                         </div>
                     ))}
-                    {seenBy.length > 5 && (
-                        <span className="text-[9px] font-bold text-slate-500">+{seenBy.length - 5}</span>
+                    {safeSeenBy.length > 5 && (
+                        <span className="text-[9px] font-bold text-slate-500">+{safeSeenBy.length - 5}</span>
                     )}
                 </div>
             )}

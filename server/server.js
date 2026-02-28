@@ -88,6 +88,19 @@ app.use('/api/scm', scmRoutes);
 app.use('/api/outlets', outletRoutes);
 app.use('/api/chat', chatRoutes);
 
+// Serve uploads via API (works when reverse proxy only forwards /api)
+// Filenames are unguessable (timestamp+random); optional: add token validation later
+app.get('/api/uploads/audio/:filename', (req, res) => {
+    const file = path.join(audioUploadsDir, req.params.filename);
+    if (!fs.existsSync(file)) return res.status(404).send('Not found');
+    res.sendFile(path.resolve(file));
+});
+app.get('/api/uploads/files/:filename', (req, res) => {
+    const file = path.join(fileUploadsDir, req.params.filename);
+    if (!fs.existsSync(file)) return res.status(404).send('Not found');
+    res.sendFile(path.resolve(file));
+});
+
 // --- SOCKET.IO LOGIC ---
 
 io.use((socket, next) => {

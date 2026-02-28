@@ -24,7 +24,7 @@ const ChatHeader = ({
     const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
     const setShowInfo = onShowInfoChange || setInternalShowInfo;
 
-    const participants = selectedChat?.participants || [];
+    const participants = Array.isArray(selectedChat?.participants) ? selectedChat.participants : [];
     const isGroup = selectedChat?.type === 'group' || selectedChat?.isDefault;
     const displayName = getChatDisplayName(selectedChat);
     

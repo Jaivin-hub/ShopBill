@@ -134,7 +134,9 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
     // Get direct chats for each staff member to sort by last message time
     const currentUserId = currentUser?._id || currentUser?.id;
     const directChatsMap = {};
-    chats.forEach(chat => {
+    const safeChats = Array.isArray(chats) ? chats : [];
+    const safeStaffList = Array.isArray(staffList) ? staffList : [];
+    safeChats.forEach(chat => {
         if (chat.type === 'direct' && Array.isArray(chat.participants)) {
             const other = chat.participants.find(p => {
                 const pid = typeof p === 'object' && p !== null ? (p._id || p.id || p) : p;
@@ -150,7 +152,7 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
     });
 
     // Sort staff by last message time (most recent first), then by name
-    const sortedStaff = [...staffList].sort((a, b) => {
+    const sortedStaff = [...safeStaffList].sort((a, b) => {
         const chatA = directChatsMap[a._id?.toString()];
         const chatB = directChatsMap[b._id?.toString()];
         
@@ -221,6 +223,7 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
 };
 
 const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading, getChatDisplayName, formatTime, currentUser, darkMode, showOutletInfo = false }) => {
+    const safeChats = Array.isArray(chats) ? chats : [];
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -231,8 +234,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
     }
 
     // Sort chats by lastMessageAt (from backend) - most recent first
-    // This ensures chats with new messages automatically move to the top
-    const sortedChats = [...chats]
+    const sortedChats = [...safeChats]
         .filter(c => c.type === 'group' || c.isDefault)
         .sort((a, b) => {
             // Use lastMessageAt from backend (most reliable)

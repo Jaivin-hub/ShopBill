@@ -23,8 +23,10 @@ const NewChatModal = ({
 
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const safeAvailableUsers = Array.isArray(availableUsers) ? availableUsers : [];
+    const safeSelectedUsers = Array.isArray(selectedUsers) ? selectedUsers : [];
 
-    const filteredUsers = availableUsers.filter(u => {
+    const filteredUsers = safeAvailableUsers.filter(u => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return u.name?.toLowerCase().includes(term) ||
@@ -78,24 +80,19 @@ const NewChatModal = ({
                                     type="button"
                                     onClick={() => {
                                         if (setSelectedUsers) {
-                                            const allManagers = availableUsers.filter(u => u.role === 'Manager').map(u => u._id);
+                                            const allManagers = safeAvailableUsers.filter(u => u.role === 'Manager').map(u => u._id);
                                             setSelectedUsers(prev => {
-                                                // Check if all managers are already selected
-                                                const allManagersSelected = allManagers.every(managerId => prev.includes(managerId));
-                                                if (allManagersSelected) {
-                                                    // Deselect all managers
-                                                    return prev.filter(id => !allManagers.includes(id));
-                                                } else {
-                                                    // Select all managers (add to existing)
-                                                    return [...new Set([...prev, ...allManagers])];
-                                                }
+                                                const p = Array.isArray(prev) ? prev : [];
+                                                const allManagersSelected = allManagers.every(managerId => p.includes(managerId));
+                                                if (allManagersSelected) return p.filter(id => !allManagers.includes(id));
+                                                return [...new Set([...p, ...allManagers])];
                                             });
                                         }
                                     }}
                                     className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
                                         (() => {
-                                            const allManagers = availableUsers.filter(u => u.role === 'Manager').map(u => u._id);
-                                            const allSelected = allManagers.length > 0 && allManagers.every(id => selectedUsers.includes(id));
+                                            const allManagers = safeAvailableUsers.filter(u => u.role === 'Manager').map(u => u._id);
+                                            const allSelected = allManagers.length > 0 && allManagers.every(id => safeSelectedUsers.includes(id));
                                             return allSelected
                                                 ? 'bg-indigo-600 text-white border border-indigo-500'
                                                 : darkMode 
@@ -110,24 +107,19 @@ const NewChatModal = ({
                                     type="button"
                                     onClick={() => {
                                         if (setSelectedUsers) {
-                                            const allCashiers = availableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
+                                            const allCashiers = safeAvailableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
                                             setSelectedUsers(prev => {
-                                                // Check if all cashiers are already selected
-                                                const allCashiersSelected = allCashiers.every(cashierId => prev.includes(cashierId));
-                                                if (allCashiersSelected) {
-                                                    // Deselect all cashiers
-                                                    return prev.filter(id => !allCashiers.includes(id));
-                                                } else {
-                                                    // Select all cashiers (add to existing)
-                                                    return [...new Set([...prev, ...allCashiers])];
-                                                }
+                                                const p = Array.isArray(prev) ? prev : [];
+                                                const allCashiersSelected = allCashiers.every(cashierId => p.includes(cashierId));
+                                                if (allCashiersSelected) return p.filter(id => !allCashiers.includes(id));
+                                                return [...new Set([...p, ...allCashiers])];
                                             });
                                         }
                                     }}
                                     className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${
                                         (() => {
-                                            const allCashiers = availableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
-                                            const allSelected = allCashiers.length > 0 && allCashiers.every(id => selectedUsers.includes(id));
+                                            const allCashiers = safeAvailableUsers.filter(u => u.role === 'Cashier').map(u => u._id);
+                                            const allSelected = allCashiers.length > 0 && allCashiers.every(id => safeSelectedUsers.includes(id));
                                             return allSelected
                                                 ? 'bg-indigo-600 text-white border border-indigo-500'
                                                 : darkMode 
@@ -164,7 +156,7 @@ const NewChatModal = ({
                                     </div>
                                 ) : (
                                     filteredUsers.map(user => {
-                                        const isSelected = selectedUsers.includes(user._id);
+                                        const isSelected = safeSelectedUsers.includes(user._id);
                                         return (
                                             <button
                                                 key={user._id}
