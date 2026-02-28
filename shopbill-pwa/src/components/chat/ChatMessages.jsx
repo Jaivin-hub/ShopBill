@@ -41,18 +41,18 @@ const ChatMessages = ({
     const safeParticipants = Array.isArray(participants) ? participants : [];
     const currentUserId = (currentUser?._id || currentUser?.id)?.toString();
 
-    // Compute seenBy only for the LAST message each participant has seen (one bubble per user)
+    // Seen-by: for each message I sent, show who has read it (works for owner, manager, cashier - all senders)
     const seenByForMessage = {};
     if (currentUserId) {
         safeParticipants.forEach(p => {
             const pid = (p._id || p.id || p)?.toString();
             if (!pid || pid === currentUserId) return;
-            const readAt = lastReadBy && lastReadBy[pid] ? new Date(lastReadBy[pid]).getTime() : 0;
+            const readAt = lastReadBy?.[pid] ? new Date(lastReadBy[pid]).getTime() : 0;
             if (!readAt) return;
             let lastSeenMsg = null;
             safeMessages.forEach(m => {
-                const sid = m.senderId?._id || m.senderId?.id || m.senderId;
-                if (!sid || String(sid) !== currentUserId) return;
+                const sid = (m.senderId?._id ?? m.senderId?.id ?? m.senderId)?.toString();
+                if (!sid || sid !== currentUserId) return;
                 const mt = m.timestamp ? new Date(m.timestamp).getTime() : 0;
                 if (mt <= readAt && (!lastSeenMsg || mt > new Date(lastSeenMsg.timestamp).getTime())) lastSeenMsg = m;
             });

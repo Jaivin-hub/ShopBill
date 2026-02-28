@@ -8,6 +8,7 @@ import { io } from 'socket.io-client';
 import API from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
+import { usePushNotifications } from './hooks/usePushNotifications';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -400,6 +401,7 @@ const App = () => {
   const planUpper = currentUser?.plan?.toUpperCase();
   const isPremium = planUpper === 'PREMIUM';
   const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
+  usePushNotifications(!!currentUser);
 
   // Calculate unread count - updates in real-time when notifications change via Socket.IO
   const unreadCount = useMemo(() => {

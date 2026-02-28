@@ -8,6 +8,7 @@ const Chat = require('../models/Chat');
 const User = require('../models/User');
 const Store = require('../models/Store');
 const Staff = require('../models/Staff');
+const { sendPushNotification } = require('../services/firebaseAdmin');
 const router = express.Router();
 
 // Configure multer for audio file uploads
@@ -803,12 +804,10 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         // Emit to Socket.IO for real-time updates
         const io = req.app.get('socketio');
         if (io) {
-            // Emit to chat room
             io.to(`chat_${chat._id}`).emit('new_message', {
                 chatId: chat._id,
                 message: populatedMessage
             });
-            // Also emit to user rooms for notifications
             chat.participants.forEach(participantId => {
                 if (participantId.toString() !== req.user.id.toString()) {
                     io.to(`user_${participantId}`).emit('new_message', {
@@ -817,6 +816,29 @@ router.post('/:chatId/message', protect, (req, res, next) => {
                     });
                 }
             });
+        }
+
+        // Send push notifications to recipients
+        const recipientIds = chat.participants.filter(p => p.toString() !== req.user.id.toString());
+        if (recipientIds.length > 0) {
+            const recipients = await User.find({ _id: { $in: recipientIds } })
+                .select('deviceTokens')
+                .lean();
+            const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+            if (allTokens.length > 0) {
+                const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
+                sendPushNotification(allTokens, {
+                    title: senderName,
+                    body: contentPreview,
+                    data: {
+                        chatId: chat._id.toString(),
+                        messageId: populatedMessage._id?.toString() || '',
+                        senderId: req.user.id.toString(),
+                        senderName,
+                        type: 'chat_message'
+                    }
+                }).catch(err => console.error('[Chat] Push notification error:', err));
+            }
         }
 
         res.json({ success: true, data: populatedMessage });

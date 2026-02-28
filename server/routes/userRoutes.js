@@ -66,6 +66,60 @@ router.put('/plan', protect, async (req, res) => {
 });
 
 /**
+ * @route POST /api/user/device-token
+ * @desc Register FCM device token for push notifications
+ * @access Private
+ */
+router.post('/device-token', protect, async (req, res) => {
+    try {
+        const { token, platform = 'web' } = req.body;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: 'Device token is required.' });
+        }
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        const deviceTokens = user.deviceTokens || [];
+        const existing = deviceTokens.findIndex(d => d.token === token);
+        const now = new Date();
+        if (existing >= 0) {
+            deviceTokens[existing].platform = platform;
+            deviceTokens[existing].updatedAt = now;
+        } else {
+            deviceTokens.push({ token, platform, updatedAt: now });
+        }
+        user.deviceTokens = deviceTokens;
+        await user.save();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Device Token Error:', error);
+        res.status(500).json({ error: 'Failed to register device token.' });
+    }
+});
+
+/**
+ * @route DELETE /api/user/device-token
+ * @desc Remove FCM device token
+ * @access Private
+ */
+router.delete('/device-token', protect, async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return res.status(400).json({ error: 'Device token is required.' });
+        }
+        await User.findByIdAndUpdate(req.user.id, {
+            $pull: { deviceTokens: { token } },
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Device Token Remove Error:', error);
+        res.status(500).json({ error: 'Failed to remove device token.' });
+    }
+});
+
+/**
  * @route GET /api/user/plan
  * @desc Get user's current plan details
  * @access Private

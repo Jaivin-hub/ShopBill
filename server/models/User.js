@@ -76,6 +76,13 @@ const UserSchema = new mongoose.Schema({
     planEndDate: { type: Date, default: null },
     subscriptionStatus: { type: String, default: null },
 
+    // FCM device tokens for push notifications
+    deviceTokens: [{
+        token: { type: String, required: true },
+        platform: { type: String, default: 'web' },
+        updatedAt: { type: Date, default: Date.now }
+    }],
+
 }, { timestamps: true });
 
 // Pre-save hook to hash password before saving

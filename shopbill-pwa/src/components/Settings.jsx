@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-    User, Lock, Globe, Check, Bell, RefreshCw, Users, LogOut, 
+    User, Lock, Globe, Check, Bell, RefreshCw, Users, LogOut, MessageCircle, 
     UploadCloud, CheckCircle, Link, Mail, Crown, LifeBuoy, 
     Gift, ShieldCheck, Activity, Settings as SettingsIcon,
     ChevronRight, CreditCard, ExternalLink, ShieldAlert,
@@ -13,6 +13,7 @@ import StaffPermissionsManager from './StaffPermissionsManager';
 import ChangePasswordForm from './ChangePasswordForm';
 import PlanUpgrade from './PlanUpgrade';
 import API from '../config/api';
+import { isChatSoundEnabled, setChatSoundEnabled } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
 
 // --- MODAL: Cloud Upload Confirmation ---
@@ -130,6 +131,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
         return 'main';
     }); 
     const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
+    const [chatSoundEnabled, setChatSoundEnabledState] = useState(() => isChatSoundEnabled());
     const [confirmModal, setConfirmModal] = useState(null); 
     const [cloudUploadStatus, setCloudUploadStatus] = useState('idle');
     const [cloudSelectionModal, setCloudSelectionModal] = useState(null); 
@@ -280,6 +282,16 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             accentColor="text-sky-600" 
                             darkMode={darkMode}
                         />
+                        {(currentUser?.plan === 'PRO' || currentUser?.plan === 'PREMIUM') && (
+                            <SettingItem 
+                                icon={MessageCircle} 
+                                title="Chat message sound" 
+                                description="Play sound when new message arrives." 
+                                actionComponent={<ToggleSwitch checked={chatSoundEnabled} onChange={(v) => { setChatSoundEnabled(v); setChatSoundEnabledState(v); }} darkMode={darkMode} />} 
+                                accentColor="text-indigo-500" 
+                                darkMode={darkMode}
+                            />
+                        )}
                         <SettingItem 
                             icon={darkMode ? Sun : Moon} 
                             title="Theme" 

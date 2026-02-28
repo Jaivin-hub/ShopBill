@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const Staff = require('../models/Staff');
 const Store = require('../models/Store');
 const User = require('../models/User');
+const { sendPushNotification } = require('../services/firebaseAdmin');
 
 const router = express.Router();
 
@@ -248,6 +249,28 @@ const emitAlert = async (req, storeId, type, data) => {
                 targetUserIds.forEach(userId => {
                     io.to(`user_${userId}`).emit('new_notification', notificationData);
                 });
+
+                // Push notifications to target users
+                if (targetUserIds.size > 0) {
+                    const recipients = await User.find({ _id: { $in: [...targetUserIds] } })
+                        .select('deviceTokens')
+                        .lean();
+                    const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+                    if (allTokens.length > 0) {
+                        sendPushNotification(allTokens, {
+                            title: title || 'Pocket POS',
+                            body: finalMessage?.slice(0, 120) || message?.slice(0, 120) || 'New notification',
+                            data: {
+                                type: 'notification',
+                                link: '/notifications',
+                                notificationId: newNotification._id?.toString() || '',
+                                storeId: storeIdStr,
+                                notificationType: type,
+                                category,
+                            },
+                        }).catch(err => console.error('[Notification] Push error:', err));
+                    }
+                }
 
                 // Also emit to store room for backward compatibility (but filter on client side)
                 // This ensures users who haven't refreshed still get notifications
