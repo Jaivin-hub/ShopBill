@@ -67,7 +67,8 @@ apiClient.interceptors.request.use(
     const url = config.url || '';
     const isPaymentOrSignup = /\/payment\/(create-subscription|verify-subscription|verify-plan-change)/.test(url) ||
       /\/auth\/signup/.test(url);
-    const skipDuplicateCancel = isPaymentOrSignup;
+    const isChatMessage = /\/chat\/[^/]+\/message/.test(url);
+    const skipDuplicateCancel = isPaymentOrSignup || isChatMessage;
 
     // Cancel previous identical request if still pending (skip for payment/signup)
     if (!skipDuplicateCancel && activeRequests.has(cacheKey)) {

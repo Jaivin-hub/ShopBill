@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ArrowDown, ChevronDown, Receipt, Clock, ArrowRight } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ChevronDown, Receipt, Clock, ArrowRight } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
@@ -354,6 +354,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
             100% { transform: scale(1); }
         }
         .cart-animate { animation: cartPulse 0.3s ease-in-out; }
+        @keyframes cartBulge {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        .cart-bulge { animation: cartBulge 1.8s ease-in-out infinite; }
       `}</style>
 
       <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
@@ -405,7 +410,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </header>
 
       <main className="flex-1 px-4 md:px-8 py-6">
-        <div className="max-w-7xl mx-auto space-y-8 pb-44">
+        <div className="max-w-7xl mx-auto space-y-8 pb-36 md:pb-44">
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex items-center gap-2">
@@ -504,58 +509,56 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </main>
 
       {cart.length > 0 && (
-          <div className="md:hidden fixed bottom-[100px] left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-bottom-4 fade-in duration-300">
-              <button 
-                onClick={scrollToCart}
-                className="bg-indigo-600 text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-3 active:scale-90 transition-transform cart-animate"
-              >
-                  <div className="relative">
+        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[72px]`}>
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-safe md:pb-5">
+            {/* Mobile: single compact row */}
+            <div className="w-full md:flex-1 flex flex-row md:flex-row items-center gap-2 md:gap-4">
+              <div className={`flex-1 min-w-0 border rounded-xl md:rounded-2xl px-3 py-2 md:px-6 md:py-4 flex flex-row md:flex-row items-center justify-between gap-2 shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <div className="min-w-0">
+                  <p className="text-[8px] md:text-[9px] font-black text-slate-500 tracking-[0.15em] md:tracking-[0.2em]">Total</p>
+                  <p className="text-lg md:text-2xl font-black tracking-tighter text-indigo-500 truncate">₹{totalAmount.toLocaleString('en-IN')}</p>
+                </div>
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                  <span className="text-[10px] md:text-[9px] font-black text-slate-500">{cart.length}×{cart.reduce((a, b) => a + b.quantity, 0)}</span>
+                  <button
+                    onClick={scrollToCart}
+                    className="md:hidden relative flex items-center justify-center w-9 h-9 rounded-full bg-indigo-600 text-white active:scale-90 transition-transform shrink-0 cart-bulge"
+                    aria-label="View Cart"
+                  >
                     <ShoppingCart className="w-4 h-4" />
-                    <span className="absolute -top-2 -right-2 bg-rose-500 text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full border-2 border-indigo-600">
-                        {cart.length}
+                    <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-[9px] font-black min-w-[14px] h-[14px] flex items-center justify-center rounded-full border-2 border-indigo-600">
+                      {cart.length}
                     </span>
+                  </button>
+                  <div className="hidden md:flex gap-4">
+                    <div className="text-right border-r border-slate-700/30 pr-4">
+                      <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Items</p>
+                      <p className="text-sm font-black">{cart.length}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Qty</p>
+                      <p className="text-sm font-black">{cart.reduce((a, b) => a + b.quantity, 0)}</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest">View Cart</span>
-                  <ArrowDown className="w-3 h-3 animate-bounce" />
-              </button>
-          </div>
-      )}
-
-      {cart.length > 0 && (
-        <footer className={`fixed bottom-0 left-0 right-0 z-[100] border-t px-4 md:px-8 py-5 shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
-            
-            <div className={`w-full md:flex-1 border rounded-2xl px-6 py-4 flex items-center justify-between shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-              <div>
-                <p className="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-1">Total Payable</p>
-                <p className="text-2xl font-black tracking-tighter text-indigo-500">₹{totalAmount.toLocaleString('en-IN')}</p>
-              </div>
-              <div className="flex gap-4">
-                  <div className="text-right border-r border-slate-700/30 pr-4">
-                    <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Items</p>
-                    <p className="text-sm font-black">{cart.length}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black text-slate-500 tracking-widest mb-1">Qty</p>
-                    <p className="text-sm font-black">{cart.reduce((a, b) => a + b.quantity, 0)}</p>
-                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="w-full md:w-auto flex items-center gap-3 h-[68px]">
+            <div className="w-full md:w-auto flex flex-row items-center gap-2 md:gap-3 h-11 md:h-[68px]">
               <button
                 onClick={handleCancelTransaction}
-                className={`group h-full px-6 border rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
+                className={`group h-full px-4 md:px-6 border rounded-xl md:rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 transition-all active:scale-95 shrink-0 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
+                aria-label="Discard"
               >
-                <XCircle className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                <span className="text-[10px] font-black tracking-widest">Discard</span>
+                <XCircle className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-90 transition-transform" />
+                <span className="text-[9px] md:text-[10px] font-black tracking-widest hidden sm:inline">Discard</span>
               </button>
 
               <button
                 onClick={() => setIsPaymentModalOpen(true)}
-                className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-[11px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95"
+                className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-[11px] tracking-[0.15em] md:tracking-[0.2em] flex items-center justify-center gap-2 md:gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95 min-w-0"
               >
-                Collect Payment <ChevronRight className="w-5 h-5" />
+                Collect Payment <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             </div>
           </div>

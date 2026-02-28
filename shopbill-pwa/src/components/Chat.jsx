@@ -737,30 +737,33 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
 
         const formData = new FormData();
-        // Determine file extension based on blob type
+        // Determine file extension and MIME type (some devices send empty blob.type)
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         let fileExtension = 'webm';
-        const blobType = audioBlob.type || '';
+        let mimeType = audioBlob.type || '';
         
-        console.log('[sendVoiceMessage] Blob type:', blobType, 'isIOS:', isIOS);
-        
-        if (blobType.includes('mp4') || blobType.includes('m4a') || blobType.includes('x-m4a')) {
+        if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('x-m4a')) {
             fileExtension = 'm4a';
-        } else if (blobType.includes('aac')) {
+        } else if (mimeType.includes('aac')) {
             fileExtension = 'aac';
-        } else if (blobType.includes('ogg')) {
+        } else if (mimeType.includes('ogg')) {
             fileExtension = 'ogg';
-        } else if (blobType.includes('webm')) {
+        } else if (mimeType.includes('webm')) {
             fileExtension = 'webm';
         } else if (isIOS) {
-            // iOS default - use m4a even if type is not detected
             fileExtension = 'm4a';
         }
+        if (!mimeType) {
+            mimeType = fileExtension === 'm4a' ? 'audio/mp4' : 'audio/webm';
+        }
         
-        console.log('[sendVoiceMessage] Using file extension:', fileExtension);
+        // Wrap with explicit type when device sends empty blob.type (fixes some Android/WebView)
+        const blobToAppend = audioBlob.type
+            ? audioBlob
+            : new Blob([audioBlob], { type: mimeType });
         
-        formData.append('audio', audioBlob, `voice.${fileExtension}`);
+        formData.append('audio', blobToAppend, `voice.${fileExtension}`);
         formData.append('messageType', 'audio');
         formData.append('audioDuration', recordingTime.toString());
         

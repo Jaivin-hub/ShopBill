@@ -583,8 +583,18 @@ router.post('/:chatId/message', protect, (req, res, next) => {
             limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
             fileFilter: (req, file, cb) => {
                 if (file.fieldname === 'audio') {
-                    const allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/m4a'];
-                    if (allowedMimes.includes(file.mimetype)) {
+                    // Include formats produced by MediaRecorder across Safari, Chrome, Firefox, iOS, Android
+                    const allowedMimes = [
+                        'audio/mpeg', 'audio/mp3', 'audio/wav',
+                        'audio/webm', 'video/webm',  // Chrome/Android (video/webm for audio-only)
+                        'audio/ogg', 'audio/opus',
+                        'audio/aac', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'  // Safari/iOS
+                    ];
+                    const ext = (path.extname(file.originalname || '').toLowerCase()) || '';
+                    const validExt = ['.webm', '.m4a', '.mp4', '.ogg', '.aac', '.mp3', '.wav'];
+                    const mimeAllowed = file.mimetype && allowedMimes.includes(file.mimetype);
+                    const extAllowed = validExt.includes(ext);
+                    if (mimeAllowed || extAllowed) {
                         cb(null, true);
                     } else {
                         cb(new Error('Invalid file type. Only audio files are allowed.'), false);
