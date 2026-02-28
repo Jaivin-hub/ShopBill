@@ -19,6 +19,7 @@ const ChatInput = ({
     onSendFile,
     onCancelFile,
     isUploadingFile,
+    uploadProgress = 0,
     darkMode
 }) => {
     const fileInputRef = useRef(null);
@@ -63,7 +64,13 @@ const ChatInput = ({
                 </div>
             ) : audioUrl ? (
                 /* VOICE PREVIEW STATE */
-                <div className="flex items-center gap-3 px-2 py-1">
+                <div className="flex flex-col gap-2 px-2 py-1">
+                    {uploadProgress > 0 && (
+                        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                    )}
+                    <div className="flex items-center gap-3">
                     <div className="flex-1 flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl px-4 py-2">
                         <Mic size={14} className="text-indigo-500" />
                         <span className="text-[11px] font-black tracking-widest text-indigo-500 uppercase">
@@ -75,9 +82,16 @@ const ChatInput = ({
                     </button>
                     <ActionButton onClick={onSendVoiceMessage} icon={Send} />
                 </div>
+                </div>
             ) : selectedFile ? (
                 /* FILE PREVIEW STATE */
-                <div className="flex items-center gap-3 px-2 py-1">
+                <div className="flex flex-col gap-2 px-2 py-1">
+                    {isUploadingFile && uploadProgress > 0 && (
+                        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                    )}
+                    <div className="flex items-center gap-3">
                     <div className="flex-1 flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-4 py-2 min-w-0">
                         {filePreview ? (
                             <img src={filePreview} alt="Preview" className="w-8 h-8 rounded-lg object-cover shrink-0" />
@@ -100,6 +114,7 @@ const ChatInput = ({
                         icon={Send}
                         disabled={isUploadingFile}
                     />
+                </div>
                 </div>
             ) : (
                 /* NORMAL TEXT STATE */

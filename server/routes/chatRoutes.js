@@ -408,6 +408,40 @@ router.get('/:chatId/messages', protect, async (req, res) => {
         chat.lastReadBy.set(req.user.id.toString(), new Date());
         await chat.save();
 
+        // Emit chat_read to other participants for real-time seen updates
+        const io = req.app.get('socketio');
+        if (io) {
+            const lastReadByPlain = {};
+            if (chat.lastReadBy instanceof Map) {
+                chat.lastReadBy.forEach((v, k) => { lastReadByPlain[k] = v; });
+            } else if (typeof chat.lastReadBy === 'object') {
+                Object.assign(lastReadByPlain, chat.lastReadBy);
+            }
+            chat.participants.forEach(pid => {
+                if (pid.toString() !== req.user.id.toString()) {
+                    io.to(`user_${pid}`).emit('chat_read', {
+                        chatId: chat._id,
+                        lastReadBy: lastReadByPlain
+                    });
+                }
+            });
+        }
+
+        // Build participants list with names (for seen-by display)
+        const participantsPopulated = await Promise.all((chat.participants || []).map(async (pid) => {
+            const user = await User.findById(pid).select('name email').lean();
+            const staff = await Staff.findOne({ userId: pid, active: true }).populate('storeId', 'name').lean();
+            const name = staff?.name || user?.name || user?.email || 'Unknown';
+            return { _id: pid.toString(), name };
+        }));
+
+        const lastReadByPlain = {};
+        if (chat.lastReadBy instanceof Map) {
+            chat.lastReadBy.forEach((v, k) => { lastReadByPlain[k] = v; });
+        } else if (typeof chat.lastReadBy === 'object') {
+            Object.assign(lastReadByPlain, chat.lastReadBy);
+        }
+
         // Paginate messages (most recent first)
         const skip = (page - 1) * limit;
         const messages = chat.messages
@@ -415,7 +449,6 @@ router.get('/:chatId/messages', protect, async (req, res) => {
             .slice(skip, skip + parseInt(limit))
             .reverse() // Reverse to show oldest first
             .map(msg => {
-                // Convert Mongoose subdocument to plain object with all fields
                 const msgObj = msg.toObject ? msg.toObject() : msg;
                 return {
                     _id: msgObj._id,
@@ -437,7 +470,11 @@ router.get('/:chatId/messages', protect, async (req, res) => {
 
         res.json({ 
             success: true, 
-            data: messages,
+            data: {
+                messages,
+                lastReadBy: lastReadByPlain,
+                participants: participantsPopulated
+            },
             total: chat.messages.length,
             page: parseInt(page),
             limit: parseInt(limit)

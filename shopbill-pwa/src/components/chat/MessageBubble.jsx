@@ -9,10 +9,23 @@ const MessageBubble = ({
     onToggleAudio,
     formatRecordingTime,
     audioRefs,
-    showSenderInfo = true
+    showSenderInfo = true,
+    lastReadBy = {},
+    participants = []
 }) => {
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
     const isFileMessage = msg.messageType === 'file' || msg.fileUrl;
+
+    // Compute who has seen this message (for sender only): other participants whose lastReadBy >= message timestamp
+    const senderIdStr = msg.senderId ? (msg.senderId._id || msg.senderId.id || msg.senderId).toString() : '';
+    const msgTime = msg.timestamp ? new Date(msg.timestamp).getTime() : 0;
+    const seenBy = isOwn && msgTime > 0 ? participants.filter(p => {
+        const pid = (p._id || p.id || p).toString();
+        if (pid === senderIdStr) return false; // exclude sender
+        const readAt = lastReadBy[pid];
+        if (!readAt) return false;
+        return new Date(readAt).getTime() >= msgTime;
+    }) : [];
     
     // Logic for Audio Source
     let audioSrc = null;
@@ -188,6 +201,23 @@ const MessageBubble = ({
                     {new Date(msg.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                 </p>
             </div>
+            {/* Seen by - small circles with initials (sender only) */}
+            {isOwn && seenBy.length > 0 && (
+                <div className="flex items-center justify-end gap-0.5 mt-1 px-1" title={`Seen by ${seenBy.map(p => p.name).join(', ')}`}>
+                    {seenBy.slice(0, 5).map(p => (
+                        <div
+                            key={p._id || p.id}
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border-2 ${darkMode ? 'bg-slate-800 border-slate-700 text-indigo-300' : 'bg-indigo-100 border-indigo-200 text-indigo-600'}`}
+                            title={p.name}
+                        >
+                            {(p.name || '?')[0].toUpperCase()}
+                        </div>
+                    ))}
+                    {seenBy.length > 5 && (
+                        <span className="text-[9px] font-bold text-slate-500">+{seenBy.length - 5}</span>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

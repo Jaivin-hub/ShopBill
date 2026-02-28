@@ -11,7 +11,9 @@ const ChatMessages = ({
     onToggleAudio,
     formatRecordingTime,
     audioRefs,
-    messagesEndRef
+    messagesEndRef,
+    lastReadBy = {},
+    participants = []
 }) => {
     if (isLoadingMessages) {
         return (
@@ -90,6 +92,8 @@ const ChatMessages = ({
                             formatRecordingTime={formatRecordingTime}
                             audioRefs={audioRefs}
                             showSenderInfo={showSenderInfo}
+                            lastReadBy={lastReadBy}
+                            participants={participants}
                         />
                     </div>
                 );

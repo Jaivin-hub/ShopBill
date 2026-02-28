@@ -61,6 +61,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [selectedFile, setSelectedFile] = useState(null);
     const [filePreview, setFilePreview] = useState(null);
     const [isUploadingFile, setIsUploadingFile] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    
+    // Seen/read receipts
+    const [chatLastReadBy, setChatLastReadBy] = useState({});
+    const [chatParticipants, setChatParticipants] = useState([]);
     
     // Refs
     const socketRef = useRef(null);
@@ -87,6 +92,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             transports: ['polling', 'websocket'],
             withCredentials: true,
             reconnection: true
+        });
+
+        socketRef.current.on('chat_read', (data) => {
+            if (data.chatId === selectedChat?._id) {
+                setChatLastReadBy(prev => ({ ...prev, ...(data.lastReadBy || {}) }));
+            }
         });
 
         socketRef.current.on('new_message', (data) => {
@@ -131,6 +142,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
     }, [hasChatAccess, selectedChat]);
+
+    // Join/leave chat room for real-time read receipts
+    useEffect(() => {
+        if (!socketRef.current?.connected || !selectedChat?._id) return;
+        socketRef.current.emit('join_chat', selectedChat._id);
+        return () => { socketRef.current?.emit('leave_chat', selectedChat._id); };
+    }, [selectedChat?._id]);
 
     // Cleanup media stream on unmount
     useEffect(() => {
@@ -187,9 +205,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         try {
             const response = await apiClient.get(API.chatMessages(chatId));
             if (response.data.success) {
-                setMessages(response.data.data || []);
+                setMessages(response.data.data?.messages || response.data.data || []);
+                setChatLastReadBy(response.data.data?.lastReadBy || {});
+                setChatParticipants(response.data.data?.participants || []);
                 setTimeout(() => scrollToBottom(), 100);
-                // Refresh chats list to update unread counts after marking messages as read
                 fetchChats();
             }
         } catch (error) { showToast('Failed to load messages', 'error'); }
@@ -225,10 +244,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     useEffect(() => {
         if (selectedChat) {
-            // Fetch messages for all chats (groups, direct chats, default groups)
             fetchMessages(selectedChat._id);
         } else {
             setMessages([]);
+            setChatLastReadBy({});
+            setChatParticipants([]);
         }
     }, [selectedChat, fetchMessages]);
 
@@ -641,6 +661,34 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         setFilePreview(null);
     };
 
+    const compressImageIfNeeded = (file) => {
+        if (!file.type.startsWith('image/') || file.size < 500 * 1024) return Promise.resolve(file);
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const maxDim = 1920;
+                let w = img.width, h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = (h / w) * maxDim; w = maxDim; }
+                    else { w = (w / h) * maxDim; h = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob((blob) => {
+                    if (blob && blob.size < file.size) {
+                        resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                    } else resolve(file);
+                }, 'image/jpeg', 0.82);
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+            img.src = url;
+        });
+    };
+
     const sendFileMessage = async () => {
         if (!selectedFile || !selectedChat) {
             showToast('No file selected to send', 'error');
@@ -648,13 +696,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
 
         setIsUploadingFile(true);
+        const fileToUpload = await compressImageIfNeeded(selectedFile);
         const formData = new FormData();
-        formData.append('file', selectedFile);
+        formData.append('file', fileToUpload);
         formData.append('messageType', 'file');
-        formData.append('content', selectedFile.name);
-        formData.append('fileName', selectedFile.name);
-        formData.append('fileType', selectedFile.type);
-        formData.append('fileSize', selectedFile.size.toString());
+        formData.append('content', fileToUpload.name);
+        formData.append('fileName', fileToUpload.name);
+        formData.append('fileType', fileToUpload.type);
+        formData.append('fileSize', fileToUpload.size.toString());
 
         // Optimistic update
         const tempMessageId = `temp-file-${Date.now()}`;
@@ -680,11 +729,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         scrollToBottom(true);
 
         try {
+            setUploadProgress(0);
             const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
+                headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000,
+                onUploadProgress: (e) => setUploadProgress(e.loaded && e.total ? Math.round((e.loaded / e.total) * 100) : 0)
             });
 
             if (response.data.success) {
@@ -720,6 +769,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
         } finally {
             setIsUploadingFile(false);
+            setUploadProgress(0);
         }
     };
 
@@ -802,18 +852,16 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         scrollToBottom(true); // Instant scroll for optimistic update
         
         try {
+            setUploadProgress(0);
             const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-                timeout: 60000, // 60 second timeout for file upload
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 60000,
+                onUploadProgress: (e) => setUploadProgress(e.loaded && e.total ? Math.round((e.loaded / e.total) * 100) : 0)
             });
             
             if (response.data.success) {
-                // Revoke the optimistic blob URL
+                setUploadProgress(0);
                 URL.revokeObjectURL(audioUrlForPreview);
-                
-                // Replace optimistic message with real one
                 setMessages(prev => {
                     const filtered = prev.filter(m => m._id !== tempMessageId);
                     // Check if message already exists (from socket)
@@ -831,7 +879,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
         } catch (error) {
             console.error('Voice message send error:', error);
-            
+            setUploadProgress(0);
             // Revoke the optimistic blob URL
             URL.revokeObjectURL(audioUrlForPreview);
             
@@ -1221,6 +1269,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 formatRecordingTime={formatRecordingTime}
                                 audioRefs={audioRefs}
                                 messagesEndRef={messagesEndRef}
+                                lastReadBy={chatLastReadBy}
+                                participants={chatParticipants}
                             />
                         </div>
 
@@ -1245,6 +1295,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                     onSendFile={sendFileMessage}
                                     onCancelFile={cancelFileSelection}
                                     isUploadingFile={isUploadingFile}
+                                    uploadProgress={uploadProgress}
                                     darkMode={darkMode}
                                 />
                             </div>
