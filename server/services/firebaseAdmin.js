@@ -41,7 +41,8 @@ async function sendPushNotification(tokens, payload) {
     }
     const deduped = [...new Set(tokens)];
     const { title, body, data = {} } = payload;
-    console.log(`[Push] Sending to ${deduped.length} token(s) | title: "${title}" | body: "${(body || '').slice(0, 50)}..." | data:`, JSON.stringify(data));
+    const ts = new Date().toISOString();
+    console.log(`[Push] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
     try {
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
@@ -59,7 +60,7 @@ async function sendPushNotification(tokens, payload) {
                 Object.entries(data).map(([k, v]) => [String(k), String(v ?? '')])
             ),
         });
-        console.log(`[Push] Result: ${result.successCount} success, ${result.failureCount} failed (total: ${deduped.length})`);
+        console.log(`[Push] ${new Date().toISOString()} firebaseAdmin RESULT: success=${result.successCount} failure=${result.failureCount} total=${deduped.length}`);
         if (result.failureCount > 0 && result.responses) {
             result.responses.forEach((resp, i) => {
                 if (!resp.success) {

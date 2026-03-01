@@ -72,6 +72,18 @@ const io = new Server(server, {
 // IMPORTANT: Shared Socket.io instance
 app.set('socketio', io);
 
+// Push debug: log push-related API requests
+app.use((req, res, next) => {
+    const p = req.path || (req.url && req.url.split('?')[0]) || '';
+    if (p.includes('/chat/') && p.endsWith('/message') && req.method === 'POST') {
+        console.log(`[Push] ${new Date().toISOString()} REQ POST ${p}`);
+    }
+    if (p.includes('/user/device-token') && (req.method === 'POST' || req.method === 'DELETE')) {
+        console.log(`[Push] ${new Date().toISOString()} REQ ${req.method} ${p}`);
+    }
+    next();
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/inventory', inventoryRoutes);

@@ -389,6 +389,7 @@ router.get('/chats', protect, async (req, res) => {
  */
 router.get('/:chatId/messages', protect, async (req, res) => {
     try {
+        console.log('[Push] GET messages hit: chatId=', req.params.chatId, 'user=', req.user?.id);
         const { chatId } = req.params;
         const { page = 1, limit = 50 } = req.query;
 
@@ -582,7 +583,10 @@ router.post('/create', protect, async (req, res) => {
  * @desc Send a message to a chat (text, voice, or file)
  * @access Private (PRO/PREMIUM)
  */
-router.post('/:chatId/message', protect, (req, res, next) => {
+router.post('/:chatId/message', (req, res, next) => {
+    console.log(`[Push] ${new Date().toISOString()} chat message route matched chatId=${req.params.chatId} (before auth)`);
+    next();
+}, protect, (req, res, next) => {
     // Use multer.any() to accept any file field, then we'll check the fieldname in the handler
     // This avoids the issue of req.body not being available before multer processes the form
     const contentType = req.headers['content-type'] || '';
@@ -678,13 +682,16 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         next();
     }
 }, async (req, res) => {
+    const ts = () => new Date().toISOString();
     try {
         const { chatId } = req.params;
+        console.log(`[Push] ${ts()} ===== MESSAGE API HANDLER START ===== chatId=${chatId} sender=${req.user?.id}`);
         // Parse body - multer should have parsed it by now
         const { content, audioDuration, messageType, fileName, fileType, fileSize } = req.body || {};
 
         // Validate: must have either content, audio file, or file
         if (!content?.trim() && !req.file) {
+            console.log(`[Push] ${ts()} MESSAGE API validation failed: no content or file`);
             return res.status(400).json({ error: 'Message content, audio file, or file is required' });
         }
 
@@ -768,6 +775,7 @@ router.post('/:chatId/message', protect, (req, res, next) => {
         chat.messages.push(message);
         chat.lastMessageAt = new Date();
         await chat.save();
+        console.log('[Push] Message saved to chat. Type:', detectedMessageType, '| participants:', chat.participants?.length);
 
         // Reload chat to get the saved message with all fields
         const updatedChat = await Chat.findById(chatId);
@@ -820,14 +828,20 @@ router.post('/:chatId/message', protect, (req, res, next) => {
 
         // Send push notifications to recipients
         const recipientIds = chat.participants.filter(p => p.toString() !== req.user.id.toString());
+        console.log('[Push] Recipient IDs for push:', recipientIds?.map(id => id.toString()) || []);
         if (recipientIds.length > 0) {
             const recipients = await User.find({ _id: { $in: recipientIds } })
-                .select('deviceTokens')
+                .select('deviceTokens name email')
                 .lean();
             const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
-            console.log(`[Push] Chat message: ${recipientIds.length} recipient(s), ${allTokens.length} device token(s)`);
+            recipients.forEach(r => {
+                const tk = (r.deviceTokens || []).map(t => t.token);
+                console.log('[Push] Recipient:', r._id, r.name || r.email, '| tokens:', tk.length, tk.length ? '(...)' : '(none)');
+            });
+            console.log('[Push] Chat message: total', recipientIds.length, 'recipient(s),', allTokens.length, 'device token(s). Will send push:', allTokens.length > 0);
             if (allTokens.length > 0) {
                 const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
+                console.log('[Push] Calling sendPushNotification now...');
                 sendPushNotification(allTokens, {
                     title: senderName,
                     body: contentPreview,
@@ -838,15 +852,22 @@ router.post('/:chatId/message', protect, (req, res, next) => {
                         senderName,
                         type: 'chat_message'
                     }
-                }).then(r => console.log(`[Push] Chat push delivered: ${r.success} ok, ${r.failure} failed`)).catch(err => console.error('[Push] Chat push error:', err));
+                }).then(r => {
+                    console.log('[Push] Chat push RESULT: success=', r.success, 'failure=', r.failure);
+                }).catch(err => {
+                    console.error('[Push] Chat push ERROR:', err?.message || err, err?.stack);
+                });
             } else {
-                console.log('[Push] No device tokens for chat recipients');
+                console.log('[Push] SKIP: No device tokens for chat recipients - users must register tokens first');
             }
+        } else {
+            console.log('[Push] SKIP: No recipients (only sender in chat)');
         }
 
+        console.log(`[Push] ${ts()} ===== MESSAGE API DONE (200) =====`);
         res.json({ success: true, data: populatedMessage });
     } catch (error) {
-        console.error('Send Message Error:', error);
+        console.error(`[Push] ${new Date().toISOString()} MESSAGE API ERROR:`, error?.message, error?.stack);
         // Clean up uploaded file if there was an error
         if (req.file) {
             try {

@@ -71,6 +71,8 @@ router.put('/plan', protect, async (req, res) => {
  * @access Private
  */
 router.post('/device-token', protect, async (req, res) => {
+    const ts = () => new Date().toISOString();
+    console.log(`[Push] ${ts()} device-token POST hit user=${req.user?.id}`);
     try {
         const { token, platform = 'web' } = req.body;
         if (!token || typeof token !== 'string') {
@@ -91,7 +93,7 @@ router.post('/device-token', protect, async (req, res) => {
         }
         user.deviceTokens = deviceTokens;
         await user.save();
-        console.log(`[Push] Device token registered | user: ${req.user.id} | platform: ${platform} | total tokens: ${deviceTokens.length} | token preview: ...${token.slice(-12)}`);
+        console.log(`[Push] ${ts()} Device token REGISTERED user=${req.user.id} platform=${platform} total=${deviceTokens.length} tokenTail=...${token.slice(-12)}`);
         res.json({ success: true });
     } catch (error) {
         console.error('Device Token Error:', error);
