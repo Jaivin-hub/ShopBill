@@ -6,7 +6,8 @@ const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 
 dotenv.config();
-const connectDB = require('./db'); 
+const connectDB = require('./db');
+const { getAdmin } = require('./services/firebaseAdmin');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -175,10 +176,14 @@ io.on('connection', (socket) => {
 // Server Start
 const startServer = async () => {
     try {
-        await connectDB(); 
+        await connectDB();
+        // Initialize Firebase Admin early so push logs appear on first notification
+        const fb = getAdmin();
+        console.log(`[Push] Debugging: ${fb ? 'Firebase Admin ready' : 'Firebase Admin NOT configured (check .env FIREBASE_*)'}`);
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
             console.log(`📡 Socket.io Active for Alerts & Resolutions`);
+            console.log(`[Push] Push notification logs: [Push] prefix = firebase, device-token, notification, chat`);
         });
     } catch (error) {
         console.error('Startup Error:', error);
