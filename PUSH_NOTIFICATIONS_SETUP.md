@@ -40,18 +40,7 @@ VITE_FIREBASE_VAPID_KEY=BKagOny0KF_2pCJQ3m...  # From Web Push certificates in F
 
 ## 4. Firebase Messaging Service Worker
 
-Edit `shopbill-pwa/public/firebase-messaging-sw.js` and replace placeholders with your actual Firebase config:
-
-```javascript
-const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-};
-```
+The service worker is **auto-generated** at build/dev from your `shopbill-pwa/.env` (VITE_FIREBASE_*). No manual edit needed if env is set.
 
 ## 5. Install Dependencies
 
@@ -65,7 +54,20 @@ cd shopbill-pwa && npm install
 
 ## Behavior
 
-- When a PRO/PREMIUM user logs in, the app requests notification permission and registers the FCM token with the backend.
-- When someone sends a chat message, the server sends push notifications to all recipients' registered device tokens.
+- When a user logs in, the app may request notification permission and register the FCM token.
+- **Mobile:** Go to Settings → Push notifications → tap **Enable** (required for iOS; must be a user tap).
+- When someone sends a chat message, the server sends push to all recipients' device tokens.
 - Message ringtone: Settings → Chat message sound toggle (PRO/PREMIUM).
-- Seen bubble: Shows for all users (owner, manager, cashier) who have read the message.
+
+## Mobile PWA Troubleshooting
+
+**Push notifications not showing when app is closed:**
+1. Add the app to Home Screen and open from there (not from Safari tab).
+2. Go to Settings → Push notifications → tap **Enable** and allow when prompted.
+3. Ensure `shopbill-pwa/.env` has all VITE_FIREBASE_* vars and rebuild (`npm run build`).
+4. After deploy, remove from Home Screen and re-add, then open again.
+5. iOS 16.4+ required for web push on PWA.
+
+**Message ringtone not playing on mobile:**
+1. Tap anywhere on the app screen once after opening (unlocks audio on iOS).
+2. Ensure Chat message sound is ON in Settings.

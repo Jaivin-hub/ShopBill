@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite' // Used to import the plugin
+import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import firebaseSwPlugin from './vite-firebase-sw-plugin.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,6 +14,7 @@ export default defineConfig({
     historyApiFallback: true,
   },
   plugins: [
+    firebaseSwPlugin(),
     react(),
     
     // 💥 CRITICAL FIX: Pass the configuration object directly to the plugin 💥

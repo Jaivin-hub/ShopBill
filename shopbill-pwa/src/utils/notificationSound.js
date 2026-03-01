@@ -73,10 +73,15 @@ const playHtmlAudioFallback = () => {
   try {
     if (!htmlAudioFallback) {
       htmlAudioFallback = new Audio(getBeepDataUri());
+      htmlAudioFallback.setAttribute?.('playsinline', 'true');
+      htmlAudioFallback.playsInline = true;
+      htmlAudioFallback.preload = 'auto';
     }
+    htmlAudioFallback.volume = 0.7;
+    htmlAudioFallback.muted = false;
     htmlAudioFallback.currentTime = 0;
-    htmlAudioFallback.volume = 0.6;
-    htmlAudioFallback.play().catch(() => {});
+    const p = htmlAudioFallback.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch {}
 };
 
@@ -103,30 +108,40 @@ const playWebAudio = () => {
   }
 };
 
-/** Call on first user interaction to unlock audio on mobile */
+/** Pre-create and play on first tap to unlock audio (required for iOS/mobile) */
 export const unlockAudio = () => {
   if (audioUnlocked) return;
   audioUnlocked = true;
   try {
     const ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
-    playHtmlAudioFallback();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (!htmlAudioFallback) {
+      htmlAudioFallback = new Audio(getBeepDataUri());
+      htmlAudioFallback.playsInline = true;
+      htmlAudioFallback.preload = 'auto';
+    }
+    htmlAudioFallback.volume = 0.5;
+    htmlAudioFallback.muted = false;
+    htmlAudioFallback.currentTime = 0;
+    htmlAudioFallback.play().then(() => {}).catch(() => {});
   } catch {}
 };
 
-/** Setup unlock on first tap/click - call once from App */
+/** Setup unlock on first tap/click - call once from App. Use capture so we run before nav. Also triggers push permission on each tap (iOS needs gesture). */
 export const setupAudioUnlock = () => {
-  const unlockOnce = () => { unlockAudio(); };
-  document.addEventListener('click', unlockOnce, { once: true, passive: true });
-  document.addEventListener('touchstart', unlockOnce, { once: true, passive: true });
+  const onInteraction = () => {
+    unlockAudio();
+    import('./pushOnGesture.js').then((m) => m.requestPushFromGesture()).catch(() => {});
+  };
+  const opts = { passive: true, capture: true };
+  document.addEventListener('click', onInteraction, opts);
+  document.addEventListener('touchstart', onInteraction, opts);
+  document.addEventListener('touchend', onInteraction, opts);
+  document.addEventListener('keydown', onInteraction, opts);
 };
 
 export const playMessageSound = () => {
   if (!isChatSoundEnabled()) return;
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  if (isMobile) {
-    playHtmlAudioFallback();
-  } else {
-    playWebAudio();
-  }
+  // Use HTML5 Audio for all platforms - works after unlock on desktop and mobile
+  playHtmlAudioFallback();
 };

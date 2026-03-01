@@ -825,6 +825,7 @@ router.post('/:chatId/message', protect, (req, res, next) => {
                 .select('deviceTokens')
                 .lean();
             const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+            console.log(`[Push] Chat message: ${recipientIds.length} recipient(s), ${allTokens.length} device token(s)`);
             if (allTokens.length > 0) {
                 const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
                 sendPushNotification(allTokens, {
@@ -837,7 +838,9 @@ router.post('/:chatId/message', protect, (req, res, next) => {
                         senderName,
                         type: 'chat_message'
                     }
-                }).catch(err => console.error('[Chat] Push notification error:', err));
+                }).then(r => console.log(`[Push] Chat push delivered: ${r.success} ok, ${r.failure} failed`)).catch(err => console.error('[Push] Chat push error:', err));
+            } else {
+                console.log('[Push] No device tokens for chat recipients');
             }
         }
 

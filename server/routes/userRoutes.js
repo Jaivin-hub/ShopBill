@@ -91,6 +91,7 @@ router.post('/device-token', protect, async (req, res) => {
         }
         user.deviceTokens = deviceTokens;
         await user.save();
+        console.log(`[Push] Device token registered | user: ${req.user.id} | platform: ${platform} | total tokens: ${deviceTokens.length} | token preview: ...${token.slice(-12)}`);
         res.json({ success: true });
     } catch (error) {
         console.error('Device Token Error:', error);

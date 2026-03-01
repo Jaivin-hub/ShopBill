@@ -9,6 +9,7 @@ import API from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { playMessageSound, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -368,6 +369,7 @@ const App = () => {
   const [notifications, setNotifications] = useState([]);
   const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
+  const currentUserRef = useRef(currentUser);
   const outletRestoredRef = useRef(false);
   const billingRefreshRef = useRef(null); // BillingPOS sets this to fetchRecentSales so we can refresh on new_sale
 
@@ -388,6 +390,7 @@ const App = () => {
     return saved !== null ? JSON.parse(saved) : true;
   });
 
+  currentUserRef.current = currentUser;
   useEffect(() => {
     localStorage.setItem('themePreference', JSON.stringify(darkMode));
   }, [darkMode]);
@@ -700,7 +703,11 @@ useEffect(() => {
     };
     
     const handleNewMessage = (data) => {
-      // Update chat unread count when a new message arrives
+      const me = currentUserRef.current;
+      const senderId = data?.message?.senderId && (data.message.senderId._id || data.message.senderId.id || data.message.senderId);
+      const myId = me?._id || me?.id;
+      const isFromOthers = senderId && senderId.toString() !== (myId?.toString?.() || String(myId));
+      if (isFromOthers) playMessageSound();
       updateChatUnreadCount();
     };
     
@@ -746,6 +753,7 @@ useEffect(() => {
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('push_token_registered');
     setCurrentUser(null);
     setCurrentOutletId(null);
     setCurrentOutlet(null);
@@ -779,6 +787,7 @@ useEffect(() => {
     }
     
     setCurrentPage('dashboard'); // All roles start at dashboard now
+    unlockAudio(); // Unlock audio for message sounds (user gesture from login)
   }, [apiClient, API]);
 
   const handleOutletSwitch = useCallback((outlet) => {

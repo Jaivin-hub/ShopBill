@@ -256,6 +256,7 @@ const emitAlert = async (req, storeId, type, data) => {
                         .select('deviceTokens')
                         .lean();
                     const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+                    console.log(`[Push] Notification: ${targetUserIds.size} target users, ${recipients.length} recipients, ${allTokens.length} device token(s)`);
                     if (allTokens.length > 0) {
                         sendPushNotification(allTokens, {
                             title: title || 'Pocket POS',
@@ -268,7 +269,9 @@ const emitAlert = async (req, storeId, type, data) => {
                                 notificationType: type,
                                 category,
                             },
-                        }).catch(err => console.error('[Notification] Push error:', err));
+                        }).then(r => console.log(`[Push] Notification delivered: ${r.success} ok, ${r.failure} failed`)).catch(err => console.error('[Push] Notification error:', err));
+                    } else {
+                        console.log('[Push] No device tokens for notification recipients - users may need to enable notifications in the app');
                     }
                 }
 

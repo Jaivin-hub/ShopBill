@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, Loader2, ShieldCheck, Plus } from 'lucide-react';
-import { playMessageSound } from '../utils/notificationSound';
 import { io } from 'socket.io-client';
 import API from '../config/api';
 import ChatListSidebar from './chat/ChatListSidebar';
@@ -102,8 +101,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         });
 
         socketRef.current.on('new_message', (data) => {
-            const isFromOthers = data.message?.senderId && (data.message.senderId._id || data.message.senderId.id || data.message.senderId)?.toString() !== (currentUser?._id || currentUser?.id)?.toString();
-            if (isFromOthers) playMessageSound();
             if (data.chatId === selectedChat?._id) {
                 setMessages(prev => {
                     // Remove any optimistic messages

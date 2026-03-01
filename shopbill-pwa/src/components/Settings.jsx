@@ -13,8 +13,7 @@ import StaffPermissionsManager from './StaffPermissionsManager';
 import ChangePasswordForm from './ChangePasswordForm';
 import PlanUpgrade from './PlanUpgrade';
 import API from '../config/api';
-import { isChatSoundEnabled, setChatSoundEnabled } from '../utils/notificationSound';
-import { requestNotificationPermissionAndToken, isPushSupported } from '../lib/firebase';
+import { isChatSoundEnabled, setChatSoundEnabled, playMessageSound, unlockAudio } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
 
 // --- MODAL: Cloud Upload Confirmation ---
@@ -133,7 +132,6 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     }); 
     const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
     const [chatSoundEnabled, setChatSoundEnabledState] = useState(() => isChatSoundEnabled());
-    const [pushEnabling, setPushEnabling] = useState(false);
     const [confirmModal, setConfirmModal] = useState(null); 
     const [cloudUploadStatus, setCloudUploadStatus] = useState('idle');
     const [cloudSelectionModal, setCloudSelectionModal] = useState(null); 
@@ -284,47 +282,22 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             accentColor="text-sky-600" 
                             darkMode={darkMode}
                         />
-                        <SettingItem 
-                            icon={Bell} 
-                            title="Push notifications" 
-                            description="Enable to receive messages and alerts when app is in background. Tap to enable (required on mobile)." 
-                            actionComponent={
-                                <button
-                                    onClick={async () => {
-                                        if (pushEnabling) return;
-                                        const vapid = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-                                        if (!vapid) { showToast?.('Push not configured.', 'info'); return; }
-                                        setPushEnabling(true);
-                                        try {
-                                            if (!(await isPushSupported())) { showToast?.('Push not supported.', 'info'); return; }
-                                            const token = await requestNotificationPermissionAndToken(vapid);
-                                            if (token && apiClient) {
-                                                await apiClient.post('/user/device-token', { token, platform: 'web' });
-                                                showToast?.('Push notifications enabled.', 'success');
-                                            } else if (!token) {
-                                                showToast?.('Permission denied or failed.', 'info');
-                                            }
-                                        } catch (e) {
-                                            showToast?.(e?.message || 'Failed to enable push.', 'error');
-                                        } finally {
-                                            setPushEnabling(false);
-                                        }
-                                    }}
-                                    disabled={pushEnabling}
-                                    className={`px-3 py-2 rounded-lg text-xs font-bold ${pushEnabling ? 'opacity-60' : ''} ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'} hover:opacity-90 active:scale-95 transition-all`}
-                                >
-                                    {pushEnabling ? 'Enabling...' : 'Enable'}
-                                </button>
-                            } 
-                            accentColor="text-indigo-500" 
-                            darkMode={darkMode}
-                        />
                         {(currentUser?.plan === 'PRO' || currentUser?.plan === 'PREMIUM') && (
                             <SettingItem 
                                 icon={MessageCircle} 
                                 title="Chat message sound" 
-                                description="Play sound when new message arrives." 
-                                actionComponent={<ToggleSwitch checked={chatSoundEnabled} onChange={(v) => { setChatSoundEnabled(v); setChatSoundEnabledState(v); }} darkMode={darkMode} />} 
+                                description="Play sound when new message arrives. Tap Test to unlock audio on mobile." 
+                                actionComponent={
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => { unlockAudio(); setChatSoundEnabled(true); setChatSoundEnabledState(true); playMessageSound(); }}
+                                            className={`px-2 py-1.5 rounded-lg text-[10px] font-bold ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'} hover:opacity-90 active:scale-95 transition-all`}
+                                        >
+                                            Test
+                                        </button>
+                                        <ToggleSwitch checked={chatSoundEnabled} onChange={() => { const next = !chatSoundEnabled; setChatSoundEnabled(next); setChatSoundEnabledState(next); }} darkMode={darkMode} />
+                                    </div>
+                                } 
                                 accentColor="text-indigo-500" 
                                 darkMode={darkMode}
                             />
