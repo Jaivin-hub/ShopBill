@@ -665,8 +665,10 @@ router.post('/:chatId/message', (req, res, next) => {
         
         return combinedUpload(req, res, (err) => {
             if (err) {
+                console.log(`[Push] ${new Date().toISOString()} MESSAGE API: multer error`, err.message);
                 return res.status(400).json({ error: err.message });
             }
+            console.log(`[Push] ${new Date().toISOString()} MESSAGE API: multer done multipart`);
             // Convert req.files to req.file format for compatibility
             if (req.files) {
                 if (req.files['audio'] && req.files['audio'][0]) {
@@ -679,6 +681,7 @@ router.post('/:chatId/message', (req, res, next) => {
         });
     } else {
         // Not multipart, must be text message
+        console.log(`[Push] ${new Date().toISOString()} MESSAGE API: text path (no multipart)`);
         next();
     }
 }, async (req, res) => {
@@ -697,16 +700,21 @@ router.post('/:chatId/message', (req, res, next) => {
 
         const user = await User.findById(req.user.id);
         if (!user) {
+            console.log(`[Push] ${ts()} MESSAGE API: user not found`);
             return res.status(404).json({ error: 'User not found' });
         }
+        console.log(`[Push] ${ts()} MESSAGE API: user ok`, user.name || user.email);
 
         const chat = await Chat.findById(chatId);
         if (!chat) {
+            console.log(`[Push] ${ts()} MESSAGE API: chat not found chatId=${chatId}`);
             return res.status(404).json({ error: 'Chat not found' });
         }
+        console.log(`[Push] ${ts()} MESSAGE API: chat ok participants=${chat.participants?.length}`);
 
         // Check if user is a participant
         if (!chat.participants.includes(req.user.id)) {
+            console.log(`[Push] ${ts()} MESSAGE API: access denied - user not participant`);
             return res.status(403).json({ error: 'Access denied' });
         }
 
@@ -744,7 +752,8 @@ router.post('/:chatId/message', (req, res, next) => {
         } else if (messageType) {
             detectedMessageType = messageType;
         }
-        
+        console.log(`[Push] ${ts()} MESSAGE API: messageType=${detectedMessageType} hasFile=${!!req.file}`);
+
         const message = {
             senderId: req.user.id,
             senderName: senderName,
@@ -811,6 +820,7 @@ router.post('/:chatId/message', (req, res, next) => {
 
         // Emit to Socket.IO for real-time updates
         const io = req.app.get('socketio');
+        console.log(`[Push] ${ts()} MESSAGE API: socket emit io=${!!io}`);
         if (io) {
             io.to(`chat_${chat._id}`).emit('new_message', {
                 chatId: chat._id,
@@ -824,6 +834,7 @@ router.post('/:chatId/message', (req, res, next) => {
                     });
                 }
             });
+            console.log(`[Push] ${ts()} MESSAGE API: socket emitted to chat_${chat._id} + user rooms`);
         }
 
         // Send push notifications to recipients
