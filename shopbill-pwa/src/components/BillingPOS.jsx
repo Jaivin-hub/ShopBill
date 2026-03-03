@@ -17,7 +17,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
   const [isRecentSalesOpen, setIsRecentSalesOpen] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
-  const [recentSalesCountSeen, setRecentSalesCountSeen] = useState(0); // when user opens sales modal, mark as read so badge goes to 0
+  const [salesLastReadAt, setSalesLastReadAt] = useState(null); // server-backed; when user opens modal we call mark-recent-read so count persists across navigation
   const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [isFetchingSaleDetail, setIsFetchingSaleDetail] = useState(false);
@@ -49,24 +49,15 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, []); // Empty deps - only run on mount
 
-  // When user opens Recent Sales modal, mark as read so badge count goes to 0
-  const handleOpenRecentSales = useCallback(() => {
-    setRecentSalesCountSeen(recentSales.length);
-    setIsRecentSalesOpen(true);
-    fetchRecentSales();
-  }, [recentSales.length, fetchRecentSales]);
-
-  // When user closes Recent Sales modal, keep count as seen (already marked read on open)
-  const handleCloseRecentSales = useCallback(() => {
-    setIsRecentSalesOpen(false);
-  }, []);
-
-  // Fetch recent sales
+  // Fetch recent sales (response includes lastReadAt for badge count)
   const fetchRecentSales = useCallback(async () => {
     setIsLoadingSales(true);
     try {
       const response = await apiClient.get(`${API.sales}?limit=10`);
       setRecentSales(response.data?.sales || []);
+      if (response.data?.lastReadAt != null) {
+        setSalesLastReadAt(response.data.lastReadAt instanceof Date ? response.data.lastReadAt : new Date(response.data.lastReadAt));
+      }
     } catch (error) {
       if (error?.cancelled || error?.message?.includes?.('cancelled')) return; // Duplicate request cancelled by apiClient, ignore
       console.error('Error fetching recent sales:', error);
@@ -75,6 +66,25 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       setIsLoadingSales(false);
     }
   }, [apiClient, API.sales, showToast]);
+
+  // When user opens Recent Sales modal: call read-all API so count persists across page navigation, then open modal
+  const handleOpenRecentSales = useCallback(async () => {
+    setIsRecentSalesOpen(true);
+    try {
+      const readRes = await apiClient.post(`${API.sales}/mark-recent-read`);
+      const at = readRes?.data?.lastReadAt;
+      if (at) setSalesLastReadAt(at instanceof Date ? at : new Date(at));
+    } catch (e) {
+      // fallback: mark as read locally so badge still goes to 0 for this session
+      setSalesLastReadAt(new Date());
+    }
+    fetchRecentSales();
+  }, [apiClient, API.sales, fetchRecentSales]);
+
+  // When user closes Recent Sales modal, keep count as seen (already marked read on open)
+  const handleCloseRecentSales = useCallback(() => {
+    setIsRecentSalesOpen(false);
+  }, []);
 
   // Fetch recent sales on mount so the sales history count badge shows on billing page load
   const hasFetchedRecentSalesRef = useRef(false);
@@ -387,9 +397,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                   className={`p-2.5 border rounded-xl transition-all active:scale-90 relative ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}
                 >
                   <Receipt className="w-5 h-5" />
-                  {(() => {
-                    const unseenCount = Math.max(0, recentSales.length - recentSalesCountSeen);
-                    return unseenCount > 0 ? (
+                    {(() => {
+                                    const unseenCount = salesLastReadAt == null
+                                      ? recentSales.length
+                                      : recentSales.filter(s => new Date(s.timestamp) > new Date(salesLastReadAt)).length;
+                                    return unseenCount > 0 ? (
                       <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full">
                         {unseenCount > 9 ? '9+' : unseenCount}
                       </span>

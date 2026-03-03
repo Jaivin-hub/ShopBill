@@ -83,6 +83,9 @@ const UserSchema = new mongoose.Schema({
         updatedAt: { type: Date, default: Date.now }
     }],
 
+    // Per-store last time user viewed "Recent Sales" in billing (for unseen count badge)
+    salesLastReadAt: { type: mongoose.Schema.Types.Mixed, default: {} },
+
 }, { timestamps: true });
 
 // Pre-save hook to hash password before saving

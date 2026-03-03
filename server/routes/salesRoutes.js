@@ -1,9 +1,10 @@
 const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
-const Inventory = require('../models/Inventory'); 
+const Inventory = require('../models/Inventory');
 const Customer = require('../models/Customer');
 const Staff = require('../models/Staff');
+const User = require('../models/User');
 const mongoose = require('mongoose');
 const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
 
@@ -72,6 +73,18 @@ router.get('/', protect, async (req, res) => {
             .skip(skip);
             
         const total = await Sale.countDocuments(filter);
+
+        // Include lastReadAt for billing "recent sales" badge (persisted per user per store)
+        let lastReadAt = null;
+        try {
+            const userDoc = await User.findById(req.user._id).select('salesLastReadAt').lean();
+            const storeIdStr = req.user.storeId && req.user.storeId.toString();
+            if (userDoc && userDoc.salesLastReadAt && storeIdStr && userDoc.salesLastReadAt[storeIdStr]) {
+                lastReadAt = userDoc.salesLastReadAt[storeIdStr];
+            }
+        } catch (e) {
+            // ignore
+        }
         
         res.json({
             sales,
@@ -80,11 +93,30 @@ router.get('/', protect, async (req, res) => {
                 limit,
                 total,
                 pages: Math.ceil(total / limit)
-            }
+            },
+            lastReadAt: lastReadAt || null
         });
     } catch (error) {
         console.error('Failed to fetch sales data:', error);
         res.status(500).json({ error: 'Failed to fetch sales data.' });
+    }
+});
+
+// POST mark recent sales as read (for billing terminal badge; persists across navigation)
+router.post('/mark-recent-read', protect, async (req, res) => {
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected.' });
+    }
+    try {
+        const storeIdStr = req.user.storeId.toString();
+        const now = new Date();
+        await User.findByIdAndUpdate(req.user._id, {
+            $set: { [`salesLastReadAt.${storeIdStr}`]: now }
+        });
+        res.json({ success: true, lastReadAt: now });
+    } catch (error) {
+        console.error('Sales mark-recent-read error:', error);
+        res.status(500).json({ error: 'Failed to mark sales as read.' });
     }
 });
 

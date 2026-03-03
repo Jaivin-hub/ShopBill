@@ -258,10 +258,12 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             : isPendingActivation
                             ? (darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-100 text-amber-800 border border-amber-300')
                             : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white')
-                        } disabled:opacity-20`}
+                        } ${isPendingActivation ? 'disabled:!opacity-100' : 'disabled:opacity-20'}`}
                     >
                         <Power className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                        {staff.active ? 'Deactivate Account' : isPendingActivation ? 'Pending Activation' : 'Reactivate Account'}
+                        {staff.active ? 'Deactivate Account' : isPendingActivation ? (
+                            <span className={darkMode ? '' : 'text-amber-950'}>{'Pending Activation'}</span>
+                        ) : 'Reactivate Account'}
                     </button>
                     {isPendingActivation && (
                         <>

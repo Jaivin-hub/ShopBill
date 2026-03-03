@@ -211,19 +211,22 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
-                // Credit limit updated: Owner → notify Manager + Cashier; Manager → notify Owner + Cashier; Cashier → notify Owner + Manager
+                // Credit limit updated (ledger limit): Owner → Manager+Cashier; Manager → Owner+Cashier; Cashier → Owner+Manager
                 if (!isLowStockAlert && isCreditLimitUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     if (actorRoleLower === 'owner') {
+                        // Owner updated: notify all staff (managers and cashiers)
                         staffMembers.forEach(staff => {
                             if (staff.userId) targetUserIds.add(staff.userId.toString());
                         });
-                    } else if (actorRole === 'Manager') {
+                    } else if ((actorRole || '').toLowerCase() === 'manager') {
+                        // Manager updated: notify owner and all cashiers
                         if (ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
                         staffMembers.forEach(staff => {
                             if (staff.role === 'Cashier' && staff.userId && staff.userId.toString() !== actorIdStr) targetUserIds.add(staff.userId.toString());
                         });
-                    } else if (actorRole === 'Cashier') {
+                    } else if ((actorRole || '').toLowerCase() === 'cashier') {
+                        // Cashier updated: notify owner and all managers
                         if (ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
                         staffMembers.forEach(staff => {
                             if (staff.role === 'Manager' && staff.userId && staff.userId.toString() !== actorIdStr) targetUserIds.add(staff.userId.toString());
