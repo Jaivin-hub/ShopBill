@@ -253,8 +253,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const selectedSupplier = suppliers.find(s => s._id === purchaseForm.supplierId);
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${themeBase}`}>
-      <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+    <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
@@ -284,7 +284,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-8 py-6 overflow-x-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
         <div className="max-w-7xl mx-auto space-y-8 pb-12">
         {activeTab === 'purchase' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -665,7 +665,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           </div>
         )}
         </div>
-      </main>
+      </div>
 
       {/* FAB: Add New Vendor Button - Floating Icon */}
       {activeTab === 'suppliers' && (

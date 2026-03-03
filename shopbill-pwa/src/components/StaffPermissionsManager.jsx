@@ -745,9 +745,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${themeBase}`}>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
-            <header className={`sticky top-0 z-[100] backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-slate-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button onClick={onBack} className={`p-2 md:p-2.5 rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}>
@@ -773,6 +773,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
                 {/* Staff List */}
                 {isLoading ? (
@@ -834,6 +835,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     </div>
                 )}
             </div>
+            </div>
 
             <button 
                 onClick={() => setIsAddModalOpen(true)}
@@ -880,7 +882,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     cancelText={confirmModal.cancelText || 'Cancel'}
                 />
             )}
-        </main>
+        </div>
     );
 };
 

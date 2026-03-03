@@ -381,8 +381,8 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
     const btnClass = (active) => `p-2.5 border rounded-xl transition-all flex items-center justify-center ${active ? 'bg-indigo-600 border-indigo-600 text-white' : (darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')}`;
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${mainBg}`}>
-            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
                 <div className="max-w-7xl mx-auto space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -444,6 +444,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
                 <div className="space-y-2">
                     {isLoadingSales ? (
@@ -514,6 +515,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                     )}
                 </div>
             </div>
+            </div>
 
             {isModalOpen && (
                 <BillModal 
@@ -524,7 +526,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                     shopInfo={userProfile}
                 />
             )}
-        </main>
+        </div>
     );
 };
 

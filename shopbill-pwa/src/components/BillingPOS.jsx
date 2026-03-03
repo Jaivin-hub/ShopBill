@@ -356,7 +356,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   );
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${themeBase}`}>
+    <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
       <style>{`
         .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -366,9 +366,6 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         .product-grid-scroll::-webkit-scrollbar-track { background: transparent; }
         .product-grid-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .no-zoom-input { font-size: 16px !important; }
-        @media (max-width: 768px) {
-          .no-zoom-input { transform: scale(0.8); transform-origin: left center; width: 125% !important; }
-        }
         @keyframes cartPulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -382,7 +379,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         .cart-bulge { animation: cartBulge 1.8s ease-in-out infinite; }
       `}</style>
 
-      <header className={`sticky top-0 z-[100] w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -429,7 +426,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-8 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
         <div className="max-w-7xl mx-auto space-y-8 pb-36 md:pb-44">
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
@@ -526,7 +523,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
               </div>
             </section>
         </div>
-      </main>
+      </div>
 
       {cart.length > 0 && (
         <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[72px]`}>

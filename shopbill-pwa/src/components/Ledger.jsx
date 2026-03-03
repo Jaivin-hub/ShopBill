@@ -22,16 +22,9 @@ const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar-thumb:hover { background: #6366f1; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   
-  /* Prevent Auto-Zoom on iOS and Horizontal Jump */
+  /* Prevent Auto-Zoom on iOS - 16px avoids focus zoom; no scale to prevent layout shift */
   .no-zoom-input {
     font-size: 16px !important;
-  }
-  @media (max-width: 768px) {
-    .no-zoom-input {
-      transform: scale(0.9);
-      transform-origin: left center;
-      width: 111% !important;
-    }
   }
 `;
 

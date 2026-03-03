@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
     AlertTriangle, CheckCircle, Info, X, BellOff, 
     ShieldAlert, Sparkles, Trash2, Clock, Activity,
-    ShieldCheck, Zap, Layers, Bell, CreditCard, DollarSign, ArrowDown, ArrowUp
+    ShieldCheck, Zap, Layers, Bell, CreditCard, DollarSign, ArrowDown, ArrowUp, Store
 } from 'lucide-react';
 import apiClient from '../lib/apiClient';
 import Api from '../config/api';
@@ -100,6 +100,15 @@ const getNotificationTypeDetails = (type) => {
                 glow: 'shadow-emerald-500/5',
                 label: 'SYSTEM SUCCESS'
             };
+        case 'new_shop_registered':
+            return { 
+                icon: Store, 
+                color: 'text-teal-500', 
+                bgColor: 'bg-teal-500/10', 
+                borderColor: 'border-teal-500/20',
+                glow: 'shadow-teal-500/5',
+                label: 'NEW SHOP'
+            };
         default:
             return { 
                 icon: Info, 
@@ -172,7 +181,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
     };
 
     return (
-        <main className={`min-h-screen ${themeBase} transition-colors duration-200`}>
+        <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
             {showClearAllConfirm && (
                 <ConfirmationModal
                     message="Delete all notifications? This will clear your full notifications."
@@ -190,7 +199,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
             `}</style>
 
             {/* --- ELITE HEADER --- */}
-            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-6 py-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div>
@@ -225,6 +234,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
             </header>
 
             {/* --- FEED SECTION --- */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="mx-auto px-6 py-8 space-y-4 pb-32">
                 {notifications.length > 0 ? (
                     notifications.map((notification, index) => {
@@ -297,7 +307,8 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                     </div>
                 )}
             </div>
-        </main>
+            </div>
+        </div>
     );
 };
 

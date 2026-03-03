@@ -58,6 +58,7 @@ const API = {
     superadminReports: API_BASE_URL + '/superadmin/reports',        // GET (Global Reports)
     superadminShopPayments: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payments`, // GET (Payment History)
     superadminShopPaymentStatus: (id) => `${API_BASE_URL}/superadmin/shops/${id}/payment-status`, // GET (Payment Status)
+    superadminPerformance: API_BASE_URL + '/superadmin/performance', // GET (All shops performance metrics)
     superadminRecentActivity: API_BASE_URL + '/superadmin/recent-activity', // GET (Recent Activities)
     // ------------------------------------------
     

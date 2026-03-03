@@ -136,9 +136,9 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
     const labelColor = darkMode ? 'text-gray-500' : 'text-slate-900';
 
     return (
-        <main ref={containerRef} className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black'} selection:bg-indigo-500/30`}>
+        <div ref={containerRef} className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black'} selection:bg-indigo-500/30`}>
             {/* --- RESPONSIVE STICKY HEADER (Matches SalesActivityPage) --- */}
-            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-md border-b px-4 md:px-6 py-4 transition-colors ${darkMode ? 'bg-gray-950/95 border-gray-800/60' : 'bg-white/95 border-slate-200'}`}>
                 <div className="mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button 
@@ -163,6 +163,7 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="mx-auto p-4 md:p-8 space-y-8 pb-32">
                 {/* SECURITY ALERT BANNER */}
                 <div className={`border rounded-2xl p-4 flex gap-4 items-start ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
@@ -277,7 +278,8 @@ const ChangePasswordForm = ({ apiClient, onBack, showToast, onLogout, darkMode }
                     </button>
                 </form>
             </div>
-        </main>
+            </div>
+        </div>
     );
 };
 

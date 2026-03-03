@@ -363,9 +363,9 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white/95 border-slate-300 shadow-sm';
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
             {/* STICKY HEADER */}
-            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-md border-b px-6 py-6`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-6 py-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         {currentView !== 'main' && (
@@ -395,8 +395,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-10 pb-32">
                 {renderContent()}
+            </div>
             </div>
             
             {confirmModal && (
@@ -419,7 +421,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     darkMode={darkMode}
                 />
             )}
-        </main>
+        </div>
     );
 }
 

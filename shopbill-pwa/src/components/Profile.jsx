@@ -183,9 +183,9 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
     const sectionHeaderBg = darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-slate-50 border-slate-200';
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${mainBg}`}>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg}`}>
             {/* --- ELITE HEADER --- */}
-            <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-6 ${headerBg}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-md border-b px-6 py-6 ${headerBg} ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div>
@@ -226,6 +226,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="mx-auto px-4 py-10 space-y-8 pb-32">
                 
                 {/* 1. Account Security & Identity */}
@@ -343,7 +344,8 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                     </div>
                 </section>
             </div>
-        </main>
+            </div>
+        </div>
     );
 }
 

@@ -8,7 +8,7 @@ const Staff = require('../models/Staff');
 const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
-const { emitAlert } = require('./notificationRoutes');
+const { emitAlert, notifySuperadminsNewShop } = require('./notificationRoutes');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -216,6 +216,9 @@ router.post('/signup', async (req, res) => {
         // Set the shopId to the user's own ID as they are the first user/owner of this shop.
         newUser.shopId = newUser._id;
         await newUser.save();
+
+        // Notify superadmins that a new shop registered (non-blocking)
+        notifySuperadminsNewShop(req, newUser).catch(err => console.error('Notify superadmins new shop:', err));
 
         const token = generateToken(newUser._id, newUser.shopId, newUser.role);
 

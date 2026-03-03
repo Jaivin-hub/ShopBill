@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const User = require('../models/User'); // Reusing the User model for shop data (as shopId is linked)
+const Store = require('../models/Store');
 const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
@@ -25,110 +26,319 @@ const superadminProtect = [protect, authorize('superadmin')];
 // ====================================================
 
 /**
+ * Compute a 0-100 performance score from components (growth, revenue, activity, scale, engagement, tenure).
+ * Label: High 70+, Medium 40-69, Low 0-39.
+ */
+function compositePerformanceScore(opts) {
+    const {
+        growthPct = 0,
+        revenueLast30 = 0,
+        salesCountLast30 = 0,
+        storeCount = 0,
+        staffTotal = 0,
+        customerCount = 0,
+        inventoryCount = 0,
+        tenureDays = 0
+    } = opts;
+
+    // Growth: -50% to +50% -> 0 to 25 points
+    const growthScore = Math.max(0, Math.min(25, 12.5 + (growthPct * 0.25)));
+
+    // Revenue (log-like bands): 0->0, 1k->5, 10k->12, 50k->18, 100k->21, 500k+->25
+    let revenueScore = 0;
+    if (revenueLast30 >= 500000) revenueScore = 25;
+    else if (revenueLast30 >= 100000) revenueScore = 21;
+    else if (revenueLast30 >= 50000) revenueScore = 18;
+    else if (revenueLast30 >= 10000) revenueScore = 12;
+    else if (revenueLast30 >= 1000) revenueScore = 5;
+
+    // Activity: sales count last 30 -> 0–20 points (bands)
+    let activityScore = 0;
+    if (salesCountLast30 >= 100) activityScore = 20;
+    else if (salesCountLast30 >= 50) activityScore = 15;
+    else if (salesCountLast30 >= 25) activityScore = 10;
+    else if (salesCountLast30 >= 1) activityScore = 5;
+
+    // Scale: stores*3 + staff*2, max 15
+    const scaleScore = Math.min(15, storeCount * 3 + staffTotal * 2);
+
+    // Engagement: customers/10 + inventory/50, max 10
+    const engagementScore = Math.min(10, Math.floor(customerCount / 10) + Math.floor(inventoryCount / 50));
+
+    // Tenure: 30+ days = 5, else proportional
+    const tenureScore = tenureDays >= 30 ? 5 : (tenureDays / 30) * 5;
+
+    const total = Math.round(growthScore + revenueScore + activityScore + scaleScore + engagementScore + tenureScore);
+    const score = Math.max(0, Math.min(100, total));
+    const label = score >= 70 ? 'High' : score >= 40 ? 'Medium' : 'Low';
+    return { score, label };
+}
+
+/**
+ * Compute performance metrics for shops (owners) using full shop data.
+ * Uses: sales (last 30 vs previous 30), store count, staff, customers, inventory, tenure.
+ * @param {ObjectId[]} ownerIds - Owner (shop) user IDs
+ * @param {Map<string, { managerCount, cashierCount }>} staffCountMap - Staff counts per owner
+ * @param {Map<string, number>} tenureDaysMap - Tenure in days per owner (optional)
+ * @returns {Promise<Map<string, { revenueLast30, revenuePrev30, salesCountLast30, growthPct, trend, metric, score, label, storeCount, customerCount, inventoryCount }>>}
+ */
+async function computeShopsPerformance(ownerIds, staffCountMap = new Map(), tenureDaysMap = new Map()) {
+    if (!ownerIds || ownerIds.length === 0) return new Map();
+    const now = new Date();
+    const ms30 = 30 * 24 * 60 * 60 * 1000;
+    const ms60 = 60 * 24 * 60 * 60 * 1000;
+    const startLast30 = new Date(now.getTime() - ms30);
+    const startPrev30 = new Date(now.getTime() - ms60);
+
+    const stores = await Store.find({ ownerId: { $in: ownerIds } }).select('_id ownerId').lean();
+    const ownerToStores = new Map();
+    stores.forEach(s => {
+        const oid = s.ownerId.toString();
+        if (!ownerToStores.has(oid)) ownerToStores.set(oid, []);
+        ownerToStores.get(oid).push(s._id);
+    });
+    const allStoreIds = stores.map(s => s._id);
+
+    const [last30Agg, prev30Agg, customerCounts, inventoryCounts] = await Promise.all([
+        Sale.aggregate([
+            { $match: { storeId: { $in: allStoreIds }, timestamp: { $gte: startLast30 } } },
+            { $group: { _id: '$storeId', total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
+        ]),
+        Sale.aggregate([
+            { $match: { storeId: { $in: allStoreIds }, timestamp: { $gte: startPrev30, $lt: startLast30 } } },
+            { $group: { _id: '$storeId', total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
+        ]),
+        Customer.aggregate([
+            { $match: { storeId: { $in: allStoreIds } } },
+            { $group: { _id: '$storeId', count: { $sum: 1 } } }
+        ]),
+        Inventory.aggregate([
+            { $match: { storeId: { $in: allStoreIds } } },
+            { $group: { _id: '$storeId', count: { $sum: 1 } } }
+        ])
+    ]);
+
+    const last30ByStore = new Map();
+    last30Agg.forEach(r => last30ByStore.set(r._id.toString(), { total: r.total || 0, count: r.count || 0 }));
+    const prev30ByStore = new Map();
+    prev30Agg.forEach(r => prev30ByStore.set(r._id.toString(), { total: r.total || 0, count: r.count || 0 }));
+    const storeToOwner = new Map();
+    stores.forEach(s => storeToOwner.set(s._id.toString(), s.ownerId.toString()));
+    const customerByStore = new Map();
+    customerCounts.forEach(r => customerByStore.set(r._id.toString(), r.count || 0));
+    const inventoryByStore = new Map();
+    inventoryCounts.forEach(r => inventoryByStore.set(r._id.toString(), r.count || 0));
+
+    const result = new Map();
+    ownerIds.forEach(id => {
+        const oid = id.toString();
+        const storeIds = ownerToStores.get(oid) || [];
+        let revenueLast30 = 0, revenuePrev30 = 0, salesCountLast30 = 0, customerCount = 0, inventoryCount = 0;
+        storeIds.forEach(sid => {
+            const s = sid.toString();
+            const l = last30ByStore.get(s) || { total: 0, count: 0 };
+            const p = prev30ByStore.get(s) || { total: 0, count: 0 };
+            revenueLast30 += l.total;
+            revenuePrev30 += p.total;
+            salesCountLast30 += l.count;
+            customerCount += customerByStore.get(s) || 0;
+            inventoryCount += inventoryByStore.get(s) || 0;
+        });
+        const growthPct = revenuePrev30 > 0
+            ? ((revenueLast30 - revenuePrev30) / revenuePrev30) * 100
+            : (revenueLast30 > 0 ? 100 : 0);
+        const trend = growthPct > 5 ? 'up' : growthPct < -5 ? 'down' : 'flat';
+        const metric = (growthPct >= 0 ? '+' : '') + Number(growthPct).toFixed(1) + '%';
+        const staffCount = staffCountMap.get(oid) || { managerCount: 0, cashierCount: 0 };
+        const staffTotal = (staffCount.managerCount || 0) + (staffCount.cashierCount || 0);
+        const tenureDays = tenureDaysMap.get(oid) ?? 0;
+        const { score, label } = compositePerformanceScore({
+            growthPct,
+            revenueLast30,
+            salesCountLast30,
+            storeCount: storeIds.length,
+            staffTotal,
+            customerCount,
+            inventoryCount,
+            tenureDays
+        });
+        result.set(oid, {
+            revenueLast30,
+            revenuePrev30,
+            salesCountLast30,
+            growthPct,
+            trend,
+            metric,
+            score,
+            label,
+            storeCount: storeIds.length,
+            customerCount,
+            inventoryCount
+        });
+    });
+    return result;
+}
+
+/**
  * @route GET /api/superadmin/shops
- * @desc Get a list of all shops (User documents where role is 'owner')
+ * @desc Get a list of all shops (User documents where role is 'owner') with real performance metrics
  * @access Private (Superadmin only)
  */
 router.get('/shops', superadminProtect, async (req, res) => {
     try {
         // Find all users who are owners, as the owner represents the shop entry.
-        // 1. SORTING: Add .sort({ createdAt: -1 }) for Last-In, First-Out order.
         const shops = await User.find({ role: 'owner' })
-            .sort({ createdAt: -1 }) // Sort by creation date descending (newest first)
-            // Ensure subscriptionStatus is selected for the response
+            .sort({ createdAt: -1 })
             .select('-password -resetPasswordToken -resetPasswordExpire');
 
         if (!shops.length) {
             return res.status(200).json({ success: true, message: 'No shops registered yet.', data: [] });
         }
 
-        // Get staff counts for each shop
         const shopIds = shops.map(shop => shop._id);
+
+        // Get staff counts for each shop
         const staffCounts = await User.aggregate([
-            { $match: { shopId: { $in: shopIds }, role: { $in: ['Manager', 'Cashier'] } } }, // Match only relevant staff roles
+            { $match: { shopId: { $in: shopIds }, role: { $in: ['Manager', 'Cashier'] } } },
             {
                 $group: {
                     _id: '$shopId',
-                    managerCount: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$role', 'Manager'] },
-                                1,
-                                0
-                            ]
-                        }
-                    },
-                    cashierCount: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$role', 'Cashier'] },
-                                1,
-                                0
-                            ]
-                        }
-                    }
+                    managerCount: { $sum: { $cond: [{ $eq: ['$role', 'Manager'] }, 1, 0] } },
+                    cashierCount: { $sum: { $cond: [{ $eq: ['$role', 'Cashier'] }, 1, 0] } }
                 }
             }
         ]);
-
         const staffCountMap = new Map();
         staffCounts.forEach(item => {
             staffCountMap.set(item._id.toString(), { managerCount: item.managerCount, cashierCount: item.cashierCount });
         });
 
-        // Enhance shop data with calculated tenure, payment status, and mock performance
-        const shopsWithDetails = shops.map(shop => {
-            const shopObject = shop.toObject();
-            
-            // --- CORE LOGIC FOR TENURE ---
+        const tenureDaysMap = new Map();
+        shops.forEach(shop => {
             const daysActive = Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24));
-            
-            // 🛑 SUBSCRIPTION STATUS LOGIC (Using the real data from the User model)
-            const subscriptionStatus = shop.subscriptionStatus || 'created';
-            // Defaulting to 'created' if the field is missing, as that is the earliest state.
-            // --------------------------------------------------------------------------
-
-            // Mock Performance Trend (0: flat, 1: up, 2: down) - Still uses pure random as it's time-based data
-            const trendValue = Math.floor(Math.random() * 3);
-            let trendType = 'flat';
-            if (trendValue === 1) trendType = 'up';
-            else if (trendValue === 2) trendType = 'down';
-
-            // Mock performance metric
-            const performanceMetric = (Math.random() * 10).toFixed(2) + '%';
-
-            // Get staff counts
-            const staffCount = staffCountMap.get(shop._id.toString()) || { managerCount: 0, cashierCount: 0 };
-
-
-            return {
-                ...shopObject, 
-                shopName: shopObject.shopName, 
-                dateJoined: shop.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
-                tenureDays: daysActive, 
-                performanceTrend: { metric: performanceMetric, trend: trendType },
-                plan: shop.plan || 'BASIC', 
-                managerCount: staffCount.managerCount,
-                cashierCount: staffCount.cashierCount,
-                location: shop.location || 'N/A', 
-                // ✅ Using the actual subscription status from the User model
-                subscriptionStatus: subscriptionStatus, 
-            };
+            tenureDaysMap.set(shop._id.toString(), daysActive);
         });
 
+        // Full performance: sales, growth, scale, engagement, tenure
+        const performanceMap = await computeShopsPerformance(shopIds, staffCountMap, tenureDaysMap);
+
+        const shopsWithDetails = shops.map(shop => {
+            const shopObject = shop.toObject();
+            const daysActive = tenureDaysMap.get(shop._id.toString()) ?? 0;
+            const subscriptionStatus = shop.subscriptionStatus || 'created';
+            const staffCount = staffCountMap.get(shop._id.toString()) || { managerCount: 0, cashierCount: 0 };
+            const perf = performanceMap.get(shop._id.toString()) || {
+                revenueLast30: 0,
+                revenuePrev30: 0,
+                salesCountLast30: 0,
+                growthPct: 0,
+                trend: 'flat',
+                metric: '0.0%',
+                score: 50,
+                label: 'Low',
+                storeCount: 0,
+                customerCount: 0,
+                inventoryCount: 0
+            };
+
+            return {
+                ...shopObject,
+                shopName: shopObject.shopName,
+                dateJoined: shop.createdAt.toISOString().split('T')[0],
+                tenureDays: daysActive,
+                performanceTrend: { metric: perf.metric, trend: perf.trend, score: perf.score, label: perf.label },
+                performance: {
+                    revenueLast30: perf.revenueLast30,
+                    salesCountLast30: perf.salesCountLast30,
+                    growthPct: perf.growthPct,
+                    score: perf.score,
+                    label: perf.label,
+                    storeCount: perf.storeCount,
+                    customerCount: perf.customerCount,
+                    inventoryCount: perf.inventoryCount
+                },
+                plan: shop.plan || 'BASIC',
+                managerCount: staffCount.managerCount,
+                cashierCount: staffCount.cashierCount,
+                location: shop.location || 'N/A',
+                subscriptionStatus,
+            };
+        });
 
         res.json({
             success: true,
             count: shopsWithDetails.length,
             data: shopsWithDetails
         });
-
     } catch (error) {
         console.error('Superadmin Shop List Error:', error);
         res.status(500).json({ error: 'Server error retrieving shop list.' });
     }
 });
 
+/**
+ * @route GET /api/superadmin/performance
+ * @desc Get performance metrics for all shops (composite score, growth, revenue, scale, engagement)
+ * @access Private (Superadmin only)
+ */
+router.get('/performance', superadminProtect, async (req, res) => {
+    try {
+        const shops = await User.find({ role: 'owner' })
+            .sort({ createdAt: -1 })
+            .select('_id shopName email createdAt');
+
+        if (!shops.length) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        const shopIds = shops.map(s => s._id);
+        const staffCounts = await User.aggregate([
+            { $match: { shopId: { $in: shopIds }, role: { $in: ['Manager', 'Cashier'] } } },
+            {
+                $group: {
+                    _id: '$shopId',
+                    managerCount: { $sum: { $cond: [{ $eq: ['$role', 'Manager'] }, 1, 0] } },
+                    cashierCount: { $sum: { $cond: [{ $eq: ['$role', 'Cashier'] }, 1, 0] } }
+                }
+            }
+        ]);
+        const staffCountMap = new Map();
+        staffCounts.forEach(item => staffCountMap.set(item._id.toString(), { managerCount: item.managerCount, cashierCount: item.cashierCount }));
+        const tenureDaysMap = new Map();
+        shops.forEach(shop => {
+            tenureDaysMap.set(shop._id.toString(), Math.floor((Date.now() - shop.createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+        });
+
+        const performanceMap = await computeShopsPerformance(shopIds, staffCountMap, tenureDaysMap);
+
+        const data = shops.map(shop => {
+            const oid = shop._id.toString();
+            const perf = performanceMap.get(oid) || { revenueLast30: 0, salesCountLast30: 0, growthPct: 0, trend: 'flat', metric: '0.0%', score: 50, label: 'Low', storeCount: 0, customerCount: 0, inventoryCount: 0 };
+            return {
+                shopId: oid,
+                shopName: shop.shopName || shop.email?.split('@')[0] || 'Shop',
+                email: shop.email,
+                performance: {
+                    score: perf.score,
+                    label: perf.label,
+                    revenueLast30: perf.revenueLast30,
+                    growthPct: perf.growthPct,
+                    trend: perf.trend,
+                    metric: perf.metric,
+                    salesCountLast30: perf.salesCountLast30,
+                    storeCount: perf.storeCount,
+                    customerCount: perf.customerCount,
+                    inventoryCount: perf.inventoryCount
+                }
+            };
+        });
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Superadmin Performance API Error:', error);
+        res.status(500).json({ error: 'Server error retrieving performance.' });
+    }
+});
 
 /**
  * @route GET /api/superadmin/shops/:id

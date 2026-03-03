@@ -352,9 +352,9 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     const mainBg = darkMode ? 'bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950' : 'bg-gradient-to-br from-slate-50 via-white to-slate-50';
 
     return (
-        <main className={`min-h-screen transition-colors duration-300 ${mainBg} selection:bg-indigo-500/30`}>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg} selection:bg-indigo-500/30`}>
             {/* REDESIGNED STICKY HEADER */}
-            <header className={`sticky top-0 z-[100] ${headerBase} backdrop-blur-xl border-b px-4 md:px-6 py-5`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-xl border-b px-4 md:px-6 py-5 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button 
@@ -381,6 +381,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 pb-20 space-y-8 md:space-y-10">
                 {/* REDESIGNED CURRENT SUBSCRIPTION CARD */}
                 {currentPlan && (
@@ -475,7 +476,8 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                     darkMode={darkMode}
                 />
             )}
-        </main>
+            </div>
+        </div>
     );
 };
 

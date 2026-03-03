@@ -158,9 +158,9 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
 
     return (
-        <div className={`min-h-screen ${themeBase} transition-colors duration-200`}>
+        <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
             {/* CLEAN PROFESSIONAL HEADER */}
-            <header className={`sticky top-0 z-[100] ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto space-y-3">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                         <div>
@@ -224,6 +224,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                 </div>
             </header>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-20">
                 {/* KPI DASHBOARD */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -396,6 +397,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}} />
+            </div>
         </div>
     );
 };

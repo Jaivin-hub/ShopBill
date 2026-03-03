@@ -477,9 +477,9 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     }
 
     return (
-        <main className="min-h-screen bg-transparent text-white">
+        <div className="h-full flex flex-col min-h-0 bg-transparent text-white">
             {/* Sticky Header */}
-            <header className={`sticky top-0 z-[50] ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
+            <header className={`sticky top-0 z-[50] shrink-0 ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
                 <div className="p-4 md:p-6">
                     <div className="flex flex-col gap-4">
                         <div className="flex items-start justify-between gap-4">
@@ -537,6 +537,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             </header>
 
             {/* Content Area */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="p-4 md:p-8">
                 <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredOutlets.length === 0 && !isLoading ? (
@@ -674,6 +675,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                     })
                     )}
                 </section>
+            </div>
             </div>
 
             {/* FAB: Add New Branch Button - Floating Icon */}
@@ -877,7 +879,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                     cancelText="Cancel"
                 />
             )}
-        </main>
+        </div>
     );
 };
 

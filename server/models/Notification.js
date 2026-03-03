@@ -38,10 +38,13 @@ const NotificationSchema = new mongoose.Schema({
             'system_update',
             'profile_updated',
             'customer_added',
-            'inventory_bulk_upload'
+            'inventory_bulk_upload',
+            'new_shop_registered'
         ], 
         required: true 
     },
+    // When true, this notification is for superadmins (e.g. new shop registered)
+    forSuperAdmin: { type: Boolean, default: false },
     category: { 
         type: String, 
         enum: ['Critical', 'Urgent', 'Info', 'Success'],
@@ -110,5 +113,8 @@ NotificationSchema.index({ storeId: 1, createdAt: -1 });
 
 // Compound Index: Optimizes owner queries (filter by ownerId, sort by createdAt descending)
 NotificationSchema.index({ ownerId: 1, createdAt: -1 });
+
+// Compound Index: Optimizes superadmin global notifications
+NotificationSchema.index({ forSuperAdmin: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', NotificationSchema);

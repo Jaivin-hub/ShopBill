@@ -11,20 +11,12 @@ const ScrollbarStyles = ({ darkMode }) => (
         __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
-        /* Prevent Auto-Zoom on iOS while maintaining design scale */
+        /* Prevent Auto-Zoom on iOS - 16px avoids focus zoom; no scale to prevent layout shift */
         .no-zoom-input {
             font-size: 16px !important;
         }
-        @media (max-width: 768px) {
-            .no-zoom-input {
-                transform: scale(0.85);
-                transform-origin: left center;
-                width: 117.6% !important; 
-            }
-            .no-zoom-search {
-                font-size: 16px !important;
-                height: 42px !important;
-            }
+        .no-zoom-search {
+            font-size: 16px !important;
         }
     `}} />
 );
@@ -546,15 +538,13 @@ const InventoryContent = ({
     };
 
     return (
-        /* min-h-screen allows the window to scroll naturally */
-        <div className={`min-h-screen flex flex-col ${themeBase} transition-colors duration-200`}>
+        <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
             <ScrollbarStyles darkMode={darkMode} />
 
             {/* --- STICKY STACK (Header + Search/Sort) --- */}
-            {/* sticky top-0 makes the header stick to the browser window */}
-            <div className="sticky top-0 z-[100] shadow-sm flex-none">
+            <div className="sticky top-0 z-[100] shadow-sm shrink-0 ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}" style={{ backdropFilter: 'blur(12px)' }}>
                 {/* Header */}
-                <header className={`backdrop-blur-xl border-b px-4 md:px-8 py-5 ${darkMode ? 'bg-slate-950/80 border-slate-800/60' : 'bg-white/80 border-slate-200'}`}>
+                <header className={`border-b px-4 md:px-8 py-5 ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex justify-between items-center">
                             <div>
@@ -615,7 +605,7 @@ const InventoryContent = ({
             </div>
 
             {/* --- CONTENT --- */}
-            {/* Removed overflow-y-auto so the main page body handles scrolling */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <main className="flex-1">
                 <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
                     {/* Desktop & Tablet: Enhanced Card Grid Layout */}
@@ -656,6 +646,7 @@ const InventoryContent = ({
                     </section>
                 </div>
             </main>
+            </div>
 
             {/* --- MODALS --- */}
             {isFormModalOpen && (

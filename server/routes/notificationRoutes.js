@@ -371,28 +371,81 @@ const resolveLowStockAlert = async (req, storeId, itemId, variantId = null) => {
     }
 };
 
+/**
+ * Notify all superadmins when a new shop (owner) registers.
+ * Call this from auth signup after creating the new owner user.
+ * @param {Object} req - Express request (for req.app.get('socketio'))
+ * @param {Object} newOwner - The new User document (owner) with at least _id, shopName, email
+ */
+const notifySuperadminsNewShop = async (req, newOwner) => {
+    const io = req.app && req.app.get ? req.app.get('socketio') : null;
+    try {
+        const superadmins = await User.find({ role: 'superadmin' }).select('_id deviceTokens').lean();
+        if (superadmins.length === 0) return;
+
+        const shopName = newOwner.shopName || 'Unknown';
+        const email = newOwner.email || '';
+        const title = 'New Shop Registered';
+        const message = `"${shopName}" (${email}) just signed up.`;
+        const newNotification = await Notification.create({
+            storeId: newOwner._id,
+            ownerId: newOwner._id,
+            forSuperAdmin: true,
+            type: 'new_shop_registered',
+            category: 'Info',
+            title,
+            message,
+            metadata: { shopName, email, ownerId: newOwner._id },
+            readBy: [],
+            createdAt: new Date()
+        });
+
+        const notificationData = { ...newNotification.toObject(), isRead: false, storeName: shopName };
+        superadmins.forEach(sa => {
+            if (io && sa._id) io.to(`user_${sa._id}`).emit('new_notification', notificationData);
+        });
+
+        if (superadmins.some(sa => (sa.deviceTokens || []).length > 0)) {
+            const allTokens = superadmins.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+            if (allTokens.length > 0) {
+                const { sendPushNotification } = require('../services/firebaseAdmin');
+                sendPushNotification(allTokens, {
+                    title: title,
+                    body: message.slice(0, 120),
+                    data: { type: 'notification', link: '/notifications', notificationType: 'new_shop_registered' }
+                }).catch(err => console.error('[Push] Superadmin new-shop notification error:', err));
+            }
+        }
+        console.log(`📢 Superadmin notification: new shop "${shopName}" registered; sent to ${superadmins.length} superadmin(s).`);
+    } catch (err) {
+        console.error('❌ notifySuperadminsNewShop error:', err.message);
+    }
+};
+
 // --- API ROUTES ---
 
 /**
  * GET /alerts
  * Fetches notifications and calculates 'isRead' specifically for the logged-in user.
  * UPDATED: Filters out notifications where the current user is the actor (they don't need to see their own actions).
+ * Superadmin: returns notifications where forSuperAdmin is true.
  */
 router.get('/alerts', protect, async (req, res) => {
     try {
-        // For owners, get notifications from all their stores (don't require storeId)
-        // For staff, require storeId and get notifications from current store only
-        if (req.user.role !== 'owner' && !req.user.storeId) {
+        let filter;
+        if (req.user.role === 'superadmin') {
+            filter = { forSuperAdmin: true, dismissedBy: { $nin: [req.user._id] } };
+        } else if (req.user.role === 'owner') {
+            filter = { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } };
+        } else if (req.user.storeId) {
+            filter = { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+        } else {
             return res.json({ count: 0, alerts: [] });
         }
-        
-        const filter = req.user.role === 'owner'
-            ? { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } }
-            : { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
 
-        // Get notifications - for owners, we'll fetch store names separately
+        // Get notifications - for owners we fetch store names separately
         const notifications = await Notification.find(filter)
-            .select('type category title message metadata storeId ownerId actorId readBy createdAt')
+            .select('type category title message metadata storeId ownerId actorId readBy createdAt forSuperAdmin')
             .lean()
             .sort({ createdAt: -1 })
             .limit(30);
@@ -427,9 +480,10 @@ router.get('/alerts', protect, async (req, res) => {
             // Ensure readBy is an array (it should be from the schema)
             const readByArray = Array.isArray(n.readBy) ? n.readBy : (n.readBy ? [n.readBy] : []);
             
-            // Get store name for owners
             const storeIdStr = n.storeId?.toString();
-            const storeName = req.user.role === 'owner' && storeIdStr ? (storeNameMap[storeIdStr] || null) : null;
+            let storeName = null;
+            if (req.user.role === 'superadmin' && n.metadata && n.metadata.shopName) storeName = n.metadata.shopName;
+            else if (req.user.role === 'owner' && storeIdStr) storeName = storeNameMap[storeIdStr] || null;
             
             return {
                 ...n,
@@ -456,9 +510,14 @@ router.get('/alerts', protect, async (req, res) => {
  */
 router.put('/alerts/dismiss-all', protect, async (req, res) => {
     try {
-        const filter = req.user.role === 'owner'
-            ? { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } }
-            : { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+        let filter;
+        if (req.user.role === 'superadmin') {
+            filter = { forSuperAdmin: true, dismissedBy: { $nin: [req.user._id] } };
+        } else if (req.user.role === 'owner') {
+            filter = { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } };
+        } else {
+            filter = { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+        }
         const result = await Notification.updateMany(
             filter,
             { $addToSet: { dismissedBy: req.user._id } }
@@ -477,9 +536,14 @@ router.put('/alerts/dismiss-all', protect, async (req, res) => {
 router.put('/alerts/:id/dismiss', protect, async (req, res) => {
     try {
         const { id } = req.params;
-        const filter = req.user.role === 'owner'
-            ? { _id: id, ownerId: req.user._id }
-            : { _id: id, storeId: req.user.storeId };
+        let filter;
+        if (req.user.role === 'superadmin') {
+            filter = { _id: id, forSuperAdmin: true };
+        } else if (req.user.role === 'owner') {
+            filter = { _id: id, ownerId: req.user._id };
+        } else {
+            filter = { _id: id, storeId: req.user.storeId };
+        }
         const doc = await Notification.findOneAndUpdate(
             filter,
             { $addToSet: { dismissedBy: req.user._id } },
@@ -500,9 +564,14 @@ router.put('/alerts/:id/dismiss', protect, async (req, res) => {
  */
 router.put('/read-all', protect, async (req, res) => {
     try {
-        const filter = req.user.role === 'owner' 
-            ? { ownerId: req.user._id, readBy: { $ne: req.user._id } }
-            : { storeId: req.user.storeId, readBy: { $ne: req.user._id } };
+        let filter;
+        if (req.user.role === 'superadmin') {
+            filter = { forSuperAdmin: true, readBy: { $ne: req.user._id } };
+        } else if (req.user.role === 'owner') {
+            filter = { ownerId: req.user._id, readBy: { $ne: req.user._id } };
+        } else {
+            filter = { storeId: req.user.storeId, readBy: { $ne: req.user._id } };
+        }
         const result = await Notification.updateMany(
             filter,
             { $addToSet: { readBy: req.user._id } } // Add the user ID to the array
@@ -513,4 +582,4 @@ router.put('/read-all', protect, async (req, res) => {
     }
 });
 
-module.exports = { router, emitAlert, resolveLowStockAlert };
+module.exports = { router, emitAlert, resolveLowStockAlert, notifySuperadminsNewShop };

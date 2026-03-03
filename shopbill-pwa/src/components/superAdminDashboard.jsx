@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 
-// Stat Card Component
-const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, subtitle, darkMode = true }) => {
+// Stat Card Component (compact = smaller card for key metrics row)
+const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, subtitle, darkMode = true, compact = false }) => {
     const colorClasses = {
         indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30',
         green: 'text-green-400 bg-green-500/10 border-green-500/30',
@@ -26,26 +26,25 @@ const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, su
     const textSubtitle = darkMode ? 'text-gray-500' : 'text-slate-500';
 
     return (
-        <article className={`${cardBg} rounded-xl p-5 border transition-all duration-200`} itemScope itemType="https://schema.org/QuantitativeValue">
-            <div className="flex items-center justify-between mb-3">
-                <div className={`w-12 h-12 rounded-lg ${colorClass} flex items-center justify-center border`}>
-                    <Icon className="w-6 h-6" />
+        <article className={`${cardBg} rounded-xl border transition-all duration-200 ${compact ? 'p-3' : 'p-5'}`} itemScope itemType="https://schema.org/QuantitativeValue">
+            <div className={`flex items-center justify-between ${compact ? 'mb-2' : 'mb-3'}`}>
+                <div className={`rounded-lg ${colorClass} flex items-center justify-center border ${compact ? 'w-9 h-9' : 'w-12 h-12'}`}>
+                    <Icon className={compact ? 'w-4 h-4' : 'w-6 h-6'} />
                 </div>
                 {trend && (
-                    <div className={`flex items-center gap-1 text-xs font-medium ${trend === 'up' ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                        {trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                    <div className={`flex items-center gap-0.5 font-medium ${trend === 'up' ? 'text-green-400' : 'text-red-400'} ${compact ? 'text-[10px]' : 'text-xs'}`}>
+                        {trend === 'up' ? <ArrowUpRight className={compact ? 'w-3 h-3' : 'w-4 h-4'} /> : <ArrowDownRight className={compact ? 'w-3 h-3' : 'w-4 h-4'} />}
                         {Math.abs(trendValue).toFixed(1)}%
                     </div>
                 )}
             </div>
             <div>
-                <p className={`text-sm font-medium ${textMuted} mb-1`} itemProp="name">{title}</p>
+                <p className={`font-medium ${textMuted} ${compact ? 'text-[10px] mb-0.5' : 'text-sm mb-1'}`} itemProp="name">{title}</p>
                 <div className="flex items-baseline gap-1">
-                    {unit && <span className={`text-lg ${textSubtitle}`}>{unit}</span>}
-                    <h3 className={`text-2xl font-bold ${textValue}`} itemProp="value">{value}</h3>
+                    {unit && <span className={`${textSubtitle} ${compact ? 'text-xs' : 'text-lg'}`}>{unit}</span>}
+                    <h3 className={`font-bold ${textValue} ${compact ? 'text-base' : 'text-2xl'}`} itemProp="value">{value}</h3>
                 </div>
-                {subtitle && <p className={`text-xs ${textSubtitle} mt-1`} itemProp="description">{subtitle}</p>}
+                {subtitle && <p className={`${textSubtitle} mt-0.5 ${compact ? 'text-[10px]' : 'text-xs'}`} itemProp="description">{subtitle}</p>}
             </div>
         </article>
     );
@@ -185,10 +184,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
     }
 
     return (
-        <main className={`p-4 md:p-8 h-full flex flex-col ${mainBg} transition-colors duration-300 overflow-y-auto custom-scrollbar`} itemScope itemType="https://schema.org/Dashboard">
+        <div className={`h-full flex flex-col min-h-0 ${mainBg} transition-colors duration-300`} itemScope itemType="https://schema.org/Dashboard">
             {/* Header */}
-            <header className="mb-6" itemProp="headline">
-                <div className="flex items-center justify-between mb-2">
+            <header className={`sticky top-0 z-[100] shrink-0 mb-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`} style={{ backdropFilter: 'blur(12px)' }} itemProp="headline">
+                <div className="flex items-center justify-between mb-2 p-4 md:p-8 pb-0">
                     <h1 className={`text-2xl font-extrabold ${textPrimary} flex items-center gap-3`}>
                         Super Admin
                     </h1>
@@ -199,9 +198,11 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                 </div>
             </header>
 
-            {/* Key Metrics Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 md:p-8">
+            {/* Key Metrics Grid - compact cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 mb-6">
                 <StatCard
+                    compact
                     title="Total Revenue"
                     value={formatCurrency(dashboardData.totalPlanRevenue || 0)}
                     unit="₹"
@@ -213,6 +214,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                     darkMode={darkMode}
                 />
                 <StatCard
+                    compact
                     title="Monthly Revenue"
                     value={formatNumber(dashboardData.totalPlanRevenue || 0)}
                     unit="₹"
@@ -224,6 +226,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                     darkMode={darkMode}
                 />
                 <StatCard
+                    compact
                     title="Total Shops"
                     value={dashboardData.totalShops || 0}
                     icon={Building}
@@ -234,6 +237,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                     darkMode={darkMode}
                 />
                 <StatCard
+                    compact
                     title="Total Users"
                     value={formatNumber(dashboardData.totalUsers || 0)}
                     icon={Users}
@@ -502,7 +506,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                     </div>
                 </div>
             </header>
-        </main>
+            </div>
+        </div>
     );
 };
 

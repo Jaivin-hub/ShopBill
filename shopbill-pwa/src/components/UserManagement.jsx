@@ -85,8 +85,24 @@ const StaffPill = ({ count }) => {
     );
 };
 
-const PerformanceTrendIndicator = ({ performance }) => {
-    const { metric, trend } = performance;
+const PerformanceLabelBadge = ({ label }) => {
+    const l = (label || 'Low').toLowerCase();
+    const styles = {
+        high: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        low: 'bg-slate-500/15 text-slate-400 border-slate-500/30'
+    };
+    const cls = styles[l] || styles.low;
+    return (
+        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border ${cls}`}>
+            {l === 'high' ? 'High' : l === 'medium' ? 'Medium' : 'Low'}
+        </span>
+    );
+};
+
+const PerformanceTrendIndicator = ({ performance, showScore = true, showLabel = true, showRevenue = false, darkMode = true }) => {
+    const { metric, trend, score, label } = performance || {};
+    const safeScore = score != null ? score : 50;
     let icon = Minus;
     let color = 'text-gray-400';
     let bgColor = 'bg-gray-500/10';
@@ -105,10 +121,20 @@ const PerformanceTrendIndicator = ({ performance }) => {
     }
 
     const IconComponent = icon;
+    const scoreColor = safeScore >= 70 ? 'text-green-400' : safeScore >= 40 ? 'text-amber-400' : 'text-red-400';
     return (
-        <div className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg ${bgColor} border ${borderColor}`}>
-            <IconComponent className={`w-3.5 h-3.5 ${color}`} />
-            <span className={color}>{metric}</span>
+        <div className="flex flex-col items-center gap-1.5">
+            {showLabel && <PerformanceLabelBadge label={label} />}
+            <div className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg ${bgColor} border ${borderColor}`}>
+                <IconComponent className={`w-3.5 h-3.5 ${color}`} />
+                <span className={color}>{metric ?? '0.0%'}</span>
+            </div>
+            {showScore && (
+                <span className={`text-[10px] font-bold ${darkMode ? scoreColor : scoreColor.replace('400', '600')}`}>Score {safeScore}</span>
+            )}
+            {showRevenue && performance?.revenueLast30 != null && (
+                <span className="text-[10px] text-gray-500 font-medium">₹{(performance.revenueLast30 || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} (30d)</span>
+            )}
         </div>
     );
 };
@@ -327,17 +353,20 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
 
     const mapUserToShop = (user) => {
         const dueStatus = calculateDueStatus(user.planEndDate);
+        const perf = user.performanceTrend || { metric: '0.0%', trend: 'flat', score: 50, label: 'Low' };
+        const perfFull = user.performance || { revenueLast30: 0, salesCountLast30: 0, growthPct: 0, score: perf.score ?? 50, label: perf.label || 'Low', storeCount: 0, customerCount: 0, inventoryCount: 0 };
         return {
             id: user._id,
             dateSortValue: user.createdAt,
             dateJoined: formatDateUTC(user.createdAt),
-            name: user.shopName || user.email.split('@')[0],
+            name: user.shopName || user.email?.split('@')[0],
             email: user.email || 'N/A',
             phone: user.phone || 'N/A',
             status: user.isActive !== false ? 'Active' : 'Inactive',
             plan: String(user.plan || 'BASIC').toUpperCase(),
             staffCount: { manager: user.managerCount || 0, cashier: user.cashierCount || 0 },
-            performanceTrend: user.performanceTrend || { metric: "0.00%", trend: 'flat' },
+            performanceTrend: { metric: perf.metric, trend: perf.trend, score: perf.score, label: perf.label || perfFull.label },
+            performance: { ...perfFull, revenueLast30: perfFull.revenueLast30 ?? 0 },
             subscriptionStatus: user.subscriptionStatus || 'created',
             planEndDate: user.planEndDate,
             dueStatus: dueStatus
@@ -395,6 +424,13 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                 const aOrder = planOrder[aValue] || 0;
                 const bOrder = planOrder[bValue] || 0;
                 const result = aOrder - bOrder;
+                return sortBy.direction === 'ascending' ? result : -result;
+            }
+
+            if (sortBy.key === 'performance') {
+                const aScore = a.performance?.score ?? 0;
+                const bScore = b.performance?.score ?? 0;
+                const result = aScore - bScore;
                 return sortBy.direction === 'ascending' ? result : -result;
             }
 
@@ -533,7 +569,7 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                             </div>
                                             <div className={`flex flex-col p-2 rounded-lg ${innerCardBg} border`}>
                                                 <span className={`text-[10px] ${textMuted} mb-1`}>Performance</span>
-                                                <PerformanceTrendIndicator performance={shop.performanceTrend} />
+                                                <PerformanceTrendIndicator performance={{ ...shop.performanceTrend, revenueLast30: shop.performance?.revenueLast30 }} showScore={true} showLabel={true} showRevenue={true} darkMode={darkMode} />
                                             </div>
                                         </div>
 
@@ -584,7 +620,9 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                                 <div className="flex items-center justify-center">Plan / Due <SortIcon columnKey="plan" /></div>
                                             </th>
                                             <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Staffing</th>
-                                            <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Growth</th>
+                                            <th onClick={() => handleSort('performance')} className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider cursor-pointer hover:${textPrimary} transition-colors`}>
+                                                <div className="flex items-center justify-center">Performance <SortIcon columnKey="performance" /></div>
+                                            </th>
                                             <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Subscription</th>
                                             <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Actions</th>
                                         </tr>
@@ -621,7 +659,9 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center"><StaffPill count={shop.staffCount} /></td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center"><PerformanceTrendIndicator performance={shop.performanceTrend} /></td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <PerformanceTrendIndicator performance={{ ...shop.performanceTrend, revenueLast30: shop.performance?.revenueLast30 }} showScore={true} showLabel={true} showRevenue={false} darkMode={darkMode} />
+                                                    </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center"><SubscriptionStatusBadge status={shop.subscriptionStatus} /></td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         <div className="flex justify-center gap-2">
