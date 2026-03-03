@@ -238,7 +238,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                     </span>
                                 )}
                                 {isPendingActivation && (
-                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>
+                                    <span className={`text-[9px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-200 text-amber-800 border-amber-400'}`}>
                                         <AlertCircle className="w-2.5 h-2.5" />
                                         Pending Setup
                                     </span>
@@ -252,11 +252,11 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                     <button
                         onClick={() => onToggleActive(staff)}
                         disabled={isActionDisabled || isPendingActivation} 
-                        className={`w-full sm:w-auto px-4 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                        className={`touch-manipulation min-h-[44px] w-full sm:w-auto px-4 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[11px] md:text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
                             staff.active 
                             ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
                             : isPendingActivation
-                            ? (darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-700 border border-amber-200')
+                            ? (darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-100 text-amber-800 border border-amber-300')
                             : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white')
                         } disabled:opacity-20`}
                     >
@@ -294,7 +294,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         <button
                             onClick={() => onEdit(staff)}
                             disabled={isActionDisabled} 
-                            className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
+                            className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
                         >
                             <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
@@ -305,7 +305,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                 onClick={() => onRemove(staff)}
                                 disabled={isActionDisabled}
                                 title="Delete permanently – removes all data; staff cannot log in again"
-                                className={`p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
+                                className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
                             >
                                 <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                             </button>
@@ -338,15 +338,21 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
 // --- AddStaffModal ---
 const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, error, onUpgradePlan }) => {
     const [formData, setFormData] = useState({ name: '', email: '', role: 'Cashier' });
+    const [fieldErrors, setFieldErrors] = useState({ name: '', email: '' });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        // Clear this field's validation error when user types
+        if (name === 'name' || name === 'email') {
+            setFieldErrors(prev => ({ ...prev, [name]: '' }));
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+        setFieldErrors({ name: '', email: '' });
+
         // Validate fields
         const errors = {};
         if (!formData.name || !formData.name.trim()) {
@@ -354,7 +360,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
         } else if (formData.name.trim().length < 2) {
             errors.name = 'Name must be at least 2 characters.';
         }
-        
+
         if (!formData.email || !formData.email.trim()) {
             errors.email = 'Email is required.';
         } else {
@@ -366,19 +372,23 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                 errors.email = 'Please enter a valid email address.';
             }
         }
-        
+
         if (Object.keys(errors).length > 0) {
-            // Show errors (you can add error state if needed)
+            setFieldErrors(errors);
             return;
         }
-        
-        onAddStaff(formData, () => setFormData({ name: '', email: '', role: 'Cashier' }));
+
+        onAddStaff(formData, () => {
+            setFormData({ name: '', email: '', role: 'Cashier' });
+            setFieldErrors({ name: '', email: '' });
+        });
     };
 
-    // Clear form when modal closes
+    // Clear form and errors when modal closes
     useEffect(() => {
         if (!isOpen) {
             setFormData({ name: '', email: '', role: 'Cashier' });
+            setFieldErrors({ name: '', email: '' });
         }
     }, [isOpen]);
 
@@ -404,7 +414,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </button>
                 </div>
                 
-                <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                     {error && (
                         <div className={`flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
                             <div className="flex gap-2 sm:gap-3">
@@ -435,32 +445,49 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </div>
                     
                     <div className="space-y-3 sm:space-y-4">
-                        <div className="relative group">
-                            <User className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500" />
-                            <input
-                                type="text"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                required
-                                className={`w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg}`}
-                                placeholder='Full Legal Name'
-                                disabled={isSubmitting}
-                            />
+                        <div>
+                            <div className={`relative group ${fieldErrors.name ? 'mb-1' : ''}`}>
+                                <User className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${fieldErrors.name ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-indigo-500'}`} />
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className={`w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl outline-none transition-all ${inputBg} ${fieldErrors.name ? 'border-rose-500 focus:border-rose-500' : 'focus:border-indigo-500'}`}
+                                    placeholder='Full Legal Name'
+                                    disabled={isSubmitting}
+                                    aria-invalid={!!fieldErrors.name}
+                                    aria-describedby={fieldErrors.name ? 'name-error' : undefined}
+                                />
+                            </div>
+                            {fieldErrors.name && (
+                                <p id="name-error" className="text-[11px] font-semibold text-rose-500 mt-1 px-1">
+                                    {fieldErrors.name}
+                                </p>
+                            )}
                         </div>
-                        
-                        <div className="relative group">
-                            <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500" />
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                                className={`w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg}`}
-                                placeholder='Corporate Email Address'
-                                disabled={isSubmitting}
-                            />
+
+                        <div>
+                            <div className={`relative group ${fieldErrors.email ? 'mb-1' : ''}`}>
+                                <Mail className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${fieldErrors.email ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-indigo-500'}`} />
+                                <input
+                                    type="text"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    autoComplete="email"
+                                    className={`w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl outline-none transition-all ${inputBg} ${fieldErrors.email ? 'border-rose-500 focus:border-rose-500' : 'focus:border-indigo-500'}`}
+                                    placeholder='Corporate Email Address'
+                                    disabled={isSubmitting}
+                                    aria-invalid={!!fieldErrors.email}
+                                    aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                                />
+                            </div>
+                            {fieldErrors.email && (
+                                <p id="email-error" className="text-[11px] font-semibold text-rose-500 mt-1 px-1">
+                                    {fieldErrors.email}
+                                </p>
+                            )}
                         </div>
 
                         <div className="relative group">

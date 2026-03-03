@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     User, Mail, Phone, MapPin, IndianRupee, Clock, Check, Building, 
-    Edit, Shield, Loader, Info, Save, X, Activity, Globe
+    Edit, Shield, Loader, Save, X, Activity, Globe
 } from 'lucide-react';
 import API from '../config/api';
 import { validatePhoneNumber, validateEmail, validateShopName, validateTaxId, validateAddress } from '../utils/validation';
@@ -33,6 +33,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
                 maxLength={name.includes('phone') ? 10 : undefined}
                 /* MOBILE ZOOM FIX: text-[16px] md:text-xs prevents auto-zoom on mobile */
                 className={`w-full p-4 rounded-xl transition-all text-[16px] md:text-xs font-bold outline-none border tabular-nums
+                    ${!readOnly && isEditing ? 'pr-10' : ''}
                     ${readOnly || !isEditing 
                         ? (darkMode ? 'border-gray-800/50 bg-gray-900/20 text-gray-500 cursor-not-allowed' : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed')
                         : (darkMode ? 'border-gray-700 bg-gray-950 text-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-2xl shadow-indigo-500/5' 
@@ -45,7 +46,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
                 <p className="text-[10px] text-red-500 font-bold ml-1 mt-1">{validationErrors[name]}</p>
             )}
             {!readOnly && isEditing && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
+                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
                     <Edit className="w-3.5 h-3.5 text-indigo-400" />
                 </div>
             )}
@@ -192,7 +193,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                                 Profile <span className="text-indigo-500">Center</span>
                             </h1>
                             <p className={`text-[9px] font-bold tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
-                                Merchant Identity Verified
+                                Your verified account
                             </p>
                         </div>
                     </div>
@@ -268,7 +269,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                 <section className={`rounded-3xl overflow-hidden border transition-colors ${sectionBg}`}>
                     <div className={`px-6 py-5 border-b transition-colors ${sectionHeaderBg}`}>
                         <h2 className={`text-[10px] font-bold tracking-[0.25em] flex items-center ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
-                            <Building className="w-4 h-4 mr-3 text-amber-500" /> Business Infrastructure
+                            <Building className="w-4 h-4 mr-3 text-amber-500" /> Business Information
                         </h2>
                     </div>
                     
@@ -300,7 +301,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                                 setValidationErrors={setValidationErrors}
                             />
                             <ProfileInputField 
-                                label="Operational Headquarters" 
+                                label="Address" 
                                 name="address" 
                                 value={profile.address} 
                                 icon={MapPin} 
@@ -315,7 +316,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
 
                         <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t transition-colors ${darkMode ? 'border-gray-800/60' : 'border-slate-100'}`}>
                             <ProfileInputField 
-                                label="Default Ledger Currency" 
+                                label="Default Currency" 
                                 name="currency" 
                                 value={profile.currency} 
                                 icon={IndianRupee} 
@@ -327,7 +328,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                                 setValidationErrors={setValidationErrors}
                             />
                             <ProfileInputField 
-                                label="Regional Synchronization Timezone" 
+                                label="Regional Timezone" 
                                 name="timezone" 
                                 value={profile.timezone} 
                                 icon={Globe} 
@@ -341,17 +342,6 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
                         </div>
                     </div>
                 </section>
-
-                {/* SUPPORT NOTICE */}
-                <div className={`border rounded-xl p-6 flex gap-4 transition-colors ${darkMode ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-indigo-50 border-indigo-100'}`}>
-                    <Info className="w-5 h-5 text-indigo-400 shrink-0" />
-                    <div>
-                        <p className={`text-[10px] font-bold tracking-widest mb-1 ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>Infrastructure Notice</p>
-                        <p className={`text-[10px] font-medium leading-relaxed tracking-tight ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
-                            Regional localization (Currency & Timezone) is locked to your primary registration. Contact system architecture support to modify core regional headers.
-                        </p>
-                    </div>
-                </div>
             </div>
         </main>
     );

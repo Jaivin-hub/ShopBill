@@ -248,6 +248,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             { label: 'Add Stock', icon: Package, color: 'bg-amber-500', page: 'inventory', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: ownerAddStockOrder, manager: 1, cashier: null } },
             { label: 'New Bill', icon: PlusCircle, color: 'bg-indigo-600', page: 'billing', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: ownerNewBillOrder, manager: managerNewBillOrder, cashier: 1 } },
             { label: 'Reports', icon: BarChart3, color: 'bg-rose-500', page: 'reports', roles: [USER_ROLES.OWNER], order: { owner: ownerReportsOrder, manager: null, cashier: null } },
+            { label: 'Settings', icon: Settings2, color: 'bg-slate-500', page: 'settings', roles: [USER_ROLES.CASHIER], order: { owner: null, manager: null, cashier: 4 } },
         ];
         
         // Filter by role; for Pro plan owner, hide New Bill quick button
@@ -490,7 +491,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                 <h3 className="text-[11px] font-black tracking-[0.1em] flex items-center gap-2 ">
                                     <Package size={16} className="text-amber-500" /> Low Stock
                                 </h3>
-                                {lowStock.length > 0 && (
+                                {lowStock.length > 0 && userRole !== USER_ROLES.CASHIER && (
                                     <button
                                         onClick={onViewAllInventory}
                                         className="text-[10px] font-bold text-indigo-500 hover:underline flex items-center gap-1 leading-none"

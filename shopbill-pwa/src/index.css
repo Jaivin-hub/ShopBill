@@ -74,6 +74,25 @@ html:not(.dark) body, html:not(.dark) #root {
 }
 
 /* ============================================
+   ANDROID / MOBILE WEBVIEW FRIENDLY STYLES
+   ============================================ */
+/* Reduce tap highlight and improve touch response (Android Chrome/WebView) */
+button,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"] {
+    -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
+    tap-highlight-color: rgba(99, 102, 241, 0.2);
+}
+/* Utility for touch-friendly tap (no 300ms delay) - use on key buttons */
+.touch-manipulation {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+}
+/* Use env(safe-area-inset-*) in components for notched Android devices where needed */
+
+/* ============================================
    GLOBAL SCROLLBAR DESIGN SYSTEM
    ============================================ */
 

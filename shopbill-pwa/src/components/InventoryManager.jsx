@@ -259,8 +259,27 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         }
     };
 
-    // --- Pattern-Optimized Memoized Filtering ---
+    // --- Pattern-Optimized Memoized Filtering (variant-aware low-stock sort) ---
     const sortedAndFilteredInventory = useMemo(() => {
+        const isLowStock = (item) => {
+            const hasVariants = item.variants && item.variants.length > 0;
+            if (hasVariants) {
+                return item.variants.some(v => {
+                    const reorderLevel = v.reorderLevel != null ? v.reorderLevel : (item.reorderLevel || 5);
+                    return (v.quantity || 0) <= reorderLevel;
+                });
+            }
+            return (item.quantity || 0) <= (item.reorderLevel || 5);
+        };
+        const effectiveQuantity = (item) => {
+            const hasVariants = item.variants && item.variants.length > 0;
+            if (hasVariants) {
+                const qty = Math.min(...item.variants.map(v => v.quantity ?? 0));
+                return Number.isFinite(qty) ? qty : 0;
+            }
+            return item.quantity ?? 0;
+        };
+
         const query = debouncedSearchTerm.toLowerCase();
         return [...inventory]
             .filter(item =>
@@ -269,11 +288,11 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             )
             .sort((a, b) => {
                 if (sortOption === 'low-stock') {
-                    const aIsLow = a.quantity <= a.reorderLevel;
-                    const bIsLow = b.quantity <= b.reorderLevel;
+                    const aIsLow = isLowStock(a);
+                    const bIsLow = isLowStock(b);
                     if (aIsLow && !bIsLow) return -1;
                     if (!aIsLow && bIsLow) return 1;
-                    return a.quantity - b.quantity;
+                    return effectiveQuantity(a) - effectiveQuantity(b);
                 }
                 return a.name.localeCompare(b.name);
             });

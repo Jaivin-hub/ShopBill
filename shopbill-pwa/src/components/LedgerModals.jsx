@@ -21,8 +21,18 @@ const getTypeStyles = (type, darkMode) => {
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   try {
-    return new Date(dateString).toLocaleDateString('en-IN', { 
+    return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric'
+    });
+  } catch (e) { return 'Invalid Date'; }
+};
+
+const formatDateWithTime = (dateString) => {
+  if (!dateString) return 'N/A';
+  try {
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
     });
   } catch (e) { return 'Invalid Date'; }
 };
@@ -449,7 +459,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                             <div className="flex-grow min-w-0">
                                                 <p className={`font-black text-[9px] sm:text-[10px] tracking-widest uppercase truncate ${darkMode ? 'text-white' : 'text-slate-800'}`}>{styles.label}</p>
                                                 <div className="flex items-center text-[8px] sm:text-[9px] font-bold text-slate-400 mt-1 uppercase">
-                                                    <Calendar size={9} className="sm:w-[10px] sm:h-[10px] mr-1" /> {formatDate(t.timestamp)}
+                                                    <Calendar size={9} className="sm:w-[10px] sm:h-[10px] mr-1" /> {formatDateWithTime(t.timestamp)}
                                                 </div>
                                             </div>
                                             <div className={`font-black text-sm sm:text-base shrink-0 whitespace-nowrap ml-2 ${isCredit ? 'text-rose-500' : 'text-emerald-500'}`}>
@@ -473,7 +483,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                                 <p className={`text-[9px] sm:text-[10px] font-black tracking-widest ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>MSG DISPATCHED</p>
                                             </div>
                                             <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-tighter opacity-60 whitespace-nowrap">
-                                                {formatDate(t.timestamp)}
+                                                {formatDateWithTime(t.timestamp)}
                                             </p>
                                         </div>
                                         <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>

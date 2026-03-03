@@ -17,7 +17,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
   const [isRecentSalesOpen, setIsRecentSalesOpen] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
-  const [recentSalesCountSeen, setRecentSalesCountSeen] = useState(0); // when user closes modal, mark current count as seen so badge resets
+  const [recentSalesCountSeen, setRecentSalesCountSeen] = useState(0); // when user opens sales modal, mark as read so badge goes to 0
   const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [isFetchingSaleDetail, setIsFetchingSaleDetail] = useState(false);
@@ -49,11 +49,17 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, []); // Empty deps - only run on mount
 
-  // When user closes Recent Sales modal, mark current count as seen so badge resets until new sales arrive
-  const handleCloseRecentSales = useCallback(() => {
+  // When user opens Recent Sales modal, mark as read so badge count goes to 0
+  const handleOpenRecentSales = useCallback(() => {
     setRecentSalesCountSeen(recentSales.length);
+    setIsRecentSalesOpen(true);
+    fetchRecentSales();
+  }, [recentSales.length, fetchRecentSales]);
+
+  // When user closes Recent Sales modal, keep count as seen (already marked read on open)
+  const handleCloseRecentSales = useCallback(() => {
     setIsRecentSalesOpen(false);
-  }, [recentSales.length]);
+  }, []);
 
   // Fetch recent sales
   const fetchRecentSales = useCallback(async () => {
@@ -302,12 +308,17 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     };
 
     try {
-      await apiClient.post(API.sales, saleData);
+      const response = await apiClient.post(API.sales, saleData);
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
       fetchData(); // Refresh inventory and customer balances
-      await fetchRecentSales(); // Refresh recent sales so badge count updates immediately
+      // Optimistic update: prepend new sale so badge count shows instantly
+      const newSale = response?.data?.newSale;
+      if (newSale) {
+        setRecentSales(prev => [newSale, ...prev].slice(0, 10));
+      }
+      await fetchRecentSales(); // Sync canonical list (populated customerId, etc.)
     } catch (error) {
       // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
       throw error; 
@@ -372,10 +383,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
             </div>
             <div className="flex gap-2">
                 <button 
-                  onClick={() => {
-                    setIsRecentSalesOpen(true);
-                    fetchRecentSales();
-                  }} 
+                  onClick={handleOpenRecentSales} 
                   className={`p-2.5 border rounded-xl transition-all active:scale-90 relative ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}
                 >
                   <Receipt className="w-5 h-5" />

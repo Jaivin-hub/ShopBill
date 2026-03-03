@@ -6,8 +6,9 @@ const ScannerModal = ({
     onClose, 
     onScanSuccess, 
     onScanError,
-    inventory, 
+    inventory = [], 
     onScanNotFound,
+    onCodeScanned, // When set, scanner returns raw barcode only (no inventory lookup)
     darkMode = true // Defaulting to dark for professional scanner look
 }) => {
     
@@ -72,10 +73,16 @@ const ScannerModal = ({
         isProcessingRef.current = true; 
         lastScannedCodeRef.current = decodedText; 
         setResult(decodedText);
-        setLookupStatus('lookingUp');
         if (codeReaderRef.current) {
              try { codeReaderRef.current.reset(); } catch (e) {}
         }
+        if (onCodeScanned) {
+            setLookupStatus('found');
+            isProcessingRef.current = false;
+            onCodeScanned(decodedText);
+            return;
+        }
+        setLookupStatus('lookingUp');
         const normalizedCode = decodedText.toLowerCase().trim();
         const existingItem = inventory.find(item => 
             item.hsn && item.hsn.toLowerCase().trim() === normalizedCode
@@ -84,14 +91,14 @@ const ScannerModal = ({
             isProcessingRef.current = false; 
             if (existingItem) {
                 setLookupStatus('found');
-                onScanSuccess(existingItem);
+                if (onScanSuccess) onScanSuccess(existingItem);
             } else {
                 setLookupStatus('notFound'); 
                 setLookupError(`Item "${decodedText}" not found.`);
-                onScanNotFound(decodedText); 
+                if (onScanNotFound) onScanNotFound(decodedText); 
             }
         }, 500); 
-    }, [inventory, onScanSuccess, onScanNotFound]);
+    }, [inventory, onScanSuccess, onScanNotFound, onCodeScanned]);
 
     useEffect(() => {
         if (!isOpen) { resetScannerState(); return; }
@@ -141,7 +148,7 @@ const ScannerModal = ({
     return (
         <div 
             ref={containerRef} 
-            className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[1000] p-3 sm:p-4 md:p-6 font-sans overflow-y-auto"
+            className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[10000] p-3 sm:p-4 md:p-6 font-sans overflow-y-auto"
             onClick={isAutoClosing ? null : onClose} 
         >
             <div 

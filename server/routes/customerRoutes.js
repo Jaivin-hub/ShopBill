@@ -291,6 +291,20 @@ router.put('/:customerId', protect, async (req, res) => {
         if (!updated) {
             return res.status(404).json({ error: 'Customer not found or does not belong to this shop.' });
         }
+
+        // Notify other roles when credit limit is updated (owner→manager+cashier; manager→owner+cashier; cashier→owner+manager)
+        if (updates.creditLimit !== undefined && req.user.storeId) {
+            const actorName = await getActorNameWithRole(req);
+            emitAlert(req, req.user.storeId, 'credit_limit_updated', {
+                customerId: updated._id,
+                customerName: updated.name,
+                newLimit: updated.creditLimit,
+                actorName
+            }).catch(notifErr => {
+                console.error('Error sending credit_limit_updated notification:', notifErr);
+            });
+        }
+
         res.json({ message: 'Customer updated successfully', customer: updated });
     } catch (error) {
         console.error('Customer PUT Error:', error);

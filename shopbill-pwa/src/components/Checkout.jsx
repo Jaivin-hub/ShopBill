@@ -44,7 +44,6 @@ const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return 'Email is required.';
     if (/\s/.test(email)) return 'Email cannot contain spaces.';
-    if (email !== email.toLowerCase()) return 'Email must be entirely lowercase.';
     if (!emailRegex.test(email)) return 'Please enter a valid email address.';
     return null;
 };

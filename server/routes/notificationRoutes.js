@@ -121,6 +121,12 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || `${data.count ?? 0} items were added to inventory via bulk upload.`;
             metadata = data.count != null ? { count: data.count } : {};
             break;
+        case 'credit_limit_updated':
+            title = 'Credit Limit Updated';
+            category = 'Info';
+            message = data.message || `Credit limit for ${data.customerName || 'customer'} updated to ₹${(data.newLimit ?? 0).toLocaleString('en-IN')} by ${data.actorName || 'user'}.`;
+            metadata = data.customerId ? { customerId: data.customerId } : {};
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -172,6 +178,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Credit sale: notify only owner and manager(s), not cashiers
                 const isCreditSale = type === 'credit_sale';
                 const isBulkUpload = type === 'inventory_bulk_upload';
+                const isCreditLimitUpdated = type === 'credit_limit_updated';
                 const actorRoleLower = (actorRole || '').toLowerCase();
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
@@ -182,9 +189,18 @@ const emitAlert = async (req, storeId, type, data) => {
                 }).select('userId role').lean();
 
                 const targetUserIds = new Set();
+                const isLowStockAlert = type === 'inventory_low';
+
+                // Low stock: notify ALL users including the actor (person who added/updated should also be informed)
+                if (isLowStockAlert) {
+                    if (store && store.ownerId) targetUserIds.add(store.ownerId.toString());
+                    staffMembers.forEach(staff => {
+                        if (staff.userId) targetUserIds.add(staff.userId.toString());
+                    });
+                }
 
                 // Bulk upload: Manager/Cashier → notify owner only; Owner → notify managers and cashiers
-                if (isBulkUpload) {
+                if (!isLowStockAlert && isBulkUpload) {
                     const ownerIdStr = store?.ownerId?.toString();
                     if (actorRoleLower === 'owner') {
                         staffMembers.forEach(staff => {
@@ -195,8 +211,28 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
+                // Credit limit updated: Owner → notify Manager + Cashier; Manager → notify Owner + Cashier; Cashier → notify Owner + Manager
+                if (!isLowStockAlert && isCreditLimitUpdated && store && store.ownerId) {
+                    const ownerIdStr = store.ownerId.toString();
+                    if (actorRoleLower === 'owner') {
+                        staffMembers.forEach(staff => {
+                            if (staff.userId) targetUserIds.add(staff.userId.toString());
+                        });
+                    } else if (actorRole === 'Manager') {
+                        if (ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
+                        staffMembers.forEach(staff => {
+                            if (staff.role === 'Cashier' && staff.userId && staff.userId.toString() !== actorIdStr) targetUserIds.add(staff.userId.toString());
+                        });
+                    } else if (actorRole === 'Cashier') {
+                        if (ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
+                        staffMembers.forEach(staff => {
+                            if (staff.role === 'Manager' && staff.userId && staff.userId.toString() !== actorIdStr) targetUserIds.add(staff.userId.toString());
+                        });
+                    }
+                }
+
                 // Owner: for ledger_payment when Manager reported → only owner; otherwise owner gets it if not actor
-                if (!isBulkUpload && store && store.ownerId) {
+                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     if (ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
@@ -215,8 +251,8 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Staff: for Manager-reported ledger payment, do NOT notify any staff (owner only)
-                // For credit_sale, notify only managers (not cashiers). Skip for bulk upload (handled above).
-                if (!isBulkUpload && !managerReported) {
+                // For credit_sale, notify only managers (not cashiers). Skip for bulk upload and credit_limit_updated (handled above).
+                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !managerReported) {
                     staffMembers.forEach(staff => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();
@@ -279,7 +315,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 // This ensures users who haven't refreshed still get notifications
                 io.to(storeIdStr).emit('new_notification', notificationData);
 
-                console.log(`📢 Notification sent to ${targetUserIds.size} users (excluding actor ${actorId}) from store: ${storeName}`);
+                console.log(`📢 Notification sent to ${targetUserIds.size} users${isLowStockAlert ? ' (including actor)' : ` (excluding actor ${actorId})`} from store: ${storeName}`);
             } catch (targetingError) {
                 console.error("❌ Error in smart notification targeting:", targetingError);
                 // Fallback to broadcast if targeting fails

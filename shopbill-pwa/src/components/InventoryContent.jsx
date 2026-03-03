@@ -451,6 +451,7 @@ const InventoryContent = ({
     inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+    const [isHsnScannerOpen, setIsHsnScannerOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const sortDropdownRef = useRef(null);
     const [hasVariants, setHasVariants] = useState(false);
@@ -586,8 +587,11 @@ const InventoryContent = ({
                         <div className="relative flex-grow">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                             <input
-                                type="text" placeholder="search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                                className={`no-zoom-search w-full pl-11 pr-4 py-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl text-[10px] font-black text-white tracking-[0.2em]  focus:outline-none focus:border-indigo-500 transition-all ${!darkMode ? 'text-slate-900' : ''}`}
+                                type="text"
+                                placeholder="search..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className={`no-zoom-search w-full pl-11 pr-4 py-3 border rounded-xl text-[10px] font-black tracking-[0.2em] focus:outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'}`}
                             />
                             {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500"><X className="w-4 h-4" /></button>}
                         </div>
@@ -655,10 +659,10 @@ const InventoryContent = ({
 
             {/* --- MODALS --- */}
             {isFormModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4 overflow-x-hidden" onClick={(e) => e.target === e.currentTarget && closeFormModal()}>
-                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl flex flex-col max-h-[90vh] transform transition-all`} onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9998] p-3 sm:p-4 overflow-hidden max-h-[100dvh]" onClick={(e) => e.target === e.currentTarget && closeFormModal()}>
+                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} w-full max-w-md min-w-0 max-h-[100dvh] border overflow-hidden shadow-2xl flex flex-col rounded-2xl pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] transform transition-all`} onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0 overflow-x-hidden`}>
+                        <div className={`p-4 sm:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0 overflow-x-hidden`}>
                             <h3 className={`text-lg font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {isEditing ? 'Edit Product' : 'Add New Product'}
                             </h3>
@@ -672,9 +676,9 @@ const InventoryContent = ({
                         </div>
 
                         {/* Form Fields - Scrollable */}
-                        <div className="p-6 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar flex-1 min-h-0 overscroll-contain">
+                        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto overflow-x-auto custom-scrollbar flex-1 min-h-0 overscroll-contain min-w-0">
                             {/* Product Name */}
-                            <div>
+                            <div className="min-w-0">
                                 <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                     Product Name <span className="text-red-500">*</span>
                                 </label>
@@ -685,7 +689,7 @@ const InventoryContent = ({
                                     onChange={handleInputChange}
                                     placeholder="Enter product name"
                                     required
-                                    className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    className={`no-zoom-input w-full min-w-0 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                 />
                             </div>
 
@@ -736,7 +740,7 @@ const InventoryContent = ({
                                                 onChange={handleInputChange}
                                                 placeholder="0.00"
                                                 required
-                                                className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} pl-8 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                                className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} pl-8 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                             />
                                         </div>
                                     </div>
@@ -753,7 +757,7 @@ const InventoryContent = ({
                                             onChange={handleInputChange}
                                             placeholder="0"
                                             required
-                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                     </div>
                                 </>
@@ -800,7 +804,7 @@ const InventoryContent = ({
                                                             onChange={(e) => updateVariant(index, 'label', e.target.value)}
                                                             placeholder="500ml"
                                                             required
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500`}
                                                         />
                                                     </div>
                                                     <div>
@@ -821,7 +825,7 @@ const InventoryContent = ({
                                                             }}
                                                             placeholder="0.00"
                                                             required
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                     <div>
@@ -842,7 +846,7 @@ const InventoryContent = ({
                                                             }}
                                                             placeholder="0"
                                                             required
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                     <div>
@@ -862,7 +866,7 @@ const InventoryContent = ({
                                                                 }
                                                             }}
                                                             placeholder={formData.reorderLevel || '5'}
-                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                                            className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                                                         />
                                                     </div>
                                                 </div>
@@ -891,7 +895,7 @@ const InventoryContent = ({
                                             value={formData.reorderLevel}
                                             onChange={handleInputChange}
                                             placeholder="5"
-                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                     </div>
 
@@ -899,14 +903,24 @@ const InventoryContent = ({
                                         <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                             HSN Code / Barcode
                                         </label>
-                                        <input
-                                            name="hsn"
-                                            type="text"
-                                            value={formData.hsn}
-                                            onChange={handleInputChange}
-                                            placeholder="Optional"
-                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                name="hsn"
+                                                type="text"
+                                                value={formData.hsn}
+                                                onChange={handleInputChange}
+                                                placeholder="Optional - Enter or scan"
+                                                className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsHsnScannerOpen(true)}
+                                                title="Scan barcode"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 transition-colors"
+                                            >
+                                                <ScanLine className="w-5 h-5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -917,20 +931,30 @@ const InventoryContent = ({
                                     <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                         HSN Code / Barcode <span className="text-[10px] text-slate-500 font-normal">(Optional default for all variants)</span>
                                     </label>
-                                    <input
-                                        name="hsn"
-                                        type="text"
-                                        value={formData.hsn}
-                                        onChange={handleInputChange}
-                                        placeholder="Optional - Can be set per variant"
-                                        className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            name="hsn"
+                                            type="text"
+                                            value={formData.hsn}
+                                            onChange={handleInputChange}
+                                            placeholder="Optional - Enter or scan"
+                                            className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsHsnScannerOpen(true)}
+                                            title="Scan barcode"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 transition-colors"
+                                        >
+                                            <ScanLine className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {/* Footer Actions */}
-                        <div className={`p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3 shrink-0 overflow-x-hidden`}>
+                        <div className={`p-4 sm:p-6 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex gap-3 shrink-0 overflow-x-hidden`}>
                             <button
                                 type="button"
                                 onClick={closeFormModal}
@@ -988,14 +1012,19 @@ const InventoryContent = ({
             )}
 
             <ScannerModal 
-                isOpen={isScannerModalOpen} 
-                inventory={inventory} 
-                onClose={closeScannerModal} 
-                onScanSuccess={handleScannedItemSuccess} 
-                onScanNotFound={handleScannedItemNotFound}
+                isOpen={isScannerModalOpen || isHsnScannerOpen} 
+                inventory={isHsnScannerOpen ? [] : inventory} 
+                onClose={isHsnScannerOpen ? () => setIsHsnScannerOpen(false) : closeScannerModal} 
+                onCodeScanned={isHsnScannerOpen ? (code) => {
+                    handleInputChange({ target: { name: 'hsn', value: code } });
+                    setIsHsnScannerOpen(false);
+                } : undefined}
+                onScanSuccess={isHsnScannerOpen ? undefined : handleScannedItemSuccess} 
+                onScanNotFound={isHsnScannerOpen ? undefined : handleScannedItemNotFound}
                 onScanError={(error) => {
                     console.error('Scanner error:', error);
-                    closeScannerModal();
+                    if (isHsnScannerOpen) setIsHsnScannerOpen(false);
+                    else closeScannerModal();
                 }}
                 darkMode={darkMode} 
             />
