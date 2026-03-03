@@ -100,7 +100,7 @@ const PerformanceLabelBadge = ({ label }) => {
     );
 };
 
-const PerformanceTrendIndicator = ({ performance, showScore = true, showLabel = true, showRevenue = false, darkMode = true }) => {
+const PerformanceTrendIndicator = ({ performance, showScore = true, showLabel = true, showRevenue = false, darkMode = true, compact = false }) => {
     const { metric, trend, score, label } = performance || {};
     const safeScore = score != null ? score : 50;
     let icon = Minus;
@@ -122,6 +122,31 @@ const PerformanceTrendIndicator = ({ performance, showScore = true, showLabel = 
 
     const IconComponent = icon;
     const scoreColor = safeScore >= 70 ? 'text-green-400' : safeScore >= 40 ? 'text-amber-400' : 'text-red-400';
+
+    if (compact) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-1 min-w-0 w-full">
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {showLabel && <PerformanceLabelBadge label={label} />}
+                    <div className={`flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-md ${bgColor} border ${borderColor}`}>
+                        <IconComponent className={`w-3 h-3 shrink-0 ${color}`} />
+                        <span className={color}>{metric ?? '0.0%'}</span>
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0">
+                    {showScore && (
+                        <span className={`text-[9px] font-bold whitespace-nowrap ${darkMode ? scoreColor : scoreColor.replace('400', '600')}`}>Score {safeScore}</span>
+                    )}
+                    {showRevenue && performance?.revenueLast30 != null && (
+                        <span className="text-[9px] text-gray-500 font-medium whitespace-nowrap truncate max-w-[72px] sm:max-w-none" title={`₹${(performance.revenueLast30 || 0).toLocaleString('en-IN')}`}>
+                            ₹{(performance.revenueLast30 || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} 30d
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col items-center gap-1.5">
             {showLabel && <PerformanceLabelBadge label={label} />}
@@ -558,18 +583,20 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div className={`flex flex-col p-2 rounded-lg ${innerCardBg} border`}>
+                                            <div className={`flex flex-col min-w-0 p-2 rounded-lg ${innerCardBg} border`}>
                                                 <span className={`text-[10px] ${textMuted} mb-1`}>Due Status</span>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Clock className={`w-3 h-3 ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
-                                                    <span className={`text-xs font-bold ${shop.dueStatus.isUrgent ? 'text-red-400' : textPrimary}`}>
+                                                <div className="flex items-center gap-1.5 min-h-[40px]">
+                                                    <Clock className={`w-3 h-3 shrink-0 ${shop.dueStatus.isUrgent ? 'text-red-400' : 'text-indigo-400'}`} />
+                                                    <span className={`text-xs font-bold truncate ${shop.dueStatus.isUrgent ? 'text-red-400' : textPrimary}`}>
                                                         {shop.dueStatus.text}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className={`flex flex-col p-2 rounded-lg ${innerCardBg} border`}>
-                                                <span className={`text-[10px] ${textMuted} mb-1`}>Performance</span>
-                                                <PerformanceTrendIndicator performance={{ ...shop.performanceTrend, revenueLast30: shop.performance?.revenueLast30 }} showScore={true} showLabel={true} showRevenue={true} darkMode={darkMode} />
+                                            <div className={`flex flex-col min-w-0 p-2 rounded-lg ${innerCardBg} border overflow-hidden`}>
+                                                <span className={`text-[10px] ${textMuted} mb-1 shrink-0`}>Performance</span>
+                                                <div className="min-h-[40px] flex items-center justify-center">
+                                                    <PerformanceTrendIndicator compact performance={{ ...shop.performanceTrend, revenueLast30: shop.performance?.revenueLast30 }} showScore={true} showLabel={true} showRevenue={true} darkMode={darkMode} />
+                                                </div>
                                             </div>
                                         </div>
 
