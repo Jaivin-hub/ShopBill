@@ -207,8 +207,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     };
 
     // --- Styling Vars ---
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
-    const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const headerBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
 
@@ -297,7 +297,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
-            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-black tracking-tight">
@@ -325,7 +325,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 </div>
             </header>
 
-            <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+            <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
             {/* Address Reminder Banner - opaque background so content behind does not show through */}
             {isAddressMissing && showAddressReminder && userRole === USER_ROLES.OWNER && (
                 <div className={`mx-0 mb-4 border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${darkMode ? 'bg-slate-900 border-amber-500/50' : 'bg-amber-50 border-amber-200'}`}>

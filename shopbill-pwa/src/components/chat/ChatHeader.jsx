@@ -84,12 +84,12 @@ const ChatHeader = ({
     };
 
     // Theme Colors
-    const drawerBg = darkMode ? 'bg-slate-950' : 'bg-white';
+    const drawerBg = darkMode ? 'bg-gray-950' : 'bg-white';
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
     return (
         /* HEADER: Will be sticky via parent container */
-        <div className={`w-full ${darkMode ? 'bg-slate-950' : 'bg-white'} border-b ${borderStyle} shadow-sm`}>
+        <div className={`w-full ${darkMode ? 'bg-gray-950' : 'bg-white'} border-b ${borderStyle} shadow-sm`}>
             {/* --- NAV BAR --- */}
             <div className={`p-3 md:p-4 flex items-center justify-between`}>
                 <div 

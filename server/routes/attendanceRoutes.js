@@ -399,6 +399,31 @@ router.post('/punch-out', protect, async (req, res) => {
 
         await attendance.save();
 
+        // Close any other stale active records for this staff so owner dashboard never shows
+        // them as "in break" or "working" after punch-out
+        const stale = await Attendance.find({
+            staffId: staff._id,
+            _id: { $ne: attendance._id },
+            status: 'active',
+            punchOut: null
+        });
+        const punchOutTime = attendance.punchOut;
+        for (const doc of stale) {
+            if (doc.onBreak) {
+                const ab = doc.breaks && doc.breaks.find(b => !b.breakEnd);
+                if (ab) {
+                    ab.breakEnd = punchOutTime;
+                    ab.breakDuration = Math.round((ab.breakEnd - ab.breakStart) / (1000 * 60));
+                }
+                doc.onBreak = false;
+            }
+            doc.punchOut = punchOutTime;
+            doc.status = 'completed';
+            const diff = doc.punchOut - doc.punchIn;
+            doc.workingHours = Math.round(diff / (1000 * 60));
+            await doc.save();
+        }
+
         // Calculate hours and minutes for display
         const hours = Math.floor(attendance.workingHours / 60);
         const minutes = attendance.workingHours % 60;
@@ -953,17 +978,19 @@ router.get('/active-status', protect, async (req, res) => {
         }
 
         const now = new Date();
-        const fortyEightHoursAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+        // Only treat punch-in within last 24h as "currently working" – avoids showing staff who forgot to punch out days ago
+        const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-        // Find active attendance by status (same approach as GET /current) so timezone/date doesn't hide staff
+        // Find active attendance: must have punched in within last 24 hours to show as "Currently Working"
         let activeAttendance = await Attendance.find({
             storeId: req.user.storeId,
             status: 'active',
             punchOut: null,
-            punchIn: { $gte: fortyEightHoursAgo }
+            punchIn: { $gte: twentyFourHoursAgo }
         })
         .select('staffId punchIn onBreak breaks')
         .populate('staffId', 'name email')
+        .sort({ punchIn: -1 })
         .lean();
 
         if (activeAttendance.length === 0) {
@@ -976,10 +1003,12 @@ router.get('/active-status', protect, async (req, res) => {
                 storeId: req.user.storeId,
                 date: { $gte: yesterday, $lt: dayAfterTomorrow },
                 status: 'active',
-                punchOut: null
+                punchOut: null,
+                punchIn: { $gte: twentyFourHoursAgo }
             })
             .select('staffId punchIn onBreak breaks')
             .populate('staffId', 'name email')
+            .sort({ punchIn: -1 })
             .lean();
         }
 
@@ -987,16 +1016,32 @@ router.get('/active-status', protect, async (req, res) => {
             activeAttendance = await Attendance.find({
                 storeId: req.user.storeId,
                 status: 'active',
-                punchOut: null
+                punchOut: null,
+                punchIn: { $gte: twentyFourHoursAgo }
             })
             .select('staffId punchIn onBreak breaks')
             .populate('staffId', 'name email')
+            .sort({ punchIn: -1 })
             .lean();
         }
 
-        // Return array of staff IDs who are currently active and their punch in / break info
-        const activeStaffMap = {};
+        // One record per staff: keep only the most recent active session (by punchIn) so punched-out
+        // staff are not shown as "in break" due to stale/old active records
+        const byStaff = {};
+        const cutoff = twentyFourHoursAgo.getTime();
         activeAttendance.forEach(record => {
+            const staffId = record.staffId?._id?.toString();
+            if (!staffId) return;
+            const punchInTime = record.punchIn ? new Date(record.punchIn).getTime() : 0;
+            if (punchInTime < cutoff) return; // ignore punch-in older than 24h
+            if (byStaff[staffId] && byStaff[staffId].punchInTime >= punchInTime) return;
+            byStaff[staffId] = { record, punchInTime };
+        });
+        const latestOnly = Object.values(byStaff).map(({ record }) => record);
+
+        // Build response from latest record per staff only
+        const activeStaffMap = {};
+        latestOnly.forEach(record => {
             const staffId = record.staffId?._id?.toString();
             if (staffId) {
                 const onBreak = record.onBreak || false;

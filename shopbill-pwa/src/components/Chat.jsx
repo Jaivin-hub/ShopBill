@@ -11,7 +11,7 @@ import EmptyChatView from './chat/EmptyChatView';
 
 const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange, onNavigateToStaffPermissions }) => {
     // Styling Vars matching Dashboard architecture
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
     // Safety check
     if (!currentUser) {
@@ -1271,7 +1271,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
                         {/* Fixed Input section - Footer position (hidden when info page is open) */}
                         {!showInfo && (
-                            <div className={`shrink-0 z-50 ${darkMode ? 'bg-slate-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                            <div className={`shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
                                 <ChatInput
                                     messageInput={messageInput}
                                     onMessageChange={setMessageInput}

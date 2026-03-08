@@ -22,6 +22,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [selectedSale, setSelectedSale] = useState(null);
   const [isFetchingSaleDetail, setIsFetchingSaleDetail] = useState(false);
   const [shopInfo, setShopInfo] = useState(null);
+  const justClosedBillRef = useRef({ id: null, at: 0 });
+  const closedBillIdRef = useRef(null);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -49,9 +51,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, []); // Empty deps - only run on mount
 
-  // Fetch recent sales (response includes lastReadAt for badge count)
-  const fetchRecentSales = useCallback(async () => {
-    setIsLoadingSales(true);
+  // Fetch recent sales (response includes lastReadAt for badge count). silent=true = no spinner, refresh in background.
+  const fetchRecentSales = useCallback(async (silent = false) => {
+    if (!silent) setIsLoadingSales(true);
     try {
       const response = await apiClient.get(`${API.sales}?limit=10`);
       setRecentSales(response.data?.sales || []);
@@ -59,15 +61,15 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         setSalesLastReadAt(response.data.lastReadAt instanceof Date ? response.data.lastReadAt : new Date(response.data.lastReadAt));
       }
     } catch (error) {
-      if (error?.cancelled || error?.message?.includes?.('cancelled')) return; // Duplicate request cancelled by apiClient, ignore
+      if (error?.cancelled || error?.message?.includes?.('cancelled')) return;
       console.error('Error fetching recent sales:', error);
-      showToast('Failed to load recent sales', 'error');
+      if (!silent) showToast('Failed to load recent sales', 'error');
     } finally {
       setIsLoadingSales(false);
     }
   }, [apiClient, API.sales, showToast]);
 
-  // When user opens Recent Sales modal: call read-all API so count persists across page navigation, then open modal
+  // When user opens Recent Sales modal: mark read, then refresh list (silent if we already have data to avoid double loading)
   const handleOpenRecentSales = useCallback(async () => {
     setIsRecentSalesOpen(true);
     try {
@@ -75,11 +77,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       const at = readRes?.data?.lastReadAt;
       if (at) setSalesLastReadAt(at instanceof Date ? at : new Date(at));
     } catch (e) {
-      // fallback: mark as read locally so badge still goes to 0 for this session
       setSalesLastReadAt(new Date());
     }
-    fetchRecentSales();
-  }, [apiClient, API.sales, fetchRecentSales]);
+    fetchRecentSales(recentSales.length > 0);
+  }, [apiClient, API.sales, fetchRecentSales, recentSales.length]);
 
   // When user closes Recent Sales modal, keep count as seen (already marked read on open)
   const handleCloseRecentSales = useCallback(() => {
@@ -123,19 +124,42 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     fetchShopInfo();
   }, [apiClient, API.profile]);
 
-  // Fetch sale detail for viewing
+  // Fetch sale detail for viewing (call after setting selectedSale to list item so modal opens immediately)
   const fetchSaleDetail = useCallback(async (saleId) => {
     setIsFetchingSaleDetail(true);
     try {
       const response = await apiClient.get(`${API.sales}/${saleId}`);
-      setSelectedSale(response.data);
+      const data = response.data;
+      if (data?._id && closedBillIdRef.current === data._id) return;
+      setSelectedSale(data);
     } catch (error) {
       console.error('Error fetching sale detail:', error);
       showToast('Failed to load bill details', 'error');
+      setSelectedSale(null);
     } finally {
       setIsFetchingSaleDetail(false);
     }
   }, [apiClient, API.sales, showToast]);
+
+  const closeBillDetail = useCallback(() => {
+    const id = selectedSale?._id;
+    setSelectedSale(null);
+    if (id) {
+      closedBillIdRef.current = id;
+      justClosedBillRef.current = { id, at: Date.now() };
+      setTimeout(() => {
+        justClosedBillRef.current = { id: null, at: 0 };
+      }, 500);
+    }
+  }, [selectedSale?._id]);
+
+  const openBillDetail = useCallback((sale) => {
+    const { id, at } = justClosedBillRef.current;
+    if (sale._id && id === sale._id && Date.now() - at < 500) return;
+    closedBillIdRef.current = null;
+    setSelectedSale(sale);
+    fetchSaleDetail(sale._id);
+  }, [fetchSaleDetail]);
 
   // --- Core POS Logic ---
   const totalAmount = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
@@ -343,8 +367,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }
 
-  const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
-  const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
+  const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+  const headerBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   const inputBase = darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
 
@@ -379,7 +403,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         .cart-bulge { animation: cartBulge 1.8s ease-in-out infinite; }
       `}</style>
 
-      <header className={`sticky top-0 z-[100] shrink-0 w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -497,7 +521,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                         </div>
                         
                         <div className="flex items-center gap-2 md:gap-4 md:gap-8 flex-shrink-0">
-                          <div className={`flex items-center rounded-xl border p-1 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className={`flex items-center rounded-xl border p-1 ${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                             <button onClick={() => updateCartQuantity(item._id, -1, item.variantId)} className="p-1.5 text-slate-500 hover:text-rose-500 transition-colors"><Minus className="w-3.5 h-3.5" /></button>
                             <span className="w-8 text-center text-xs font-black text-indigo-500">{item.quantity}</span>
                             <button onClick={() => updateCartQuantity(item._id, 1, item.variantId)} className="p-1.5 text-slate-500 hover:text-emerald-500 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
@@ -526,7 +550,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </div>
 
       {cart.length > 0 && (
-        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[72px]`}>
+        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[72px]`}>
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-safe md:pb-5">
             {/* Mobile: single compact row */}
             <div className="w-full md:flex-1 flex flex-row md:flex-row items-center gap-2 md:gap-4">
@@ -660,10 +684,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     return (
                       <div
                         key={sale._id}
-                        onClick={() => fetchSaleDetail(sale._id)}
+                        onClick={() => openBillDetail(sale)}
                         className={`group flex items-center justify-between p-4 border rounded-xl transition-all cursor-pointer active:scale-[0.98] hover:border-indigo-500/50 ${
                           darkMode 
-                            ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' 
+                            ? 'bg-gray-950 border-slate-800 hover:bg-slate-900' 
                             : 'bg-slate-50 border-slate-200 hover:bg-white'
                         }`}
                       >
@@ -731,7 +755,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
 
       {/* Bill Modal - Reusing from SalesActivityPage */}
       {selectedSale && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 sm:p-4 z-[300] backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); closeBillDetail(); }}>
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {
               @page {
@@ -816,14 +840,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
             className={`print-content ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-xl border w-full max-w-md overflow-hidden shadow-2xl h-[85vh] sm:h-[80vh] max-h-[600px] flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
-            {isFetchingSaleDetail ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-3" />
-                <p className="text-[10px] font-black tracking-widest text-indigo-500 uppercase">Loading Bill...</p>
-              </div>
-            ) : selectedSale ? (
+            {selectedSale ? (
               <>
-                <div className={`p-5 border-b flex justify-between items-center ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`p-5 border-b flex justify-between items-center ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <Receipt className="w-3.5 h-3.5 text-indigo-500" />
@@ -834,7 +853,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     </h3>
                   </div>
                   <button 
-                    onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }} 
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); closeBillDetail(); }} 
                     className={`p-2 rounded-lg transition-all ${darkMode ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-200 text-slate-400'}`}
                   >
                     <X className="w-5 h-5" />
@@ -855,7 +875,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     </div>
                   )}
 
-                  <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                     <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Billed To</span>
                     <div className="flex items-center gap-2">
                       <User className="w-3.5 h-3.5 text-indigo-500" />
@@ -866,7 +886,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                   </div>
 
                   {selectedSale.paymentMethod && (
-                    <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                       <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Payment Method</span>
                       <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {selectedSale.paymentMethod}
@@ -877,26 +897,33 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                   <div className="space-y-3">
                     <span className={`text-[9px] font-bold tracking-widest px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Line Items</span>
                     <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-                      {selectedSale.items?.map((item, i) => (
-                        <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 ${darkMode ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-white'}`}>
-                          <div className="flex flex-col">
-                            <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {item.name || 'General Item'}
-                            </span>
-                            <span className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Qty: {item.quantity} × ₹{item.price?.toLocaleString()}
+                      {isFetchingSaleDetail && (!selectedSale.items || selectedSale.items.length === 0) ? (
+                        <div className={`flex items-center justify-center gap-2 p-6 ${darkMode ? 'bg-slate-900/20' : 'bg-slate-50'}`}>
+                          <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                          <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading items...</span>
+                        </div>
+                      ) : (
+                        selectedSale.items?.map((item, i) => (
+                          <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 ${darkMode ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-white'}`}>
+                            <div className="flex flex-col">
+                              <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {item.name || 'General Item'}
+                              </span>
+                              <span className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                Qty: {item.quantity} × ₹{item.price?.toLocaleString()}
+                              </span>
+                            </div>
+                            <span className={`font-bold tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
                             </span>
                           </div>
-                          <span className={`font-bold tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                   <div className="flex justify-between items-center">
                     <div className="space-y-0.5">
                       <p className={`text-[10px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Grand Total</p>
@@ -931,15 +958,15 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       <Printer className="w-4 h-4" /> Print Receipt
                     </button>
                     <button 
-                      onClick={() => { setSelectedSale(null); handleCloseRecentSales(); }} 
+                      onClick={(e) => { e.stopPropagation(); closeBillDetail(); }} 
                       className={`flex-1 py-3 text-[11px] font-bold tracking-wider rounded-lg border transition-all active:scale-[0.98] ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                     >
-                      Close
+                      Back to list
                     </button>
                   </div>
                 </div>
               </>
-            ) : null}
+          ) : null}
           </div>
         </div>
       )}
@@ -979,7 +1006,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       onClick={() => addItemToCart(variantSelectorItem, variant)}
                       className={`w-full p-3 md:p-4 rounded-xl border text-left transition-all active:scale-95 hover:border-indigo-500/50 ${
                         darkMode 
-                          ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' 
+                          ? 'bg-gray-950 border-slate-800 hover:bg-slate-900' 
                           : 'bg-slate-50 border-slate-200 hover:bg-white'
                       }`}
                     >

@@ -82,7 +82,7 @@ const Header = ({
         }
     };
 
-    const headerBg = darkMode ? 'bg-slate-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
+    const headerBg = darkMode ? 'bg-gray-950/95 border-slate-900' : 'bg-white/95 border-slate-200 shadow-sm';
     const logoText = darkMode ? 'text-white' : 'text-slate-900';
     const hubBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200';
 

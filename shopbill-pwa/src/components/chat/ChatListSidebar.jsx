@@ -26,7 +26,7 @@ const ChatListSidebar = ({
     const [viewMode, setViewMode] = useState('chats');
 
     // --- Theme Vars ---
-    const sidebarBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
+    const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const activeTab = 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]';
 
     return (
@@ -36,7 +36,7 @@ const ChatListSidebar = ({
             {/* Scrollable Container - Required for sticky to work */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {/* Sticky Header Area - Title, Description, Toggle, and Search */}
-                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg`}>
+                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg`}>
                     <div className="p-4 md:p-6 pb-3 md:pb-4">
                         {/* Toggle */}
                         <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
@@ -64,7 +64,7 @@ const ChatListSidebar = ({
                     </div>
 
                     {/* Search - Inside Sticky Header */}
-                    <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+                    <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950' : 'bg-white'}`}>
                         <div className="relative group">
                             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
                             <input
@@ -295,7 +295,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                 </div>
                                 {/* Status Badge Overlay */}
                                 {isVerified && (
-                                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-slate-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-gray-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                         <ShieldCheck size={10} className="text-indigo-500" />
                                     </div>
                                 )}

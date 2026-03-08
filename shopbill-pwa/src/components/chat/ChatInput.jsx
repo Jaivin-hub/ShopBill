@@ -26,7 +26,7 @@ const ChatInput = ({
     // Theme Colors
     const bgColor = darkMode ? 'bg-slate-900/90' : 'bg-white/95';
     const borderColor = darkMode ? 'border-slate-800' : 'border-slate-200';
-    const inputBg = darkMode ? 'bg-slate-950' : 'bg-white';
+    const inputBg = darkMode ? 'bg-gray-950' : 'bg-white';
 
     const ActionButton = ({ onClick, icon: Icon, color = "indigo", disabled = false }) => (
         <button

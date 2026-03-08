@@ -85,7 +85,7 @@ const CustomerList = ({
                     </div>
                     {/* Status Badge Overlay */}
                     {isOverLimit && (
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-slate-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-gray-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                             <ShieldAlert size={10} className="text-rose-500" />
                         </div>
                     )}

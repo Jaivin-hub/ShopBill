@@ -168,8 +168,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
     const theme = {
         bg: darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200',
-        input: darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900',
-        card: darkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-100',
+        input: darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900',
+        card: darkMode ? 'bg-gray-950/40 border-slate-800' : 'bg-slate-50 border-slate-100',
         text: darkMode ? 'text-slate-200' : 'text-slate-800',
         muted: 'text-slate-500 font-black uppercase text-[9px] tracking-widest'
     };
@@ -177,7 +177,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     // --- Sub-Form: Add New Customer ---
     if (isNewCustomerFormOpen) {
         return (
-            <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 bg-gray-950/60 backdrop-blur-sm">
                 <div className={`${theme.bg} w-full max-w-md rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
                     <div className="px-4 sm:px-5 py-3 sm:py-4 border-b flex justify-between items-center bg-inherit flex-shrink-0">
                         <div className="flex items-center gap-2">
@@ -226,7 +226,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     }
 
     return (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex justify-center items-center p-3 sm:p-4 bg-gray-950/60 backdrop-blur-sm">
             <div className={`${theme.bg} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}>
                 
                 {/* Header */}

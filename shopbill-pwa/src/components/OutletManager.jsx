@@ -45,7 +45,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     // Styling logic
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-    const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
 
     // Filter outlets based on search term
@@ -479,7 +479,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     return (
         <div className="h-full flex flex-col min-h-0 bg-transparent text-white">
             {/* Sticky Header */}
-            <header className={`sticky top-0 z-[50] shrink-0 ${darkMode ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
+            <header className={`sticky top-0 z-[50] shrink-0 ${darkMode ? 'bg-gray-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
                 <div className="p-4 md:p-6">
                     <div className="flex flex-col gap-4">
                         <div className="flex items-start justify-between gap-4">

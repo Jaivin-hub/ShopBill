@@ -195,10 +195,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     setActiveModal('remind');
   };
 
-  const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+  const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-  const sidebarBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
-  const headerBg = darkMode ? 'bg-slate-950' : 'bg-white';
+  const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
   const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
   return (
@@ -210,7 +210,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
         {/* Scrollable Container - Header and List both inside */}
         <div className="flex-1 overflow-y-auto custom-scrollbar relative">
           {/* Sticky Header Area - Sticks to top when scrolling */}
-          <div className={`sticky top-0 left-0 right-0 border-b ${borderStyle} ${darkMode ? 'bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg transition-all duration-300 ${activeModal ? 'z-[50]' : 'z-[100]'} shrink-0`}>
+          <div className={`sticky top-0 left-0 right-0 border-b ${borderStyle} ${darkMode ? 'bg-gray-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg transition-all duration-300 ${activeModal ? 'z-[50]' : 'z-[100]'} shrink-0`}>
             {activeModal && (
               <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-10" />
             )}
@@ -268,7 +268,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
 
               {/* Search - Inside Sticky Header */}
               {showSearch && (
-                <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'}`}>
+                <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'}`}>
                   <div className="relative group">
                     <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
                     <input
@@ -289,7 +289,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
 
               {/* Sort Options - Inside Sticky Header */}
               {showSort && (
-                <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-slate-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'}`}>
+                <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'}`}>
                   <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                     {[
                       { id: 'due-high', label: 'Highest Priority' },

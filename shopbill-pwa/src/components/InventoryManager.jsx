@@ -24,7 +24,7 @@ const initialItemState = {
 const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet }) => {
     // Permission: Owner and Manager only; Cashiers do not have access
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
 
 
     // --- Data States ---

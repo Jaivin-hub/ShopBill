@@ -468,7 +468,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                                         </span>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className={`text-[9px] font-bold tabular-nums ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                                                {new Date(sale.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                {new Date(sale.timestamp).toLocaleDateString([], { day: 'numeric', month: 'short' })}, {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                             <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-slate-200'}`} />
                                             <span className={`text-[9px] font-bold  ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>
@@ -491,13 +491,18 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                                         <p className={`text-[14px] font-black tabular-nums leading-tight ${darkMode ? 'text-white' : 'text-black'}`}>
                                             ₹{sale.totalAmount.toLocaleString()}
                                         </p>
-                                        <span className={`text-[8px] font-black tracking-widest ${sale.amountCredited > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        <span className="text-[8px] font-black tracking-widest">
                                             {sale.amountCredited > 0 
                                                 ? (sale.amountPaid > 0 
-                                                    ? `₹${sale.amountPaid.toLocaleString()} paid, ₹${sale.amountCredited.toLocaleString()} balance`
-                                                    : `DUE: ₹${sale.amountCredited.toLocaleString()}`
+                                                    ? (
+                                                        <>
+                                                            <span className="text-emerald-600">₹{sale.amountPaid.toLocaleString()} paid</span>
+                                                            <span className="text-rose-600">, ₹{sale.amountCredited.toLocaleString()} balance</span>
+                                                        </>
+                                                    )
+                                                    : <span className="text-rose-600">DUE: ₹{sale.amountCredited.toLocaleString()}</span>
                                                 )
-                                                : 'CLEARED'
+                                                : <span className="text-emerald-600">CLEARED</span>
                                             }
                                         </span>
                                     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
     Package, Plus, AlertTriangle, Edit, Trash2, X, Search, 
-    ListOrdered, Loader2, ScanLine, Upload, Hash, Layers, Bell, Info, 
+    ListOrdered, Loader2, ScanLine, Upload, Hash, Bell, Info, 
     ChevronDown, ChevronUp, Settings2, ChevronRight
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
@@ -69,7 +69,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
     if (!isOpen) return null;
 
     const modalBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
-    const innerBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
+    const innerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
 
     return (
         <section className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[200] p-4">
@@ -115,7 +115,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
 const InputField = ({ label, darkMode, ...props }) => (
     <div className="space-y-2">
         <label className={`text-[9px] font-black  tracking-[0.2em] ml-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{label}</label>
-        <input className={`no-zoom-input w-full p-3.5 ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-all placeholder-slate-700`} {...props} />
+        <input className={`no-zoom-input w-full p-3.5 ${darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-all placeholder-slate-700`} {...props} />
     </div>
 );
 
@@ -210,13 +210,13 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                     
                     {/* Stats Row: Compact Grid */}
                     <div className={`grid gap-2 ${hasVariants ? 'grid-cols-3' : 'grid-cols-3'}`}>
-                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                             <p className={`text-sm font-black tabular-nums ${isLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                 {totalQuantity}
                             </p>
                         </div>
-                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
                             {hasVariants ? (
                                 <p className={`text-[10px] font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -228,7 +228,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                 </p>
                             )}
                         </div>
-                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                        <div className={`text-center p-2 rounded-lg ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                             <p className={`text-[7px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                             {hasVariants && priceRange ? (
                                 <p className="text-sm font-black text-emerald-500 tabular-nums">
@@ -355,7 +355,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                             const variantIsLowStock = (variant.quantity || 0) <= variantReorderLevel;
                             
                             return (
-                                <div key={variant._id || idx} className={`p-2.5 md:p-3 rounded-lg border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                <div key={variant._id || idx} className={`p-2.5 md:p-3 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                     {/* Mobile: Stacked Layout */}
                                     <div className="md:hidden space-y-2">
                                         <div className="flex items-center justify-between">
@@ -367,19 +367,19 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
-                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
                                                 <p className={`text-xs font-black tabular-nums ${variantIsLowStock ? 'text-red-500' : 'text-indigo-500'}`}>
                                                     {variant.quantity || 0}
                                                 </p>
                                             </div>
-                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Reorder</p>
                                                 <p className={`text-xs font-black tabular-nums ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                     {variantReorderLevel}
                                                 </p>
                                             </div>
-                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-slate-950/30' : 'bg-slate-100'}`}>
+                                            <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                                                 <p className="text-xs font-black text-emerald-500 tabular-nums">
                                                     ₹{variant.price?.toLocaleString() || '0'}
@@ -449,7 +449,7 @@ const InventoryContent = ({
     const [hasVariants, setHasVariants] = useState(false);
     const [editingVariantIndex, setEditingVariantIndex] = useState(null);
 
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-900';
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-200' : 'bg-slate-50 text-slate-900';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
 
     const openScannerModal = () => setIsScannerModalOpen(true);
@@ -542,7 +542,7 @@ const InventoryContent = ({
             <ScrollbarStyles darkMode={darkMode} />
 
             {/* --- STICKY STACK (Header + Search/Sort) --- */}
-            <div className="sticky top-0 z-[100] shadow-sm shrink-0 ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}" style={{ backdropFilter: 'blur(12px)' }}>
+            <div className="sticky top-0 z-[100] shadow-sm shrink-0 ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}" style={{ backdropFilter: 'blur(12px)' }}>
                 {/* Header */}
                 <header className={`border-b px-4 md:px-8 py-5 ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -572,7 +572,7 @@ const InventoryContent = ({
                 </header>
 
                 {/* Search & Sort Bar */}
-                <div className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'bg-slate-950 border-slate-900/60' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'bg-gray-950 border-slate-900/60' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="max-w-7xl mx-auto flex gap-3">
                         <div className="relative flex-grow">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
@@ -610,17 +610,6 @@ const InventoryContent = ({
                 <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
                     {/* Desktop & Tablet: Enhanced Card Grid Layout */}
                     <section className="hidden md:block pb-6">
-                        <div className={`mb-6 flex items-center justify-between ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'} px-6 py-4 rounded-2xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <div className="flex items-center gap-3">
-                                <Layers className="w-5 h-5 text-indigo-500" />
-                                <h2 className={`text-[11px] font-black tracking-[0.2em] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                    Master Registry
-                                </h2>
-                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
-                                    {inventory.length} {inventory.length === 1 ? 'Asset' : 'Assets'}
-                                </span>
-                            </div>
-                        </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                             {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} />)}
                             {inventory.length === 0 && (
@@ -680,7 +669,7 @@ const InventoryContent = ({
                                     onChange={handleInputChange}
                                     placeholder="Enter product name"
                                     required
-                                    className={`no-zoom-input w-full min-w-0 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                    className={`no-zoom-input w-full min-w-0 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                 />
                             </div>
 
@@ -689,7 +678,7 @@ const InventoryContent = ({
                                 <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                     Product Variants
                                 </label>
-                                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <Settings2 className={`w-5 h-5 ${hasVariants ? 'text-indigo-500' : 'text-slate-500'}`} />
@@ -731,7 +720,7 @@ const InventoryContent = ({
                                                 onChange={handleInputChange}
                                                 placeholder="0.00"
                                                 required
-                                                className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} pl-8 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                                className={`no-zoom-input w-full ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} pl-8 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                             />
                                         </div>
                                     </div>
@@ -748,7 +737,7 @@ const InventoryContent = ({
                                             onChange={handleInputChange}
                                             placeholder="0"
                                             required
-                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                     </div>
                                 </>
@@ -771,7 +760,7 @@ const InventoryContent = ({
                                     </div>
                                     <div className="space-y-3">
                                         {(formData.variants || []).map((variant, index) => (
-                                            <div key={variant._id || `variant-${index}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                            <div key={variant._id || `variant-${index}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                                 <div className="flex items-center justify-between mb-3">
                                                     <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                         Variant {index + 1}
@@ -886,7 +875,7 @@ const InventoryContent = ({
                                             value={formData.reorderLevel}
                                             onChange={handleInputChange}
                                             placeholder="5"
-                                            className={`no-zoom-input w-full ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input w-full ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                     </div>
 
@@ -901,7 +890,7 @@ const InventoryContent = ({
                                                 value={formData.hsn}
                                                 onChange={handleInputChange}
                                                 placeholder="Optional - Enter or scan"
-                                                className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                                className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                             />
                                             <button
                                                 type="button"
@@ -929,7 +918,7 @@ const InventoryContent = ({
                                             value={formData.hsn}
                                             onChange={handleInputChange}
                                             placeholder="Optional - Enter or scan"
-                                            className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                         <button
                                             type="button"

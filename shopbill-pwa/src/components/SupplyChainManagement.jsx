@@ -23,11 +23,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [inventory, setInventory] = useState([]);
 
   // Theme Variables - Matching other pages
-  const themeBase = darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-900';
+  const themeBase = darkMode ? 'bg-gray-950 text-slate-200' : 'bg-slate-50 text-slate-900';
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-  const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
+  const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
   const dateTextColor = darkMode ? 'text-white' : 'text-slate-900';
-  const headerBg = darkMode ? 'bg-slate-950/80' : 'bg-white/80';
+  const headerBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
 
   const [inventorySort, setInventorySort] = useState('low-stock');
   const [inventorySearch, setInventorySearch] = useState('');
@@ -254,7 +254,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
-      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-slate-950/95' : 'bg-slate-50/95'}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
@@ -370,7 +370,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <div className="flex justify-between items-center">
                     <h3 className={`text-[11px] font-black tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'} `}>Live Stock Overview</h3>
                     <div className="flex items-center gap-2">
-                      <select value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} text-[10px] font-black text-indigo-500 px-3 py-1.5 rounded-xl border outline-none cursor-pointer`}>
+                      <select value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} className={`${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-white border-slate-200'} text-[10px] font-black text-indigo-500 px-3 py-1.5 rounded-xl border outline-none cursor-pointer`}>
                         <option value="low-stock">SORT: LOW STOCK</option>
                         <option value="a-z">SORT: A-Z</option>
                       </select>
@@ -387,7 +387,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     const isLow = item.quantity <= (item.reorderLevel || 5);
                     const isSelected = purchaseForm.productId === item._id;
                     return (
-                      <button key={item._id} onClick={() => setPurchaseForm(prev => ({ ...prev, productId: item._id }))} className={`p-5 rounded-2xl border text-left transition-all relative group hover:scale-[1.02] active:scale-95 ${isSelected ? 'bg-indigo-600 border-indigo-500 shadow-lg' : isLow ? 'bg-red-500/5 border-red-500/20' : (darkMode ? 'bg-slate-950/50 border-slate-800/50' : 'bg-slate-50 border-slate-200')}`}>
+                      <button key={item._id} onClick={() => setPurchaseForm(prev => ({ ...prev, productId: item._id }))} className={`p-5 rounded-2xl border text-left transition-all relative group hover:scale-[1.02] active:scale-95 ${isSelected ? 'bg-indigo-600 border-indigo-500 shadow-lg' : isLow ? 'bg-red-500/5 border-red-500/20' : (darkMode ? 'bg-gray-950/50 border-slate-800/50' : 'bg-slate-50 border-slate-200')}`}>
                         <div className="flex justify-between items-start mb-3 gap-2">
                           <p className={`text-[11px] font-black truncate ${isSelected ? 'text-white' : (darkMode ? 'text-slate-300' : 'text-slate-700')}`}>{item.name}</p>
                           {isLow && <AlertTriangle className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-red-500'} shrink-0`} />}
@@ -690,7 +690,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
           <form onSubmit={handleQuickAddProduct} className={`relative w-full max-w-lg ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden`}>
             {/* Header */}
-            <div className={`p-6 border-b ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
+            <div className={`p-6 border-b ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-indigo-500/10">
                   <Package className="w-5 h-5 text-indigo-500" />
@@ -792,7 +792,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </div>
 
             {/* Footer Actions */}
-            <div className={`p-6 border-t ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
+            <div className={`p-6 border-t ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
               <button
                 type="button"
                 onClick={() => setIsProductModalOpen(false)}

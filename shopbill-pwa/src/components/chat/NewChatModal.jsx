@@ -22,7 +22,7 @@ const NewChatModal = ({
     if (!show) return null;
 
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-    const inputBase = darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const safeAvailableUsers = Array.isArray(availableUsers) ? availableUsers : [];
     const safeSelectedUsers = Array.isArray(selectedUsers) ? selectedUsers : [];
 

@@ -58,7 +58,7 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 );
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
-  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-slate-950/80' : 'bg-slate-900/40'}`}>
+  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
     <section className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[550px] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
       {/* Header */}
       <header className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100 bg-slate-50/50'}`}>
@@ -86,7 +86,7 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
       {/* Content */}
       <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
         {/* Customer Info */}
-        <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
+        <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
           <p className={`text-[8px] sm:text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
             Customer Account
           </p>
@@ -121,7 +121,7 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
               placeholder="0.00" 
               value={amount} 
               onChange={(e) => setAmount(e.target.value)}
-              className={`w-full py-4 sm:py-5 pl-12 sm:pl-14 pr-4 border rounded-xl sm:rounded-2xl text-2xl sm:text-3xl font-black text-center outline-none focus:ring-4 transition-all tabular-nums ${darkMode ? 'bg-slate-950 border-slate-800 text-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20' : 'bg-white border-slate-200 text-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/10'}`}
+              className={`w-full py-4 sm:py-5 pl-12 sm:pl-14 pr-4 border rounded-xl sm:rounded-2xl text-2xl sm:text-3xl font-black text-center outline-none focus:ring-4 transition-all tabular-nums ${darkMode ? 'bg-gray-950 border-slate-800 text-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20' : 'bg-white border-slate-200 text-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/10'}`}
             />
           </div>
         </div>

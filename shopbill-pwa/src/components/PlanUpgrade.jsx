@@ -50,9 +50,9 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
     const isYellowWarning = modalWarning.icon === 'yellow';
     
     return (
-        <div className={`fixed inset-0 flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-slate-950/80' : 'bg-black/50'}`} role="dialog" aria-modal="true">
+        <div className={`fixed inset-0 flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-gray-950/80' : 'bg-black/50'}`} role="dialog" aria-modal="true">
             <div className={`w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-200 my-auto max-h-[95vh] flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-indigo-500/10 rounded-lg text-indigo-500 shrink-0">
                             <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -98,9 +98,9 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
 
 const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alreadyInTerminalState, isCurrentlyInTrial, handleConfirmCancellation, cancellationMessage, formatDate, darkMode }) => {
     return (
-        <div className={`fixed inset-0 flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-slate-950/80' : 'bg-black/50'}`} role="dialog" aria-modal="true">
+        <div className={`fixed inset-0 flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-gray-950/80' : 'bg-black/50'}`} role="dialog" aria-modal="true">
             <div className={`w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden my-auto max-h-[95vh] flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-red-500/10 rounded-lg text-red-500 shrink-0">
                             <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -354,12 +354,12 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     };
 
     // Match other app pages (Settings, Profile)
-    const headerBase = darkMode ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm';
-    const mainBg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
+    const headerBase = darkMode ? 'bg-gray-950/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm';
+    const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg} selection:bg-indigo-500/30`}>
-            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-4 ${darkMode ? 'bg-slate-950/95' : 'bg-white/95'}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-4 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button 

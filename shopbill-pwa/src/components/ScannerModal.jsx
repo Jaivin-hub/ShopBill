@@ -148,7 +148,7 @@ const ScannerModal = ({
     return (
         <div 
             ref={containerRef} 
-            className={`fixed inset-0 flex items-center justify-center z-[10000] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-slate-950/80' : 'bg-black/50'}`}
+            className={`fixed inset-0 flex items-center justify-center z-[10000] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-gray-950/80' : 'bg-black/50'}`}
             onClick={isAutoClosing ? null : onClose} 
             role="dialog"
             aria-modal="true"
@@ -159,7 +159,7 @@ const ScannerModal = ({
                 onClick={(e) => e.stopPropagation()} 
             >
                 {/* Header - matches other app modals */}
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <div className="p-1.5 sm:p-2 bg-indigo-500/10 rounded-lg text-indigo-500 shrink-0">
                             <ScanLine className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -210,7 +210,7 @@ const ScannerModal = ({
 
                         {/* Loading overlay */}
                         {(lookupStatus === 'initializing' || lookupStatus === 'loadingLib') && (
-                            <div className={`absolute inset-0 flex flex-col items-center justify-center p-4 backdrop-blur-sm ${darkMode ? 'bg-slate-950/90' : 'bg-slate-900/90'}`}>
+                            <div className={`absolute inset-0 flex flex-col items-center justify-center p-4 backdrop-blur-sm ${darkMode ? 'bg-gray-950/90' : 'bg-slate-900/90'}`}>
                                 <Loader className={`w-10 h-10 animate-spin mb-4 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
                                 <span className={`text-xs font-bold tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-200'}`}>Starting camera...</span>
                             </div>

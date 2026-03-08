@@ -60,7 +60,7 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
             <div className={`${modalBg} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[550px] rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-white'} flex-shrink-0`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} flex-shrink-0`}>
                     <div>
                         <h2 className={`text-lg md:text-xl font-black tracking-tight flex items-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             <Edit3 className="w-5 h-5 mr-3 text-indigo-500 shrink-0" />
@@ -739,15 +739,15 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     };
     
 
-    const themeBase = darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-    const headerBg = darkMode ? 'bg-slate-950' : 'bg-white';
+    const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
-            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-slate-950/95' : 'bg-white/95'}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button onClick={onBack} className={`p-2 md:p-2.5 rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}>
