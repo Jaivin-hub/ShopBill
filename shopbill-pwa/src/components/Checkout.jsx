@@ -2,41 +2,45 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
     ShoppingCart, CreditCard, CheckCircle, Lock, ArrowLeft, 
     Loader, IndianRupee, Wifi, AlertTriangle, Eye, EyeOff, 
-    Globe, Building, ShieldCheck, Zap, Smartphone
+    Globe, Building, ShieldCheck, Zap, XCircle
 } from 'lucide-react';
 import API from '../config/api';
 import apiClient from '../lib/apiClient';
 import axios from 'axios';
 
+// Feature lists aligned with landing page (included + excluded)
 const PLAN_DETAILS = {
     BASIC: {
         name: 'Small Shop',
         price: 999,
-        features: ['Unlimited Billing', '3 Staff Users', 'Standard Inventory', 'Full Digital Khata'],
         interval: 'monthly',
         color: 'from-gray-600 to-gray-800',
         featured: false,
         tagline: 'For single-outlet starters',
+        items: ['Unlimited Billing', '3 Staff User accounts', 'Standard Inventory', 'Full Digital Khata', 'Sales reports', 'Employee Audit Logs'],
+        excludedItems: ['Supplier Management', 'Realtime team chat system', 'Auto SMS Payment Reminders', 'Multishop management'],
     },
     PRO: {
         name: 'Growing Business',
         price: 2199,
-        features: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management'],
         interval: 'monthly',
         color: 'from-indigo-600 via-indigo-500 to-teal-600',
         featured: true,
         tagline: 'Best value for growth',
         badge: 'RECOMMENDED',
         valueNote: '₹73/day · Most chosen',
+        items: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management', 'Sales reports', 'Realtime team chat system', 'Employee Audit Logs'],
+        excludedItems: ['Multishop management'],
     },
     PREMIUM: {
         name: 'Big Enterprise',
         price: 4999,
-        features: ['All Pro Features', 'Up to 10 Store Locations', 'Inventory Syncing', 'Employee Audit Logs', '24/7 Priority Support'],
         interval: 'monthly',
         color: 'from-slate-600 to-slate-800',
         featured: false,
         tagline: 'For multi-store chains',
+        items: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management', 'Sales reports', 'Realtime team chat system', 'Employee Audit Logs', 'Multishop management', 'Up to 10 outlets management'],
+        excludedItems: [],
     }
 };
 
@@ -71,7 +75,7 @@ const loadRazorpayScript = (src) => {
     });
 };
 
-const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans, showToast, darkMode = true }) => {
+const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans, showToast, darkMode = true, API }) => {
     const fromCreateAccount = !planKey;
     const [detailsComplete, setDetailsComplete] = useState(!fromCreateAccount); // true when from landing (plan pre-selected)
     const [selectedPlanInCheckout, setSelectedPlanInCheckout] = useState(planKey || 'PRO'); // Default to Pro (best value)
@@ -99,6 +103,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [paymentError, setPaymentError] = useState(null);
+    const [accountExistsError, setAccountExistsError] = useState(false);
 
     const selectedCountry = useMemo(() => 
         countryCodes.find(c => c.code === dialCode) || { flag: '🇮🇳', code: '+91', name: 'India' }
@@ -152,9 +157,10 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
         setPhoneError(null);
     };
 
-    const handleProceedToPlanSelection = (e) => {
+    const handleProceedToPlanSelection = async (e) => {
         e.preventDefault();
         setPaymentError(null);
+        setAccountExistsError(false);
         const emailV = validateEmail(email);
         const phoneV = validatePhoneNumber(localNumber);
         const shopV = validateShopName(shopName);
@@ -164,7 +170,24 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
         setShopNameError(shopV);
         setPasswordError(pwdV);
         if (emailV || phoneV || shopV || pwdV) return;
-        setDetailsComplete(true);
+        const fullPhone = (dialCode + localNumber.replace(/\D/g, '')).trim();
+        setIsProcessing(true);
+        try {
+            const res = await apiClient.post(API?.checkAvailability ?? 'auth/check-availability', {
+                email: email?.trim()?.toLowerCase() || undefined,
+                phone: fullPhone || undefined,
+            });
+            if (res.data?.exists) {
+                setAccountExistsError(true);
+                setPaymentError('An account with this email or phone already exists. Use a different one or ');
+                return;
+            }
+            setDetailsComplete(true);
+        } catch (err) {
+            setPaymentError(err.response?.data?.error || 'Could not verify. Please try again.');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleNumberChange = (e) => {
@@ -283,27 +306,15 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
 
     return (
         <main className={`min-h-screen ${bgColor} flex flex-col items-center p-0 sm:p-6 lg:p-8 font-sans transition-colors duration-300`}>
-            <div className="flex-1 w-full flex flex-col items-center min-h-0">
+            <div className={`flex-1 w-full flex flex-col items-center min-h-0 ${fromCreateAccount && !detailsComplete ? 'justify-center' : ''}`}>
             <section className={`max-w-5xl w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-xl sm:rounded-[2rem] sm:border sm:${sectionBorder} shadow-2xl overflow-hidden transition-colors duration-300`}>
                 <div className="flex flex-col lg:grid lg:grid-cols-12">
                     
-                    {/* Compact Summary Side (Top on Mobile) - Plan selection only after details complete (Create Account) or plan summary when from landing */}
+                    {/* Compact Summary Side (Top on Mobile) - only when we have plan selection or plan summary; no steps section */}
+                    {!(fromCreateAccount && !detailsComplete) && (
                     <div className={`${fromCreateAccount && detailsComplete ? 'lg:col-span-12' : 'lg:col-span-4'} ${sectionBg} sm:${sectionCardBg} p-3 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r ${sectionBorder} transition-colors duration-300`}>
-                        {fromCreateAccount && !detailsComplete ? (
-                            <div className={`p-4 sm:p-6 ${infoBg} rounded-2xl border ${infoBorder} transition-colors duration-300`}>
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center ${darkMode ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
-                                        <Building className={`w-7 h-7 sm:w-8 sm:h-8 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} strokeWidth={2} />
-                                    </div>
-                                    <div className="text-center">
-                                        <h3 className={`text-sm font-black ${textColor} tracking-widest mb-2 uppercase`}>Step 1</h3>
-                                        <p className={`text-[11px] font-bold ${infoText} leading-relaxed`}>Enter your business details on the right, then click Continue to choose your plan.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (fromCreateAccount && detailsComplete) || !plan ? (
+                        {(fromCreateAccount && detailsComplete) || !plan ? (
                             <div>
-                                <h3 className={`text-sm font-black ${textColor} tracking-widest mb-1 uppercase`}>Choose your plan</h3>
                                 <p className={`text-[10px] ${descColor} mb-4 font-bold`}>Pro gives you the best value to grow</p>
                                 <div className={`grid gap-3 md:gap-4 ${fromCreateAccount && detailsComplete ? 'grid-cols-1 md:grid-cols-3 md:grid-rows-1' : 'space-y-3'}`}>
                                     {(['BASIC', 'PRO', 'PREMIUM']).map((key) => {
@@ -345,9 +356,14 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                                 </div>
                                                 <p className={`text-[9px] mt-1 ${isPro ? 'text-white/60' : descColor}`}>Verification: ₹1</p>
                                                 <ul className="mt-2.5 space-y-1">
-                                                    {p.features.map((f, i) => (
+                                                    {(p.items || []).map((f, i) => (
                                                         <li key={i} className={`text-[9px] font-bold flex items-center gap-1.5 ${isPro ? 'text-white/95' : descColor}`}>
                                                             <ShieldCheck size={10} className={`shrink-0 ${isPro ? 'text-teal-300/80' : 'text-indigo-500/70'}`} /> {f}
+                                                        </li>
+                                                    ))}
+                                                    {(p.excludedItems || []).map((f, i) => (
+                                                        <li key={`ex-${i}`} className={`text-[9px] font-bold flex items-center gap-1.5 ${isPro ? 'text-white/50 line-through' : 'text-gray-500 line-through'} ${darkMode ? '' : ''}`}>
+                                                            <XCircle size={10} className="shrink-0 opacity-70" /> {f}
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -397,7 +413,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                         <span className="text-xl lg:text-3xl font-black text-white">₹1</span>
                                     </div>
                                     <ul className="hidden sm:grid grid-cols-2 lg:grid-cols-1 gap-2 lg:space-y-2 mt-0 lg:mt-4">
-                                        {plan.features.map((f, i) => (
+                                        {(plan.items || []).map((f, i) => (
                                             <li key={i} className="flex items-center text-[9px] lg:text-[10px] font-black text-white tracking-wider">
                                                 <ShieldCheck size={12} className="mr-1.5 text-white/70 shrink-0" /> {f}
                                             </li>
@@ -416,11 +432,12 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                             <p className={`text-[10px] font-bold ${infoText} leading-relaxed tracking-tighter transition-colors duration-300`}>Encrypted by Razorpay. Cancel anytime via dashboard.</p>
                         </div>
                     </div>
+                    )}
 
                     {/* Form Side - hidden when Create Account flow has proceeded to plan selection */}
                     {!(fromCreateAccount && detailsComplete) && (
-                    <div className="lg:col-span-8 px-4 pt-4 pb-4 sm:p-10 lg:p-14">
-                        <header className="mb-5 sm:mb-8 lg:mb-10 text-center lg:text-left">
+                    <div className={`px-5 pt-6 pb-8 sm:p-10 lg:p-14 ${fromCreateAccount && !detailsComplete ? 'lg:col-span-12' : 'lg:col-span-8'}`}>
+                        <header className="mb-6 sm:mb-8 lg:mb-10 text-center">
                             <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-3">
                                 <Zap className="w-3 h-3 text-indigo-400" />
                                 <span className="text-[9px] lg:text-[10px] font-black text-indigo-400 tracking-widest uppercase">30-Day Free Trial</span>
@@ -428,14 +445,23 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                             <h1 className={`text-2xl lg:text-4xl font-black ${textColor} tracking-tighter transition-colors duration-300`}>Create Your Business Account</h1>
                         </header>
 
-                        <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-5 lg:space-y-6">
-                            {paymentError && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold">{paymentError}</div>}
+                        <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-6 sm:space-y-5 lg:space-y-6">
+                            {paymentError && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold">
+                                        {paymentError}
+                                        {accountExistsError && setCurrentPage && (
+                                            <button type="button" onClick={() => setCurrentPage('support')} className="underline font-black ml-0.5 hover:text-red-300 cursor-pointer">
+                                                Contact support
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-5 lg:gap-6">
                                 <div className="md:col-span-2">
                                     <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={(v) => { setShopName(v); setShopNameError(null); }} placeholder="Ex: Sharma Stores" disabled={isProcessing} darkMode={darkMode} />
                                 </div>
-                                <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
+                                <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); setAccountExistsError(false); setPaymentError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
                                 
                                 <div className="relative" ref={dropdownRef}>
                                     <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>Mobile Number</label>
@@ -444,7 +470,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                             <span>{selectedCountry.flag}</span>
                                             <span>{selectedCountry.code}</span>
                                         </button>
-                                        <input type="tel" inputMode="numeric" maxLength={10} value={localNumber} onChange={handleNumberChange} className={`flex-1 ${phoneInputBg} px-4 py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="9876543210" disabled={isProcessing} />
+                                        <input type="tel" inputMode="numeric" maxLength={10} value={localNumber} onChange={(e) => { handleNumberChange(e); setAccountExistsError(false); setPaymentError(null); }} className={`flex-1 ${phoneInputBg} px-4 py-3.5 sm:py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="9876543210" disabled={isProcessing} />
                                     </div>
                                     {isDropdownOpen && (
                                         <div className={`absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar ${dropdownBg} border ${dropdownBorder} rounded-2xl shadow-2xl p-2 left-0 top-full transition-colors duration-300`}>
@@ -468,14 +494,14 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                 </div>
                             </div>
 
-                            <div className={`pt-3 pb-1 sm:pt-4 sm:pb-0 lg:pt-6 border-t ${sectionBorder} transition-colors duration-300 relative z-10`}>
+                            <div className={`pt-6 pb-2 sm:pt-4 sm:pb-0 lg:pt-6 border-t ${sectionBorder} transition-colors duration-300 relative z-10`}>
                                 <button type="submit" disabled={isProcessing || (detailsComplete && !plan)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
                                     {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : (fromCreateAccount && !detailsComplete) ? <><CreditCard className="w-4 h-4 mr-2" /> Continue to Plan</> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
                                 </button>
-                                <p className={`text-[9px] ${infoText} text-center mt-2 sm:mt-4 font-bold leading-relaxed tracking-tighter uppercase transition-colors duration-300`}>
+                                <p className={`text-[10px] sm:text-[9px] ${infoText} text-center mt-4 sm:mt-4 font-bold leading-relaxed tracking-tighter uppercase transition-colors duration-300`}>
                                     {(fromCreateAccount && !detailsComplete) ? 'Next: Select your plan and complete payment.' : 'By proceeding, you authorize a ₹1 verification charge.'}
                                 </p>
-                                <button type="button" onClick={(e) => { e.preventDefault(); (planKey ? onBackToPlans : onBackToLogin)?.(); }} className={`w-full text-center text-[10px] font-black ${labelColor} mt-2 sm:mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase py-2 -mb-2`}>
+                                <button type="button" onClick={(e) => { e.preventDefault(); (planKey ? onBackToPlans : onBackToLogin)?.(); }} className={`w-full text-center text-[10px] font-black ${labelColor} mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase py-3 sm:py-2 -mb-2`}>
                                     <ArrowLeft size={12} className="mr-1 shrink-0" /> {planKey ? 'Back to Plans' : 'Back to Login'}
                                 </button>
                             </div>
@@ -485,20 +511,6 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                 </div>
             </section>
             </div>
-            {/* Footer - fills space and adds trust (hidden on desktop) */}
-            <footer className={`w-full max-w-5xl py-4 px-4 flex flex-col items-center justify-center gap-3 sm:hidden ${darkMode ? 'text-gray-500 bg-gray-900/40' : 'text-slate-600 bg-slate-100/50'} border-t ${sectionBorder} relative z-0`}>
-                <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
-                        <Smartphone className={`w-4 h-4 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                    </div>
-                    <span className="text-[10px] font-black tracking-wider uppercase">Pocket POS</span>
-                </div>
-                <div className="flex items-center gap-4 text-[9px] font-bold">
-                    <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-indigo-500" /> Secure checkout</span>
-                    <span>·</span>
-                    <span>Razorpay</span>
-                </div>
-            </footer>
         </main>
     );
 };
@@ -523,7 +535,7 @@ const InputField = ({ label, id, type = 'text', value, onChange, placeholder, er
                 disabled={disabled}
                 placeholder={placeholder}
                 inputMode={inputMode}
-                className={`w-full ${inputBg} border ${error ? 'border-red-500' : `${inputBorder} group-focus-within:border-indigo-500`} rounded-2xl px-5 py-3 text-sm font-bold ${inputText} ${placeholderColor} outline-none transition-all ${icon ? 'pl-11' : ''}`}
+                className={`w-full ${inputBg} border ${error ? 'border-red-500' : `${inputBorder} group-focus-within:border-indigo-500`} rounded-2xl px-5 py-3.5 sm:py-3 text-sm font-bold ${inputText} ${placeholderColor} outline-none transition-all ${icon ? 'pl-11' : ''}`}
             />
         </div>
         {error && <p className="text-red-500 text-[9px] mt-1 font-bold tracking-tight">{error}</p>}

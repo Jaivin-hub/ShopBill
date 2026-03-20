@@ -521,7 +521,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                         })}
                                     </div>
                                 ) : (
-                                    <EmptyState icon={Package} title="Optimal Levels" message="All stock levels healthy." actionText="Inventory" onAction={() => setCurrentPage('inventory')} />
+                                    <EmptyState icon={Package} title="Optimal Levels" message="All stock levels healthy." actionText="Stock" onAction={() => setCurrentPage('inventory')} />
                                 )}
                             </div>
                         </div>

@@ -1,18 +1,28 @@
 import React, { useEffect } from 'react';
 import { Printer, LifeBuoy, ArrowLeft, Mail, Phone, MessageCircle, Clock, ExternalLink } from 'lucide-react';
 
-const SupportPage = ({ onBack, origin }) => {
+const SupportPage = ({ onBack, origin, darkMode = true }) => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
+  const handleBackClick = () => onBack(origin === 'settings' ? 'settings' : 'dashboard');
 
-  const handleBackClick = () => {
-    onBack(origin === 'settings' ? 'settings' : 'dashboard');
-  };
+  const bgPage = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+  const textMuted = darkMode ? 'text-gray-400' : 'text-slate-600';
+  const textDim = darkMode ? 'text-gray-500' : 'text-slate-500';
+  const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
+  const borderCl = darkMode ? 'border-gray-800' : 'border-slate-200';
+  const navBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
+  const contactCardBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const navBtnBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+  const navBtnBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+  const navBtnText = darkMode ? 'text-gray-300' : 'text-slate-700';
+  const backHover = darkMode ? 'text-gray-400 hover:text-indigo-400' : 'text-slate-600 hover:text-indigo-600';
+  const faqSectionBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const faqHeading = darkMode ? 'text-gray-200' : 'text-slate-800';
 
   const supportContacts = [
     {
@@ -53,7 +63,7 @@ const SupportPage = ({ onBack, origin }) => {
   return (
       <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
-          <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white" itemScope itemType="https://schema.org/ContactPage">
+          <article className={`min-h-screen flex flex-col items-center transition-colors duration-300 ${bgPage} ${textPrimary}`} itemScope itemType="https://schema.org/ContactPage">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           .print-hidden { display: none !important; }
@@ -63,20 +73,13 @@ const SupportPage = ({ onBack, origin }) => {
       `}} />
 
       {/* --- STICKY NAVIGATION --- */}
-      <nav className="sticky top-0 w-full z-40 bg-gray-950/80 backdrop-blur-md border-b border-gray-800 print-hidden">
+      <nav className={`sticky top-0 w-full z-40 backdrop-blur-md border-b print-hidden transition-colors duration-300 ${navBg} ${borderCl}`}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
-          <button 
-            onClick={handleBackClick} 
-            className="flex items-center gap-2 text-gray-400 hover:text-indigo-400 transition-colors font-medium group"
-          >
+          <button onClick={handleBackClick} className={`flex items-center gap-2 transition-colors font-medium group ${backHover}`}>
             <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> 
             Back {origin === 'settings' ? 'to Settings' : ''}
           </button>
-          
-          <button 
-            onClick={handlePrint} 
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 text-gray-300 rounded-lg hover:bg-gray-800 shadow-lg transition-all text-sm"
-          >
+          <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200'}`}>
             <Printer size={18} /> Print Info
           </button>
         </div>
@@ -84,7 +87,7 @@ const SupportPage = ({ onBack, origin }) => {
 
       {/* --- SCROLLABLE CONTENT --- */}
       <div className="w-full max-w-4xl px-4 py-8 print-container">
-        <div className="bg-gray-900 rounded-2xl shadow-2xl shadow-indigo-900/20 overflow-hidden border border-gray-800 dark-card">
+        <div className={`rounded-2xl shadow-2xl overflow-hidden border dark-card transition-colors duration-300 ${cardBg} ${borderCl} ${darkMode ? 'shadow-indigo-900/20' : 'shadow-slate-200'}`}>
           
           {/* Header Section */}
           <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 p-10 text-center relative overflow-hidden">
@@ -106,18 +109,18 @@ const SupportPage = ({ onBack, origin }) => {
             {/* Contact Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {supportContacts.map((contact, idx) => (
-                <div key={idx} className="flex flex-col items-center p-6 rounded-2xl bg-gray-950 border border-gray-800 text-center hover:border-indigo-500/50 transition-all group">
+                <div key={idx} className={`flex flex-col items-center p-6 rounded-2xl border text-center hover:border-indigo-500/50 transition-all group ${contactCardBg} ${borderCl}`}>
                   <div className="mb-4 transform group-hover:scale-110 transition-transform">{contact.icon}</div>
-                  <h3 className="font-bold text-white">{contact.title}</h3>
-                  <p className="text-sm text-gray-400 mt-1 mb-4">{contact.detail}</p>
-                  <p className="text-xs text-gray-500 mb-6 flex items-center gap-1 justify-center">
+                  <h3 className={`font-bold ${textPrimary}`}>{contact.title}</h3>
+                  <p className={`text-sm mt-1 mb-4 ${textMuted}`}>{contact.detail}</p>
+                  <p className={`text-xs mb-6 flex items-center gap-1 justify-center ${textDim}`}>
                     <Clock size={12} /> {contact.sub}
                   </p>
                   <a 
                     href={contact.action} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="mt-auto w-full py-2.5 px-4 bg-gray-900 border border-gray-700 text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
+                    className={`mt-auto w-full py-2.5 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${darkMode ? 'bg-gray-900 border border-gray-700 text-indigo-400 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}
                   >
                     {contact.btnText} <ExternalLink size={14} />
                   </a>
@@ -126,35 +129,35 @@ const SupportPage = ({ onBack, origin }) => {
             </div>
 
             {/* Common Help Topics */}
-            <section className="bg-gray-950 rounded-2xl p-6 sm:p-8 border border-gray-800">
+            <section className={`rounded-2xl p-6 sm:p-8 border ${faqSectionBg} ${borderCl}`}>
               <h2 className="text-xl font-bold text-teal-400 mb-6 flex items-center gap-2">
                  Frequently Asked Questions
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <h4 className="font-bold text-gray-200">Forgot Password?</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">Go to the Login screen and click on "Forgot Password". You will receive a reset link via your registered email.</p>
+                  <h4 className={`font-bold ${faqHeading}`}>Forgot Password?</h4>
+                  <p className={`text-sm leading-relaxed ${textDim}`}>Go to the Login screen and click on "Forgot Password". You will receive a reset link via your registered email.</p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-gray-200">Printer not connecting?</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">Ensure Bluetooth is on and paired. We support standard 58mm/80mm Thermal Printers.</p>
+                  <h4 className={`font-bold ${faqHeading}`}>Printer not connecting?</h4>
+                  <p className={`text-sm leading-relaxed ${textDim}`}>Ensure Bluetooth is on and paired. We support standard 58mm/80mm Thermal Printers.</p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-gray-200">Data Synchronization</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">Data syncs automatically with internet. If offline, it saves locally and syncs once you are back online.</p>
+                  <h4 className={`font-bold ${faqHeading}`}>Data Synchronization</h4>
+                  <p className={`text-sm leading-relaxed ${textDim}`}>Data syncs automatically with internet. If offline, it saves locally and syncs once you are back online.</p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-gray-200">Can I add more staff?</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">Yes, Owners can add staff via Settings &gt; Team Management and assign roles like Manager or Cashier.</p>
+                  <h4 className={`font-bold ${faqHeading}`}>Can I add more staff?</h4>
+                  <p className={`text-sm leading-relaxed ${textDim}`}>Yes, Owners can add staff via Settings &gt; Team Management and assign roles like Manager or Cashier.</p>
                 </div>
               </div>
             </section>
 
             {/* Registered Office Info */}
-            <div className="pt-8 border-t border-gray-800 text-center">
-              <h3 className="font-bold text-gray-500 mb-3 uppercase text-[10px] tracking-[0.2em]">Registered Office</h3>
-              <p className="text-sm text-gray-400 leading-relaxed font-medium">
-                Jaivin JV, Block no 181, Venkolla PO<br />
+            <div className={`pt-8 border-t text-center ${borderCl}`}>
+              <h3 className={`font-bold mb-3 uppercase text-[10px] tracking-[0.2em] ${textDim}`}>Registered Office</h3>
+              <p className={`text-sm leading-relaxed font-medium ${textMuted}`}>
+                PocketPos, Block no 181, Venkolla PO<br />
                 Madathara, Trivandrum, Kerala, India - 691541
               </p>
             </div>
@@ -162,7 +165,7 @@ const SupportPage = ({ onBack, origin }) => {
         </div>
 
         {/* Footer info */}
-        <div className="mt-8 text-center text-gray-600 text-xs pb-12 print:hidden">
+        <div className={`mt-8 text-center text-xs pb-12 print:hidden ${darkMode ? 'text-gray-600' : 'text-slate-500'}`}>
           &copy; {new Date().getFullYear()} Pocket POS &bull; Helping your business grow
         </div>
       </div>

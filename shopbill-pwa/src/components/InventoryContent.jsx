@@ -104,7 +104,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
 
                 <div className={`p-6 ${innerBg} border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                     <button type="submit" disabled={loading || !csvData} className="w-full py-4 bg-indigo-600 text-white text-[10px] font-black tracking-[0.2em]  rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg active:scale-[0.98]">
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Execute Asset Integration'}
+                        {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Importing…</> : 'Import products'}
                     </button>
                 </div>
             </form>
@@ -548,8 +548,8 @@ const InventoryContent = ({
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Inventory <span className="text-indigo-500">Vault</span></h1>
-                                <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]  mt-1">Asset Management Interface</p>
+                                <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Stock <span className="text-indigo-500">Hub</span></h1>
+                                <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]  mt-1">Manage your products and stock levels</p>
                             </div>
                             {!readOnly && (
                             <div className="flex md:hidden items-center gap-2">
@@ -564,7 +564,7 @@ const InventoryContent = ({
                             <button onClick={openScannerModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all`}><ScanLine className="w-5 h-5" /></button>
                             <button onClick={openBulkUploadModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-500'} border text-emerald-500 rounded-xl transition-all`}><Upload className="w-5 h-5" /></button>
                             <button onClick={openAddModal} className="px-6 py-3 bg-indigo-600 text-white text-[10px] font-black tracking-[0.2em]  rounded-xl hover:bg-indigo-500 transition-all flex items-center gap-2">
-                                <Plus className="w-4 h-4" /> Add Asset
+                                <Plus className="w-4 h-4" /> Add product
                             </button>
                         </div>
                         )}

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { 
     CreditCard, Receipt, Package, Users, LineChart, 
     UserCog, Cloud, Truck, ChevronRight, CheckCircle2, 
-    MessageCircle, ClipboardList
+    MessageCircle, ClipboardList, Bell, XCircle
 } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
 
@@ -18,15 +18,17 @@ const content = {
     
     // Features
     fastPOS: "Quick & Easy Billing",
-    fastPOSDesc: "Finish sales in seconds. No more long lines or math mistakes. Print bills or send them straight to your customer's phone via SMS.",
+    fastPOSDesc: "Finish sales in seconds. No more long lines or math mistakes. Print clear bills and keep your counter moving.",
     stockControl: "Smart Stock Tracking",
-    stockControlDesc: "Know exactly what's on your shelves. Get a friendly nudge when items are running low so you never run out of your best-sellers.",
+    stockControlDesc: "See what you have in stock at a glance. We'll remind you when it's time to reorder so you never run out of what sells.",
     supplyChain: "Supplier & Order Manager",
     supplyChainDesc: "Keep a list of all your suppliers in one place. Track your orders from the moment you call them until the stock reaches your shop door.",
     khata: "Easy Digital Khata",
     khataDesc: "No more notebooks! Track who owes you money, send polite payment reminders, and keep your credit accounts crystal clear.",
     reports: "Simple Sales Insights",
     reportsDesc: "See your daily profit and top items with one tap. Understand your busy hours and make better choices for your business.",
+    realTimeSales: "Real-Time Sales & Notifications",
+    realTimeSalesDesc: "See sales as they happen and get instant alerts for new orders, low stock, and important updates—so you're always in the loop.",
     cloudSync: "Safe & Always Ready",
     cloudSyncDesc: "Your data is backed up safely in the cloud. If you switch phones, your data is right there waiting for you. 100% secure.",
     teamManagement: "Team Management & Attendance Tracker",
@@ -40,6 +42,7 @@ const content = {
     
     pricingTitle: "Fair Pricing for Every Shop",
     pricingSubtitle: "Pick the plan that fits your size. No hidden tricks, just clear tools to help you grow.",
+    pricingTrialNote: "Try your trial for just ₹1 — a one-time verification charge. No hidden fees.",
     basicPlan: "Small Shop",
     proPlan: "Growing Business",
     premiumPlan: "Big Enterprise",
@@ -49,16 +52,25 @@ const content = {
     recommended: "MOST POPULAR",
     selectBasic: "Start Basic",
     choosePro: "Upgrade to Pro",
-    choosePremium: "Contact for Enterprise",
+    choosePremium: "Get in touch",
     unlimitedTxn: "Unlimited Billing",
-    user3: "3 Staff Users",
+    user3: "3 Staff User accounts",
     userUnlimited: "Unlimited Staff & Managers",
     fullInv: "Standard Inventory",
     fullInvBulk: "Smart Stock & Auto-PO",
     khataFull: "Full Digital Khata",
+    salesReports: "Sales reports",
     khataSMS: "Auto SMS Payment Reminders",
     multiStore: "Up to 10 Store Locations",
     prioritySupport: "24/7 Priority Support",
+    employeeAuditLogs: "Employee Audit Logs",
+    multishopManagement: "Multishop management",
+    upTo10Outlets: "Up to 10 outlets management",
+    allIncluded: "All features included",
+    basicExcluded2: "Realtime team chat system",
+    basicExcluded3: "Auto SMS Payment Reminders",
+    basicExcluded4: "Multishop management",
+    basicExcluded5: "Supplier Management",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     support: "Help & Support",
@@ -205,9 +217,10 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             <FeatureItem icon={<Truck />} title={content.supplyChain} desc={content.supplyChainDesc} color="amber" darkMode={darkMode} />
                             <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
                             <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
-                            <FeatureItem icon={<Cloud />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                             <FeatureItem icon={<ClipboardList />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
                             <FeatureItem icon={<MessageCircle />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="cyan" darkMode={darkMode} />
+                            <FeatureItem icon={<Bell />} title={content.realTimeSales} desc={content.realTimeSalesDesc} color="orange" darkMode={darkMode} />
+                            <FeatureItem icon={<Cloud />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                         </div>
                     </div>
                 </section>
@@ -218,13 +231,15 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         <div className="text-center mb-16">
                             <h2 className={`text-3xl md:text-5xl font-black ${titleColor}  tracking-tighter mb-4 transition-colors duration-300`}>{content.pricingTitle}</h2>
                             <p className={`${descColor} font-bold transition-colors duration-300`}>{content.pricingSubtitle}</p>
+                            <p className={`mt-4 text-sm font-bold ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>{content.pricingTrialNote}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <PriceCard 
                                 plan={content.basicPlan} 
                                 price="999" 
                                 desc={content.basicDesc} 
-                                items={[content.unlimitedTxn, content.user3, content.fullInv, content.khataFull]} 
+                                items={[content.unlimitedTxn, content.user3, content.fullInv, content.khataFull, content.salesReports, content.employeeAuditLogs]} 
+                                excludedItems={[content.basicExcluded5, content.basicExcluded2, content.basicExcluded3, content.basicExcluded4]}
                                 btn={content.selectBasic} 
                                 onSelect={() => onSelectPlan('BASIC')} 
                                 darkMode={darkMode}
@@ -234,7 +249,8 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 price="2199" 
                                 featured={true}
                                 desc={content.proDesc} 
-                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management"]} 
+                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.basicExcluded2, content.employeeAuditLogs]} 
+                                excludedItems={[content.basicExcluded4]}
                                 btn={content.choosePro} 
                                 onSelect={() => onSelectPlan('PRO')} 
                                 darkMode={darkMode}
@@ -243,7 +259,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 plan={content.premiumPlan} 
                                 price="4999" 
                                 desc={content.premiumDesc} 
-                                items={["All Pro Features", content.multiStore, "Inventory Syncing", "Employee Audit Logs", content.prioritySupport]} 
+                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.basicExcluded2, content.employeeAuditLogs, content.multishopManagement, content.upTo10Outlets]} 
                                 btn={content.choosePremium} 
                                 onSelect={() => onSelectPlan('PREMIUM')} 
                                 darkMode={darkMode}
@@ -289,13 +305,14 @@ const FeatureItem = ({ icon, title, desc, color, darkMode = true }) => {
     );
 };
 
-const PriceCard = ({ plan, price, desc, items, btn, featured, onSelect, darkMode = true }) => {
+const PriceCard = ({ plan, price, desc, items, excludedItems = [], btn, featured, onSelect, darkMode = true }) => {
     const cardBg = darkMode ? (featured ? 'bg-indigo-600' : 'bg-gray-900') : (featured ? 'bg-indigo-600' : 'bg-white');
     const cardBorder = darkMode ? (featured ? 'border-indigo-400' : 'border-gray-800') : (featured ? 'border-indigo-400' : 'border-slate-300');
     const cardHover = darkMode ? 'hover:border-gray-700' : 'hover:border-slate-400';
     const textColor = featured ? 'text-white' : (darkMode ? 'text-white' : 'text-slate-900');
     const descColor = featured ? 'text-indigo-100' : (darkMode ? 'text-gray-500' : 'text-slate-600');
     const itemColor = featured ? 'text-white' : (darkMode ? 'text-gray-300' : 'text-slate-700');
+    const excludedColor = darkMode ? 'text-gray-500' : 'text-slate-400';
     return (
     <div className={`relative p-10 rounded-[1.25rem] border-2 transition-all ${featured ? `${cardBg} ${cardBorder} shadow-2xl shadow-indigo-500/20 scale-105 z-10` : `${cardBg} ${cardBorder} ${cardHover}`}`}>
         {featured && <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-teal-400 text-gray-900 text-[10px] font-black  tracking-widest px-4 py-1 rounded-full">{content.recommended}</div>}
@@ -308,7 +325,12 @@ const PriceCard = ({ plan, price, desc, items, btn, featured, onSelect, darkMode
         <ul className="space-y-4 mb-10 text-left">
             {items.map((item, i) => (
                 <li key={i} className={`flex items-center text-xs font-bold ${itemColor} transition-colors duration-300`}>
-                    <CheckCircle2 className={`w-4 h-4 mr-3 ${featured ? 'text-teal-300' : 'text-indigo-500'}`} /> {item}
+                    <CheckCircle2 className={`w-4 h-4 mr-3 shrink-0 ${featured ? 'text-teal-300' : 'text-indigo-500'}`} /> {item}
+                </li>
+            ))}
+            {excludedItems.map((item, i) => (
+                <li key={`excluded-${i}`} className={`flex items-center text-xs font-bold ${excludedColor} transition-colors duration-300 line-through`}>
+                    <XCircle className="w-4 h-4 mr-3 shrink-0 opacity-70" aria-hidden /> {item}
                 </li>
             ))}
         </ul>

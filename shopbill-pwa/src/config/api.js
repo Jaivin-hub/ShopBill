@@ -6,6 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://server.pocket
 const API = {
     // New Authentication Endpoints
     login: API_BASE_URL + '/auth/login',
+    checkAvailability: API_BASE_URL + '/auth/check-availability',
     signup: API_BASE_URL + '/auth/signup',
     passwordchange: API_BASE_URL + '/auth/password/change',
     forgetpassword: API_BASE_URL + '/auth/forgot-password',

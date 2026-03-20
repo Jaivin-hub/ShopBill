@@ -168,6 +168,31 @@ router.post('/login', async (req, res) => {
 });
 
 /**
+ * @route POST /api/auth/check-availability
+ * @desc Check if a user already exists with the given email or phone (for registration flow).
+ * @access Public
+ */
+router.post('/check-availability', async (req, res) => {
+    const { email, phone } = req.body;
+    if (!email && !phone) {
+        return res.status(400).json({ error: 'Email or phone is required.' });
+    }
+    try {
+        const conditions = [];
+        if (email) conditions.push({ email: email.toLowerCase().trim() });
+        if (phone) {
+            const cleaned = String(phone).replace(/\s/g, '');
+            if (cleaned) conditions.push({ phone: cleaned });
+        }
+        const userExists = await User.findOne({ $or: conditions });
+        return res.json({ exists: !!userExists });
+    } catch (err) {
+        console.error('Check availability error:', err);
+        return res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+/**
  * @route POST /api/auth/signup
  * @desc Register a New owner/Shop after successful payment verification.
  * @access Public

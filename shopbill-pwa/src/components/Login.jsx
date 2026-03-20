@@ -159,7 +159,7 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
         <section aria-labelledby="reset-heading" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="text-center">
                 <h2 id="reset-heading" className={`text-lg font-black ${titleColor}  tracking-tighter`}>
-                    Reset Access
+                    Reset Password
                 </h2>
             </div>
 

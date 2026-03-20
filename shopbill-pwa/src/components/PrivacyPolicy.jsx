@@ -1,20 +1,27 @@
 import React, { useEffect } from 'react';
 import { Printer, Lock, ArrowLeft, EyeOff, Server, Smartphone, ShieldCheck } from 'lucide-react';
 
-const PrivacyPolicy = ({ onBack, origin }) => {
-    // Ensure the page starts at the top when opened
+const PrivacyPolicy = ({ onBack, origin, darkMode = true }) => {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
 
-    const handlePrint = () => {
-        window.print();
-    };
+    const handlePrint = () => window.print();
+    const handleBackClick = () => onBack(origin === 'settings' ? 'settings' : 'dashboard');
 
-    const handleBackClick = () => {
-        // Returns to 'settings' if that's where the user came from, else 'dashboard' (landing)
-        onBack(origin === 'settings' ? 'settings' : 'dashboard');
-    };
+    const bgPage = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+    const textMuted = darkMode ? 'text-gray-400' : 'text-slate-600';
+    const textDim = darkMode ? 'text-gray-500' : 'text-slate-500';
+    const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
+    const borderCl = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const navBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
+    const navBorder = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const navBtnBg = darkMode ? 'bg-gray-900' : 'bg-slate-100';
+    const navBtnBorder = darkMode ? 'border-gray-800' : 'border-slate-300';
+    const navBtnText = darkMode ? 'text-gray-300' : 'text-slate-700';
+    const navBtnHover = darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200';
+    const backHover = darkMode ? 'text-gray-400 hover:text-teal-400' : 'text-slate-600 hover:text-teal-600';
 
     // Structured Data for Privacy Policy
     const structuredData = {
@@ -28,7 +35,7 @@ const PrivacyPolicy = ({ onBack, origin }) => {
     return (
         <>
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
-            <article className="min-h-screen bg-gray-950 flex flex-col items-center text-white font-sans" itemScope itemType="https://schema.org/WebPage">
+            <article className={`min-h-screen flex flex-col items-center font-sans transition-colors duration-300 ${bgPage} ${textPrimary}`} itemScope itemType="https://schema.org/WebPage">
             {/* Styles for print and layout */}
             <style dangerouslySetInnerHTML={{
                 __html: `
@@ -42,20 +49,20 @@ const PrivacyPolicy = ({ onBack, origin }) => {
       `}} />
 
             {/* Sticky Navigation */}
-            <nav className="sticky top-0 w-full z-40 bg-gray-950/80 backdrop-blur-md border-b border-gray-800 print-hidden">
+            <nav className={`sticky top-0 w-full z-40 backdrop-blur-md border-b print-hidden transition-colors duration-300 ${navBg} ${navBorder}`}>
                 <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
-                    <button onClick={handleBackClick} className="flex items-center gap-2 text-gray-400 hover:text-teal-400 transition-colors font-medium text-sm sm:text-base group">
+                    <button onClick={handleBackClick} className={`flex items-center gap-2 transition-colors font-medium text-sm sm:text-base group ${backHover}`}>
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
                         Back {origin === 'settings' ? 'to Settings' : ''}
                     </button>
-                    <button onClick={handlePrint} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 text-gray-300 rounded-lg hover:bg-gray-800 shadow-lg transition-all text-sm">
+                    <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${navBtnHover}`}>
                         <Printer size={18} /> Print Policy
                     </button>
                 </div>
             </nav>
 
             <div className="w-full max-w-4xl px-4 py-8 print-container">
-                <div className="bg-gray-900 rounded-2xl shadow-2xl shadow-teal-900/10 overflow-hidden border border-gray-800 dark-card">
+                <div className={`rounded-2xl shadow-2xl overflow-hidden border dark-card transition-colors duration-300 ${cardBg} ${borderCl} ${darkMode ? 'shadow-teal-900/10' : 'shadow-slate-200'}`}>
                     
                     {/* Hero Header Section */}
                     <div className="bg-gradient-to-br from-teal-700 to-teal-900 p-8 text-center text-white relative overflow-hidden">
@@ -73,12 +80,10 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                     </div>
 
                     {/* Content Body */}
-                    <div className="p-6 md:p-12 text-gray-300 leading-relaxed space-y-12">
+                    <div className={`p-6 md:p-12 leading-relaxed space-y-12 transition-colors duration-300 ${textMuted}`}>
                         <section className="text-center max-w-2xl mx-auto">
-                            <p className="text-base sm:text-lg text-gray-400">
-                                At Pocket POS, we understand that your business data is sensitive. This policy explains how 
-                                <span className="font-bold text-white mx-1"> Jaivin JV </span> 
-                                collects, protects, and handles your information.
+                            <p className={`text-base sm:text-lg ${textMuted}`}>
+                                At Pocket POS, we understand that your business data is sensitive. This policy explains how PocketPos collects, protects, and handles your information.
                             </p>
                         </section>
 
@@ -89,10 +94,10 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                     <div className="bg-teal-900/30 p-2.5 rounded-xl text-teal-400 border border-teal-800/50">
                                         <Smartphone size={22} />
                                     </div>
-                                    <h2 className="text-xl font-bold text-white">1. Information We Collect</h2>
+                                    <h2 className={`text-xl font-bold ${textPrimary}`}>1. Information We Collect</h2>
                                 </div>
                                 <div className="pl-2 sm:pl-14 space-y-4">
-                                    <p className="text-sm text-gray-400">To provide our services, we collect:</p>
+                                    <p className={`text-sm ${textMuted}`}>To provide our services, we collect:</p>
                                     <ul className="space-y-3">
                                         {[
                                             { label: "Business Profile", desc: "Name, phone number, and address." },
@@ -101,7 +106,7 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                         ].map((item, i) => (
                                             <li key={i} className="flex gap-3 text-sm">
                                                 <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-teal-500 flex-shrink-0" />
-                                                <p><span className="text-white font-semibold">{item.label}:</span> {item.desc}</p>
+                                                <p><span className={`font-semibold ${textPrimary}`}>{item.label}:</span> {item.desc}</p>
                                             </li>
                                         ))}
                                     </ul>
@@ -114,10 +119,10 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                     <div className="bg-teal-900/30 p-2.5 rounded-xl text-teal-400 border border-teal-800/50">
                                         <Server size={22} />
                                     </div>
-                                    <h2 className="text-xl font-bold text-white">2. How We Use Your Data</h2>
+                                    <h2 className={`text-xl font-bold ${textPrimary}`}>2. How We Use Your Data</h2>
                                 </div>
                                 <div className="pl-2 sm:pl-14 space-y-4">
-                                    <p className="text-sm text-gray-400">Your data is used strictly for:</p>
+                                    <p className={`text-sm ${textMuted}`}>Your data is used strictly for:</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {[
                                             "Cloud synchronization across devices.",
@@ -125,7 +130,7 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                             "Automated SMS/WhatsApp reminders.",
                                             "Technical support & troubleshooting."
                                         ].map((text, i) => (
-                                            <div key={i} className="bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs text-gray-400">
+                                            <div key={i} className={`p-3 rounded-lg border text-xs ${darkMode ? 'bg-gray-950 border-gray-800 text-gray-400' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                                                 {text}
                                             </div>
                                         ))}
@@ -139,14 +144,14 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                     <div className="bg-teal-900/30 p-2.5 rounded-xl text-teal-400 border border-teal-800/50">
                                         <EyeOff size={22} />
                                     </div>
-                                    <h2 className="text-xl font-bold text-white">3. Data Sharing & Security</h2>
+                                    <h2 className={`text-xl font-bold ${textPrimary}`}>3. Data Sharing & Security</h2>
                                 </div>
                                 <div className="pl-2 sm:pl-14 space-y-5">
                                     <div className="bg-teal-900/20 border-l-4 border-teal-500 p-5 rounded-r-xl accent-box">
                                         <p className="font-bold text-teal-400 mb-1">The "No-Sell" Promise:</p>
                                         <p className="text-teal-100/70 text-sm">We do not sell, trade, or rent your business or customer data to third-party marketing companies. Ever.</p>
                                     </div>
-                                    <p className="text-sm text-gray-400">All data is transmitted via secure encrypted protocols (SSL/TLS) and stored on protected cloud servers.</p>
+                                    <p className={`text-sm ${textMuted}`}>All data is transmitted via secure encrypted protocols (SSL/TLS) and stored on protected cloud servers.</p>
                                 </div>
                             </section>
 
@@ -156,10 +161,10 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                                     <div className="bg-teal-900/30 p-2.5 rounded-xl text-teal-400 border border-teal-800/50">
                                         <ShieldCheck size={22} />
                                     </div>
-                                    <h2 className="text-xl font-bold text-white">4. Your Rights</h2>
+                                    <h2 className={`text-xl font-bold ${textPrimary}`}>4. Your Rights</h2>
                                 </div>
                                 <div className="pl-2 sm:pl-14">
-                                    <p className="text-sm text-gray-400 leading-relaxed">
+                                    <p className={`text-sm leading-relaxed ${textMuted}`}>
                                         You have the right to access, export, or delete your business data at any time through the application settings. 
                                         Upon account deletion, all associated records are permanently removed from our active databases.
                                     </p>
@@ -168,15 +173,15 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                         </div>
 
                         {/* Footer Contact */}
-                        <div className="mt-16 pt-8 border-t border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-950 p-8 rounded-2xl">
+                        <div className={`mt-16 pt-8 border-t grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-2xl ${borderCl} ${darkMode ? 'bg-gray-950' : 'bg-slate-100'}`}>
                             <div>
                                 <h3 className="font-bold text-teal-500 mb-3 uppercase text-[10px] tracking-widest">Privacy Officer</h3>
-                                <p className="text-sm font-bold text-white">Jaivin JV</p>
-                                <p className="text-sm text-gray-500">pocketpos.official@gmail.com</p>
+                                <p className={`text-sm font-bold ${textPrimary}`}>PocketPos</p>
+                                <p className={`text-sm ${textDim}`}>hello@pocketpos.io</p>
                             </div>
                             <div>
                                 <h3 className="font-bold text-teal-500 mb-3 uppercase text-[10px] tracking-widest">Data Protection Office</h3>
-                                <p className="text-sm text-gray-400 leading-relaxed">
+                                <p className={`text-sm leading-relaxed ${textMuted}`}>
                                     Madathara, Trivandrum<br />
                                     Kerala, India - 691541
                                 </p>
@@ -185,7 +190,7 @@ const PrivacyPolicy = ({ onBack, origin }) => {
                     </div>
                 </div>
 
-                <div className="mt-8 text-center text-gray-600 text-[10px] pb-12 print:hidden uppercase tracking-[0.2em]">
+                <div className={`mt-8 text-center text-[10px] pb-12 print:hidden uppercase tracking-[0.2em] ${darkMode ? 'text-gray-600' : 'text-slate-500'}`}>
                     &copy; {new Date().getFullYear()} Pocket POS &bull; Secure & Reliable Billing
                 </div>
             </div>

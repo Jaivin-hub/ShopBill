@@ -851,6 +851,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     <h3 className={`text-base font-bold tabular-nums tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                       #{selectedSale._id?.slice(-12).toUpperCase()}
                     </h3>
+                    {(selectedSale.timestamp || selectedSale.createdAt) && (
+                      <p className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <Clock className="w-3 h-3" />
+                        {new Date(selectedSale.timestamp || selectedSale.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    )}
                   </div>
                   <button 
                     type="button"

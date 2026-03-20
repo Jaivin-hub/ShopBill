@@ -182,7 +182,7 @@ const StaffSetPassword = () => {
                         <div className="relative">
                             <input
                                 type={showPassword ? 'text' : 'password'}
-                                placeholder="New Password (min 8 chars)"
+                                placeholder="New Password"
                                 className={`w-full pr-12 px-4 py-3 bg-gray-700 border text-gray-200 rounded-lg placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ${passwordError ? 'border-red-500' : 'border-gray-600'}`}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 value={newPassword}
