@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
-    ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, HelpCircle, Clock, CheckCircle2, XCircle
+    ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, Clock, CheckCircle2, XCircle
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
@@ -130,7 +130,6 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 
 // --- StaffStatusButton Component ---
 const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes }) => {
-    const [showTooltip, setShowTooltip] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
 
     // Format "time ago" for punch in (working) or break start (on break)
@@ -244,53 +243,33 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                     </span>
                                 )}
                             </div>
+                            {isPendingActivation && (
+                                <div className={`mt-3 p-3 rounded-xl border flex gap-2.5 ${darkMode ? 'bg-amber-500/10 border-amber-500/25' : 'bg-amber-50 border-amber-200'}`}>
+                                    <Info className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                                    <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                        An activation email with a password setup link has been sent to <strong>{staff.email}</strong>. The staff member needs to click the link and set their password to activate their account.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                     
                     <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
-                        <div className="relative flex-1 sm:flex-none">
+                        <div className="flex-1 sm:flex-none">
                     <button
                         onClick={() => onToggleActive(staff)}
-                        disabled={isActionDisabled || isPendingActivation} 
+                        disabled={isActionDisabled}
                         className={`touch-manipulation min-h-[44px] w-full sm:w-auto px-4 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[11px] md:text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                            staff.active 
+                            staff.active
                             ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
                             : isPendingActivation
-                            ? (darkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-amber-100 text-amber-800 border border-amber-300')
+                            ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
                             : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white')
-                        } ${isPendingActivation ? 'disabled:!opacity-100' : 'disabled:opacity-20'}`}
+                        } disabled:opacity-20`}
                     >
                         <Power className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                        {staff.active ? 'Deactivate Account' : isPendingActivation ? (
-                            <span className={darkMode ? '' : 'text-amber-950'}>{'Pending Activation'}</span>
-                        ) : 'Reactivate Account'}
+                        {staff.active || isPendingActivation ? 'Deactivate Account' : 'Reactivate Account'}
                     </button>
-                    {isPendingActivation && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowTooltip(!showTooltip);
-                                }}
-                                className="absolute -top-1 -right-1 p-1 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-colors z-10"
-                                title="Activation Status"
-                            >
-                                <HelpCircle className="w-3 h-3" />
-                            </button>
-                            {showTooltip && (
-                                <div className={`absolute bottom-full right-0 mb-2 w-64 p-3 rounded-xl border shadow-lg z-20 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                                    <div className="flex gap-2">
-                                        <Info className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                                        <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                                            An activation email with a password setup link has been sent to <strong>{staff.email}</strong>. The staff member needs to click the link and set their password to activate their account.
-                                        </p>
-                                    </div>
-                                    <div className={`absolute bottom-0 right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${darkMode ? 'border-t-slate-800' : 'border-t-white'}`} style={{ transform: 'translateY(100%)' }}></div>
-                                </div>
-                            )}
-                        </>
-                    )}
                         </div>
 
                         <button
@@ -301,12 +280,16 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                         
-                        {/* Delete option only for deactivated staff: permanently removes account and all data */}
-                        {!staff.active && !isPendingActivation && (
+                        {/* Delete: inactive staff (includes pending activation — never completed setup) */}
+                        {!staff.active && (
                             <button
                                 onClick={() => onRemove(staff)}
                                 disabled={isActionDisabled}
-                                title="Delete permanently – removes all data; staff cannot log in again"
+                                title={
+                                    isPendingActivation
+                                        ? 'Delete this pending invite and remove the account from your team'
+                                        : 'Delete permanently – removes all data; staff cannot log in again'
+                                }
                                 className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
                             >
                                 <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
@@ -672,15 +655,50 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
-        
+
+        const isPendingActivation =
+            staffMember.passwordSetupStatus === 'pending' && !staffMember.active;
+
+        // Pending invite: same endpoint revokes token (does not activate without password)
+        if (isPendingActivation) {
+            const showModal = externalSetConfirmModal || setConfirmModal;
+            showModal({
+                message: `This stops the activation link for ${staffMember.name}. They have not finished setup. You can remove them from the team or add them again with the same email to send a new invitation.`,
+                confirmText: 'Deactivate Account',
+                cancelText: 'Cancel',
+                onConfirm: async () => {
+                    if (externalSetConfirmModal) {
+                        externalSetConfirmModal(null);
+                    } else {
+                        setConfirmModal(null);
+                    }
+                    try {
+                        await apiClient.put(API.staffSetActive(staffMember._id), { active: false });
+                        if (showToast) showToast('Activation link disabled. Member stays inactive until you add them again.', 'success');
+                        await fetchStaff();
+                    } catch (error) {
+                        if (showToast) showToast(error.response?.data?.error || 'Failed to deactivate.', 'error');
+                    }
+                },
+                onCancel: () => {
+                    if (externalSetConfirmModal) {
+                        externalSetConfirmModal(null);
+                    } else {
+                        setConfirmModal(null);
+                    }
+                },
+            });
+            return;
+        }
+
         // If activating, do it directly without confirmation
         if (!staffMember.active) {
             try {
-                await apiClient.put(API.staffToggle(staffMember._id)); 
+                await apiClient.put(API.staffSetActive(staffMember._id), { active: true });
                 if (showToast) showToast('Staff account activated successfully.', 'success');
                 await fetchStaff();
             } catch (error) {
-                if (showToast) showToast('Failed to activate account.', 'error');
+                if (showToast) showToast(error.response?.data?.error || 'Failed to activate account.', 'error');
             }
             return;
         }
@@ -698,11 +716,11 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     setConfirmModal(null);
                 }
                 try {
-                    await apiClient.put(API.staffToggle(staffMember._id)); 
+                    await apiClient.put(API.staffSetActive(staffMember._id), { active: false });
                     if (showToast) showToast('Staff account deactivated successfully.', 'success');
                     await fetchStaff();
                 } catch (error) {
-                    if (showToast) showToast('Failed to deactivate account.', 'error');
+                    if (showToast) showToast(error.response?.data?.error || 'Failed to deactivate account.', 'error');
                 }
             },
             onCancel: () => {
@@ -719,8 +737,12 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         if (!hasWriteAccess || staffMember.role === 'owner') return;
 
         const showModal = externalSetConfirmModal || setConfirmModal;
+        const isPendingActivation =
+            staffMember.passwordSetupStatus === 'pending' && !staffMember.active;
         showModal({
-            message: `Permanently delete ${staffMember.name}? All their data (attendance, etc.) will be removed from the database and they will not be able to log in again. This cannot be undone.`,
+            message: isPendingActivation
+                ? `Permanently remove ${staffMember.name}. They have not activated their account yet. This deletes their pending login and team record. This cannot be undone.`
+                : `Permanently delete ${staffMember.name}. All their data (attendance, etc.) will be removed from the database and they will not be able to log in again. This cannot be undone.`,
             onConfirm: async () => {
                 if (externalSetConfirmModal) {
                     externalSetConfirmModal(null);

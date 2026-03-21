@@ -60,6 +60,80 @@ const staffDebug = (step, payload = {}) => {
 // to match the convention established in authRoutes.js and StaffSchema.
 const isowner = (userRole) => userRole === 'owner';
 
+/** Only explicit `true` counts as active — fixes legacy docs missing `active` and avoids UI showing the wrong state. */
+function enrichStaffMember(staff) {
+    if (!staff) return null;
+    const hasInviteToken = !!(staff.userId && typeof staff.userId === 'object' && staff.userId.resetPasswordToken);
+    return {
+        ...staff,
+        active: staff.active === true,
+        passwordSetupStatus: hasInviteToken ? 'pending' : 'completed',
+    };
+}
+
+async function enrichStaffById(staffId) {
+    const staff = await Staff.findById(staffId)
+        .select('name email role phone active storeId userId')
+        .populate('userId', 'resetPasswordToken')
+        .lean();
+    return enrichStaffMember(staff);
+}
+
+/**
+ * Idempotent set Staff.active + User.isActive (or revoke pending invite). Avoids toggle double-requests flipping state back to active.
+ */
+async function applyStaffActiveState(res, { staffMember, linkedUser, targetActive, staffName }) {
+    const staffId = staffMember._id;
+    const currentlyActive = staffMember.active === true;
+    const isPendingInvite = !!linkedUser.resetPasswordToken && !currentlyActive;
+
+    if (targetActive === false) {
+        if (isPendingInvite) {
+            await User.findByIdAndUpdate(linkedUser._id, {
+                $unset: { resetPasswordToken: 1, resetPasswordExpire: 1 },
+                isActive: false,
+            });
+            staffDebug('PUT staff active=false: revoked pending invite', { staffId: String(staffId) });
+            const enriched = await enrichStaffById(staffId);
+            return res.json({
+                message: `${staffName}: activation invitation revoked. The setup link no longer works. You can delete this member or add them again with the same email to send a new invite.`,
+                staff: enriched,
+                revokedPending: true,
+            });
+        }
+        await Staff.findByIdAndUpdate(staffId, { active: false }, { new: true, runValidators: true });
+        await User.findByIdAndUpdate(linkedUser._id, { isActive: false }, { new: true, runValidators: true });
+        staffDebug('PUT staff active=false: deactivated', { staffId: String(staffId) });
+        const enriched = await enrichStaffById(staffId);
+        return res.json({
+            message: `${staffName} is now inactive.`,
+            staff: enriched,
+        });
+    }
+
+    // targetActive === true — never enable staff login without a real password
+    const hasPassword = !!(linkedUser.password && String(linkedUser.password).length > 0);
+    if (!hasPassword) {
+        if (linkedUser.resetPasswordToken) {
+            return res.status(400).json({
+                error: 'This member must finish the activation link and set a password before their account can be activated.',
+            });
+        }
+        return res.status(400).json({
+            error: 'This member never completed password setup and has no pending invite. Remove them from the team and add them again to send a new activation email.',
+        });
+    }
+
+    await Staff.findByIdAndUpdate(staffId, { active: true }, { new: true, runValidators: true });
+    await User.findByIdAndUpdate(linkedUser._id, { isActive: true }, { new: true, runValidators: true });
+    staffDebug('PUT staff active=true', { staffId: String(staffId) });
+    const enriched = await enrichStaffById(staffId);
+    return res.json({
+        message: `${staffName} is now active.`,
+        staff: enriched,
+    });
+}
+
 // ====================================================================
 // @route   GET /api/staff
 // @desc    Get all staff members for the current shop
@@ -95,11 +169,7 @@ router.get('/', protect, async (req, res) => {
             .lean()
             .sort({ role: -1, name: 1 });
         
-        // Add passwordSetupStatus to each staff member
-        const enrichedStaffList = staffList.map(staff => ({
-            ...staff,
-            passwordSetupStatus: staff.userId?.resetPasswordToken ? 'pending' : 'completed'
-        }));
+        const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
         
         staffDebug('GET / success', { count: enrichedStaffList.length, storeId: String(req.user.storeId) });
         res.json(enrichedStaffList);
@@ -317,16 +387,21 @@ router.post('/', protect, async (req, res) => {
 });
 
 // ====================================================================
-// @route   PUT /api/staff/:id/toggle
-// @desc    Toggle a staff member's active status
-// @access  Private (owner-only access)
+// @route   PUT /api/staff/:id/active
+// @desc    Set staff active flag explicitly (idempotent; avoids double-toggle bugs)
+// @body    { "active": true | false }
+// @access  Private (owner-only)
 // ====================================================================
-router.put('/:id/toggle', protect, async (req, res) => {
-    // FIX: Use the corrected helper function 'isowner'
+router.put('/:id/active', protect, async (req, res) => {
     if (!isowner(req.user.role)) {
         return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
     }
-    
+
+    const { active: targetActive } = req.body;
+    if (typeof targetActive !== 'boolean') {
+        return res.status(400).json({ error: 'Request body must include active: true or false.' });
+    }
+
     const staffId = req.params.id;
 
     try {
@@ -334,38 +409,80 @@ router.put('/:id/toggle', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
-        
         if (!staffMember) {
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
         }
-        
-        // FIX: Use the corrected helper function 'isowner'
         if (isowner(staffMember.role)) {
             return res.status(400).json({ error: 'Cannot deactivate the primary owner account.' });
         }
 
-        const newStatus = !staffMember.active;
-        
-        // 1. Update the Staff model status
-        const updatedStaff = await Staff.findByIdAndUpdate(
-            staffId, 
-            { active: newStatus }, 
-            { new: true, runValidators: true }
-        );
-        
-        // 2. CRITICAL: Update the linked User model status (to block/allow login)
-        await User.findByIdAndUpdate(
-            updatedStaff.userId, 
-            { isActive: newStatus }, // Assuming your User model has an 'isActive' field
-            { new: true, runValidators: true }
-        );
+        const linkedUser = await User.findById(staffMember.userId);
+        if (!linkedUser) {
+            return res.status(404).json({ error: 'Linked user account not found.' });
+        }
 
-
-        res.json({ 
-            message: `${updatedStaff.name} status set to ${newStatus ? 'ACTIVE' : 'INACTIVE'}.`, 
-            staff: updatedStaff 
+        return await applyStaffActiveState(res, {
+            staffMember,
+            linkedUser,
+            targetActive,
+            staffName: staffMember.name,
         });
-        
+    } catch (error) {
+        console.error('Staff PUT /active error:', error.message);
+        res.status(500).json({ error: 'Failed to update staff status.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/:id/toggle
+// @desc    Toggle active (legacy). Prefer PUT /:id/active with explicit boolean.
+// @access  Private (owner-only access)
+// ====================================================================
+router.put('/:id/toggle', protect, async (req, res) => {
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
+    }
+
+    const staffId = req.params.id;
+
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
+
+        if (!staffMember) {
+            return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
+        }
+
+        if (isowner(staffMember.role)) {
+            return res.status(400).json({ error: 'Cannot deactivate the primary owner account.' });
+        }
+
+        const linkedUser = await User.findById(staffMember.userId);
+        if (!linkedUser) {
+            return res.status(404).json({ error: 'Linked user account not found.' });
+        }
+
+        const currentlyActive = staffMember.active === true;
+        const isPendingInvite = !!linkedUser.resetPasswordToken && !currentlyActive;
+
+        // Pending invite: always treat toggle as "turn off" (revoke), never activate without password
+        if (isPendingInvite) {
+            return await applyStaffActiveState(res, {
+                staffMember,
+                linkedUser,
+                targetActive: false,
+                staffName: staffMember.name,
+            });
+        }
+
+        return await applyStaffActiveState(res, {
+            staffMember,
+            linkedUser,
+            targetActive: !currentlyActive,
+            staffName: staffMember.name,
+        });
     } catch (error) {
         console.error('Staff toggle error:', error.message);
         res.status(500).json({ error: 'Failed to update staff status.' });

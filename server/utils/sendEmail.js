@@ -16,14 +16,8 @@ function htmlToPlainText(html) {
 /**
  * Sends email via Nodemailer (real SMTP — Gmail, SendGrid, SES, Resend, etc.).
  *
- * Console output (always):
- *   [sendEmail] ========== START ==========
- *   [sendEmail] config check / transporter ready / calling sendMail...
- *   [sendEmail] ========== RESULT: SENT OK ==========   OR   RESULT: NOT SENT (ERROR)
- *
  * Required .env: EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS
- * Optional: EMAIL_SECURE, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_REQUIRE_TLS,
- *           EMAIL_TLS_REJECT_UNAUTHORIZED, EMAIL_DEBUG=1 (verbose SMTP)
+ * Optional: EMAIL_SEND_TIMEOUT_MS (default 45000), EMAIL_DEBUG=1
  */
 const sendEmail = async (options) => {
     const ts = () => new Date().toISOString();
@@ -54,11 +48,28 @@ const sendEmail = async (options) => {
         throw err;
     }
 
+    // Gmail SMTP only accepts logins for @gmail.com OR Google Workspace accounts on that domain.
+    if (/gmail\.com/i.test(host) && user && !/@gmail\.com$/i.test(user)) {
+        console.warn(
+            '[sendEmail] ⚠️  GMAIL SMTP + non-@gmail.com EMAIL_USER:',
+            user.replace(/(.{2}).*(@.*)/, '$1***$2'),
+            '→ This ONLY works if that domain is on Google Workspace. If not, use SendGrid/Resend OR set EMAIL_USER to a @gmail.com address + App Password.'
+        );
+    }
+
+    // Many hosts block outbound 465; 587 STARTTLS often works — document in log
+    if (port === 465) {
+        console.warn(
+            '[sendEmail] Using port 465. If send hangs or times out, try EMAIL_PORT=587 and EMAIL_SECURE=false (or unset).'
+        );
+    }
+
     console.log('[sendEmail] SMTP target:', { host, port, secure, user: user.replace(/(.{2}).*(@.*)/, '$1***$2') });
 
-    const connMs = parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '15000', 10);
-    const greetMs = parseInt(process.env.EMAIL_GREETING_TIMEOUT_MS || '10000', 10);
-    const sockMs = parseInt(process.env.EMAIL_SOCKET_TIMEOUT_MS || '25000', 10);
+    const connMs = parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '20000', 10);
+    const greetMs = parseInt(process.env.EMAIL_GREETING_TIMEOUT_MS || '15000', 10);
+    const sockMs = parseInt(process.env.EMAIL_SOCKET_TIMEOUT_MS || '30000', 10);
+    const overallMs = parseInt(process.env.EMAIL_SEND_TIMEOUT_MS || '45000', 10);
 
     const emailDebug = process.env.EMAIL_DEBUG === '1';
 
@@ -103,18 +114,55 @@ const sendEmail = async (options) => {
         hasHtml: !!options.html,
         hasText: !!textBody,
     });
-    console.log('[sendEmail] calling transporter.sendMail() ...', ts());
+    console.log('[sendEmail] calling transporter.sendMail() ...', ts(), `(hard timeout ${overallMs}ms)`);
+
+    let settled = false;
+    let progressCount = 0;
+    const progressTimer = setInterval(() => {
+        if (settled) return;
+        progressCount += 1;
+        console.warn(`[sendEmail] … still waiting on SMTP (${progressCount * 8}s elapsed) — if this never ends, port may be blocked or auth stuck`);
+    }, 8000);
+
+    const closeTransport = () => {
+        try {
+            transporter.close();
+        } catch (_) {
+            /* ignore */
+        }
+    };
 
     try {
-        const info = await transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(
+                    new Error(
+                        `SMTP sendMail() timed out after ${overallMs}ms. Try: EMAIL_PORT=587, EMAIL_SECURE=false; check host firewall allows outbound SMTP; verify Google Workspace if using @domain on smtp.gmail.com.`
+                    )
+                );
+            }, overallMs);
+        });
+
+        const info = await Promise.race([transporter.sendMail(mailOptions), timeoutPromise]);
+
+        settled = true;
+        clearInterval(progressTimer);
+        closeTransport();
 
         console.log('[sendEmail] ========== RESULT: SENT OK ==========', ts());
         console.log('[sendEmail] messageId:', info.messageId);
         console.log('[sendEmail] accepted:', info.accepted, '| rejected:', info.rejected);
         console.log('[sendEmail] smtp response:', info.response);
+        console.log(
+            '[sendEmail] If inbox is empty: check Spam; for Workspace/custom From, verify SPF/DKIM for your domain.'
+        );
 
         return info;
     } catch (err) {
+        settled = true;
+        clearInterval(progressTimer);
+        closeTransport();
+
         console.error('[sendEmail] ========== RESULT: NOT SENT (ERROR) ==========', ts());
         console.error('[sendEmail] error.message:', err.message);
         console.error('[sendEmail] error.code:', err.code);

@@ -18,7 +18,8 @@ const API = {
 
     // Staff Management Endpoints
     staff: API_BASE_URL + '/staff', // GET, POST
-    staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT (for active status)
+    staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT legacy toggle
+    staffSetActive: (id) => `${API_BASE_URL}/staff/${id}/active`, // PUT body: { active: boolean }
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,

@@ -23,6 +23,12 @@ export const staffService = {
     return response.data;
   },
 
+  /** Idempotent: avoids double-request flipping toggle back to active */
+  setActiveStatus: async (id, active) => {
+    const response = await apiClient.put(API.staffSetActive(id), { active });
+    return response.data;
+  },
+
   toggleActive: async (id) => {
     const response = await apiClient.put(API.staffToggle(id));
     return response.data;
