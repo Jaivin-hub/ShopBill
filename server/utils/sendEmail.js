@@ -16,33 +16,27 @@ function htmlToPlainText(html) {
 /**
  * Sends email via Nodemailer (real SMTP — Gmail, SendGrid, SES, Resend, etc.).
  *
- * Required .env:
- *   EMAIL_HOST   — e.g. smtp.gmail.com, smtp.sendgrid.net
- *   EMAIL_PORT   — e.g. 587 (STARTTLS) or 465 (SSL)
- *   EMAIL_USER   — SMTP username (Gmail address, or "apikey" for SendGrid)
- *   EMAIL_PASS   — App password / API key / SMTP password
+ * Console output (always):
+ *   [sendEmail] ========== START ==========
+ *   [sendEmail] config check / transporter ready / calling sendMail...
+ *   [sendEmail] ========== RESULT: SENT OK ==========   OR   RESULT: NOT SENT (ERROR)
  *
- * Optional:
- *   EMAIL_SECURE              — "true" for SSL on port 465 (auto-true if port is 465)
- *   EMAIL_FROM                — Sender address (e.g. hello@pocketpos.io or "Name <hello@pocketpos.io>")
- *   EMAIL_FROM_NAME           — Display name if EMAIL_FROM is only an email (default: Pocket POS)
- *   EMAIL_REQUIRE_TLS         — "true" to force STARTTLS on port 587
- *   EMAIL_TLS_REJECT_UNAUTHORIZED — set "false" only for broken dev certs (not recommended in prod)
- *   EMAIL_DEBUG               — "1" to log full Nodemailer SMTP traffic (very verbose)
- *
- * @param {object} options
- * @param {string} options.to
- * @param {string} options.subject
- * @param {string} [options.text]
- * @param {string} [options.html]
+ * Required .env: EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS
+ * Optional: EMAIL_SECURE, EMAIL_FROM, EMAIL_FROM_NAME, EMAIL_REQUIRE_TLS,
+ *           EMAIL_TLS_REJECT_UNAUTHORIZED, EMAIL_DEBUG=1 (verbose SMTP)
  */
 const sendEmail = async (options) => {
+    const ts = () => new Date().toISOString();
+
+    console.log('[sendEmail] ========== START ==========', ts());
+    console.log('[sendEmail] to:', options?.to, '| subject:', options?.subject || '(no subject)');
+
     const host = process.env.EMAIL_HOST?.trim();
     if (!host) {
         const err = new Error(
             'EMAIL_HOST is not set. Add SMTP settings to your .env to send real email. See server/.env.example'
         );
-        console.error('[sendEmail] CONFIG ERROR:', err.message);
+        console.error('[sendEmail] ========== RESULT: NOT SENT (CONFIG) ==========', err.message);
         throw err;
     }
 
@@ -56,13 +50,17 @@ const sendEmail = async (options) => {
     const pass = process.env.EMAIL_PASS;
     if (!user || pass == null || pass === '') {
         const err = new Error('EMAIL_USER and EMAIL_PASS are required for SMTP.');
-        console.error('[sendEmail] CONFIG ERROR:', err.message);
+        console.error('[sendEmail] ========== RESULT: NOT SENT (CONFIG) ==========', err.message);
         throw err;
     }
+
+    console.log('[sendEmail] SMTP target:', { host, port, secure, user: user.replace(/(.{2}).*(@.*)/, '$1***$2') });
 
     const connMs = parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '15000', 10);
     const greetMs = parseInt(process.env.EMAIL_GREETING_TIMEOUT_MS || '10000', 10);
     const sockMs = parseInt(process.env.EMAIL_SOCKET_TIMEOUT_MS || '25000', 10);
+
+    const emailDebug = process.env.EMAIL_DEBUG === '1';
 
     const transporter = nodemailer.createTransport({
         host,
@@ -72,8 +70,8 @@ const sendEmail = async (options) => {
         connectionTimeout: connMs,
         greetingTimeout: greetMs,
         socketTimeout: sockMs,
-        debug: process.env.EMAIL_DEBUG === '1',
-        logger: process.env.EMAIL_DEBUG === '1',
+        debug: emailDebug,
+        ...(emailDebug ? { logger: console } : {}),
         ...(process.env.EMAIL_REQUIRE_TLS === 'true' ? { requireTLS: true } : {}),
         tls: {
             rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
@@ -99,36 +97,32 @@ const sendEmail = async (options) => {
         html: options.html,
     };
 
-    // Always log send attempts (no secrets) — production was silent before, hiding SMTP failures.
-    console.log('[sendEmail] attempt', {
-        host,
-        port,
-        secure,
+    console.log('[sendEmail] mail envelope:', {
+        from: from.replace(/<[^>]+>/, '<hidden@domain>'),
         to: options.to,
-        subject: options.subject,
-        fromPreview: from.replace(/<[^>]*>/, '<addr>'),
+        hasHtml: !!options.html,
         hasText: !!textBody,
     });
+    console.log('[sendEmail] calling transporter.sendMail() ...', ts());
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log('[sendEmail] success', {
-            messageId: info.messageId,
-            to: options.to,
-            accepted: info.accepted,
-            rejected: info.rejected,
-            response: info.response,
-        });
+
+        console.log('[sendEmail] ========== RESULT: SENT OK ==========', ts());
+        console.log('[sendEmail] messageId:', info.messageId);
+        console.log('[sendEmail] accepted:', info.accepted, '| rejected:', info.rejected);
+        console.log('[sendEmail] smtp response:', info.response);
+
         return info;
     } catch (err) {
-        console.error('[sendEmail] FAILED', {
-            message: err.message,
-            code: err.code,
-            command: err.command,
-            responseCode: err.responseCode,
-            response: err.response,
-            to: options.to,
-        });
+        console.error('[sendEmail] ========== RESULT: NOT SENT (ERROR) ==========', ts());
+        console.error('[sendEmail] error.message:', err.message);
+        console.error('[sendEmail] error.code:', err.code);
+        console.error('[sendEmail] error.command:', err.command);
+        console.error('[sendEmail] error.responseCode:', err.responseCode);
+        console.error('[sendEmail] error.response:', err.response);
+        if (err.stack) console.error('[sendEmail] stack:\n', err.stack);
+
         throw err;
     }
 };
