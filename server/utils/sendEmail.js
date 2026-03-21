@@ -214,4 +214,64 @@ const sendEmail = async (options) => {
     }
 };
 
+/**
+ * Run send after the current HTTP response finishes (setImmediate) so slow SMTP does not block the client.
+ * All queue + result logging stays in this file — routes should only call sendEmail() or queueSendEmail().
+ *
+ * @param {object} mailOpts — { to, subject, html?, text? }
+ * @param {string} [contextLabel] — e.g. activation-new-staff (appears in logs only)
+ */
+function queueSendEmail(mailOpts, contextLabel = 'queued') {
+    const startedAt = new Date().toISOString();
+    console.log('[sendEmail] ========== QUEUED (async, non-blocking) ==========', startedAt, `context=${contextLabel}`);
+    console.log('[sendEmail] QUEUED detail:', {
+        context: contextLabel,
+        to: mailOpts?.to,
+        subject: mailOpts?.subject || '(none)',
+        hasHtml: !!mailOpts?.html,
+        hasText: !!mailOpts?.text,
+        htmlLength: mailOpts?.html ? String(mailOpts.html).length : 0,
+    });
+    console.log('[sendEmail] QUEUED env: EMAIL_HOST=', process.env.EMAIL_HOST || '(unset)', '| full SMTP trace follows on send');
+
+    setImmediate(() => {
+        const smtpStart = new Date().toISOString();
+        console.log('[sendEmail] QUEUED → invoking sendEmail()', smtpStart, `context=${contextLabel}`);
+        sendEmail(mailOpts)
+            .then((info) => {
+                const done = new Date().toISOString();
+                console.log('[sendEmail] ========== QUEUED SEND OK ==========', done, `context=${contextLabel}`);
+                console.log('[sendEmail] QUEUED SEND OK detail:', {
+                    to: mailOpts.to,
+                    messageId: info?.messageId,
+                    accepted: info?.accepted,
+                    rejected: info?.rejected,
+                    response: info?.response,
+                });
+            })
+            .catch((err) => {
+                const failAt = new Date().toISOString();
+                console.error('[sendEmail] ========== QUEUED SEND FAILED ==========', failAt, `context=${contextLabel}`);
+                console.error('[sendEmail] QUEUED SEND FAILED detail:', {
+                    to: mailOpts.to,
+                    message: err.message,
+                    code: err.code,
+                    command: err.command,
+                    responseCode: err.responseCode,
+                    response: err.response,
+                });
+                if (err.stack) console.error('[sendEmail] QUEUED SEND FAILED stack:', err.stack);
+            })
+            .finally(() => {
+                console.log(
+                    '[sendEmail] QUEUED sendMail promise settled (OK or FAIL logged above)',
+                    new Date().toISOString(),
+                    `context=${contextLabel}`
+                );
+            });
+    });
+}
+
+sendEmail.queueSendEmail = queueSendEmail;
+
 module.exports = sendEmail;

@@ -6,11 +6,12 @@ const User = require('../models/User'); // REQUIRED: To create a login account
 const Attendance = require('../models/Attendance');
 const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
-const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activation link
+/** Mail: use sendEmail.queueSendEmail() for non-blocking staff emails — implementation lives in utils/sendEmail.js */
+const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
 
-/** Structured logs for /api/staff — keep console output; do not remove (mail + staff debugging). */
+/** Structured logs for /api/staff — keep console output; do not remove (staff API debugging). */
 const staffDebug = (step, payload = {}) => {
     const line = `[STAFF API ${new Date().toISOString()}] ${step}`;
     try {
@@ -18,63 +19,6 @@ const staffDebug = (step, payload = {}) => {
     } catch {
         console.log(line, payload);
     }
-};
-
-/**
- * Fire-and-forget email so HTTP is not blocked by SMTP.
- * IMPORTANT: Keep all console.log / console.error here — trace “mail not sending” in PM2 / Docker / hosting logs.
- */
-const sendStaffEmailAsync = (mailOpts, label) => {
-    const startedAt = new Date().toISOString();
-    console.log('[staffRoutes] ========== EMAIL ASYNC QUEUED ==========', startedAt, `label=${label}`);
-    console.log('[staffRoutes] email QUEUED detail:', {
-        label,
-        to: mailOpts?.to,
-        subject: mailOpts?.subject || '(none)',
-        hasHtml: !!mailOpts?.html,
-        hasText: !!mailOpts?.text,
-        htmlLength: mailOpts?.html ? String(mailOpts.html).length : 0,
-    });
-    console.log('[staffRoutes] email SMTP env hint: EMAIL_HOST=', process.env.EMAIL_HOST || '(unset)', '| detailed [sendEmail] logs follow');
-    setImmediate(() => {
-        const smtpStart = new Date().toISOString();
-        console.log('[staffRoutes] email START (setImmediate → sendEmail)', smtpStart, `label=${label}`);
-        sendEmail(mailOpts)
-            .then((info) => {
-                const done = new Date().toISOString();
-                console.log('[staffRoutes] ========== email SENT OK ==========', done, `label=${label}`);
-                console.log(`[staffRoutes] email SENT OK (${label})`, {
-                    to: mailOpts.to,
-                    messageId: info?.messageId,
-                    accepted: info?.accepted,
-                    rejected: info?.rejected,
-                    response: info?.response,
-                });
-                staffDebug(`email OK: ${label}`, { to: mailOpts.to, messageId: info?.messageId });
-            })
-            .catch((err) => {
-                const failAt = new Date().toISOString();
-                console.error('[staffRoutes] ========== email SEND FAILED ==========', failAt, `label=${label}`);
-                console.error(`[staffRoutes] email SEND FAILED (${label})`, {
-                    to: mailOpts.to,
-                    message: err.message,
-                    code: err.code,
-                    command: err.command,
-                    responseCode: err.responseCode,
-                    response: err.response,
-                });
-                if (err.stack) console.error('[staffRoutes] email SEND FAILED stack:', err.stack);
-                staffDebug(`email FAIL: ${label}`, {
-                    to: mailOpts.to,
-                    message: err.message,
-                    code: err.code,
-                    responseCode: err.responseCode,
-                });
-            })
-            .finally(() => {
-                console.log('[staffRoutes] email sendMail promise settled (see SENT OK or SEND FAILED above)', new Date().toISOString(), `label=${label}`);
-            });
-    });
 };
 
 // Helper to check if the user is the owner
@@ -319,11 +263,14 @@ router.post('/', protect, async (req, res) => {
                 { new: true }
             );
             console.log('[staffRoutes] POST /staff → queue email reactivated', { to: normalizedEmail, staffId: String(updated._id) });
-            sendStaffEmailAsync({
-                to: normalizedEmail,
-                subject: 'Reactivated – Pocket POS',
-                html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
-            }, 'reactivated');
+            sendEmail.queueSendEmail(
+                {
+                    to: normalizedEmail,
+                    subject: 'Reactivated – Pocket POS',
+                    html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
+                },
+                'reactivated'
+            );
             staffDebug('POST / success: reactivated', { staffId: String(updated._id) });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
@@ -348,11 +295,14 @@ router.post('/', protect, async (req, res) => {
                 active: false,
             });
             console.log('[staffRoutes] POST /staff → queue email existing-user-new-shop', { to: normalizedEmail, staffId: String(newStaff._id) });
-            sendStaffEmailAsync({
-                to: normalizedEmail,
-                subject: 'Added to a new shop – Pocket POS',
-                html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
-            }, 'existing-user-new-shop');
+            sendEmail.queueSendEmail(
+                {
+                    to: normalizedEmail,
+                    subject: 'Added to a new shop – Pocket POS',
+                    html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
+                },
+                'existing-user-new-shop'
+            );
             staffDebug('POST / success: existing user linked', { staffId: String(newStaff._id) });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 existing-user-new-shop', { staffId: String(newStaff._id) });
             return res.status(201).json({
@@ -418,7 +368,7 @@ router.post('/', protect, async (req, res) => {
         });
 
         console.log('[staffRoutes] POST /staff → queue email activation-new-staff', { to: newUser.email, userId: String(newUser._id) });
-        sendStaffEmailAsync(
+        sendEmail.queueSendEmail(
             {
                 to: newUser.email,
                 subject: 'Pocket POS Account Activation',
