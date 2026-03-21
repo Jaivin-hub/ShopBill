@@ -110,40 +110,41 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
 // @desc    Get all staff members for the current shop
 // @access  Private (owner/Manager level access)
 // ====================================================================
-router.get('/', protect, async (req, res) => {
-    console.log('[staffRoutes] ROUTE HIT GET /api/staff', new Date().toISOString(), {
-        userId: req.user?.id?.toString?.(),
-        role: req.user?.role,
-        storeId: req.user?.storeId?.toString?.() || null,
-    });
-    // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
-    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
-        console.log('[staffRoutes] GET /api/staff → 403 wrong role', { role: req.user.role });
-        return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
-    }
+// router.get('/', protect, async (req, res) => {
+//     console.log("console the get api")
+//     console.log('[staffRoutes] ROUTE HIT GET /api/staff', new Date().toISOString(), {
+//         userId: req.user?.id?.toString?.(),
+//         role: req.user?.role,
+//         storeId: req.user?.storeId?.toString?.() || null,
+//     });
+//     // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
+//     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+//         console.log('[staffRoutes] GET /api/staff → 403 wrong role', { role: req.user.role });
+//         return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
+//     }
 
-    try {
-        // Find all staff belonging to the user's stores
-        if (!req.user.storeId) {
-            console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
-            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
-        }
-        const staffList = await Staff.find({ storeId: req.user.storeId })
-            .select('name email role phone active storeId userId')
-            .populate('userId', 'resetPasswordToken')
-            .lean()
-            .sort({ role: -1, name: 1 });
+//     try {
+//         // Find all staff belonging to the user's stores
+//         if (!req.user.storeId) {
+//             console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
+//             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+//         }
+//         const staffList = await Staff.find({ storeId: req.user.storeId })
+//             .select('name email role phone active storeId userId')
+//             .populate('userId', 'resetPasswordToken')
+//             .lean()
+//             .sort({ role: -1, name: 1 });
         
-        const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
+//         const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
         
-        console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
-        res.json(enrichedStaffList);
-    } catch (error) {
-        console.error('[staffRoutes] GET /api/staff → 500', error.message);
-        console.error('Staff GET all error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to fetch staff list.' });
-    }
-});
+//         console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
+//         res.json(enrichedStaffList);
+//     } catch (error) {
+//         console.error('[staffRoutes] GET /api/staff → 500', error.message);
+//         console.error('Staff GET all error:', error.message, error.stack);
+//         res.status(500).json({ error: 'Failed to fetch staff list.' });
+//     }
+// });
 
 // ====================================================================
 // @route   GET /api/staff/email-debug
