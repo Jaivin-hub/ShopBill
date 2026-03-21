@@ -497,10 +497,17 @@ router.put('/profile', protect, async (req, res) => {
  * * NOTE: This route typically still uses email to send the link.
  */
 router.post('/forgot-password', async (req, res) => {
+    console.log('[authRoutes] ROUTE HIT POST /api/auth/forgot-password', new Date().toISOString(), {
+        hasEmail: !!req.body?.email,
+        emailDomain: req.body?.email && String(req.body.email).includes('@')
+            ? String(req.body.email).split('@')[1]
+            : '(n/a)',
+    });
     const { email } = req.body;
     let user = null;
 
     if (!email) {
+        console.log('[authRoutes] forgot-password → 400 missing email');
         return res.status(400).json({ error: 'Email is required to request a password reset.' });
     }
 
@@ -508,7 +515,8 @@ router.post('/forgot-password', async (req, res) => {
         user = await User.findOne({ email });
 
         if (!user) {
-            // SECURITY BEST PRACTICE: Respond with a generic success message 
+            // SECURITY BEST PRACTICE: Respond with a generic success message
+            console.log('[authRoutes] ROUTE DONE POST /api/auth/forgot-password → 200 (no user in DB, generic ok)');
             return res.json({ message: 'Password reset link has been sent.' });
         }
 
@@ -539,21 +547,32 @@ router.post('/forgot-password', async (req, res) => {
         `;
 
         try {
+            console.log('[authRoutes] forgot-password → calling sendEmail', {
+                to: user.email,
+                subject: 'Pocket POS Password Reset Request',
+                resetUrlHost: process.env.CLIENT_URL || '(CLIENT_URL unset)',
+                tokenLengthChars: resetToken.length,
+            });
             // 5. Send the email using the utility function
             await sendEmail({
                 to: user.email,
                 subject: 'Pocket POS Password Reset Request',
                 html: message,
             });
+            console.log('[authRoutes] forgot-password → sendEmail resolved OK for', user.email);
 
             // 6. Send generic success response
             res.json({
                 message: 'Password reset link has been sent.',
                 devResetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
             });
+            console.log('[authRoutes] ROUTE DONE POST /api/auth/forgot-password → 200 (reset email sent)');
 
         } catch (mailError) {
-            console.error('Email sending failed:', mailError);
+            console.error('[authRoutes] ROUTE DONE POST /api/auth/forgot-password → 500 (sendEmail failed)');
+            console.error('[authRoutes] forgot-password → sendEmail FAILED:', mailError?.message, mailError?.code, mailError?.response);
+            console.error('Email sending failed (full):', mailError);
+            if (mailError?.stack) console.error('[authRoutes] forgot-password mail stack:', mailError.stack);
 
             // If email fails, clear the token from the user
             user.resetPasswordToken = undefined;

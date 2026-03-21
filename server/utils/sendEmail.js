@@ -1,4 +1,33 @@
+/**
+ * Nodemailer SMTP helper.
+ * Do NOT remove or silence console.log / console.error / console.warn in this file — owners rely on logs
+ * to debug missing mail (SMTP auth, firewall, wrong CLIENT_URL, etc.).
+ */
 const nodemailer = require('nodemailer');
+
+/** Always log (do not remove) — used to debug “mail not sending” in production logs / PM2. */
+function maskEmailUser(u) {
+    if (!u || typeof u !== 'string') return '(unset)';
+    const at = u.indexOf('@');
+    if (at <= 0) return `${u.slice(0, 2)}***`;
+    return `${u.slice(0, 2)}***${u.slice(at)}`;
+}
+
+function logEmailEnvSnapshot(context) {
+    const pass = process.env.EMAIL_PASS;
+    console.log('[sendEmail] --- ENV snapshot (masked)', context || '', {
+        EMAIL_HOST: process.env.EMAIL_HOST || '(unset)',
+        EMAIL_PORT: process.env.EMAIL_PORT || '(default 587)',
+        EMAIL_SECURE: process.env.EMAIL_SECURE ?? '(unset)',
+        EMAIL_USER: maskEmailUser(process.env.EMAIL_USER),
+        EMAIL_PASS: pass != null && pass !== '' ? '(set, length ' + String(pass).length + ')' : '(missing)',
+        EMAIL_FROM: process.env.EMAIL_FROM || '(unset — will use EMAIL_USER)',
+        EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || '(default Pocket POS)',
+        CLIENT_URL: process.env.CLIENT_URL || '(unset — activation links may be wrong)',
+        EMAIL_DEBUG: process.env.EMAIL_DEBUG === '1' ? '1 (verbose SMTP wire log on)' : '0',
+        EMAIL_SEND_TIMEOUT_MS: process.env.EMAIL_SEND_TIMEOUT_MS || '45000 (default)',
+    });
+}
 
 /**
  * Plain-text fallback for HTML-only bodies (improves deliverability / spam scoring).
@@ -21,8 +50,10 @@ function htmlToPlainText(html) {
  */
 const sendEmail = async (options) => {
     const ts = () => new Date().toISOString();
+    const t0 = Date.now();
 
     console.log('[sendEmail] ========== START ==========', ts());
+    logEmailEnvSnapshot('(each send)');
     console.log('[sendEmail] to:', options?.to, '| subject:', options?.subject || '(no subject)');
 
     const host = process.env.EMAIL_HOST?.trim();
@@ -88,6 +119,7 @@ const sendEmail = async (options) => {
             rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
         },
     });
+    console.log('[sendEmail] nodemailer transporter created', { host, port, secure, connMs, greetMs, sockMs, emailDebug });
 
     const fromName = process.env.EMAIL_FROM_NAME || 'Pocket POS';
     let from;
@@ -149,10 +181,16 @@ const sendEmail = async (options) => {
         clearInterval(progressTimer);
         closeTransport();
 
-        console.log('[sendEmail] ========== RESULT: SENT OK ==========', ts());
+        const elapsedMs = Date.now() - t0;
+        console.log('[sendEmail] ========== RESULT: SENT OK ==========', ts(), `elapsedMs=${elapsedMs}`);
         console.log('[sendEmail] messageId:', info.messageId);
         console.log('[sendEmail] accepted:', info.accepted, '| rejected:', info.rejected);
         console.log('[sendEmail] smtp response:', info.response);
+        try {
+            console.log('[sendEmail] sendMail info keys:', info && typeof info === 'object' ? Object.keys(info) : '(n/a)');
+        } catch (e) {
+            console.log('[sendEmail] sendMail info keys: (could not list)', e.message);
+        }
         console.log(
             '[sendEmail] If inbox is empty: check Spam; for Workspace/custom From, verify SPF/DKIM for your domain.'
         );
@@ -163,7 +201,8 @@ const sendEmail = async (options) => {
         clearInterval(progressTimer);
         closeTransport();
 
-        console.error('[sendEmail] ========== RESULT: NOT SENT (ERROR) ==========', ts());
+        const elapsedMs = Date.now() - t0;
+        console.error('[sendEmail] ========== RESULT: NOT SENT (ERROR) ==========', ts(), `elapsedMs=${elapsedMs}`);
         console.error('[sendEmail] error.message:', err.message);
         console.error('[sendEmail] error.code:', err.code);
         console.error('[sendEmail] error.command:', err.command);

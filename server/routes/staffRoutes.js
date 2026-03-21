@@ -10,13 +10,39 @@ const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activa
 
 const router = express.Router();
 
-/** Fire-and-forget email so HTTP responses are not blocked by slow SMTP (avoids client timeout / “canceled”). */
+/** Structured logs for /api/staff — keep console output; do not remove (mail + staff debugging). */
+const staffDebug = (step, payload = {}) => {
+    const line = `[STAFF API ${new Date().toISOString()}] ${step}`;
+    try {
+        console.log(line, typeof payload === 'object' && payload !== null ? JSON.stringify(payload) : payload);
+    } catch {
+        console.log(line, payload);
+    }
+};
+
+/**
+ * Fire-and-forget email so HTTP is not blocked by SMTP.
+ * IMPORTANT: Keep all console.log / console.error here — trace “mail not sending” in PM2 / Docker / hosting logs.
+ */
 const sendStaffEmailAsync = (mailOpts, label) => {
-    console.log(`[staffRoutes] email QUEUED (${label}) -> to: ${mailOpts?.to}, subject: ${mailOpts?.subject || '(none)'}`);
+    const startedAt = new Date().toISOString();
+    console.log('[staffRoutes] ========== EMAIL ASYNC QUEUED ==========', startedAt, `label=${label}`);
+    console.log('[staffRoutes] email QUEUED detail:', {
+        label,
+        to: mailOpts?.to,
+        subject: mailOpts?.subject || '(none)',
+        hasHtml: !!mailOpts?.html,
+        hasText: !!mailOpts?.text,
+        htmlLength: mailOpts?.html ? String(mailOpts.html).length : 0,
+    });
+    console.log('[staffRoutes] email SMTP env hint: EMAIL_HOST=', process.env.EMAIL_HOST || '(unset)', '| detailed [sendEmail] logs follow');
     setImmediate(() => {
-        console.log(`[staffRoutes] email START (${label}) -> sending via SMTP...`);
+        const smtpStart = new Date().toISOString();
+        console.log('[staffRoutes] email START (setImmediate → sendEmail)', smtpStart, `label=${label}`);
         sendEmail(mailOpts)
             .then((info) => {
+                const done = new Date().toISOString();
+                console.log('[staffRoutes] ========== email SENT OK ==========', done, `label=${label}`);
                 console.log(`[staffRoutes] email SENT OK (${label})`, {
                     to: mailOpts.to,
                     messageId: info?.messageId,
@@ -27,6 +53,8 @@ const sendStaffEmailAsync = (mailOpts, label) => {
                 staffDebug(`email OK: ${label}`, { to: mailOpts.to, messageId: info?.messageId });
             })
             .catch((err) => {
+                const failAt = new Date().toISOString();
+                console.error('[staffRoutes] ========== email SEND FAILED ==========', failAt, `label=${label}`);
                 console.error(`[staffRoutes] email SEND FAILED (${label})`, {
                     to: mailOpts.to,
                     message: err.message,
@@ -35,24 +63,18 @@ const sendStaffEmailAsync = (mailOpts, label) => {
                     responseCode: err.responseCode,
                     response: err.response,
                 });
+                if (err.stack) console.error('[staffRoutes] email SEND FAILED stack:', err.stack);
                 staffDebug(`email FAIL: ${label}`, {
                     to: mailOpts.to,
                     message: err.message,
                     code: err.code,
                     responseCode: err.responseCode,
                 });
+            })
+            .finally(() => {
+                console.log('[staffRoutes] email sendMail promise settled (see SENT OK or SEND FAILED above)', new Date().toISOString(), `label=${label}`);
             });
     });
-};
-
-/** Structured logs for /api/staff debugging (check server console / PM2 logs). */
-const staffDebug = (step, payload = {}) => {
-    const line = `[STAFF API ${new Date().toISOString()}] ${step}`;
-    try {
-        console.log(line, typeof payload === 'object' && payload !== null ? JSON.stringify(payload) : payload);
-    } catch {
-        console.log(line, payload);
-    }
 };
 
 // Helper to check if the user is the owner
@@ -95,6 +117,7 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
             });
             staffDebug('PUT staff active=false: revoked pending invite', { staffId: String(staffId) });
             const enriched = await enrichStaffById(staffId);
+            console.log('[staffRoutes] ROUTE DONE applyStaffActive → 200 revoke pending', { staffId: String(staffId) });
             return res.json({
                 message: `${staffName}: activation invitation revoked. The setup link no longer works. You can delete this member or add them again with the same email to send a new invite.`,
                 staff: enriched,
@@ -105,6 +128,7 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
         await User.findByIdAndUpdate(linkedUser._id, { isActive: false }, { new: true, runValidators: true });
         staffDebug('PUT staff active=false: deactivated', { staffId: String(staffId) });
         const enriched = await enrichStaffById(staffId);
+        console.log('[staffRoutes] ROUTE DONE applyStaffActive → 200 deactivated', { staffId: String(staffId) });
         return res.json({
             message: `${staffName} is now inactive.`,
             staff: enriched,
@@ -115,10 +139,12 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
     const hasPassword = !!(linkedUser.password && String(linkedUser.password).length > 0);
     if (!hasPassword) {
         if (linkedUser.resetPasswordToken) {
+            console.log('[staffRoutes] applyStaffActive → 400 activate blocked (pending setup)', { staffId: String(staffId) });
             return res.status(400).json({
                 error: 'This member must finish the activation link and set a password before their account can be activated.',
             });
         }
+        console.log('[staffRoutes] applyStaffActive → 400 activate blocked (no password)', { staffId: String(staffId) });
         return res.status(400).json({
             error: 'This member never completed password setup and has no pending invite. Remove them from the team and add them again to send a new activation email.',
         });
@@ -128,6 +154,7 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
     await User.findByIdAndUpdate(linkedUser._id, { isActive: true }, { new: true, runValidators: true });
     staffDebug('PUT staff active=true', { staffId: String(staffId) });
     const enriched = await enrichStaffById(staffId);
+    console.log('[staffRoutes] ROUTE DONE applyStaffActive → 200 activated', { staffId: String(staffId) });
     return res.json({
         message: `${staffName} is now active.`,
         staff: enriched,
@@ -140,6 +167,11 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
 // @access  Private (owner/Manager level access)
 // ====================================================================
 router.get('/', protect, async (req, res) => {
+    console.log('[staffRoutes] ROUTE HIT GET /api/staff', new Date().toISOString(), {
+        userId: req.user?.id?.toString?.(),
+        role: req.user?.role,
+        storeId: req.user?.storeId?.toString?.() || null,
+    });
     staffDebug('GET / start', {
         userId: req.user?.id?.toString?.(),
         role: req.user?.role,
@@ -150,6 +182,7 @@ router.get('/', protect, async (req, res) => {
 
     // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] GET /api/staff → 403 wrong role', { role: req.user.role });
         staffDebug('GET / denied: role', { role: req.user.role });
         return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
     }
@@ -157,6 +190,7 @@ router.get('/', protect, async (req, res) => {
     try {
         // Find all staff belonging to the user's stores
         if (!req.user.storeId) {
+            console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
             staffDebug('GET / denied: missing storeId', {
                 role: req.user.role,
                 hint: 'Owner: ensure outlet exists / send x-store-id. Staff: ensure activeStoreId is set.',
@@ -172,9 +206,11 @@ router.get('/', protect, async (req, res) => {
         const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
         
         staffDebug('GET / success', { count: enrichedStaffList.length, storeId: String(req.user.storeId) });
+        console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
         res.json(enrichedStaffList);
     } catch (error) {
         staffDebug('GET / error', { message: error.message, name: error.name });
+        console.error('[staffRoutes] GET /api/staff → 500', error.message);
         console.error('Staff GET all error:', error.message, error.stack);
         res.status(500).json({ error: 'Failed to fetch staff list.' });
     }
@@ -186,7 +222,12 @@ router.get('/', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
-    console.log('api req.body', req.body);
+    console.log('[staffRoutes] ROUTE HIT POST /api/staff', new Date().toISOString(), {
+        userId: req.user?.id?.toString?.(),
+        role: req.user?.role,
+        storeId: req.user?.storeId?.toString?.() || null,
+    });
+    console.log('[staffRoutes] POST /api/staff req.body', req.body);
     staffDebug('POST / start', {
         userId: req.user?.id?.toString?.(),
         role: req.user?.role,
@@ -195,6 +236,7 @@ router.post('/', protect, async (req, res) => {
     });
 
     if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] POST /api/staff → 403 not owner', { role: req.user.role });
         staffDebug('POST / denied: not owner', { role: req.user.role });
         return res.status(403).json({ error: 'Access denied. Only the owner can add new staff.' });
     }
@@ -276,12 +318,14 @@ router.post('/', protect, async (req, res) => {
                 { active: true, name, role },
                 { new: true }
             );
+            console.log('[staffRoutes] POST /staff → queue email reactivated', { to: normalizedEmail, staffId: String(updated._id) });
             sendStaffEmailAsync({
                 to: normalizedEmail,
                 subject: 'Reactivated – Pocket POS',
                 html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
             }, 'reactivated');
             staffDebug('POST / success: reactivated', { staffId: String(updated._id) });
+            console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
                 message: `Staff member ${updated.name} reactivated successfully.`,
                 staff: updated,
@@ -303,12 +347,14 @@ router.post('/', protect, async (req, res) => {
                 role,
                 active: false,
             });
+            console.log('[staffRoutes] POST /staff → queue email existing-user-new-shop', { to: normalizedEmail, staffId: String(newStaff._id) });
             sendStaffEmailAsync({
                 to: normalizedEmail,
                 subject: 'Added to a new shop – Pocket POS',
                 html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
             }, 'existing-user-new-shop');
             staffDebug('POST / success: existing user linked', { staffId: String(newStaff._id) });
+            console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 existing-user-new-shop', { staffId: String(newStaff._id) });
             return res.status(201).json({
                 message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
                 staff: newStaff,
@@ -360,11 +406,18 @@ router.post('/', protect, async (req, res) => {
         `;
 
         staffDebug('POST / success: new user (activation email queued)', { staffId: String(newStaff._id), userId: String(newUser._id) });
+        console.log('[staffRoutes] activation link build (token not logged — length only):', {
+            CLIENT_URL: process.env.CLIENT_URL || '(MISSING — set in .env or activation links are wrong)',
+            pathSuffix: '/staff-setup/<token>',
+            tokenLengthChars: activationToken.length,
+            recipient: normalizedEmail,
+        });
         res.status(201).json({
             message: `Staff member ${newStaff.name} added. They will receive an email to set their password shortly.`,
             staff: newStaff,
         });
 
+        console.log('[staffRoutes] POST /staff → queue email activation-new-staff', { to: newUser.email, userId: String(newUser._id) });
         sendStaffEmailAsync(
             {
                 to: newUser.email,
@@ -373,9 +426,14 @@ router.post('/', protect, async (req, res) => {
             },
             'activation-new-staff'
         );
+        console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 new user (email queued async)', {
+            staffId: String(newStaff._id),
+            userId: String(newUser._id),
+        });
 
     } catch (error) {
         staffDebug('POST / error: catch', { message: error.message, code: error.code });
+        console.error('[staffRoutes] POST /api/staff → 500 or handled', error.message, error.code);
         console.error('Staff POST error:', error.message, error);
         if (error.code === 11000) {
             return res.status(409).json({
@@ -393,12 +451,20 @@ router.post('/', protect, async (req, res) => {
 // @access  Private (owner-only)
 // ====================================================================
 router.put('/:id/active', protect, async (req, res) => {
+    console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id/active', new Date().toISOString(), {
+        staffId: req.params.id,
+        body: req.body,
+        userId: req.user?.id?.toString?.(),
+        storeId: req.user?.storeId?.toString?.() || null,
+    });
     if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] PUT /:id/active → 403 not owner');
         return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
     }
 
     const { active: targetActive } = req.body;
     if (typeof targetActive !== 'boolean') {
+        console.log('[staffRoutes] PUT /:id/active → 400 body.active not boolean', req.body);
         return res.status(400).json({ error: 'Request body must include active: true or false.' });
     }
 
@@ -406,21 +472,26 @@ router.put('/:id/active', protect, async (req, res) => {
 
     try {
         if (!req.user.storeId) {
+            console.log('[staffRoutes] PUT /:id/active → 400 no storeId');
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         if (!staffMember) {
+            console.log('[staffRoutes] PUT /:id/active → 404 staff not found', { staffId });
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
         }
         if (isowner(staffMember.role)) {
+            console.log('[staffRoutes] PUT /:id/active → 400 cannot change owner');
             return res.status(400).json({ error: 'Cannot deactivate the primary owner account.' });
         }
 
         const linkedUser = await User.findById(staffMember.userId);
         if (!linkedUser) {
+            console.log('[staffRoutes] PUT /:id/active → 404 linked user missing');
             return res.status(404).json({ error: 'Linked user account not found.' });
         }
 
+        console.log('[staffRoutes] PUT /:id/active → applying state', { staffId, targetActive });
         return await applyStaffActiveState(res, {
             staffMember,
             linkedUser,
@@ -428,6 +499,7 @@ router.put('/:id/active', protect, async (req, res) => {
             staffName: staffMember.name,
         });
     } catch (error) {
+        console.error('[staffRoutes] PUT /api/staff/:id/active → 500', error.message);
         console.error('Staff PUT /active error:', error.message);
         res.status(500).json({ error: 'Failed to update staff status.' });
     }
@@ -439,7 +511,13 @@ router.put('/:id/active', protect, async (req, res) => {
 // @access  Private (owner-only access)
 // ====================================================================
 router.put('/:id/toggle', protect, async (req, res) => {
+    console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id/toggle', new Date().toISOString(), {
+        staffId: req.params.id,
+        userId: req.user?.id?.toString?.(),
+        storeId: req.user?.storeId?.toString?.() || null,
+    });
     if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] PUT /:id/toggle → 403 not owner');
         return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
     }
 
@@ -447,20 +525,24 @@ router.put('/:id/toggle', protect, async (req, res) => {
 
     try {
         if (!req.user.storeId) {
+            console.log('[staffRoutes] PUT /:id/toggle → 400 no storeId');
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
 
         if (!staffMember) {
+            console.log('[staffRoutes] PUT /:id/toggle → 404 staff not found', { staffId });
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
         }
 
         if (isowner(staffMember.role)) {
+            console.log('[staffRoutes] PUT /:id/toggle → 400 cannot change owner');
             return res.status(400).json({ error: 'Cannot deactivate the primary owner account.' });
         }
 
         const linkedUser = await User.findById(staffMember.userId);
         if (!linkedUser) {
+            console.log('[staffRoutes] PUT /:id/toggle → 404 linked user missing');
             return res.status(404).json({ error: 'Linked user account not found.' });
         }
 
@@ -469,6 +551,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
 
         // Pending invite: always treat toggle as "turn off" (revoke), never activate without password
         if (isPendingInvite) {
+            console.log('[staffRoutes] PUT /:id/toggle → revoke pending invite', { staffId });
             return await applyStaffActiveState(res, {
                 staffMember,
                 linkedUser,
@@ -477,6 +560,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
             });
         }
 
+        console.log('[staffRoutes] PUT /:id/toggle → flip active', { staffId, from: currentlyActive, to: !currentlyActive });
         return await applyStaffActiveState(res, {
             staffMember,
             linkedUser,
@@ -484,6 +568,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
             staffName: staffMember.name,
         });
     } catch (error) {
+        console.error('[staffRoutes] PUT /api/staff/:id/toggle → 500', error.message);
         console.error('Staff toggle error:', error.message);
         res.status(500).json({ error: 'Failed to update staff status.' });
     }
@@ -496,8 +581,14 @@ router.put('/:id/toggle', protect, async (req, res) => {
 // @access  Private (owner-only access)
 // ====================================================================
 router.delete('/:id', protect, async (req, res) => {
+    console.log('[staffRoutes] ROUTE HIT DELETE /api/staff/:id', new Date().toISOString(), {
+        staffId: req.params.id,
+        userId: req.user?.id?.toString?.(),
+        storeId: req.user?.storeId?.toString?.() || null,
+    });
     // FIX: Use the corrected helper function 'isowner'
     if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] DELETE /:id → 403 not owner');
         return res.status(403).json({ error: 'Access denied. Only the owner can remove staff.' });
     }
     
@@ -505,16 +596,19 @@ router.delete('/:id', protect, async (req, res) => {
 
     try {
         if (!req.user.storeId) {
+            console.log('[staffRoutes] DELETE /:id → 400 no storeId');
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         
         if (!staffMember) {
+            console.log('[staffRoutes] DELETE /:id → 404 staff not found', { staffId });
             return res.status(404).json({ error: 'Staff member not found or unauthorized.' });
         }
         
         // FIX: Use the corrected helper function 'isowner'
         if (isowner(staffMember.role)) {
+            console.log('[staffRoutes] DELETE /:id → 400 cannot remove owner');
             return res.status(400).json({ error: 'Cannot remove the primary owner account.' });
         }
 
@@ -539,16 +633,24 @@ router.delete('/:id', protect, async (req, res) => {
         // 4. Delete the Staff entry
         await Staff.findByIdAndDelete(staffId);
 
+        console.log('[staffRoutes] ROUTE DONE DELETE /api/staff/:id → 200', { staffId, removedName: staffMember.name });
         res.json({ message: `${staffMember.name} permanently removed. All data deleted; they cannot log in again.` });
 
     } catch (error) {
+        console.error('[staffRoutes] DELETE /api/staff/:id → 500', error.message);
         console.error('Staff DELETE error:', error.message);
         res.status(500).json({ error: 'Failed to remove staff member.' });
     }
 });
 
 router.put('/:id/role', protect, async (req, res) => {
+    console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id/role', new Date().toISOString(), {
+        staffId: req.params.id,
+        body: req.body,
+        userId: req.user?.id?.toString?.(),
+    });
     if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] PUT /:id/role → 403 not owner');
         return res.status(403).json({ error: 'Access denied. Only the owner can change roles.' });
     }
 
@@ -557,21 +659,25 @@ router.put('/:id/role', protect, async (req, res) => {
 
     // 1. Validation
     if (!newRole || (newRole !== 'Manager' && newRole !== 'Cashier')) {
+        console.log('[staffRoutes] PUT /:id/role → 400 invalid role', { newRole });
         return res.status(400).json({ error: 'Invalid role. Must be Manager or Cashier.' });
     }
 
     try {
         // 2. Find the staff member
         if (!req.user.storeId) {
+            console.log('[staffRoutes] PUT /:id/role → 400 no storeId');
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
         if (!staffMember) {
+            console.log('[staffRoutes] PUT /:id/role → 404 staff not found', { staffId });
             return res.status(404).json({ error: 'Staff member not found.' });
         }
 
         // 3. Skip check if the role isn't actually changing
         if (staffMember.role === newRole) {
+            console.log('[staffRoutes] ROUTE DONE PUT /api/staff/:id/role → 200 (no change)', { staffId, role: newRole });
             return res.json({ message: 'Role updated (no change).', staff: staffMember });
         }
 
@@ -588,12 +694,14 @@ router.put('/:id/role', protect, async (req, res) => {
             await User.findByIdAndUpdate(updatedStaff.userId, { role: newRole });
         }
 
+        console.log('[staffRoutes] ROUTE DONE PUT /api/staff/:id/role → 200', { staffId, newRole });
         res.json({ 
             message: `Role for ${updatedStaff.name} updated to ${newRole}.`, 
             staff: updatedStaff 
         });
 
     } catch (error) {
+        console.error('[staffRoutes] PUT /api/staff/:id/role → 500', error.message);
         console.error('Staff role update error:', error.message);
         res.status(500).json({ error: 'Failed to update staff role.' });
     }
