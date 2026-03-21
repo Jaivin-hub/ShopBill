@@ -20,7 +20,6 @@ const API = {
     staff: API_BASE_URL + '/staff', // GET, POST
     staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT legacy toggle
     staffSetActive: (id) => `${API_BASE_URL}/staff/${id}/active`, // PUT body: { active: boolean }
-    staffEmailDebug: `${API_BASE_URL}/staff/email-debug`, // GET owner — last SMTP async result + env snapshot
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,

@@ -23,7 +23,7 @@ function getSmtpEnvSnapshotForApi() {
     const cu = String(process.env.CLIENT_URL || '').trim();
     const ready = !!(host && user && pass != null && String(pass).length > 0);
     let explain =
-        'After add-staff, wait a few seconds then GET /api/staff/email-debug (owner) to see if SMTP reported OK or an error.';
+        'Check server logs for [sendEmail] lines, or POST /staff response field emailDispatch.smtpEnv.';
     if (!host) explain = 'EMAIL_HOST is missing — server cannot connect to SMTP.';
     else if (!user || pass == null || String(pass).length === 0) {
         explain = 'EMAIL_USER or EMAIL_PASS missing — SMTP auth will fail.';
@@ -44,7 +44,7 @@ function getSmtpEnvSnapshotForApi() {
     };
 }
 
-/** Last async queued send result (updated by queueSendEmail). For GET /api/staff/email-debug. */
+/** Last async queued send result (updated by queueSendEmail); optional for ops / future tooling. */
 let lastQueuedDispatchDebug = null;
 
 function recordQueuedDispatchDebug(payload) {
@@ -346,5 +346,76 @@ function queueSendEmail(mailOpts, contextLabel = 'queued') {
 sendEmail.queueSendEmail = queueSendEmail;
 sendEmail.getSmtpEnvSnapshotForApi = getSmtpEnvSnapshotForApi;
 sendEmail.getLastQueuedDispatchDebug = getLastQueuedDispatchDebug;
+
+// --- Staff-specific mail (all templates + queue live here; staffRoutes only passes data) ---
+
+/**
+ * JSON snippet for POST /staff responses — SMTP snapshot only, no secrets.
+ */
+function getStaffEmailDispatchForApiResponse(context, recipientEmail, extra = {}) {
+    return {
+        queued: true,
+        context,
+        recipient: recipientEmail,
+        smtpEnv: getSmtpEnvSnapshotForApi(),
+        note: 'Mail is sent asynchronously after this response. If smtpEnv.readyToAttemptSmtp is false, configure EMAIL_* on the server.',
+        ...extra,
+    };
+}
+
+/** New staff: activation link + password setup */
+function queueStaffActivationEmail({ to, name, role, activationToken }) {
+    const clientUrl = String(process.env.CLIENT_URL || '').trim();
+    const activationUrl = `${clientUrl}/staff-setup/${activationToken}`;
+    const html = `
+            <h1>Welcome to Pocket POS, ${name}!</h1>
+            <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
+            <p>Click below to set your password and activate your account:</p>
+            <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
+        `;
+    console.log('[sendEmail] staff activation mail build (token not logged):', {
+        CLIENT_URL: clientUrl || '(MISSING)',
+        pathSuffix: '/staff-setup/<token>',
+        tokenLengthChars: activationToken.length,
+        recipient: to,
+    });
+    queueSendEmail(
+        {
+            to,
+            subject: 'Pocket POS Account Activation',
+            html,
+        },
+        'activation-new-staff'
+    );
+}
+
+function queueStaffReactivatedEmail({ to }) {
+    const html = `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`;
+    queueSendEmail(
+        {
+            to,
+            subject: 'Reactivated – Pocket POS',
+            html,
+        },
+        'reactivated'
+    );
+}
+
+function queueStaffExistingUserNewShopEmail({ to, role }) {
+    const html = `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`;
+    queueSendEmail(
+        {
+            to,
+            subject: 'Added to a new shop – Pocket POS',
+            html,
+        },
+        'existing-user-new-shop'
+    );
+}
+
+sendEmail.getStaffEmailDispatchForApiResponse = getStaffEmailDispatchForApiResponse;
+sendEmail.queueStaffActivationEmail = queueStaffActivationEmail;
+sendEmail.queueStaffReactivatedEmail = queueStaffReactivatedEmail;
+sendEmail.queueStaffExistingUserNewShopEmail = queueStaffExistingUserNewShopEmail;
 
 module.exports = sendEmail;

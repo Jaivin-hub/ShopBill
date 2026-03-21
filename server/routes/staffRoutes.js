@@ -6,23 +6,10 @@ const User = require('../models/User'); // REQUIRED: To create a login account
 const Attendance = require('../models/Attendance');
 const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
-/** Mail: use sendEmail.queueSendEmail() for non-blocking staff emails — implementation lives in utils/sendEmail.js */
+/** Staff mail: templates + queue only in utils/sendEmail.js */
 const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
-
-/** Safe JSON for API responses — debug email / SMTP without relying on server stdout (e.g. Render logs). */
-function buildStaffEmailDispatchDebug(context, recipientEmail, extra = {}) {
-    return {
-        queued: true,
-        context,
-        recipient: recipientEmail,
-        smtpEnv: sendEmail.getSmtpEnvSnapshotForApi(),
-        pollLastResult:
-            'Call GET /api/staff/email-debug with the same auth after ~5–30 seconds. It returns last SMTP result (send_ok / send_failed) and error text if any.',
-        ...extra,
-    };
-}
 
 // Helper to check if the user is the owner
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
@@ -110,59 +97,40 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
 // @desc    Get all staff members for the current shop
 // @access  Private (owner/Manager level access)
 // ====================================================================
-// router.get('/', protect, async (req, res) => {
-//     console.log("console the get api")
-//     console.log('[staffRoutes] ROUTE HIT GET /api/staff', new Date().toISOString(), {
-//         userId: req.user?.id?.toString?.(),
-//         role: req.user?.role,
-//         storeId: req.user?.storeId?.toString?.() || null,
-//     });
-//     // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
-//     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
-//         console.log('[staffRoutes] GET /api/staff → 403 wrong role', { role: req.user.role });
-//         return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
-//     }
-
-//     try {
-//         // Find all staff belonging to the user's stores
-//         if (!req.user.storeId) {
-//             console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
-//             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
-//         }
-//         const staffList = await Staff.find({ storeId: req.user.storeId })
-//             .select('name email role phone active storeId userId')
-//             .populate('userId', 'resetPasswordToken')
-//             .lean()
-//             .sort({ role: -1, name: 1 });
-        
-//         const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
-        
-//         console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
-//         res.json(enrichedStaffList);
-//     } catch (error) {
-//         console.error('[staffRoutes] GET /api/staff → 500', error.message);
-//         console.error('Staff GET all error:', error.message, error.stack);
-//         res.status(500).json({ error: 'Failed to fetch staff list.' });
-//     }
-// });
-
-// ====================================================================
-// @route   GET /api/staff/email-debug
-// @desc    Owner-only: SMTP env snapshot (no secrets) + last async queued send result — use when host logs (e.g. Render) omit stdout
-// ====================================================================
-router.get('/email-debug', protect, async (req, res) => {
-    console.log('[staffRoutes] ROUTE HIT GET /api/staff/email-debug', new Date().toISOString(), {
+router.get('/', protect, async (req, res) => {
+    console.log("console the get api")
+    console.log('[staffRoutes] ROUTE HIT GET /api/staff', new Date().toISOString(), {
         userId: req.user?.id?.toString?.(),
         role: req.user?.role,
+        storeId: req.user?.storeId?.toString?.() || null,
     });
-    if (!isowner(req.user.role)) {
-        return res.status(403).json({ error: 'Owner only. Use the shop owner account token.' });
+    // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] GET /api/staff → 403 wrong role', { role: req.user.role });
+        return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
     }
-    return res.json({
-        smtpEnv: sendEmail.getSmtpEnvSnapshotForApi(),
-        lastQueuedDispatch: sendEmail.getLastQueuedDispatchDebug(),
-        help: 'lastQueuedDispatch.phase is send_ok after SMTP accepted, or send_failed with errorMessage. phase queued means send has not finished yet.',
-    });
+
+    try {
+        // Find all staff belonging to the user's stores
+        if (!req.user.storeId) {
+            console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffList = await Staff.find({ storeId: req.user.storeId })
+            .select('name email role phone active storeId userId')
+            .populate('userId', 'resetPasswordToken')
+            .lean()
+            .sort({ role: -1, name: 1 });
+        
+        const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
+        
+        console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
+        res.json(enrichedStaffList);
+    } catch (error) {
+        console.error('[staffRoutes] GET /api/staff → 500', error.message);
+        console.error('Staff GET all error:', error.message, error.stack);
+        res.status(500).json({ error: 'Failed to fetch staff list.' });
+    }
 });
 
 // ====================================================================
@@ -171,8 +139,6 @@ router.get('/email-debug', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
-    console.log('inside the route of POST /api/staff');
-    
     console.log('[staffRoutes] POST /api/staff req.body', req.body);
 
     if (!isowner(req.user.role)) {
@@ -249,20 +215,13 @@ router.post('/', protect, async (req, res) => {
                 { active: true, name, role },
                 { new: true }
             );
-            console.log('[staffRoutes] POST /staff → queue email reactivated', { to: normalizedEmail, staffId: String(updated._id) });
-            sendEmail.queueSendEmail(
-                {
-                    to: normalizedEmail,
-                    subject: 'Reactivated – Pocket POS',
-                    html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
-                },
-                'reactivated'
-            );
+            console.log('[staffRoutes] POST /staff → queue staff reactivation email', { to: normalizedEmail, staffId: String(updated._id) });
+            sendEmail.queueStaffReactivatedEmail({ to: normalizedEmail });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
                 message: `Staff member ${updated.name} reactivated successfully.`,
                 staff: updated,
-                emailDispatch: buildStaffEmailDispatchDebug('reactivated', normalizedEmail),
+                emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('reactivated', normalizedEmail),
             });
         }
 
@@ -280,20 +239,13 @@ router.post('/', protect, async (req, res) => {
                 role,
                 active: false,
             });
-            console.log('[staffRoutes] POST /staff → queue email existing-user-new-shop', { to: normalizedEmail, staffId: String(newStaff._id) });
-            sendEmail.queueSendEmail(
-                {
-                    to: normalizedEmail,
-                    subject: 'Added to a new shop – Pocket POS',
-                    html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
-                },
-                'existing-user-new-shop'
-            );
+            console.log('[staffRoutes] POST /staff → queue existing-user new shop email', { to: normalizedEmail, staffId: String(newStaff._id) });
+            sendEmail.queueStaffExistingUserNewShopEmail({ to: normalizedEmail, role });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 existing-user-new-shop', { staffId: String(newStaff._id) });
             return res.status(201).json({
                 message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
                 staff: newStaff,
-                emailDispatch: buildStaffEmailDispatchDebug('existing-user-new-shop', normalizedEmail),
+                emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('existing-user-new-shop', normalizedEmail),
             });
         }
 
@@ -332,39 +284,23 @@ router.post('/', protect, async (req, res) => {
         newUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; 
         await newUser.save({ validateBeforeSave: false }); 
         
-        // --- 5. Activation email (async — do not block HTTP; SMTP can take 10–30s+ and causes client cancel/timeout) ---
-        const activationUrl = `${process.env.CLIENT_URL}/staff-setup/${activationToken}`;
-        const message = `
-            <h1>Welcome to Pocket POS, ${name}!</h1>
-            <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
-            <p>Click below to set your password and activate your account:</p>
-            <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
-        `;
-
-        console.log('[staffRoutes] activation link build (token not logged — length only):', {
-            CLIENT_URL: process.env.CLIENT_URL || '(MISSING — set in .env or activation links are wrong)',
-            pathSuffix: '/staff-setup/<token>',
-            tokenLengthChars: activationToken.length,
-            recipient: normalizedEmail,
-        });
+        // --- 5. Activation email (async — handled in sendEmail.js) ---
         res.status(201).json({
             message: `Staff member ${newStaff.name} added. They will receive an email to set their password shortly.`,
             staff: newStaff,
-            emailDispatch: buildStaffEmailDispatchDebug('activation-new-staff', newUser.email, {
+            emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('activation-new-staff', newUser.email, {
                 activationTokenLengthChars: activationToken.length,
                 activationLinkUsesClientUrl: !!(process.env.CLIENT_URL && String(process.env.CLIENT_URL).trim()),
             }),
         });
 
-        console.log('[staffRoutes] POST /staff → queue email activation-new-staff', { to: newUser.email, userId: String(newUser._id) });
-        sendEmail.queueSendEmail(
-            {
-                to: newUser.email,
-                subject: 'Pocket POS Account Activation',
-                html: message,
-            },
-            'activation-new-staff'
-        );
+        console.log('[staffRoutes] POST /staff → queue activation email', { to: newUser.email, userId: String(newUser._id) });
+        sendEmail.queueStaffActivationEmail({
+            to: newUser.email,
+            name,
+            role,
+            activationToken,
+        });
         console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 new user (email queued async)', {
             staffId: String(newStaff._id),
             userId: String(newUser._id),
