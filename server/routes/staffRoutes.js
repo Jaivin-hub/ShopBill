@@ -81,6 +81,7 @@ router.get('/', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
+    console.log('api req.body', req.body);
     staffDebug('POST / start', {
         userId: req.user?.id?.toString?.(),
         role: req.user?.role,
