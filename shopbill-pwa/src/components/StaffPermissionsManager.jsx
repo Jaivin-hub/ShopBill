@@ -616,7 +616,11 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         setAddStaffError(null); // Clear previous error
         setIsProcessing(true);
         try {
-            await apiClient.post(API.staff, formData); 
+            const response = await apiClient.post(API.staff, formData);
+            // Server returns emailDispatch when an email was queued — see Network tab or console (Render logs often omit stdout).
+            if (response.data?.emailDispatch) {
+                console.warn('[Staff] emailDispatch (SMTP debug from API):', response.data.emailDispatch);
+            }
             if (showToast) showToast('Staff provisioned successfully.', 'success');
             await fetchStaff(); 
             resetForm();

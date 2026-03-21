@@ -13,6 +13,51 @@ function maskEmailUser(u) {
     return `${u.slice(0, 2)}***${u.slice(at)}`;
 }
 
+/**
+ * Safe to return in JSON API responses (no passwords). Use when host logs (e.g. Render) are hard to read.
+ */
+function getSmtpEnvSnapshotForApi() {
+    const host = String(process.env.EMAIL_HOST || '').trim();
+    const user = String(process.env.EMAIL_USER || '').trim();
+    const pass = process.env.EMAIL_PASS;
+    const cu = String(process.env.CLIENT_URL || '').trim();
+    const ready = !!(host && user && pass != null && String(pass).length > 0);
+    let explain =
+        'After add-staff, wait a few seconds then GET /api/staff/email-debug (owner) to see if SMTP reported OK or an error.';
+    if (!host) explain = 'EMAIL_HOST is missing — server cannot connect to SMTP.';
+    else if (!user || pass == null || String(pass).length === 0) {
+        explain = 'EMAIL_USER or EMAIL_PASS missing — SMTP auth will fail.';
+    } else if (!cu) explain = 'CLIENT_URL missing — email may send but activation links will be wrong.';
+    return {
+        EMAIL_HOST_configured: !!host,
+        EMAIL_HOST_value: host || null,
+        EMAIL_PORT: process.env.EMAIL_PORT || '587',
+        EMAIL_SECURE: process.env.EMAIL_SECURE ?? null,
+        EMAIL_USER_configured: !!user,
+        EMAIL_USER_masked: user ? user.replace(/(.{2}).*(@.*)/, '$1***$2') : null,
+        EMAIL_PASS_configured: pass != null && String(pass).length > 0,
+        EMAIL_FROM_configured: !!(process.env.EMAIL_FROM && String(process.env.EMAIL_FROM).trim()),
+        CLIENT_URL_configured: !!cu,
+        CLIENT_URL_preview: cu ? (cu.length > 96 ? `${cu.slice(0, 96)}…` : cu) : null,
+        readyToAttemptSmtp: ready,
+        explain,
+    };
+}
+
+/** Last async queued send result (updated by queueSendEmail). For GET /api/staff/email-debug. */
+let lastQueuedDispatchDebug = null;
+
+function recordQueuedDispatchDebug(payload) {
+    lastQueuedDispatchDebug = {
+        ...payload,
+        recordedAt: new Date().toISOString(),
+    };
+}
+
+function getLastQueuedDispatchDebug() {
+    return lastQueuedDispatchDebug;
+}
+
 function logEmailEnvSnapshot(context) {
     const pass = process.env.EMAIL_PASS;
     console.log('[sendEmail] --- ENV snapshot (masked)', context || '', {
@@ -223,6 +268,13 @@ const sendEmail = async (options) => {
  */
 function queueSendEmail(mailOpts, contextLabel = 'queued') {
     const startedAt = new Date().toISOString();
+    recordQueuedDispatchDebug({
+        phase: 'queued',
+        context: contextLabel,
+        to: mailOpts?.to,
+        subject: mailOpts?.subject || null,
+        smtpEnv: getSmtpEnvSnapshotForApi(),
+    });
     console.log('[sendEmail] ========== QUEUED (async, non-blocking) ==========', startedAt, `context=${contextLabel}`);
     console.log('[sendEmail] QUEUED detail:', {
         context: contextLabel,
@@ -240,6 +292,15 @@ function queueSendEmail(mailOpts, contextLabel = 'queued') {
         sendEmail(mailOpts)
             .then((info) => {
                 const done = new Date().toISOString();
+                recordQueuedDispatchDebug({
+                    phase: 'send_ok',
+                    context: contextLabel,
+                    to: mailOpts.to,
+                    messageId: info?.messageId,
+                    accepted: info?.accepted,
+                    rejected: info?.rejected,
+                    smtpResponse: info?.response,
+                });
                 console.log('[sendEmail] ========== QUEUED SEND OK ==========', done, `context=${contextLabel}`);
                 console.log('[sendEmail] QUEUED SEND OK detail:', {
                     to: mailOpts.to,
@@ -251,6 +312,16 @@ function queueSendEmail(mailOpts, contextLabel = 'queued') {
             })
             .catch((err) => {
                 const failAt = new Date().toISOString();
+                recordQueuedDispatchDebug({
+                    phase: 'send_failed',
+                    context: contextLabel,
+                    to: mailOpts.to,
+                    errorMessage: err.message,
+                    errorCode: err.code,
+                    smtpCommand: err.command,
+                    smtpResponseCode: err.responseCode,
+                    smtpResponse: err.response,
+                });
                 console.error('[sendEmail] ========== QUEUED SEND FAILED ==========', failAt, `context=${contextLabel}`);
                 console.error('[sendEmail] QUEUED SEND FAILED detail:', {
                     to: mailOpts.to,
@@ -273,5 +344,7 @@ function queueSendEmail(mailOpts, contextLabel = 'queued') {
 }
 
 sendEmail.queueSendEmail = queueSendEmail;
+sendEmail.getSmtpEnvSnapshotForApi = getSmtpEnvSnapshotForApi;
+sendEmail.getLastQueuedDispatchDebug = getLastQueuedDispatchDebug;
 
 module.exports = sendEmail;
