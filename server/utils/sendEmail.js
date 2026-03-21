@@ -1,6 +1,19 @@
 const nodemailer = require('nodemailer');
 
 /**
+ * Plain-text fallback for HTML-only bodies (improves deliverability / spam scoring).
+ */
+function htmlToPlainText(html) {
+    if (!html || typeof html !== 'string') return '';
+    return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 8000);
+}
+
+/**
  * Sends email via Nodemailer (real SMTP — Gmail, SendGrid, SES, Resend, etc.).
  *
  * Required .env:
@@ -15,6 +28,7 @@ const nodemailer = require('nodemailer');
  *   EMAIL_FROM_NAME           — Display name if EMAIL_FROM is only an email (default: Pocket POS)
  *   EMAIL_REQUIRE_TLS         — "true" to force STARTTLS on port 587
  *   EMAIL_TLS_REJECT_UNAUTHORIZED — set "false" only for broken dev certs (not recommended in prod)
+ *   EMAIL_DEBUG               — "1" to log full Nodemailer SMTP traffic (very verbose)
  *
  * @param {object} options
  * @param {string} options.to
@@ -25,9 +39,11 @@ const nodemailer = require('nodemailer');
 const sendEmail = async (options) => {
     const host = process.env.EMAIL_HOST?.trim();
     if (!host) {
-        throw new Error(
+        const err = new Error(
             'EMAIL_HOST is not set. Add SMTP settings to your .env to send real email. See server/.env.example'
         );
+        console.error('[sendEmail] CONFIG ERROR:', err.message);
+        throw err;
     }
 
     const port = parseInt(process.env.EMAIL_PORT || '587', 10);
@@ -39,7 +55,9 @@ const sendEmail = async (options) => {
     const user = process.env.EMAIL_USER?.trim();
     const pass = process.env.EMAIL_PASS;
     if (!user || pass == null || pass === '') {
-        throw new Error('EMAIL_USER and EMAIL_PASS are required for SMTP.');
+        const err = new Error('EMAIL_USER and EMAIL_PASS are required for SMTP.');
+        console.error('[sendEmail] CONFIG ERROR:', err.message);
+        throw err;
     }
 
     const connMs = parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '15000', 10);
@@ -54,6 +72,8 @@ const sendEmail = async (options) => {
         connectionTimeout: connMs,
         greetingTimeout: greetMs,
         socketTimeout: sockMs,
+        debug: process.env.EMAIL_DEBUG === '1',
+        logger: process.env.EMAIL_DEBUG === '1',
         ...(process.env.EMAIL_REQUIRE_TLS === 'true' ? { requireTLS: true } : {}),
         tls: {
             rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
@@ -69,23 +89,48 @@ const sendEmail = async (options) => {
         from = `${fromName} <${user}>`;
     }
 
+    const textBody = options.text || (options.html ? htmlToPlainText(options.html) : undefined);
+
     const mailOptions = {
         from,
         to: options.to,
         subject: options.subject,
-        text: options.text,
+        text: textBody,
         html: options.html,
     };
 
-    if (process.env.NODE_ENV !== 'production') {
-        console.log('[sendEmail] SMTP:', { host, port, secure, from: from.replace(/<[^>]+>/, '<…>') });
-    }
+    // Always log send attempts (no secrets) — production was silent before, hiding SMTP failures.
+    console.log('[sendEmail] attempt', {
+        host,
+        port,
+        secure,
+        to: options.to,
+        subject: options.subject,
+        fromPreview: from.replace(/<[^>]*>/, '<addr>'),
+        hasText: !!textBody,
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    if (process.env.NODE_ENV !== 'production') {
-        console.log('[sendEmail] sent, messageId:', info.messageId);
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('[sendEmail] success', {
+            messageId: info.messageId,
+            to: options.to,
+            accepted: info.accepted,
+            rejected: info.rejected,
+            response: info.response,
+        });
+        return info;
+    } catch (err) {
+        console.error('[sendEmail] FAILED', {
+            message: err.message,
+            code: err.code,
+            command: err.command,
+            responseCode: err.responseCode,
+            response: err.response,
+            to: options.to,
+        });
+        throw err;
     }
-    return info;
 };
 
 module.exports = sendEmail;

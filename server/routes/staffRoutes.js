@@ -12,12 +12,35 @@ const router = express.Router();
 
 /** Fire-and-forget email so HTTP responses are not blocked by slow SMTP (avoids client timeout / “canceled”). */
 const sendStaffEmailAsync = (mailOpts, label) => {
+    console.log(`[staffRoutes] email QUEUED (${label}) -> to: ${mailOpts?.to}, subject: ${mailOpts?.subject || '(none)'}`);
     setImmediate(() => {
+        console.log(`[staffRoutes] email START (${label}) -> sending via SMTP...`);
         sendEmail(mailOpts)
-            .then(() => staffDebug(`email OK: ${label}`, { to: mailOpts.to }))
+            .then((info) => {
+                console.log(`[staffRoutes] email SENT OK (${label})`, {
+                    to: mailOpts.to,
+                    messageId: info?.messageId,
+                    accepted: info?.accepted,
+                    rejected: info?.rejected,
+                    response: info?.response,
+                });
+                staffDebug(`email OK: ${label}`, { to: mailOpts.to, messageId: info?.messageId });
+            })
             .catch((err) => {
-                console.error(`[staffRoutes] Email failed (${label}):`, err.message);
-                staffDebug(`email FAIL: ${label}`, { message: err.message, to: mailOpts.to });
+                console.error(`[staffRoutes] email SEND FAILED (${label})`, {
+                    to: mailOpts.to,
+                    message: err.message,
+                    code: err.code,
+                    command: err.command,
+                    responseCode: err.responseCode,
+                    response: err.response,
+                });
+                staffDebug(`email FAIL: ${label}`, {
+                    to: mailOpts.to,
+                    message: err.message,
+                    code: err.code,
+                    responseCode: err.responseCode,
+                });
             });
     });
 };
