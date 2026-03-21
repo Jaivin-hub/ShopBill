@@ -575,6 +575,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             });
             setStaff(sortedStaff);
         } catch (error) {
+            if (error?.cancelled) return; // duplicate-request cancel; another GET may still succeed
             console.error('Fetch failed:', error);
             if (showToast) showToast('Failed to sync directory.', 'error');
         } finally {
@@ -639,9 +640,15 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             setAddStaffError(null); // Clear error on success
             setIsAddModalOpen(false); 
         } catch (error) {
-            const errorMessage = error.response?.data?.error || 'Add failed.';
-            setAddStaffError(errorMessage); // Set error to display in modal
-            if (showToast) showToast(errorMessage, 'error');
+            if (error?.cancelled) {
+                const msg = 'Request was cancelled (often a duplicate call). Please try again.';
+                setAddStaffError(msg);
+                if (showToast) showToast(msg, 'error');
+            } else {
+                const errorMessage = error.response?.data?.error || error.message || 'Add failed.';
+                setAddStaffError(errorMessage);
+                if (showToast) showToast(errorMessage, 'error');
+            }
         } finally {
             setIsProcessing(false);
         }

@@ -10,6 +10,18 @@ const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activa
 
 const router = express.Router();
 
+/** Fire-and-forget email so HTTP responses are not blocked by slow SMTP (avoids client timeout / “canceled”). */
+const sendStaffEmailAsync = (mailOpts, label) => {
+    setImmediate(() => {
+        sendEmail(mailOpts)
+            .then(() => staffDebug(`email OK: ${label}`, { to: mailOpts.to }))
+            .catch((err) => {
+                console.error(`[staffRoutes] Email failed (${label}):`, err.message);
+                staffDebug(`email FAIL: ${label}`, { message: err.message, to: mailOpts.to });
+            });
+    });
+};
+
 /** Structured logs for /api/staff debugging (check server console / PM2 logs). */
 const staffDebug = (step, payload = {}) => {
     const line = `[STAFF API ${new Date().toISOString()}] ${step}`;
@@ -171,13 +183,11 @@ router.post('/', protect, async (req, res) => {
                 { active: true, name, role },
                 { new: true }
             );
-            try {
-                await sendEmail({
-                    to: normalizedEmail,
-                    subject: 'Reactivated – Pocket POS',
-                    html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
-                });
-            } catch (_) { /* non-fatal */ }
+            sendStaffEmailAsync({
+                to: normalizedEmail,
+                subject: 'Reactivated – Pocket POS',
+                html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
+            }, 'reactivated');
             staffDebug('POST / success: reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
                 message: `Staff member ${updated.name} reactivated successfully.`,
@@ -200,13 +210,11 @@ router.post('/', protect, async (req, res) => {
                 role,
                 active: false,
             });
-            try {
-                await sendEmail({
-                    to: normalizedEmail,
-                    subject: 'Added to a new shop – Pocket POS',
-                    html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
-                });
-            } catch (_) { /* non-fatal */ }
+            sendStaffEmailAsync({
+                to: normalizedEmail,
+                subject: 'Added to a new shop – Pocket POS',
+                html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
+            }, 'existing-user-new-shop');
             staffDebug('POST / success: existing user linked', { staffId: String(newStaff._id) });
             return res.status(201).json({
                 message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
@@ -249,7 +257,7 @@ router.post('/', protect, async (req, res) => {
         newUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; 
         await newUser.save({ validateBeforeSave: false }); 
         
-        // --- 5. Email Sending ---
+        // --- 5. Activation email (async — do not block HTTP; SMTP can take 10–30s+ and causes client cancel/timeout) ---
         const activationUrl = `${process.env.CLIENT_URL}/staff-setup/${activationToken}`;
         const message = `
             <h1>Welcome to Pocket POS, ${name}!</h1>
@@ -258,25 +266,20 @@ router.post('/', protect, async (req, res) => {
             <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
         `;
 
-        try {
-            await sendEmail({
+        staffDebug('POST / success: new user (activation email queued)', { staffId: String(newStaff._id), userId: String(newUser._id) });
+        res.status(201).json({
+            message: `Staff member ${newStaff.name} added. They will receive an email to set their password shortly.`,
+            staff: newStaff,
+        });
+
+        sendStaffEmailAsync(
+            {
                 to: newUser.email,
                 subject: 'Pocket POS Account Activation',
                 html: message,
-            });
-
-            staffDebug('POST / success: new user + activation email', { staffId: String(newStaff._id), userId: String(newUser._id) });
-            res.status(201).json({ 
-                message: `Staff member ${newStaff.name} added. Activation email sent.`, 
-                staff: newStaff 
-            });
-
-        } catch (mailError) {
-            staffDebug('POST / error: activation email failed', { message: mailError.message });
-            await User.deleteOne({ _id: newUser._id });
-            await Staff.deleteOne({ _id: newStaff._id });
-            return res.status(500).json({ error: 'Failed to send activation email. Rolling back.' });
-        }
+            },
+            'activation-new-staff'
+        );
 
     } catch (error) {
         staffDebug('POST / error: catch', { message: error.message, code: error.code });

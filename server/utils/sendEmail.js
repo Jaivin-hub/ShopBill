@@ -42,11 +42,18 @@ const sendEmail = async (options) => {
         throw new Error('EMAIL_USER and EMAIL_PASS are required for SMTP.');
     }
 
+    const connMs = parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '15000', 10);
+    const greetMs = parseInt(process.env.EMAIL_GREETING_TIMEOUT_MS || '10000', 10);
+    const sockMs = parseInt(process.env.EMAIL_SOCKET_TIMEOUT_MS || '25000', 10);
+
     const transporter = nodemailer.createTransport({
         host,
         port,
         secure,
         auth: { user, pass },
+        connectionTimeout: connMs,
+        greetingTimeout: greetMs,
+        socketTimeout: sockMs,
         ...(process.env.EMAIL_REQUIRE_TLS === 'true' ? { requireTLS: true } : {}),
         tls: {
             rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
