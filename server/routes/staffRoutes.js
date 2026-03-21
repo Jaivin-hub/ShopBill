@@ -170,11 +170,8 @@ router.get('/email-debug', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
-    console.log('[staffRoutes] ROUTE HIT POST /api/staff', new Date().toISOString(), {
-        userId: req.user?.id?.toString?.(),
-        role: req.user?.role,
-        storeId: req.user?.storeId?.toString?.() || null,
-    });
+    console.log('inside the route of POST /api/staff');
+    
     console.log('[staffRoutes] POST /api/staff req.body', req.body);
 
     if (!isowner(req.user.role)) {
