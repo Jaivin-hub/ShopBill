@@ -10,6 +10,16 @@ const sendEmail = require('../utils/sendEmail'); // REQUIRED: To send the activa
 
 const router = express.Router();
 
+/** Structured logs for /api/staff debugging (check server console / PM2 logs). */
+const staffDebug = (step, payload = {}) => {
+    const line = `[STAFF API ${new Date().toISOString()}] ${step}`;
+    try {
+        console.log(line, typeof payload === 'object' && payload !== null ? JSON.stringify(payload) : payload);
+    } catch {
+        console.log(line, payload);
+    }
+};
+
 // Helper to check if the user is the owner
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
 // to match the convention established in authRoutes.js and StaffSchema.
@@ -21,14 +31,27 @@ const isowner = (userRole) => userRole === 'owner';
 // @access  Private (owner/Manager level access)
 // ====================================================================
 router.get('/', protect, async (req, res) => {
+    staffDebug('GET / start', {
+        userId: req.user?.id?.toString?.(),
+        role: req.user?.role,
+        storeId: req.user?.storeId?.toString?.() || null,
+        activeStoreId: req.user?.activeStoreId?.toString?.() || null,
+        xStoreIdHeader: req.headers['x-store-id'] || null,
+    });
+
     // FIX: Changed role checks to use PascalCase 'owner' and 'Manager'
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        staffDebug('GET / denied: role', { role: req.user.role });
         return res.status(403).json({ error: 'Access denied. Requires owner or Manager role.' });
     }
 
     try {
         // Find all staff belonging to the user's stores
         if (!req.user.storeId) {
+            staffDebug('GET / denied: missing storeId', {
+                role: req.user.role,
+                hint: 'Owner: ensure outlet exists / send x-store-id. Staff: ensure activeStoreId is set.',
+            });
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffList = await Staff.find({ storeId: req.user.storeId })
@@ -43,9 +66,11 @@ router.get('/', protect, async (req, res) => {
             passwordSetupStatus: staff.userId?.resetPasswordToken ? 'pending' : 'completed'
         }));
         
+        staffDebug('GET / success', { count: enrichedStaffList.length, storeId: String(req.user.storeId) });
         res.json(enrichedStaffList);
     } catch (error) {
-        console.error('Staff GET all error:', error.message);
+        staffDebug('GET / error', { message: error.message, name: error.name });
+        console.error('Staff GET all error:', error.message, error.stack);
         res.status(500).json({ error: 'Failed to fetch staff list.' });
     }
 });
@@ -56,27 +81,39 @@ router.get('/', protect, async (req, res) => {
 // @access  Private (owner-only access for security)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
+    staffDebug('POST / start', {
+        userId: req.user?.id?.toString?.(),
+        role: req.user?.role,
+        storeId: req.user?.storeId?.toString?.() || null,
+        bodyKeys: Object.keys(req.body || {}),
+    });
+
     if (!isowner(req.user.role)) {
+        staffDebug('POST / denied: not owner', { role: req.user.role });
         return res.status(403).json({ error: 'Access denied. Only the owner can add new staff.' });
     }
     
     const { name, email, role, phone } = req.body;
 
     if (!name || !email || !role) {
+        staffDebug('POST / denied: validation', { hasName: !!name, hasEmail: !!email, hasRole: !!role });
         return res.status(400).json({ error: 'Please provide name, email, and role.' });
     }
     
     if (role === 'owner') {
+        staffDebug('POST / denied: cannot create owner');
         return res.status(400).json({ error: 'Cannot create an owner account through this route.' });
     }
     
     if (role !== 'Manager' && role !== 'Cashier') {
+        staffDebug('POST / denied: invalid role', { role });
         return res.status(400).json({ error: 'Invalid role specified. Must be Manager or Cashier.' });
     }
 
     try {
         // --- 0. PLAN LIMIT VALIDATION ---
         if (!req.user.storeId) {
+            staffDebug('POST / denied: missing storeId');
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const storeIdObj = new mongoose.Types.ObjectId(req.user.storeId);
@@ -88,16 +125,19 @@ router.post('/', protect, async (req, res) => {
         if (plan === 'BASIC') {
             // Basic: 1 Owner + 2 Staff total
             if (currentStaffCount >= 2) {
+                staffDebug('POST / denied: BASIC plan limit', { currentStaffCount, plan });
                 return res.status(403).json({ 
                     error: 'Plan Limit Reached: The BASIC plan allows up to 2 staff members. Please upgrade to PRO for unlimited staff.' 
                 });
             }
         }
+        staffDebug('POST / plan check ok', { plan, currentStaffCount });
         // PRO and PREMIUM plans allow unlimited staff; no further check needed.
 
         // --- 1. Email uniqueness per shop: only block if this email is already staff in THIS shop ---
         const normalizedEmail = String(email || '').trim().toLowerCase();
         if (!normalizedEmail || !normalizedEmail.includes('@')) {
+            staffDebug('POST / denied: bad email');
             return res.status(400).json({ error: 'Please provide a valid email address.' });
         }
         // Use exact same storeId as GET /api/staff (req.user.storeId) so we only see staff for this shop
@@ -108,6 +148,7 @@ router.post('/', protect, async (req, res) => {
             active: true,
         });
         if (existingActiveStaffInThisShop) {
+            staffDebug('POST / denied: duplicate email in shop', { email: normalizedEmail });
             return res.status(409).json({
                 error: `The email ${normalizedEmail} is already added in your shop. Please use a different email.`
             });
@@ -136,6 +177,7 @@ router.post('/', protect, async (req, res) => {
                     html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
                 });
             } catch (_) { /* non-fatal */ }
+            staffDebug('POST / success: reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
                 message: `Staff member ${updated.name} reactivated successfully.`,
                 staff: updated,
@@ -145,6 +187,7 @@ router.post('/', protect, async (req, res) => {
         const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) {
             if (existingUser._id.toString() === req.user.id.toString()) {
+                staffDebug('POST / denied: owner cannot add self');
                 return res.status(400).json({ error: 'You cannot add yourself as staff. Use a different email.' });
             }
             // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
@@ -163,6 +206,7 @@ router.post('/', protect, async (req, res) => {
                     html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
                 });
             } catch (_) { /* non-fatal */ }
+            staffDebug('POST / success: existing user linked', { staffId: String(newStaff._id) });
             return res.status(201).json({
                 message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
                 staff: newStaff,
@@ -220,18 +264,21 @@ router.post('/', protect, async (req, res) => {
                 html: message,
             });
 
+            staffDebug('POST / success: new user + activation email', { staffId: String(newStaff._id), userId: String(newUser._id) });
             res.status(201).json({ 
                 message: `Staff member ${newStaff.name} added. Activation email sent.`, 
                 staff: newStaff 
             });
 
         } catch (mailError) {
+            staffDebug('POST / error: activation email failed', { message: mailError.message });
             await User.deleteOne({ _id: newUser._id });
             await Staff.deleteOne({ _id: newStaff._id });
             return res.status(500).json({ error: 'Failed to send activation email. Rolling back.' });
         }
 
     } catch (error) {
+        staffDebug('POST / error: catch', { message: error.message, code: error.code });
         console.error('Staff POST error:', error.message, error);
         if (error.code === 11000) {
             return res.status(409).json({
