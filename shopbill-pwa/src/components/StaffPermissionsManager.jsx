@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
@@ -131,6 +131,23 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 // --- StaffStatusButton Component ---
 const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes }) => {
     const [showAttendance, setShowAttendance] = useState(false);
+    const [showPendingInfo, setShowPendingInfo] = useState(false);
+    const pendingInfoRef = useRef(null);
+
+    useEffect(() => {
+        if (!showPendingInfo) return;
+        const onPointerDown = (e) => {
+            if (pendingInfoRef.current && !pendingInfoRef.current.contains(e.target)) {
+                setShowPendingInfo(false);
+            }
+        };
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('touchstart', onPointerDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('touchstart', onPointerDown);
+        };
+    }, [showPendingInfo]);
 
     // Format "time ago" for punch in (working) or break start (on break)
     const formatTimeAgo = (dateOrIso) => {
@@ -237,20 +254,36 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                     </span>
                                 )}
                                 {isPendingActivation && (
-                                    <span className={`text-[9px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-200 text-amber-800 border-amber-400'}`}>
-                                        <AlertCircle className="w-2.5 h-2.5" />
-                                        Pending Setup
-                                    </span>
+                                    <div className="relative flex items-center gap-1" ref={pendingInfoRef}>
+                                        <span className={`text-[9px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-200 text-amber-800 border-amber-400'}`}>
+                                            <AlertCircle className="w-2.5 h-2.5" />
+                                            Pending Setup
+                                        </span>
+                                        <button
+                                            type="button"
+                                            aria-label="What is pending setup?"
+                                            aria-expanded={showPendingInfo}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowPendingInfo((v) => !v);
+                                            }}
+                                            className={`touch-manipulation rounded-full p-1 transition-colors ${darkMode ? 'text-amber-400 hover:bg-amber-500/20' : 'text-amber-700 hover:bg-amber-100'}`}
+                                        >
+                                            <Info className="w-3.5 h-3.5" />
+                                        </button>
+                                        {showPendingInfo && (
+                                            <div
+                                                className={`absolute left-0 top-full z-30 mt-1.5 max-w-[min(100vw-2rem,22rem)] p-3 rounded-xl border shadow-lg ${darkMode ? 'bg-slate-900 border-amber-500/30 text-slate-200' : 'bg-white border-amber-200 text-slate-800'}`}
+                                                role="tooltip"
+                                            >
+                                                <p className="text-[10px] sm:text-[11px] font-bold leading-relaxed">
+                                                    An activation email with a password setup link has been sent to <strong>{staff.email}</strong>. The staff member needs to click the link and set their password to activate their account.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
-                            {isPendingActivation && (
-                                <div className={`mt-3 p-3 rounded-xl border flex gap-2.5 ${darkMode ? 'bg-amber-500/10 border-amber-500/25' : 'bg-amber-50 border-amber-200'}`}>
-                                    <Info className={`w-4 h-4 shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                                    <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                        An activation email with a password setup link has been sent to <strong>{staff.email}</strong>. The staff member needs to click the link and set their password to activate their account.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     </div>
                     
