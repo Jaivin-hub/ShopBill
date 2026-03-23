@@ -10,18 +10,27 @@ const USER_ROLES = {
     CASHIER: 'cashier',
 };
 
+const emptyTextileMeta = () => ({
+    brand: '',
+    fabric: '',
+    season: '',
+    collection: '',
+});
+
 const initialItemState = {
     name: '',
     price: '',
     quantity: '',
     reorderLevel: 5,
     hsn: '',
-    variants: [] // Array of variant objects: { label, price, quantity, reorderLevel, hsn, sku }
+    textileMeta: emptyTextileMeta(),
+    variants: [] // Array of variant objects: { label, price, quantity, reorderLevel, hsn, sku, size?, color? }
 };
 
 
 // Added darkMode to props
-const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet }) => {
+const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet, currentUser }) => {
+    const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
     // Permission: Owner and Manager only; Cashiers do not have access
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
     const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
@@ -122,6 +131,10 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             quantity: item.quantity || 0,
             reorderLevel: item.reorderLevel || 5,
             hsn: item.hsn || '',
+            textileMeta: {
+                ...emptyTextileMeta(),
+                ...(item.textileMeta || {}),
+            },
             variants: variantsWithIds
         });
         setIsFormModalOpen(true);
@@ -162,12 +175,19 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         setIsProcessing(true);
         try {
             const { _id, id, ...dataToSend } = formData;
-            
+            if (!isTextileShop) {
+                delete dataToSend.textileMeta;
+            }
+
             // Clean variants: remove _id (only used for React keys) and clean empty values
             if (dataToSend.variants && dataToSend.variants.length > 0) {
                 dataToSend.variants = dataToSend.variants.map(v => {
                     const cleaned = { ...v };
                     delete cleaned._id; // Remove React key _id
+                    if (!isTextileShop) {
+                        delete cleaned.size;
+                        delete cleaned.color;
+                    }
                     // Ensure numeric fields are numbers, not strings
                     cleaned.price = typeof cleaned.price === 'string' ? parseFloat(cleaned.price) || 0 : (cleaned.price || 0);
                     cleaned.quantity = typeof cleaned.quantity === 'string' ? parseInt(cleaned.quantity) || 0 : (cleaned.quantity || 0);
@@ -202,12 +222,19 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         const itemId = formData._id || formData.id;
         try {
             const { _id, id, ...dataToSend } = formData;
+            if (!isTextileShop) {
+                delete dataToSend.textileMeta;
+            }
             
             // Clean variants: remove _id (only used for React keys) and clean empty values
             if (dataToSend.variants && dataToSend.variants.length > 0) {
                 dataToSend.variants = dataToSend.variants.map(v => {
                     const cleaned = { ...v };
                     delete cleaned._id; // Remove React key _id
+                    if (!isTextileShop) {
+                        delete cleaned.size;
+                        delete cleaned.color;
+                    }
                     // Ensure numeric fields are numbers, not strings
                     cleaned.price = typeof cleaned.price === 'string' ? parseFloat(cleaned.price) || 0 : (cleaned.price || 0);
                     cleaned.quantity = typeof cleaned.quantity === 'string' ? parseInt(cleaned.quantity) || 0 : (cleaned.quantity || 0);
@@ -281,10 +308,18 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         };
 
         const query = debouncedSearchTerm.toLowerCase();
+        const textileMetaMatch = (item) => {
+            if (!isTextileShop || !item.textileMeta) return false;
+            const m = item.textileMeta;
+            return ['brand', 'fabric', 'season', 'collection'].some(
+                (k) => m[k] && String(m[k]).toLowerCase().includes(query)
+            );
+        };
         return [...inventory]
             .filter(item =>
                 item.name.toLowerCase().includes(query) ||
-                (item.hsn && item.hsn.toLowerCase().includes(query))
+                (item.hsn && item.hsn.toLowerCase().includes(query)) ||
+                textileMetaMatch(item)
             )
             .sort((a, b) => {
                 if (sortOption === 'low-stock') {
@@ -296,7 +331,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
                 }
                 return a.name.localeCompare(b.name);
             });
-    }, [inventory, debouncedSearchTerm, sortOption]);
+    }, [inventory, debouncedSearchTerm, sortOption, isTextileShop]);
 
     // --- Render States ---
     if (!hasAccess) {
@@ -324,6 +359,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
 
     return (
         <InventoryContent
+            isTextileShop={isTextileShop}
             inventory={sortedAndFilteredInventory}
             loading={isProcessing}
             isFormModalOpen={isFormModalOpen}

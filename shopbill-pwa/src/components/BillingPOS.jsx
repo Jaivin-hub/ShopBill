@@ -4,7 +4,8 @@ import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
 
-const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef }) => {
+const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser }) => {
+  const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
@@ -181,11 +182,22 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     return inStockItems.filter(item =>
       item.name.toLowerCase().includes(term) || 
       (item.barcode && item.barcode.includes(term)) || 
-      (item.hsn && item.hsn.includes(term))
+      (item.hsn && item.hsn.includes(term)) ||
+      (isTextileShop && (
+        item.textileMeta?.brand?.toLowerCase()?.includes(term) ||
+        item.textileMeta?.fabric?.toLowerCase()?.includes(term) ||
+        item.textileMeta?.season?.toLowerCase()?.includes(term) ||
+        item.textileMeta?.collection?.toLowerCase()?.includes(term)
+      ))
     ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, debouncedSearchTerm, scannedBarcode]);
+  }, [inventory, debouncedSearchTerm, scannedBarcode, isTextileShop]);
 
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id)], [customers]);
+
+  const getVariantDescriptor = useCallback((variant) => {
+    if (!isTextileShop || !variant) return '';
+    return [variant.size, variant.color].filter(Boolean).join(' · ');
+  }, [isTextileShop]);
 
   const addItemToCart = useCallback((itemToAdd, variant = null) => {
     // If item has variants and no variant is selected, show variant selector
@@ -223,14 +235,17 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       }
 
       // Add new item to cart
+      const variantDescriptor = getVariantDescriptor(variant);
       const cartItem = variant 
         ? {
             _id: itemToAdd._id,
-            name: `${itemToAdd.name} (${variant.label})`,
+            name: `${itemToAdd.name} (${variant.label}${variantDescriptor ? ` • ${variantDescriptor}` : ''})`,
             price: variant.price,
             quantity: 1,
             variantId: variant._id,
-            variantLabel: variant.label
+            variantLabel: variant.label,
+            variantSize: variant.size || '',
+            variantColor: variant.color || ''
           }
         : { ...itemToAdd, quantity: 1 };
 
@@ -240,7 +255,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     setLastAddedId(itemToAdd._id);
     setTimeout(() => setLastAddedId(null), 500);
     setVariantSelectorItem(null);
-  }, [inventory, showToast]);
+  }, [inventory, showToast, getVariantDescriptor]);
 
   const updateCartQuantity = useCallback((itemId, amount, variantId = null) => {
     setCart(prevCart => {
@@ -332,7 +347,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         quantity: item.quantity, 
         price: item.price,
         variantId: item.variantId || null,
-        variantLabel: item.variantLabel || null
+        variantLabel: item.variantLabel || null,
+        variantSize: item.variantSize || null,
+        variantColor: item.variantColor || null
       })),
       // Ensure these are numbers
       amountPaid: parseFloat(amountPaid) || 0,
@@ -1021,6 +1038,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                           <p className={`text-xs md:text-sm font-black mb-1 truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             {variant.label}
                           </p>
+                          {isTextileShop && (variant.size || variant.color) && (
+                            <p className={`text-[10px] font-bold mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                              {[variant.size, variant.color].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 md:gap-4 mt-2">
                             <div>
                               <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>

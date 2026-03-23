@@ -2,6 +2,8 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
 const Staff = require('../models/Staff');
+const Store = require('../models/Store');
+const User = require('../models/User');
 // UPDATED: Import resolveLowStockAlert along with emitAlert
 const { emitAlert, resolveLowStockAlert } = require('./notificationRoutes');
 
@@ -111,7 +113,7 @@ router.get('/', protect, async (req, res) => {
         }
         // Use lean() for faster queries and select only needed fields
         const inventory = await Inventory.find({ storeId: req.user.storeId })
-            .select('name price quantity reorderLevel hsn variants storeId createdAt updatedAt')
+            .select('name price quantity reorderLevel hsn textileMeta variants storeId createdAt updatedAt')
             .lean()
             .sort({ name: 1 }); // Sort by name for consistent ordering
         res.json(inventory);
@@ -187,6 +189,14 @@ router.post('/', protect, async (req, res) => {
             existingItem.reorderLevel = cleanedData.reorderLevel != null ? cleanedData.reorderLevel : existingItem.reorderLevel;
             existingItem.quantity = (Number(existingItem.quantity) || 0) + (Number(cleanedData.quantity) || 0);
             if (cleanedData.hsn != null) existingItem.hsn = cleanedData.hsn;
+            if (cleanedData.textileMeta && typeof cleanedData.textileMeta === 'object') {
+                existingItem.textileMeta = {
+                    brand: cleanedData.textileMeta.brand || existingItem.textileMeta?.brand || '',
+                    fabric: cleanedData.textileMeta.fabric || existingItem.textileMeta?.fabric || '',
+                    season: cleanedData.textileMeta.season || existingItem.textileMeta?.season || '',
+                    collection: cleanedData.textileMeta.collection || existingItem.textileMeta?.collection || '',
+                };
+            }
             await existingItem.save();
             item = existingItem;
             await checkAndNotifyLowStock(req, item);
@@ -370,6 +380,20 @@ router.put('/:id', protect, async (req, res) => {
     }
 });
 
+/** Textile bulk: optional size / color / variantlabel columns → variant rows (only for textile business type). */
+function rowHasVariantColumns(row) {
+    return !!(row.size || row.color || row.variantlabel);
+}
+
+function buildVariantLabelFromRow(row) {
+    const vl = row.variantlabel;
+    if (vl && String(vl).trim()) return String(vl).trim();
+    const s = (row.size || '').toString().trim();
+    const c = (row.color || '').toString().trim();
+    if (s || c) return [s, c].filter(Boolean).join(' · ');
+    return 'Variant';
+}
+
 // 5. POST Bulk Upload (same name = update existing, no duplicates)
 router.post('/bulk', protect, async (req, res) => {
     const items = req.body;
@@ -380,14 +404,37 @@ router.post('/bulk', protect, async (req, res) => {
     }
 
     try {
-        const cleanedItems = items.map(item => ({
-            ...item,
-            storeId: storeId,
-            name: item.name ? String(item.name).trim() : undefined,
-            price: parseFloat(item.price) || 0,
-            quantity: parseInt(item.quantity) || 0,
-            reorderLevel: parseInt(item.reorderLevel) || 5,
-        })).filter(item => item.name);
+        const storeDoc = await Store.findById(storeId).select('ownerId').lean();
+        const ownerUser = storeDoc?.ownerId
+            ? await User.findById(storeDoc.ownerId).select('businessType').lean()
+            : null;
+        const shopIsTextile = (ownerUser?.businessType || 'grocery') === 'textile';
+
+        const cleanedItems = items.map(item => {
+            const row = {
+                storeId,
+                name: item.name ? String(item.name).trim() : undefined,
+                price: parseFloat(item.price) || 0,
+                quantity: parseInt(item.quantity) || 0,
+                reorderLevel: parseInt(item.reorderLevel) || 5,
+                hsn: item.hsn != null ? String(item.hsn).trim() : '',
+            };
+            if (item.textileMeta && typeof item.textileMeta === 'object') {
+                row.textileMeta = {
+                    brand: item.textileMeta.brand ? String(item.textileMeta.brand).trim() : '',
+                    fabric: item.textileMeta.fabric ? String(item.textileMeta.fabric).trim() : '',
+                    season: item.textileMeta.season ? String(item.textileMeta.season).trim() : '',
+                    collection: item.textileMeta.collection ? String(item.textileMeta.collection).trim() : '',
+                };
+            }
+            if (shopIsTextile) {
+                row.size = item.size != null ? String(item.size).trim() : '';
+                row.color = item.color != null ? String(item.color).trim() : '';
+                row.variantlabel = item.variantlabel != null ? String(item.variantlabel).trim() : (item.variant_label != null ? String(item.variant_label).trim() : '');
+                row.sku = item.sku != null ? String(item.sku).trim() : '';
+            }
+            return row;
+        }).filter(item => item.name);
 
         const result = [];
         let insertedCount = 0;
@@ -396,13 +443,77 @@ router.post('/bulk', protect, async (req, res) => {
         for (const row of cleanedItems) {
             const existing = await findByName(storeId, row.name);
             if (existing) {
-                existing.price = row.price;
-                existing.reorderLevel = row.reorderLevel;
-                existing.quantity = (Number(existing.quantity) || 0) + (Number(row.quantity) || 0);
-                if (row.hsn != null) existing.hsn = row.hsn;
-                await existing.save();
-                result.push(existing);
-                updatedCount++;
+                if (shopIsTextile && rowHasVariantColumns(row) && existing.variants && existing.variants.length > 0) {
+                    const match = existing.variants.find((v) => {
+                        if (row.variantlabel) {
+                            return String(v.label || '').trim() === String(row.variantlabel || '').trim();
+                        }
+                        return String(v.size || '') === String(row.size || '') && String(v.color || '') === String(row.color || '');
+                    });
+                    if (match) {
+                        match.quantity = (Number(match.quantity) || 0) + (Number(row.quantity) || 0);
+                        if (row.price > 0) match.price = row.price;
+                    } else {
+                        existing.variants.push({
+                            label: buildVariantLabelFromRow(row),
+                            price: row.price,
+                            quantity: row.quantity,
+                            reorderLevel: row.reorderLevel,
+                            hsn: row.hsn || '',
+                            sku: row.sku || '',
+                            size: row.size || '',
+                            color: row.color || '',
+                        });
+                    }
+                    if (row.textileMeta) {
+                        existing.textileMeta = {
+                            brand: row.textileMeta.brand || existing.textileMeta?.brand || '',
+                            fabric: row.textileMeta.fabric || existing.textileMeta?.fabric || '',
+                            season: row.textileMeta.season || existing.textileMeta?.season || '',
+                            collection: row.textileMeta.collection || existing.textileMeta?.collection || '',
+                        };
+                    }
+                    existing.markModified('variants');
+                    await existing.save();
+                    result.push(existing);
+                    updatedCount++;
+                } else {
+                    existing.price = row.price;
+                    existing.reorderLevel = row.reorderLevel;
+                    existing.quantity = (Number(existing.quantity) || 0) + (Number(row.quantity) || 0);
+                    if (row.hsn != null) existing.hsn = row.hsn;
+                    if (row.textileMeta) {
+                        existing.textileMeta = {
+                            brand: row.textileMeta.brand || existing.textileMeta?.brand || '',
+                            fabric: row.textileMeta.fabric || existing.textileMeta?.fabric || '',
+                            season: row.textileMeta.season || existing.textileMeta?.season || '',
+                            collection: row.textileMeta.collection || existing.textileMeta?.collection || '',
+                        };
+                    }
+                    await existing.save();
+                    result.push(existing);
+                    updatedCount++;
+                }
+            } else if (shopIsTextile && rowHasVariantColumns(row)) {
+                const newItem = await Inventory.create({
+                    storeId: row.storeId,
+                    name: row.name,
+                    reorderLevel: row.reorderLevel,
+                    hsn: row.hsn || '',
+                    textileMeta: row.textileMeta,
+                    variants: [{
+                        label: buildVariantLabelFromRow(row),
+                        price: row.price,
+                        quantity: row.quantity,
+                        reorderLevel: row.reorderLevel,
+                        hsn: row.hsn || '',
+                        sku: row.sku || '',
+                        size: row.size || '',
+                        color: row.color || '',
+                    }],
+                });
+                result.push(newItem);
+                insertedCount++;
             } else {
                 const newItem = await Inventory.create({
                     storeId: row.storeId,
@@ -411,6 +522,7 @@ router.post('/bulk', protect, async (req, res) => {
                     quantity: row.quantity,
                     reorderLevel: row.reorderLevel,
                     hsn: row.hsn != null ? row.hsn : '',
+                    textileMeta: row.textileMeta,
                 });
                 result.push(newItem);
                 insertedCount++;

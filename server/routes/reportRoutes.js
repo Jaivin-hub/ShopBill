@@ -77,16 +77,17 @@ router.get('/summary', protect, async (req, res) => {
         const [filteredSales, customers, inventoryItems, allTimeSales] = await Promise.all([
             Sale.find(salesFilter).select('totalAmount timestamp items').lean(),
             Customer.find({ storeId: req.user.storeId }).select('name outstandingCredit').lean(), // Scoped
-            Inventory.find({ storeId: req.user.storeId }).select('name price _id').lean(), // Scoped - only needed fields
+            Inventory.find({ storeId: req.user.storeId }).select('name price _id textileMeta').lean(), // Scoped — textileMeta for fabric/brand sold
             Sale.find({ storeId: req.user.storeId }).select('totalAmount timestamp').lean(), // Scoped for all-time stats
         ]);
         
-        // Create a quick lookup map for current inventory names and prices
+        // Lookup map: inventory line + textile meta (for fabric/brand attribution on sold qty)
         const inventoryMap = new Map();
         inventoryItems.forEach(item => {
             inventoryMap.set(item._id.toString(), { 
                 name: item.name, 
-                price: item.price
+                price: item.price,
+                textileMeta: item.textileMeta || {}
             });
         });
 
@@ -96,6 +97,10 @@ router.get('/summary', protect, async (req, res) => {
         let billsRaised = filteredSales.length; 
         let itemVolumeMap = new Map();
         let totalVolume = 0;
+        const sizeCountMap = new Map();
+        const colorCountMap = new Map();
+        const fabricSoldMap = new Map();
+        const brandSoldMap = new Map();
 
         filteredSales.forEach(sale => {
             revenue += sale.totalAmount;
@@ -115,6 +120,34 @@ router.get('/summary', protect, async (req, res) => {
                 
                 itemVolumeMap.set(key, current);
                 totalVolume += item.quantity;
+
+                if (item.variantSize) {
+                    const sizeKey = String(item.variantSize).trim().toLowerCase();
+                    if (sizeKey) {
+                        sizeCountMap.set(sizeKey, (sizeCountMap.get(sizeKey) || 0) + (item.quantity || 0));
+                    }
+                }
+                if (item.variantColor) {
+                    const colorKey = String(item.variantColor).trim().toLowerCase();
+                    if (colorKey) {
+                        colorCountMap.set(colorKey, (colorCountMap.get(colorKey) || 0) + (item.quantity || 0));
+                    }
+                }
+
+                // Fabric / brand sold (units), from product textile meta — same as grocery when meta empty
+                const tm = currentInventoryData?.textileMeta;
+                if (tm && typeof tm === 'object') {
+                    const fabricRaw = tm.fabric;
+                    if (fabricRaw && String(fabricRaw).trim()) {
+                        const fk = String(fabricRaw).trim().toLowerCase();
+                        fabricSoldMap.set(fk, (fabricSoldMap.get(fk) || 0) + (item.quantity || 0));
+                    }
+                    const brandRaw = tm.brand;
+                    if (brandRaw && String(brandRaw).trim()) {
+                        const bk = String(brandRaw).trim().toLowerCase();
+                        brandSoldMap.set(bk, (brandSoldMap.get(bk) || 0) + (item.quantity || 0));
+                    }
+                }
             });
         });
 
@@ -133,6 +166,26 @@ router.get('/summary', protect, async (req, res) => {
         const totalAllTimeRevenue = allTimeSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
         const totalAllTimeBills = allTimeSales.length;
 
+        const topSizes = Array.from(sizeCountMap.entries())
+            .map(([name, quantity]) => ({ name, quantity }))
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 8);
+
+        const topColors = Array.from(colorCountMap.entries())
+            .map(([name, quantity]) => ({ name, quantity }))
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 8);
+
+        const topFabrics = Array.from(fabricSoldMap.entries())
+            .map(([name, quantity]) => ({ name, quantity }))
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 8);
+
+        const topBrands = Array.from(brandSoldMap.entries())
+            .map(([name, quantity]) => ({ name, quantity }))
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 8);
+
 
         res.json({
             revenue,
@@ -143,6 +196,12 @@ router.get('/summary', protect, async (req, res) => {
             totalCreditOutstanding,
             totalAllTimeRevenue, 
             totalAllTimeBills,
+            textileInsights: {
+                topSizes,
+                topColors,
+                topFabrics,
+                topBrands
+            }
         });
 
     } catch (error) {

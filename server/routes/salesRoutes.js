@@ -214,11 +214,22 @@ router.post('/', protect, async (req, res) => {
         }
         
         // --- 3. Create Sale Record ---
+        const normalizedItems = (items || []).map((item) => ({
+            itemId: item.itemId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            variantId: item.variantId || null,
+            variantLabel: item.variantLabel || '',
+            variantSize: item.variantSize || '',
+            variantColor: item.variantColor || '',
+        }));
+
         const newSale = await Sale.create({
             totalAmount,
             paymentMethod,
             customerId: saleCustomerId, 
-            items: items || [], 
+            items: normalizedItems,
             amountPaid,
             amountCredited: saleAmountCredited,
             storeId,

@@ -31,6 +31,9 @@ const SaleSchema = new mongoose.Schema({
         price: { type: Number, required: true, min: 0 }, // Price at time of sale
         variantId: { type: mongoose.Schema.Types.ObjectId, default: null }, // Variant ID if this is a variant sale
         variantLabel: { type: String, default: '' }, // Variant label (e.g., "500ml", "1L") for display
+        // Optional textile metadata at line-item level
+        variantSize: { type: String, default: '' },
+        variantColor: { type: String, default: '' },
     }],
 }, { timestamps: true });
 

@@ -152,10 +152,12 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
     const data = summaryData || {
         revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
         topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
+        textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
     };
 
     const plan = currentUser?.plan?.toUpperCase();
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
+    const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
 
     return (
         <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
@@ -391,6 +393,42 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                         </div>
                     </div>
                 </div>
+
+                {isTextileShop && (
+                    <section className={`${cardBase} rounded-xl p-6`}>
+                        <div className="flex items-center gap-2 mb-5">
+                            <PieChart className="w-4 h-4 text-violet-500" />
+                            <h3 className={`text-sm font-bold tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                Textile Insights
+                            </h3>
+                            <span className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                (units sold in period — same filters as above)
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[
+                                { title: 'Top sizes', values: data.textileInsights?.topSizes || [] },
+                                { title: 'Top colors', values: data.textileInsights?.topColors || [] },
+                                { title: 'Top fabrics', values: data.textileInsights?.topFabrics || [] },
+                                { title: 'Top brands', values: data.textileInsights?.topBrands || [] },
+                            ].map((block) => (
+                                <div key={block.title} className={`p-4 rounded-lg border ${subCardBase}`}>
+                                    <p className="text-[10px] font-bold text-gray-500 tracking-widest mb-3">{block.title}</p>
+                                    <div className="space-y-2">
+                                        {block.values.length > 0 ? block.values.slice(0, 5).map((v, idx) => (
+                                            <div key={`${block.title}-${v.name}-${idx}`} className="flex items-center justify-between gap-2">
+                                                <span className={`text-xs font-bold truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`} title={v.name}>{v.name}</span>
+                                                <span className="text-[10px] font-bold text-indigo-500 shrink-0">{v.quantity} pcs</span>
+                                            </div>
+                                        )) : (
+                                            <p className="text-[11px] text-gray-400">No data yet</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
             </div>
 
             <style dangerouslySetInnerHTML={{__html: `

@@ -22,7 +22,7 @@ const ScrollbarStyles = ({ darkMode }) => (
 );
 
 // --- BULK UPLOAD MODAL ---
-const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
+const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTextileShop = false }) => {
     const [csvData, setCsvData] = useState('');
     const [file, setFile] = useState(null);
     const [error, setError] = useState(null);
@@ -56,13 +56,30 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
             const values = line.split(',');
             const item = {};
             headers.forEach((h, i) => item[h] = values[i]?.trim());
-            return {
+            const baseItem = {
                 name: item.name,
                 price: parseFloat(item.price || 0),
                 quantity: parseInt(item.quantity || 0),
                 reorderLevel: parseInt(item.reorderlevel || 5),
                 hsn: item.hsn || ''
             };
+            if (isTextileShop) {
+                baseItem.textileMeta = {
+                    brand: item.brand || '',
+                    fabric: item.fabric || '',
+                    season: item.season || '',
+                    collection: item.collection || ''
+                };
+                const sz = (item.size || '').trim();
+                const col = (item.color || '').trim();
+                const vl = (item.variantlabel || item.variant_label || '').trim();
+                const sku = (item.sku || '').trim();
+                if (sz) baseItem.size = sz;
+                if (col) baseItem.color = col;
+                if (vl) baseItem.variantlabel = vl;
+                if (sku) baseItem.sku = sku;
+            }
+            return baseItem;
         }).filter(i => i.name && !isNaN(i.price));
     };
 
@@ -90,7 +107,12 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode }) => {
                         </div>
                         <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             File must include a header row with: <strong className="text-indigo-400">name, price, quantity</strong>. 
-                            Optional: <span className="">reorderlevel, hsn</span>.
+                            Optional: <span className="">reorderlevel, hsn{isTextileShop ? ', brand, fabric, season, collection, size, color, variantlabel, sku' : ''}</span>.
+                            {isTextileShop && (
+                                <span className="block mt-2 text-amber-600/90 dark:text-amber-400/90">
+                                    For one row per size/color: add <strong>size</strong> and/or <strong>color</strong> (or <strong>variantlabel</strong>). New products become variant items; matching name + variant merges stock.
+                                </span>
+                            )}
                         </p>
                     </div>
 
@@ -119,7 +141,7 @@ const InputField = ({ label, darkMode, ...props }) => (
     </div>
 );
 
-const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode, readOnly = false }) => {
+const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode, readOnly = false, isTextileShop = false }) => {
     const [showVariants, setShowVariants] = useState(false);
     const hasVariants = item.variants && item.variants.length > 0;
     
@@ -175,6 +197,11 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                 {item.hsn && (
                                     <p className={`text-[8px] font-bold tracking-wider flex items-center gap-1 mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         <Hash className="w-2.5 h-2.5" /> {item.hsn}
+                                    </p>
+                                )}
+                                {isTextileShop && item.textileMeta && (item.textileMeta.brand || item.textileMeta.fabric) && (
+                                    <p className={`text-[8px] font-bold mt-0.5 truncate ${darkMode ? 'text-amber-400/90' : 'text-amber-700'}`}>
+                                        {[item.textileMeta.brand, item.textileMeta.fabric].filter(Boolean).join(' · ')}
                                     </p>
                                 )}
                             </div>
@@ -268,6 +295,11 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                             {item.hsn && (
                                 <p className={`text-[9px] font-bold tracking-wider flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                     <Hash className="w-3 h-3" /> {item.hsn}
+                                </p>
+                            )}
+                            {isTextileShop && item.textileMeta && (item.textileMeta.brand || item.textileMeta.fabric) && (
+                                <p className={`text-[9px] font-bold mt-0.5 truncate ${darkMode ? 'text-amber-400/90' : 'text-amber-700'}`}>
+                                    {[item.textileMeta.brand, item.textileMeta.fabric].filter(Boolean).join(' · ')}
                                 </p>
                             )}
                         </div>
@@ -365,6 +397,11 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                                 </span>
                                                 {variantIsLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
                                             </div>
+                                            {isTextileShop && (variant.size || variant.color) && (
+                                                <p className={`text-[8px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                    {[variant.size, variant.color].filter(Boolean).join(' · ')}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
                                             <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
@@ -390,10 +427,15 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                     
                                     {/* Desktop: Horizontal Layout */}
                                     <div className="hidden md:flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                             <span className={`text-xs font-black ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                                 {variant.label}
                                             </span>
+                                            {isTextileShop && (variant.size || variant.color) && (
+                                                <span className={`text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                    {[variant.size, variant.color].filter(Boolean).join(' · ')}
+                                                </span>
+                                            )}
                                             {variantIsLowStock && <Bell className="w-3 h-3 text-red-500 animate-pulse flex-shrink-0" />}
                                         </div>
                                         <div className="flex items-center gap-4 flex-shrink-0">
@@ -435,12 +477,17 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
         prevProps.loading === nextProps.loading &&
         prevProps.darkMode === nextProps.darkMode &&
         prevProps.readOnly === nextProps.readOnly &&
+        prevProps.isTextileShop === nextProps.isTextileShop &&
+        JSON.stringify(prevProps.item.textileMeta || {}) === JSON.stringify(nextProps.item.textileMeta || {}) &&
         JSON.stringify(prevProps.item.variants || []) === JSON.stringify(nextProps.item.variants || [])
     );
 });
 
+const EMPTY_TEXTILE_META = { brand: '', fabric: '', season: '', collection: '' };
+
 const InventoryContent = ({
-    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false
+    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
+    isTextileShop = false,
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isHsnScannerOpen, setIsHsnScannerOpen] = useState(false);
@@ -492,6 +539,13 @@ const InventoryContent = ({
         }
     }, [formData.variants]);
 
+    const setTextileMetaField = (key, value) => {
+        setFormData(prev => ({
+            ...prev,
+            textileMeta: { ...EMPTY_TEXTILE_META, ...(prev.textileMeta || {}), [key]: value },
+        }));
+    };
+
     const addVariant = () => {
         const newVariant = {
             _id: `variant-${Date.now()}-${Math.random()}`, // Unique ID for stable key
@@ -500,7 +554,9 @@ const InventoryContent = ({
             quantity: 0,
             reorderLevel: formData.reorderLevel || 5,
             hsn: formData.hsn || '',
-            sku: ''
+            sku: '',
+            size: '',
+            color: '',
         };
         setFormData(prev => ({
             ...prev,
@@ -611,7 +667,7 @@ const InventoryContent = ({
                     {/* Desktop & Tablet: Enhanced Card Grid Layout */}
                     <section className="hidden md:block pb-6">
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
                                 <div className={`col-span-full text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
@@ -624,7 +680,7 @@ const InventoryContent = ({
                     {/* Mobile: Compact Card Layout */}
                     <section className="md:hidden pb-20">
                         <div className="grid grid-cols-1 gap-4">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
                                 <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
@@ -673,6 +729,33 @@ const InventoryContent = ({
                                 />
                             </div>
 
+                            {/* Textile-only: style / brand context (optional) */}
+                            {isTextileShop && (
+                                <div className={`p-4 rounded-xl border space-y-3 ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/80 border-amber-200'}`}>
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-amber-400' : 'text-amber-800'}`}>
+                                        Dress / textile details <span className="font-bold normal-case text-slate-500">(optional)</span>
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Brand</label>
+                                            <input type="text" value={formData.textileMeta?.brand ?? ''} onChange={(e) => setTextileMetaField('brand', e.target.value)} placeholder="e.g. Raymond" className={`w-full p-2.5 text-xs rounded-lg border ${darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                                        </div>
+                                        <div>
+                                            <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Fabric</label>
+                                            <input type="text" value={formData.textileMeta?.fabric ?? ''} onChange={(e) => setTextileMetaField('fabric', e.target.value)} placeholder="e.g. Cotton" className={`w-full p-2.5 text-xs rounded-lg border ${darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                                        </div>
+                                        <div>
+                                            <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Season</label>
+                                            <input type="text" value={formData.textileMeta?.season ?? ''} onChange={(e) => setTextileMetaField('season', e.target.value)} placeholder="e.g. Summer 2026" className={`w-full p-2.5 text-xs rounded-lg border ${darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                                        </div>
+                                        <div>
+                                            <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Collection</label>
+                                            <input type="text" value={formData.textileMeta?.collection ?? ''} onChange={(e) => setTextileMetaField('collection', e.target.value)} placeholder="e.g. Festive" className={`w-full p-2.5 text-xs rounded-lg border ${darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Variants Toggle */}
                             <div>
                                 <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -687,7 +770,9 @@ const InventoryContent = ({
                                                     Enable Variants
                                                 </p>
                                                 <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                    Different sizes, prices, or options
+                                                    {isTextileShop
+                                                        ? 'Size & color per piece, with price and stock each'
+                                                        : 'Different sizes, prices, or options'}
                                                 </p>
                                             </div>
                                         </div>
@@ -776,17 +861,45 @@ const InventoryContent = ({
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                     <div>
                                                         <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                            Label (e.g., 500ml, 1L) *
+                                                            {isTextileShop ? 'Display label (shown on bill) *' : 'Label (e.g., 500ml, 1L) *'}
                                                         </label>
                                                         <input
                                                             type="text"
                                                             value={variant.label}
                                                             onChange={(e) => updateVariant(index, 'label', e.target.value)}
-                                                            placeholder="500ml"
+                                                            placeholder={isTextileShop ? 'e.g. M · Red' : '500ml'}
                                                             required
                                                             className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500`}
                                                         />
                                                     </div>
+                                                    {isTextileShop && (
+                                                        <>
+                                                            <div>
+                                                                <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                                    Size <span className="font-normal text-slate-500">(optional)</span>
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={variant.size || ''}
+                                                                    onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                                                                    placeholder="e.g. M, 32, Free"
+                                                                    className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                                    Color <span className="font-normal text-slate-500">(optional)</span>
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={variant.color || ''}
+                                                                    onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                                                                    placeholder="e.g. Navy"
+                                                                    className={`w-full p-2.5 text-xs ${darkMode ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500'} border rounded-lg focus:outline-none focus:border-indigo-500`}
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    )}
                                                     <div>
                                                         <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                             Price (₹) *
@@ -1008,7 +1121,7 @@ const InventoryContent = ({
                 }}
                 darkMode={darkMode} 
             />
-            <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={isBulkUploading} darkMode={darkMode} />
+            <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={isBulkUploading} darkMode={darkMode} isTextileShop={isTextileShop} />
         </div>
     );
 };

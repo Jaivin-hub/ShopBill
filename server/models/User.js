@@ -32,6 +32,11 @@ const UserSchema = new mongoose.Schema({
         sparse: true, 
         trim: true
     },
+    businessType: {
+        type: String,
+        enum: ['grocery', 'textile'],
+        default: 'grocery'
+    },
     
     profileImageUrl: { 
         type: String, 

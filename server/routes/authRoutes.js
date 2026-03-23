@@ -155,6 +155,7 @@ router.post('/login', async (req, res) => {
                     phone: user.phone,
                     plan: effectivePlan, // Return effective plan (owner's plan for staff)
                     shopName: shopName, // Include registered business name
+                    businessType: ownerAccount?.businessType || user.businessType || 'grocery',
                     activeStoreId: activeStoreId || undefined
                 }
             });
@@ -198,8 +199,8 @@ router.post('/check-availability', async (req, res) => {
  * @access Public
  */
 router.post('/signup', async (req, res) => {
-    // UPDATED: Destructure shopName, plan, and transactionId
-    const { email, password, phone, plan, transactionId, shopName } = req.body;
+    // UPDATED: Destructure shopName, plan, transactionId, and businessType
+    const { email, password, phone, plan, transactionId, shopName, businessType } = req.body;
 
     // REQUIREMENT: Must have a verified transaction ID, plan, and shopName to sign up as an owner
     if (!email || !password || !plan || !transactionId || !shopName) {
@@ -224,6 +225,12 @@ router.post('/signup', async (req, res) => {
         trialEndDate.setDate(trialEndDate.getDate() + 30);
         // ----------------------------------------------------------------------------------
 
+        const normalizedBusinessType = String(businessType || 'grocery').toLowerCase();
+        const allowedBusinessTypes = ['grocery', 'textile'];
+        if (!allowedBusinessTypes.includes(normalizedBusinessType)) {
+            return res.status(400).json({ error: 'Invalid business type.' });
+        }
+
         const newUser = await User.create({
             email,
             password,
@@ -234,6 +241,7 @@ router.post('/signup', async (req, res) => {
             plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
             transactionId: transactionId, // Save the subscription ID
             shopName: shopName,
+            businessType: normalizedBusinessType,
             planEndDate: trialEndDate, // 🔥 INITIALIZE THE END DATE
             subscriptionStatus: 'authenticated',
         });
@@ -257,6 +265,7 @@ router.post('/signup', async (req, res) => {
                 phone: newUser.phone,
                 plan: newUser.plan,
                 shopName: newUser.shopName,
+                businessType: newUser.businessType,
             }
         });
 
@@ -291,6 +300,7 @@ router.get('/profile', protect, async (req, res) => {
         let address = user.address || '';
         let currency = user.currency || 'INR';
         let profileImageUrl = user.profileImageUrl;
+        let businessType = user.businessType || 'grocery';
 
         // Check if we have an active outlet/store context (for Premium plans)
         const storeId = req.user.storeId || req.user.activeStoreId;
@@ -312,13 +322,14 @@ router.get('/profile', protect, async (req, res) => {
             }
         } else if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
             // For staff members, get business details from owner (and from store so GST/address show)
-            const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl');
+            const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl businessType');
             if (businessDetails) {
                 shopName = businessDetails.shopName || shopName;
                 taxId = businessDetails.taxId || taxId;
                 address = businessDetails.address || address;
                 currency = businessDetails.currency || currency;
                 profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
+                businessType = businessDetails.businessType || businessType;
             }
             // Staff work in a store: use store's taxId/address so they see same as owner for that outlet
             const staffStoreId = req.user.storeId || req.user.activeStoreId;
@@ -347,7 +358,8 @@ router.get('/profile', protect, async (req, res) => {
                 profileImageUrl: profileImageUrl,
                 timezone: user.timezone,
                 plan: user.plan,
-                planEndDate: user.planEndDate
+                planEndDate: user.planEndDate,
+                businessType: businessType
             }
         });
     } catch (error) {

@@ -9,6 +9,9 @@ const VariantSchema = new mongoose.Schema({
     reorderLevel: { type: Number, default: null, min: 0 }, // Optional, inherits from parent if null
     hsn: { type: String, trim: true, default: '' }, // Optional, inherits from parent if empty
     sku: { type: String, trim: true, default: '' }, // Optional SKU/barcode for this variant
+    // Optional — used mainly for textile / dress shops (size & color per variant)
+    size: { type: String, trim: true, default: '' },
+    color: { type: String, trim: true, default: '' },
 }, { _id: true });
 
 const InventorySchema = new mongoose.Schema({
@@ -19,6 +22,14 @@ const InventorySchema = new mongoose.Schema({
     quantity: { type: Number, default: function() { return (this.variants && this.variants.length > 0) ? null : 0; }, min: 0 },
     reorderLevel: { type: Number, default: 5, min: 0 },
     hsn: { type: String, trim: true, default: '' },
+
+    // Optional — dress / textile shop context (brand, fabric, season, collection)
+    textileMeta: {
+        brand: { type: String, trim: true, default: '' },
+        fabric: { type: String, trim: true, default: '' },
+        season: { type: String, trim: true, default: '' },
+        collection: { type: String, trim: true, default: '' },
+    },
     
     // Product variants (e.g., different sizes, brands, prices for the same product)
     variants: [VariantSchema],

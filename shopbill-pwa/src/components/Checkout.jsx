@@ -44,6 +44,17 @@ const PLAN_DETAILS = {
     }
 };
 
+const BUSINESS_TYPE_CONTENT = {
+    grocery: {
+        label: 'Supermarket / Grocery',
+        hint: 'Optimized for FMCG, barcode billing, shelf stock, and supplier flow.'
+    },
+    textile: {
+        label: 'Textile / Dress Shop',
+        hint: 'Includes support-focused flow for size/color variants, seasonal collections, and style-wise selling.'
+    }
+};
+
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return 'Email is required.';
@@ -89,6 +100,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [shopName, setShopName] = useState('');
+    const [businessType, setBusinessType] = useState('grocery');
     const [emailError, setEmailError] = useState(null);
     const [phoneError, setPhoneError] = useState(null);
     const [passwordError, setPasswordError] = useState(null);
@@ -232,7 +244,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                         if (vResp.data.success) {
                             await apiClient.post(API.signup, {
                                 email: email.toLowerCase().trim(), password, phone, plan: effectivePlanKey || 'BASIC',
-                                transactionId: vResp.data.transactionId, shopName
+                                transactionId: vResp.data.transactionId, shopName, businessType
                             });
                             setPaymentSuccess(true);
                             setTimeout(() => {
@@ -254,7 +266,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
             setPaymentError(error.response?.data?.error || "Connection failed.");
             setIsProcessing(false);
         }
-    }, [plan, effectivePlanKey, email, phone, password, shopName, showToast, localNumber]);
+    }, [plan, effectivePlanKey, email, phone, password, shopName, businessType, showToast, localNumber]);
 
     const bgColor = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const textColor = darkMode ? 'text-white' : 'text-slate-900';
@@ -459,7 +471,42 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-5 lg:gap-6">
                                 <div className="md:col-span-2">
-                                    <InputField label="Shop/Business Name" id="shopName" icon={<Building className="w-4 h-4" />} value={shopName} error={shopNameError} onChange={(v) => { setShopName(v); setShopNameError(null); }} placeholder="Ex: Sharma Stores" disabled={isProcessing} darkMode={darkMode} />
+                                    <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>
+                                        Business Type
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(BUSINESS_TYPE_CONTENT).map(([key, value]) => {
+                                            const selected = businessType === key;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setBusinessType(key)}
+                                                    className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                                                        selected
+                                                            ? 'border-indigo-500 bg-indigo-500/10'
+                                                            : `${inputBorder} ${darkMode ? 'hover:border-gray-600' : 'hover:border-slate-400'}`
+                                                    }`}
+                                                >
+                                                    <p className={`text-[11px] font-black ${textColor}`}>{value.label}</p>
+                                                    <p className={`text-[10px] mt-1 font-bold ${descColor}`}>{value.hint}</p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <InputField
+                                        label={businessType === 'textile' ? 'Textile Shop / Brand Name' : 'Shop/Business Name'}
+                                        id="shopName"
+                                        icon={<Building className="w-4 h-4" />}
+                                        value={shopName}
+                                        error={shopNameError}
+                                        onChange={(v) => { setShopName(v); setShopNameError(null); }}
+                                        placeholder={businessType === 'textile' ? 'Ex: Trend Weaves' : 'Ex: Sharma Stores'}
+                                        disabled={isProcessing}
+                                        darkMode={darkMode}
+                                    />
                                 </div>
                                 <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); setAccountExistsError(false); setPaymentError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
                                 
