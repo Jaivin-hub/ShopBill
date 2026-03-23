@@ -13,6 +13,19 @@ function maskEmailUser(u) {
     return `${u.slice(0, 2)}***${u.slice(at)}`;
 }
 
+/** Bare address from "Name <a@b.com>" or "a@b.com" */
+function parseEnvelopeEmail(fromHeader) {
+    const s = String(fromHeader);
+    const m = s.match(/<([^>]+)>/);
+    const addr = m ? m[1].trim() : s.trim();
+    return addr.toLowerCase();
+}
+
+function smtpHostIsHostingerFamily(host) {
+    const h = String(host || '').toLowerCase();
+    return h.includes('hostinger.com') || h.includes('titan.email');
+}
+
 /**
  * Safe to return in JSON API responses (no passwords). Use when host logs (e.g. Render) are hard to read.
  */
@@ -28,6 +41,18 @@ function getSmtpEnvSnapshotForApi() {
     else if (!user || pass == null || String(pass).length === 0) {
         explain = 'EMAIL_USER or EMAIL_PASS missing — SMTP auth will fail.';
     } else if (!cu) explain = 'CLIENT_URL missing — email may send but activation links will be wrong.';
+    const fromRaw = String(process.env.EMAIL_FROM || '').trim();
+    const fromMailbox = fromRaw ? parseEnvelopeEmail(fromRaw) : null;
+    const authMailbox = user ? user.toLowerCase() : null;
+    const hostingerFamily = smtpHostIsHostingerFamily(host);
+    let deliverabilityHint = null;
+    if (hostingerFamily && ready && authMailbox && fromMailbox && fromMailbox !== authMailbox) {
+        deliverabilityHint =
+            'Hostinger/Titan: EMAIL_FROM differed from EMAIL_USER — server now sends From=EMAIL_USER and Reply-To=your EMAIL_FROM so mail can reach Gmail. Prefer setting EMAIL_FROM to the same address as EMAIL_USER.';
+    } else if (hostingerFamily && ready) {
+        deliverabilityHint =
+            'Hostinger: if still no inbox delivery, check Gmail Spam, verify DNS (SPF/DKIM) for pocketpos.io, or try EMAIL_PORT=587 with EMAIL_SECURE=false on cloud hosts that block 465.';
+    }
     return {
         EMAIL_HOST_configured: !!host,
         EMAIL_HOST_value: host || null,
@@ -41,6 +66,7 @@ function getSmtpEnvSnapshotForApi() {
         CLIENT_URL_preview: cu ? (cu.length > 96 ? `${cu.slice(0, 96)}…` : cu) : null,
         readyToAttemptSmtp: ready,
         explain,
+        ...(deliverabilityHint ? { deliverabilityHint } : {}),
     };
 }
 
@@ -175,6 +201,28 @@ const sendEmail = async (options) => {
         from = `${fromName} <${user}>`;
     }
 
+    let replyTo = process.env.EMAIL_REPLY_TO?.trim();
+    if (replyTo && !replyTo.includes('<')) {
+        replyTo = `${fromName} <${replyTo}>`;
+    }
+
+    const authMailbox = user.trim().toLowerCase();
+    const fromMailbox = parseEnvelopeEmail(from);
+
+    // Hostinger / Titan: SMTP auth mailbox must usually match the visible From, or Gmail may never show the message.
+    const allowFromMismatch = process.env.EMAIL_ALLOW_FROM_MISMATCH === '1';
+    if (smtpHostIsHostingerFamily(host) && fromMailbox !== authMailbox && !allowFromMismatch) {
+        const previousFrom = from;
+        replyTo = replyTo || previousFrom;
+        from = `${fromName} <${user}>`;
+        console.warn('[sendEmail] Hostinger/Titan From-alignment:', {
+            previousFromMailbox: fromMailbox,
+            authMailbox,
+            replyToSet: !!replyTo,
+            hint: 'Set EMAIL_FROM to the same address as EMAIL_USER, or leave EMAIL_FROM unset. EMAIL_ALLOW_FROM_MISMATCH=1 disables this fix.',
+        });
+    }
+
     const textBody = options.text || (options.html ? htmlToPlainText(options.html) : undefined);
 
     const mailOptions = {
@@ -184,9 +232,13 @@ const sendEmail = async (options) => {
         text: textBody,
         html: options.html,
     };
+    if (replyTo) {
+        mailOptions.replyTo = replyTo;
+    }
 
     console.log('[sendEmail] mail envelope:', {
         from: from.replace(/<[^>]+>/, '<hidden@domain>'),
+        replyTo: replyTo ? replyTo.replace(/<[^>]+>/, '<hidden@domain>') : '(none)',
         to: options.to,
         hasHtml: !!options.html,
         hasText: !!textBody,
@@ -349,73 +401,97 @@ sendEmail.getLastQueuedDispatchDebug = getLastQueuedDispatchDebug;
 
 // --- Staff-specific mail (all templates + queue live here; staffRoutes only passes data) ---
 
-/**
- * JSON snippet for POST /staff responses — SMTP snapshot only, no secrets.
- */
-function getStaffEmailDispatchForApiResponse(context, recipientEmail, extra = {}) {
-    return {
-        queued: true,
-        context,
-        recipient: recipientEmail,
-        smtpEnv: getSmtpEnvSnapshotForApi(),
-        note: 'Mail is sent asynchronously after this response. If smtpEnv.readyToAttemptSmtp is false, configure EMAIL_* on the server.',
-        ...extra,
-    };
-}
-
-/** New staff: activation link + password setup */
-function queueStaffActivationEmail({ to, name, role, activationToken }) {
+function buildStaffActivationMail({ to, name, role, activationToken }) {
     const clientUrl = String(process.env.CLIENT_URL || '').trim();
     const activationUrl = `${clientUrl}/staff-setup/${activationToken}`;
-    const html = `
+    return {
+        context: 'activation-new-staff',
+        to,
+        subject: 'Pocket POS Account Activation',
+        html: `
             <h1>Welcome to Pocket POS, ${name}!</h1>
             <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
             <p>Click below to set your password and activate your account:</p>
             <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
-        `;
-    console.log('[sendEmail] staff activation mail build (token not logged):', {
-        CLIENT_URL: clientUrl || '(MISSING)',
-        pathSuffix: '/staff-setup/<token>',
-        tokenLengthChars: activationToken.length,
+        `,
+        activationTokenLengthChars: activationToken.length,
+        activationLinkUsesClientUrl: !!clientUrl,
+    };
+}
+
+function buildStaffReactivatedMail({ to }) {
+    return {
+        context: 'reactivated',
+        to,
+        subject: 'Reactivated – Pocket POS',
+        html: `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`,
+    };
+}
+
+function buildStaffExistingUserNewShopMail({ to, role }) {
+    return {
+        context: 'existing-user-new-shop',
+        to,
+        subject: 'Added to a new shop – Pocket POS',
+        html: `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`,
+    };
+}
+
+async function sendStaffMailAndGetDispatch(mail) {
+    const { context, to, subject, html } = mail;
+    const dispatch = {
+        queued: false,
+        context,
         recipient: to,
+        subject,
+        smtpEnv: getSmtpEnvSnapshotForApi(),
+        success: false,
+    };
+    try {
+        const info = await sendEmail({ to, subject, html });
+        dispatch.success = true;
+        dispatch.messageId = info?.messageId || null;
+        dispatch.accepted = info?.accepted || [];
+        dispatch.rejected = info?.rejected || [];
+        dispatch.smtpResponse = info?.response || null;
+        dispatch.note = 'SMTP accepted this message.';
+        return dispatch;
+    } catch (err) {
+        dispatch.success = false;
+        dispatch.errorMessage = err?.message || 'Unknown SMTP error';
+        dispatch.errorCode = err?.code || null;
+        dispatch.smtpCommand = err?.command || null;
+        dispatch.smtpResponseCode = err?.responseCode || null;
+        dispatch.smtpResponse = err?.response || null;
+        dispatch.note = 'SMTP send failed. Use these fields to debug provider/auth/network issues.';
+        return dispatch;
+    }
+}
+
+async function sendStaffActivationEmailAndGetDispatch(payload) {
+    const mail = buildStaffActivationMail(payload);
+    console.log('[sendEmail] staff activation mail build (token not logged):', {
+        CLIENT_URL: process.env.CLIENT_URL || '(MISSING)',
+        pathSuffix: '/staff-setup/<token>',
+        tokenLengthChars: mail.activationTokenLengthChars,
+        recipient: mail.to,
     });
-    queueSendEmail(
-        {
-            to,
-            subject: 'Pocket POS Account Activation',
-            html,
-        },
-        'activation-new-staff'
-    );
+    const dispatch = await sendStaffMailAndGetDispatch(mail);
+    dispatch.activationTokenLengthChars = mail.activationTokenLengthChars;
+    dispatch.activationLinkUsesClientUrl = mail.activationLinkUsesClientUrl;
+    return dispatch;
 }
 
-function queueStaffReactivatedEmail({ to }) {
-    const html = `<p>Your staff account has been reactivated. You can log in with your existing password.</p>`;
-    queueSendEmail(
-        {
-            to,
-            subject: 'Reactivated – Pocket POS',
-            html,
-        },
-        'reactivated'
-    );
+async function sendStaffReactivatedEmailAndGetDispatch(payload) {
+    return sendStaffMailAndGetDispatch(buildStaffReactivatedMail(payload));
 }
 
-function queueStaffExistingUserNewShopEmail({ to, role }) {
-    const html = `<h1>You've been added to another shop</h1><p>You were added as <strong>${role}</strong>. Log in with your existing Pocket POS password.</p>`;
-    queueSendEmail(
-        {
-            to,
-            subject: 'Added to a new shop – Pocket POS',
-            html,
-        },
-        'existing-user-new-shop'
-    );
+async function sendStaffExistingUserNewShopEmailAndGetDispatch(payload) {
+    return sendStaffMailAndGetDispatch(buildStaffExistingUserNewShopMail(payload));
 }
 
-sendEmail.getStaffEmailDispatchForApiResponse = getStaffEmailDispatchForApiResponse;
-sendEmail.queueStaffActivationEmail = queueStaffActivationEmail;
-sendEmail.queueStaffReactivatedEmail = queueStaffReactivatedEmail;
-sendEmail.queueStaffExistingUserNewShopEmail = queueStaffExistingUserNewShopEmail;
+sendEmail.sendStaffActivationEmailAndGetDispatch = sendStaffActivationEmailAndGetDispatch;
+sendEmail.sendStaffReactivatedEmailAndGetDispatch = sendStaffReactivatedEmailAndGetDispatch;
+sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch = sendStaffExistingUserNewShopEmailAndGetDispatch;
 
 module.exports = sendEmail;

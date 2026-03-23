@@ -215,13 +215,15 @@ router.post('/', protect, async (req, res) => {
                 { active: true, name, role },
                 { new: true }
             );
-            console.log('[staffRoutes] POST /staff → queue staff reactivation email', { to: normalizedEmail, staffId: String(updated._id) });
-            sendEmail.queueStaffReactivatedEmail({ to: normalizedEmail });
+            console.log('[staffRoutes] POST /staff → sending staff reactivation email', { to: normalizedEmail, staffId: String(updated._id) });
+            const emailDispatch = await sendEmail.sendStaffReactivatedEmailAndGetDispatch({ to: normalizedEmail });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 reactivated', { staffId: String(updated._id) });
             return res.status(201).json({
-                message: `Staff member ${updated.name} reactivated successfully.`,
+                message: emailDispatch.success
+                    ? `Staff member ${updated.name} reactivated successfully.`
+                    : `Staff member ${updated.name} reactivated, but email failed to send. Check emailDispatch.errorMessage.`,
                 staff: updated,
-                emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('reactivated', normalizedEmail),
+                emailDispatch,
             });
         }
 
@@ -239,13 +241,15 @@ router.post('/', protect, async (req, res) => {
                 role,
                 active: false,
             });
-            console.log('[staffRoutes] POST /staff → queue existing-user new shop email', { to: normalizedEmail, staffId: String(newStaff._id) });
-            sendEmail.queueStaffExistingUserNewShopEmail({ to: normalizedEmail, role });
+            console.log('[staffRoutes] POST /staff → sending existing-user new shop email', { to: normalizedEmail, staffId: String(newStaff._id) });
+            const emailDispatch = await sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch({ to: normalizedEmail, role });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 existing-user-new-shop', { staffId: String(newStaff._id) });
             return res.status(201).json({
-                message: `Staff member ${newStaff.name} added. They can log in with their existing account.`,
+                message: emailDispatch.success
+                    ? `Staff member ${newStaff.name} added. They can log in with their existing account.`
+                    : `Staff member ${newStaff.name} added, but notification email failed to send. Check emailDispatch.errorMessage.`,
                 staff: newStaff,
-                emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('existing-user-new-shop', normalizedEmail),
+                emailDispatch,
             });
         }
 
@@ -284,26 +288,25 @@ router.post('/', protect, async (req, res) => {
         newUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; 
         await newUser.save({ validateBeforeSave: false }); 
         
-        // --- 5. Activation email (async — handled in sendEmail.js) ---
-        res.status(201).json({
-            message: `Staff member ${newStaff.name} added. They will receive an email to set their password shortly.`,
-            staff: newStaff,
-            emailDispatch: sendEmail.getStaffEmailDispatchForApiResponse('activation-new-staff', newUser.email, {
-                activationTokenLengthChars: activationToken.length,
-                activationLinkUsesClientUrl: !!(process.env.CLIENT_URL && String(process.env.CLIENT_URL).trim()),
-            }),
-        });
-
-        console.log('[staffRoutes] POST /staff → queue activation email', { to: newUser.email, userId: String(newUser._id) });
-        sendEmail.queueStaffActivationEmail({
+        // --- 5. Activation email (sync for API debug: return SMTP success/error in this response) ---
+        console.log('[staffRoutes] POST /staff → sending activation email', { to: newUser.email, userId: String(newUser._id) });
+        const emailDispatch = await sendEmail.sendStaffActivationEmailAndGetDispatch({
             to: newUser.email,
             name,
             role,
             activationToken,
         });
-        console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 new user (email queued async)', {
+        res.status(201).json({
+            message: emailDispatch.success
+                ? `Staff member ${newStaff.name} added. They will receive an email to set their password shortly.`
+                : `Staff member ${newStaff.name} added, but activation email failed to send. Check emailDispatch.errorMessage.`,
+            staff: newStaff,
+            emailDispatch,
+        });
+        console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 new user (email attempted in-route)', {
             staffId: String(newStaff._id),
             userId: String(newUser._id),
+            emailSuccess: emailDispatch?.success === true,
         });
 
     } catch (error) {
