@@ -436,9 +436,9 @@ router.get('/alerts', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             filter = { forSuperAdmin: true, dismissedBy: { $nin: [req.user._id] } };
         } else if (req.user.role === 'owner') {
-            filter = { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } };
+            filter = { ownerId: req.user._id, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
         } else if (req.user.storeId) {
-            filter = { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+            filter = { storeId: req.user.storeId, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
         } else {
             return res.json({ count: 0, alerts: [] });
         }
@@ -514,9 +514,9 @@ router.put('/alerts/dismiss-all', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             filter = { forSuperAdmin: true, dismissedBy: { $nin: [req.user._id] } };
         } else if (req.user.role === 'owner') {
-            filter = { ownerId: req.user._id, dismissedBy: { $nin: [req.user._id] } };
+            filter = { ownerId: req.user._id, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
         } else {
-            filter = { storeId: req.user.storeId, dismissedBy: { $nin: [req.user._id] } };
+            filter = { storeId: req.user.storeId, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
         }
         const result = await Notification.updateMany(
             filter,
@@ -540,9 +540,9 @@ router.put('/alerts/:id/dismiss', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             filter = { _id: id, forSuperAdmin: true };
         } else if (req.user.role === 'owner') {
-            filter = { _id: id, ownerId: req.user._id };
+            filter = { _id: id, ownerId: req.user._id, forSuperAdmin: { $ne: true } };
         } else {
-            filter = { _id: id, storeId: req.user.storeId };
+            filter = { _id: id, storeId: req.user.storeId, forSuperAdmin: { $ne: true } };
         }
         const doc = await Notification.findOneAndUpdate(
             filter,
@@ -568,9 +568,9 @@ router.put('/read-all', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             filter = { forSuperAdmin: true, readBy: { $ne: req.user._id } };
         } else if (req.user.role === 'owner') {
-            filter = { ownerId: req.user._id, readBy: { $ne: req.user._id } };
+            filter = { ownerId: req.user._id, forSuperAdmin: { $ne: true }, readBy: { $ne: req.user._id } };
         } else {
-            filter = { storeId: req.user.storeId, readBy: { $ne: req.user._id } };
+            filter = { storeId: req.user.storeId, forSuperAdmin: { $ne: true }, readBy: { $ne: req.user._id } };
         }
         const result = await Notification.updateMany(
             filter,
