@@ -595,3 +595,13 @@ div[class*="overflow-x"]::-webkit-scrollbar-thumb:hover {
     width: 0 !important;
     height: 0 !important;
 }
+
+/* --------------------------------------------
+   Professional text casing (non-dashboard pages)
+   - Remove forced ALL CAPS utility styles.
+   - Keep Dashboard untouched (requested).
+   -------------------------------------------- */
+body.app-non-dashboard .uppercase {
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}

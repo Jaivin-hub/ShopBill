@@ -1170,6 +1170,17 @@ useEffect(() => {
       setIsChatSelected(false);
     }
   }, [currentPage]);
+
+  // Typography mode: keep Dashboard styling as-is; normalize other pages.
+  useEffect(() => {
+    const className = 'app-non-dashboard';
+    if (currentPage !== 'dashboard') {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+    return () => document.body.classList.remove(className);
+  }, [currentPage]);
   
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';

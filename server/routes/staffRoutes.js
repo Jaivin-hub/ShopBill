@@ -147,6 +147,7 @@ router.post('/', protect, async (req, res) => {
     }
     
     const { name, email, role, phone } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (!name || !email || !role) {
         return res.status(400).json({ error: 'Please provide name, email, and role.' });
@@ -182,7 +183,6 @@ router.post('/', protect, async (req, res) => {
         // PRO and PREMIUM plans allow unlimited staff; no further check needed.
 
         // --- 1. Email uniqueness per shop: only block if this email is already staff in THIS shop ---
-        const normalizedEmail = String(email || '').trim().toLowerCase();
         if (!normalizedEmail || !normalizedEmail.includes('@')) {
             return res.status(400).json({ error: 'Please provide a valid email address.' });
         }
@@ -231,6 +231,16 @@ router.post('/', protect, async (req, res) => {
         if (existingUser) {
             if (existingUser._id.toString() === req.user.id.toString()) {
                 return res.status(400).json({ error: 'You cannot add yourself as staff. Use a different email.' });
+            }
+            // Guard by userId too (email can change later; same account should not duplicate in same store)
+            const existingStaffByUserInThisShop = await Staff.findOne({
+                storeId: storeIdForStaff,
+                userId: existingUser._id
+            });
+            if (existingStaffByUserInThisShop) {
+                return res.status(409).json({
+                    error: `This user is already added in your shop.`
+                });
             }
             // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
             const newStaff = await Staff.create({
@@ -313,6 +323,53 @@ router.post('/', protect, async (req, res) => {
         console.error('[staffRoutes] POST /api/staff → 500 or handled', error.message, error.code);
         console.error('Staff POST error:', error.message, error);
         if (error.code === 11000) {
+            // Duplicate in Staff collection => already associated to this store
+            if (error?.keyPattern?.storeId && error?.keyPattern?.email) {
+                return res.status(409).json({
+                    error: 'This email is already added in your shop.'
+                });
+            }
+
+            // Duplicate in User collection (email already exists globally):
+            // recover by linking existing user to this store instead of failing.
+            if (error?.keyPattern?.email) {
+                try {
+                    const storeIdForStaff = req.user.storeId;
+                    const existingUser = await User.findOne({ email: normalizedEmail });
+                    if (existingUser) {
+                        if (existingUser._id.toString() === req.user.id.toString()) {
+                            return res.status(400).json({ error: 'You cannot add yourself as staff. Use a different email.' });
+                        }
+                        const alreadyInThisShop = await Staff.findOne({
+                            storeId: storeIdForStaff,
+                            userId: existingUser._id
+                        });
+                        if (alreadyInThisShop) {
+                            return res.status(409).json({
+                                error: 'This user is already added in your shop.'
+                            });
+                        }
+                        const recoveredStaff = await Staff.create({
+                            storeId: storeIdForStaff,
+                            userId: existingUser._id,
+                            name,
+                            email: normalizedEmail,
+                            role,
+                            active: false,
+                        });
+                        const emailDispatch = await sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch({ to: normalizedEmail, role });
+                        return res.status(201).json({
+                            message: emailDispatch.success
+                                ? `Staff member ${recoveredStaff.name} added. They can log in with their existing account.`
+                                : `Staff member ${recoveredStaff.name} added, but notification email failed to send. Check emailDispatch.errorMessage.`,
+                            staff: recoveredStaff,
+                            emailDispatch,
+                        });
+                    }
+                } catch (recoveryError) {
+                    console.error('Staff POST duplicate email recovery failed:', recoveryError);
+                }
+            }
             return res.status(409).json({
                 error: 'The email is already added in your shop. Please use a different email.'
             });

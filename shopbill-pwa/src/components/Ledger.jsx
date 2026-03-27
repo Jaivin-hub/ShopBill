@@ -219,7 +219,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
               <div className="p-4 md:p-6 pb-3 md:pb-4">
                 <div className="mb-3 md:mb-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-4 mb-2">
+                    <div className="flex items-start justify-between gap-4 mb-2">
                       <div className="flex-1 min-w-0">
                         <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           Ledger <span className="text-indigo-500">Terminal</span>
@@ -228,15 +228,24 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                           Customer account management system.
                         </p>
                       </div>
-                      {/* Total Credit Outstanding */}
-                      <div className={`flex flex-col items-end shrink-0 px-3 py-2 rounded-lg border ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-200'}`}>
-                        <p className={`text-[8px] font-black tracking-widest uppercase mb-0.5 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
-                          Total Outstanding
+                      {/* Desktop total outstanding */}
+                      <div className="hidden md:flex items-baseline gap-2 shrink-0 pl-2">
+                        <p className={`text-xs font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                          Total outstanding:
                         </p>
-                        <p className={`text-lg md:text-xl font-black tracking-tight tabular-nums ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        <p className={`text-lg font-black tabular-nums ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
                           ₹{totalOutstanding.toLocaleString('en-IN')}
                         </p>
                       </div>
+                    </div>
+                    {/* Mobile total outstanding - dedicated row to avoid collapse on large amounts */}
+                    <div className="md:hidden flex items-center justify-between gap-3">
+                      <p className={`text-[10px] font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        Total outstanding:
+                      </p>
+                      <p className={`text-base font-black tabular-nums truncate text-right ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        ₹{totalOutstanding.toLocaleString('en-IN')}
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -17,7 +17,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-amber-500/10', 
                 borderColor: 'border-amber-500/20',
                 glow: 'shadow-amber-500/5',
-                label: 'LOW STOCK'
+                label: 'Low stock'
             };
         case 'inventory_added':
             return { 
@@ -26,7 +26,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-emerald-500/10', 
                 borderColor: 'border-emerald-500/20',
                 glow: 'shadow-emerald-500/5',
-                label: 'INVENTORY ADDED'
+                label: 'Inventory added'
             };
         case 'inventory_updated':
             return { 
@@ -35,7 +35,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-blue-500/10', 
                 borderColor: 'border-blue-500/20',
                 glow: 'shadow-blue-500/5',
-                label: 'INVENTORY UPDATED'
+                label: 'Inventory updated'
             };
         case 'inventory_deleted':
             return { 
@@ -44,7 +44,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-orange-500/10', 
                 borderColor: 'border-orange-500/20',
                 glow: 'shadow-orange-500/5',
-                label: 'INVENTORY DELETED'
+                label: 'Inventory deleted'
             };
         case 'inventory_bulk_upload':
             return { 
@@ -53,7 +53,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-violet-500/10', 
                 borderColor: 'border-violet-500/20',
                 glow: 'shadow-violet-500/5',
-                label: 'BULK UPLOAD'
+                label: 'Bulk upload'
             };
         case 'purchase_recorded':
             return { 
@@ -62,7 +62,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-indigo-500/10', 
                 borderColor: 'border-indigo-500/20',
                 glow: 'shadow-indigo-500/5',
-                label: 'PURCHASE RECORDED'
+                label: 'Purchase recorded'
             };
         case 'ledger_payment':
             return { 
@@ -71,7 +71,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-emerald-500/10', 
                 borderColor: 'border-emerald-500/20',
                 glow: 'shadow-emerald-500/5',
-                label: 'PAYMENT RECEIVED'
+                label: 'Payment received'
             };
         case 'ledger_credit':
             return { 
@@ -80,7 +80,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-amber-500/10', 
                 borderColor: 'border-amber-500/20',
                 glow: 'shadow-amber-500/5',
-                label: 'CREDIT GIVEN'
+                label: 'Credit given'
             };
         case 'credit_exceeded':
             return { 
@@ -89,7 +89,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-rose-500/10', 
                 borderColor: 'border-rose-500/20',
                 glow: 'shadow-rose-500/5',
-                label: 'CREDIT WARNING'
+                label: 'Credit warning'
             };
         case 'success':
             return { 
@@ -98,7 +98,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-emerald-500/10', 
                 borderColor: 'border-emerald-500/20',
                 glow: 'shadow-emerald-500/5',
-                label: 'SYSTEM SUCCESS'
+                label: 'System success'
             };
         case 'new_shop_registered':
             return { 
@@ -107,7 +107,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-teal-500/10', 
                 borderColor: 'border-teal-500/20',
                 glow: 'shadow-teal-500/5',
-                label: 'NEW SHOP'
+                label: 'New shop'
             };
         default:
             return { 
@@ -116,7 +116,7 @@ const getNotificationTypeDetails = (type) => {
                 bgColor: 'bg-indigo-500/10', 
                 borderColor: 'border-indigo-500/20',
                 glow: 'shadow-indigo-500/5',
-                label: 'SYSTEM INFO'
+                label: 'System info'
             };
     }
 };
@@ -166,7 +166,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
     };
     
     const formatTime = (timestamp) => {
-        if (!timestamp) return 'JUST NOW';
+        if (!timestamp) return 'Just now';
         const date = new Date(timestamp);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
                ' • ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
