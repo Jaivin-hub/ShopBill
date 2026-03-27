@@ -250,6 +250,33 @@ router.post('/signup', async (req, res) => {
         newUser.shopId = newUser._id;
         await newUser.save();
 
+        // Create the first outlet from registration details so owner can start immediately.
+        // This prevents a "no outlet yet" state right after first login.
+        const initialOutlet = await Store.create({
+            name: (shopName || 'Main Store').trim(),
+            ownerId: newUser._id,
+            taxId: newUser.taxId || '',
+            address: newUser.address || '',
+            phone: newUser.phone || '',
+            email: newUser.email || '',
+            isActive: true
+        });
+        newUser.activeStoreId = initialOutlet._id;
+        await newUser.save();
+
+        // Create the default outlet group (same behavior as manual outlet creation).
+        const requiredPlan = newUser.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO';
+        await Chat.create({
+            type: 'group',
+            name: `${initialOutlet.name} Group`,
+            isGroupChat: true,
+            participants: [newUser._id],
+            createdBy: newUser._id,
+            isDefault: true,
+            outletId: initialOutlet._id,
+            requiredPlan
+        });
+
         // Notify superadmins that a new shop registered (non-blocking)
         notifySuperadminsNewShop(req, newUser).catch(err => console.error('Notify superadmins new shop:', err));
 
@@ -266,6 +293,7 @@ router.post('/signup', async (req, res) => {
                 plan: newUser.plan,
                 shopName: newUser.shopName,
                 businessType: newUser.businessType,
+                activeStoreId: newUser.activeStoreId,
             }
         });
 

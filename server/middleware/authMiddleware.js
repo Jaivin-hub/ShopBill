@@ -124,26 +124,24 @@ const protect = async (req, res, next) => {
                     }
                 }
             } else {
-                if (user.plan === 'PREMIUM') {
-                    const firstStore = await Store.findOne({ ownerId: user._id, isActive: true }).sort({ createdAt: 1 });
-                    if (firstStore) {
-                        storeId = firstStore._id;
-                        user.activeStoreId = storeId;
-                        await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
-                    }
+                const firstStore = await Store.findOne({ ownerId: user._id, isActive: true }).sort({ createdAt: 1 });
+                if (firstStore) {
+                    storeId = firstStore._id;
+                    user.activeStoreId = storeId;
+                    await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
                 } else {
-                    let defaultStore = await Store.findOne({ ownerId: user._id, name: 'Main Store' });
-                    if (!defaultStore) {
-                        defaultStore = await Store.create({
-                            name: 'Main Store',
-                            ownerId: user._id,
-                            taxId: user.taxId || '',
-                            address: user.address || '',
-                            phone: user.phone || '',
-                            email: user.email || '',
-                            isActive: true
-                        });
-                    }
+                    // Backward-safe fallback for legacy owners that somehow have no store.
+                    // Use registered business name so first context matches what they signed up with.
+                    const fallbackName = (user.shopName && String(user.shopName).trim()) || 'Main Store';
+                    const defaultStore = await Store.create({
+                        name: fallbackName,
+                        ownerId: user._id,
+                        taxId: user.taxId || '',
+                        address: user.address || '',
+                        phone: user.phone || '',
+                        email: user.email || '',
+                        isActive: true
+                    });
                     storeId = defaultStore._id;
                     user.activeStoreId = storeId;
                     await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });

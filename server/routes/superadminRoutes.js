@@ -6,6 +6,8 @@ const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Payment = require('../models/Payment');
+const Chat = require('../models/Chat');
+const { deleteStoreCascade } = require('../utils/deleteStoreCascade');
 const router = express.Router();
 const Razorpay = require('razorpay');
 const rzp = new Razorpay({
@@ -422,37 +424,48 @@ router.get('/shops/:id', superadminProtect, async (req, res) => {
 
 /**
  * @route DELETE /api/superadmin/shops/:id
- * @desc Delete a shop (deletes the owner user and associated data)
+ * @desc Delete a shop owner and all data: outlets (stores), inventory, sales, ledger, suppliers, staff, chats, payments, etc.
  * @access Private (Superadmin only)
- * * NOTE: In a full system, deleting the User/Owner document here should trigger 
- * a cascade operation to clean up all related Inventory, Sales, and Staff data 
- * linked to this shop ID. For this implementation, we focus on deleting the primary User/Owner document.
  */
 router.delete('/shops/:id', superadminProtect, async (req, res) => {
     try {
         const shopId = req.params.id;
 
-        // 1. Find and ensure the user exists and has the 'owner' role
-        // We use findOneAndDelete for atomic operation, but finding first is better 
-        // if you need the 'shop' object for the message and have pre/post hooks.
         const shop = await User.findOne({ _id: shopId, role: 'owner' });
 
         if (!shop) {
             return res.status(404).json({ success: false, message: `Shop with ID ${shopId} not found or is not an owner account.` });
         }
 
-        // --- CRUCIAL IMPROVEMENT: Delete All Associated Staff ---
-        // The shop's ID is the shopId for all its staff members.
-        const deleteStaffResult = await User.deleteMany({ shopId: shop._id, role: { $in: ['Manager', 'Cashier'] } });
-        // --------------------------------------------------------
+        const outletDocs = await Store.find({ ownerId: shop._id }).select('_id').lean();
+        const cascadeSummaries = [];
 
-        // 2. Perform the deletion of the owner document (representing the shop)
+        for (const o of outletDocs) {
+            try {
+                const summary = await deleteStoreCascade(o._id, { ownerId: shop._id });
+                cascadeSummaries.push({ storeId: o._id.toString(), ...summary });
+            } catch (e) {
+                if (e.code !== 'STORE_NOT_FOUND') throw e;
+            }
+        }
+
+        // Any remaining staff user accounts linked to this owner (e.g. legacy rows)
+        const deleteStaffResult = await User.deleteMany({ shopId: shop._id, role: { $in: ['Manager', 'Cashier'] } });
+
+        // Subscription / payment events for this business
+        await Payment.deleteMany({ shopId: shop._id });
+
+        // Owner-scoped chats (incl. cross-outlet groups)
+        await Chat.deleteMany({ createdBy: shop._id });
+
         await shop.deleteOne();
-        
-        // 3. Respond success
+
         res.json({
             success: true,
-            message: `Shop '${shop.shopName}' (Owner: ${shop.email}) and ${deleteStaffResult.deletedCount} associated staff accounts successfully deleted.`
+            message: `Shop '${shop.shopName}' (Owner: ${shop.email}) and all associated data deleted.`,
+            outletsRemoved: outletDocs.length,
+            staffAccountsRemoved: deleteStaffResult.deletedCount,
+            cascadeSummaries,
         });
 
     } catch (error) {
