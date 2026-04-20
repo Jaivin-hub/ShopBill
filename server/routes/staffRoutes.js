@@ -242,16 +242,37 @@ router.post('/', protect, async (req, res) => {
                     error: `This user is already added in your shop.`
                 });
             }
-            // User exists (e.g. staff at another shop): add them as staff in this shop only, no new User
-            const newStaff = await Staff.create({
-                storeId: storeIdForStaff,
-                userId: existingUser._id,
-                name,
-                email: normalizedEmail,
+            // Transfer semantics: if this user already has a Staff row in another store,
+            // move that Staff membership to the current store (A -> B scenario).
+            const existingStaffElsewhere = await Staff.findOne({ userId: existingUser._id });
+            let newStaff;
+            if (existingStaffElsewhere) {
+                existingStaffElsewhere.storeId = storeIdForStaff;
+                existingStaffElsewhere.name = name;
+                existingStaffElsewhere.email = normalizedEmail;
+                existingStaffElsewhere.role = role;
+                existingStaffElsewhere.active = false;
+                await existingStaffElsewhere.save();
+                newStaff = existingStaffElsewhere;
+            } else {
+                // No prior staff row; create a fresh membership in this store.
+                newStaff = await Staff.create({
+                    storeId: storeIdForStaff,
+                    userId: existingUser._id,
+                    name,
+                    email: normalizedEmail,
+                    role,
+                    active: false,
+                });
+            }
+            // Re-link login context to this owner's shop/store.
+            await User.findByIdAndUpdate(existingUser._id, {
                 role,
-                active: false,
+                shopId: req.user.id,
+                activeStoreId: storeIdForStaff,
+                isActive: true,
             });
-            console.log('[staffRoutes] POST /staff → sending existing-user new shop email', { to: normalizedEmail, staffId: String(newStaff._id) });
+            console.log('[staffRoutes] POST /staff → sending existing-user new shop email', { to: normalizedEmail, staffId: String(newStaff._id), userId: String(existingUser._id) });
             const emailDispatch = await sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch({ to: normalizedEmail, role });
             console.log('[staffRoutes] ROUTE DONE POST /api/staff → 201 existing-user-new-shop', { staffId: String(newStaff._id) });
             return res.status(201).json({
@@ -354,14 +375,35 @@ router.post('/', protect, async (req, res) => {
                             error: 'This user is already added in your shop.'
                         });
                     }
-
-                    const recoveredStaff = await Staff.create({
-                        storeId: storeIdForStaff,
-                        userId: existingUser._id,
-                        name,
-                        email: normalizedEmail,
+                    // If a legacy/global unique email index exists in Staff collection,
+                    // recover by moving existing staff doc (same email/user) to this store.
+                    let recoveredStaff = await Staff.findOne({ userId: existingUser._id });
+                    if (!recoveredStaff) {
+                        recoveredStaff = await Staff.findOne({ email: normalizedEmail });
+                    }
+                    if (recoveredStaff) {
+                        recoveredStaff.storeId = storeIdForStaff;
+                        recoveredStaff.userId = existingUser._id;
+                        recoveredStaff.name = name;
+                        recoveredStaff.email = normalizedEmail;
+                        recoveredStaff.role = role;
+                        recoveredStaff.active = false;
+                        await recoveredStaff.save();
+                    } else {
+                        recoveredStaff = await Staff.create({
+                            storeId: storeIdForStaff,
+                            userId: existingUser._id,
+                            name,
+                            email: normalizedEmail,
+                            role,
+                            active: false,
+                        });
+                    }
+                    await User.findByIdAndUpdate(existingUser._id, {
                         role,
-                        active: false,
+                        shopId: req.user.id,
+                        activeStoreId: storeIdForStaff,
+                        isActive: true,
                     });
                     const emailDispatch = await sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch({ to: normalizedEmail, role });
                     return res.status(201).json({

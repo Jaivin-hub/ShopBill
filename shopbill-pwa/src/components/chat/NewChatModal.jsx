@@ -5,7 +5,7 @@ const NewChatModal = ({
     show,
     onClose,
     newChatType,
-    onChatTypeChange,
+    onChatTypeChange: _onChatTypeChange,
     newChatName,
     onChatNameChange,
     selectedUsers,

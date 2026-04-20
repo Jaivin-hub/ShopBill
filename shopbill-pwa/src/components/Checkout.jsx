@@ -317,246 +317,235 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     );
 
     return (
-        <main className={`min-h-screen ${bgColor} flex flex-col items-center p-0 sm:p-6 lg:p-8 font-sans transition-colors duration-300`}>
-            <div className={`flex-1 w-full flex flex-col items-center min-h-0 ${fromCreateAccount && !detailsComplete ? 'justify-center' : ''}`}>
-            <section className={`max-w-5xl w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-xl sm:rounded-[2rem] sm:border sm:${sectionBorder} shadow-2xl overflow-hidden transition-colors duration-300`}>
-                <div className="flex flex-col lg:grid lg:grid-cols-12">
-                    
-                    {/* Compact Summary Side (Top on Mobile) - only when we have plan selection or plan summary; no steps section */}
-                    {!(fromCreateAccount && !detailsComplete) && (
-                    <div className={`${fromCreateAccount && detailsComplete ? 'lg:col-span-12' : 'lg:col-span-4'} ${sectionBg} sm:${sectionCardBg} p-3 sm:p-6 lg:p-10 border-b lg:border-b-0 lg:border-r ${sectionBorder} transition-colors duration-300`}>
-                        {(fromCreateAccount && detailsComplete) || !plan ? (
-                            <div>
-                                <p className={`text-[10px] ${descColor} mb-4 font-bold`}>Pro gives you the best value to grow</p>
-                                <div className={`grid gap-3 md:gap-4 ${fromCreateAccount && detailsComplete ? 'grid-cols-1 md:grid-cols-3 md:grid-rows-1' : 'space-y-3'}`}>
-                                    {(['BASIC', 'PRO', 'PREMIUM']).map((key) => {
-                                        const p = PLAN_DETAILS[key];
-                                        const isSelected = selectedPlanInCheckout === key;
-                                        const isPro = key === 'PRO';
-                                        return (
-                                            <button
-                                                key={key}
-                                                type="button"
-                                                onClick={() => setSelectedPlanInCheckout(key)}
-                                                className={`relative w-full rounded-2xl border-2 text-left transition-all duration-300 active:scale-[0.98]
-                                                    ${isPro
-                                                        ? `bg-gradient-to-br ${p.color} text-white shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/30 hover:scale-[1.02] ring-2 ${isSelected ? `ring-teal-400 ring-offset-2 border-teal-400/80 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-slate-50'}` : 'ring-transparent border-indigo-400/40'} md:scale-105 md:z-10`
-                                                        : `${darkMode ? 'bg-gray-800/70 border-gray-700' : 'bg-slate-100 border-slate-300'} ${isSelected ? `ring-2 ring-indigo-500/50 ring-offset-2 border-indigo-500 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-slate-50'}` : 'hover:border-gray-600'}`
-                                                    } p-4 ${p.featured ? 'pt-7' : ''}`}
-                                            >
-                                                {p.featured && (
-                                                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-400 to-emerald-400 text-gray-900 text-[8px] font-black tracking-[0.15em] px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
-                                                        {p.badge || 'MOST POPULAR'}
-                                                    </div>
-                                                )}
-                                                {p.valueNote && (
-                                                    <p className="text-[9px] font-black text-teal-200/90 mb-1.5">{p.valueNote}</p>
-                                                )}
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <div>
-                                                        <span className={`font-black text-sm block ${isPro ? 'text-white' : textColor}`}>{p.name}</span>
-                                                        {p.tagline && <span className={`text-[9px] block mt-0.5 ${isPro ? 'text-white/70' : descColor}`}>{p.tagline}</span>}
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-0.5 shrink-0">
-                                                        {isSelected && (
-                                                            <span className={`flex items-center gap-1 text-[8px] font-black px-2 py-0.5 rounded-full ${isPro ? 'bg-white/25 text-white' : 'bg-indigo-500/20 text-indigo-300'}`}>
-                                                                <CheckCircle size={10} /> Selected
-                                                            </span>
-                                                        )}
-                                                        <span className={`font-black text-sm ${isPro ? 'text-white' : textColor}`}>₹{p.price}<span className="text-[10px] font-bold opacity-80">/mo</span></span>
-                                                    </div>
-                                                </div>
-                                                <p className={`text-[9px] mt-1 ${isPro ? 'text-white/60' : descColor}`}>Verification: ₹1</p>
-                                                <ul className="mt-2.5 space-y-1">
-                                                    {(p.items || []).map((f, i) => (
-                                                        <li key={i} className={`text-[9px] font-bold flex items-center gap-1.5 ${isPro ? 'text-white/95' : descColor}`}>
-                                                            <ShieldCheck size={10} className={`shrink-0 ${isPro ? 'text-teal-300/80' : 'text-indigo-500/70'}`} /> {f}
-                                                        </li>
-                                                    ))}
-                                                    {(p.excludedItems || []).map((f, i) => (
-                                                        <li key={`ex-${i}`} className={`text-[9px] font-bold flex items-center gap-1.5 ${isPro ? 'text-white/50 line-through' : 'text-gray-500 line-through'} ${darkMode ? '' : ''}`}>
-                                                            <XCircle size={10} className="shrink-0 opacity-70" /> {f}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <p className={`text-[9px] ${descColor} mt-4`}>Select a plan to proceed to payment</p>
-                                {fromCreateAccount && detailsComplete && (
-                                    <div className="mt-6 space-y-3">
-                                        <button type="button" onClick={() => setDetailsComplete(false)} className={`w-full text-center text-[10px] font-black ${labelColor} hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase`}>
-                                            <ArrowLeft size={12} className="mr-1" /> Back to edit details
-                                        </button>
-                                        <form onSubmit={handlePaymentSubmit} className="space-y-3">
-                                            <button type="submit" disabled={!selectedPlanInCheckout || isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
-                                                {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
-                                            </button>
-                                            <p className={`text-[9px] ${infoText} text-center font-bold`}>By proceeding, you authorize a ₹1 verification charge.</p>
-                                            <button type="button" onClick={(e) => { e.preventDefault(); onBackToLogin?.(); }} className={`w-full text-center text-[10px] font-black ${labelColor} hover:text-indigo-400 flex items-center justify-center cursor-pointer uppercase py-2`}>
-                                                <ArrowLeft size={12} className="mr-1 shrink-0" /> Back to Login
-                                            </button>
-                                        </form>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                        <>
-                        <div className={`p-5 lg:p-8 rounded-2xl lg:rounded-[2rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-xl`}>
-                            <div className="absolute -top-2 -right-2 p-4 opacity-10 lg:opacity-20 hidden sm:block">
-                                <ShoppingCart size={60} className="lg:w-20 lg:h-20" />
-                            </div>
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4 lg:mb-8">
-                                    <div>
-                                        <span className="text-[9px] font-black tracking-[0.2em] bg-white/20 px-2 py-0.5 rounded-full mb-1 inline-block text-white uppercase">{plan.interval}</span>
-                                        <h3 className="text-xl lg:text-2xl font-black text-white tracking-tighter">{plan.name}</h3>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="block text-[9px] font-black text-white/70 uppercase">After Trial</span>
-                                        <span className="text-xl lg:text-2xl font-black text-white">₹{plan.price}</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex lg:flex-col items-center lg:items-start justify-between border-t border-white/20 pt-4 lg:space-y-4">
-                                    <div className="flex flex-col lg:w-full">
-                                        <span className="text-[9px] font-black text-white/70 uppercase">Verification Fee</span>
-                                        <span className="text-xl lg:text-3xl font-black text-white">₹1</span>
-                                    </div>
-                                    <ul className="hidden sm:grid grid-cols-2 lg:grid-cols-1 gap-2 lg:space-y-2 mt-0 lg:mt-4">
-                                        {(plan.items || []).map((f, i) => (
-                                            <li key={i} className="flex items-center text-[9px] lg:text-[10px] font-black text-white tracking-wider">
-                                                <ShieldCheck size={12} className="mr-1.5 text-white/70 shrink-0" /> {f}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        </>
-                        )}
+        <main className={`min-h-screen ${bgColor} flex flex-col items-center p-0 sm:p-6 lg:p-12 font-sans transition-all duration-500`}>
+            <div className={`flex-1 w-full max-w-6xl flex flex-col items-center min-h-0 ${fromCreateAccount && !detailsComplete ? 'justify-center' : ''}`}>
+                
+                {/* Main Container Card */}
+                <section className={`w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-2xl sm:rounded-[2.5rem] sm:border sm:${sectionBorder} shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] overflow-hidden transition-all duration-300`}>
+                    <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[600px]">
                         
-                        <div className={`mt-4 lg:mt-8 p-4 ${infoBg} rounded-xl border ${infoBorder} hidden lg:block transition-colors duration-300`}>
-                            <h4 className={`text-[10px] font-black ${textColor} tracking-widest mb-2 flex items-center uppercase transition-colors duration-300`}>
-                                <ShieldCheck className="w-3 h-3 mr-1 text-indigo-400" /> Secure Payment
-                            </h4>
-                            <p className={`text-[10px] font-bold ${infoText} leading-relaxed tracking-tighter transition-colors duration-300`}>Encrypted by Razorpay. Cancel anytime via dashboard.</p>
-                        </div>
-                    </div>
-                    )}
-
-                    {/* Form Side - hidden when Create Account flow has proceeded to plan selection */}
-                    {!(fromCreateAccount && detailsComplete) && (
-                    <div className={`px-5 pt-6 pb-8 sm:p-10 lg:p-14 ${fromCreateAccount && !detailsComplete ? 'lg:col-span-12' : 'lg:col-span-8'}`}>
-                        <header className="mb-6 sm:mb-8 lg:mb-10 text-center">
-                            <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-3 py-1 rounded-full mb-3">
-                                <Zap className="w-3 h-3 text-indigo-400" />
-                                <span className="text-[9px] lg:text-[10px] font-black text-indigo-400 tracking-widest uppercase">30-Day Free Trial</span>
-                            </div>
-                            <h1 className={`text-2xl lg:text-4xl font-black ${textColor} tracking-tighter transition-colors duration-300`}>Create Your Business Account</h1>
-                        </header>
-
-                        <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-6 sm:space-y-5 lg:space-y-6">
-                            {paymentError && (
-                                    <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold">
-                                        {paymentError}
-                                        {accountExistsError && setCurrentPage && (
-                                            <button type="button" onClick={() => setCurrentPage('support')} className="underline font-black ml-0.5 hover:text-red-300 cursor-pointer">
-                                                Contact support
-                                            </button>
+                        {/* LEFT SIDE: Plan Selection / Summary */}
+                        {!(fromCreateAccount && !detailsComplete) && (
+                            <div className={`${fromCreateAccount && detailsComplete ? 'lg:col-span-12' : 'lg:col-span-5'} ${darkMode ? 'bg-gray-900/40' : 'bg-slate-50/50'} p-6 lg:p-12 border-b lg:border-b-0 lg:border-r ${sectionBorder} transition-colors duration-300`}>
+                                {(fromCreateAccount && detailsComplete) || !plan ? (
+                                    <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                                        <div className="flex items-center gap-2 mb-6">
+                                            <div className="h-1 w-12 bg-indigo-500 rounded-full"></div>
+                                            <p className={`text-[11px] ${descColor} font-black uppercase tracking-widest`}>Choose Your Growth Engine</p>
+                                        </div>
+                                        
+                                        <div className={`grid gap-4 ${fromCreateAccount && detailsComplete ? 'grid-cols-1 md:grid-cols-3' : 'flex flex-col'}`}>
+                                            {(['BASIC', 'PRO', 'PREMIUM']).map((key) => {
+                                                const p = PLAN_DETAILS[key];
+                                                const isSelected = selectedPlanInCheckout === key;
+                                                const isPro = key === 'PRO';
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => setSelectedPlanInCheckout(key)}
+                                                        className={`group relative w-full rounded-3xl border-2 text-left transition-all duration-300 
+                                                            ${isPro
+                                                                ? `bg-gradient-to-br ${p.color} text-white shadow-2xl shadow-indigo-500/20 hover:scale-[1.03] ${isSelected ? 'ring-4 ring-teal-400/50 border-white/50' : 'border-transparent'}`
+                                                                : `${darkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white border-slate-200'} ${isSelected ? 'ring-4 ring-indigo-500/30 border-indigo-500' : 'hover:border-indigo-300'}`
+                                                            } p-5 lg:p-6 active:scale-95`}
+                                                    >
+                                                        {p.featured && (
+                                                            <div className="absolute -top-3 left-6 bg-gradient-to-r from-teal-400 to-emerald-400 text-gray-900 text-[9px] font-black tracking-tighter px-3 py-1 rounded-full shadow-lg z-20">
+                                                                {p.badge || 'MOST POPULAR'}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <span className={`font-black text-lg block leading-none ${isPro ? 'text-white' : textColor}`}>{p.name}</span>
+                                                                <span className={`text-[10px] font-bold mt-1 block opacity-80 ${isPro ? 'text-indigo-100' : descColor}`}>{p.tagline}</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className={`text-xl font-black block ${isPro ? 'text-white' : textColor}`}>₹{p.price}</span>
+                                                                <span className={`text-[10px] font-bold opacity-60 ${isPro ? 'text-white' : descColor}`}>/month</span>
+                                                            </div>
+                                                        </div>
+    
+                                                        <ul className="space-y-2 mb-2">
+                                                            {(p.items || []).slice(0, 4).map((f, i) => (
+                                                                <li key={i} className={`text-[10px] font-bold flex items-center gap-2 ${isPro ? 'text-white' : descColor}`}>
+                                                                    <ShieldCheck size={14} className={`${isPro ? 'text-teal-300' : 'text-indigo-500'} shrink-0`} /> {f}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                        
+                                                        {isSelected && (
+                                                            <div className={`mt-4 pt-4 border-t ${isPro ? 'border-white/20' : 'border-gray-100'} flex items-center justify-between`}>
+                                                                <span className="text-[10px] font-black uppercase tracking-tighter">Selected Plan</span>
+                                                                <CheckCircle size={16} className={isPro ? 'text-white' : 'text-indigo-500'} />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+    
+                                        {fromCreateAccount && detailsComplete && (
+                                            <div className="mt-10 animate-in fade-in zoom-in-95 duration-700">
+                                                <form onSubmit={handlePaymentSubmit} className="max-w-md mx-auto space-y-4">
+                                                    <button type="submit" disabled={!selectedPlanInCheckout || isProcessing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-[0.2em] py-5 rounded-2xl transition-all hover:shadow-[0_20px_40px_-12px_rgba(79,70,229,0.4)] active:scale-95 flex items-center justify-center disabled:opacity-50 uppercase text-xs">
+                                                        {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Activate My Account</>}
+                                                    </button>
+                                                    <p className={`text-[10px] ${infoText} text-center font-bold opacity-60 italic`}>Secure 256-bit SSL encrypted payment</p>
+                                                    <button type="button" onClick={() => setDetailsComplete(false)} className={`w-full text-[10px] font-black ${labelColor} hover:text-indigo-500 flex items-center justify-center py-2 transition-all uppercase tracking-widest`}>
+                                                        <ArrowLeft size={14} className="mr-2" /> Edit Business Info
+                                                    </button>
+                                                </form>
+                                            </div>
                                         )}
                                     </div>
-                                )}
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-5 lg:gap-6">
-                                <div className="md:col-span-2">
-                                    <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>
-                                        Business Type
-                                    </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {Object.entries(BUSINESS_TYPE_CONTENT).map(([key, value]) => {
-                                            const selected = businessType === key;
-                                            return (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setBusinessType(key)}
-                                                    className={`text-left rounded-xl border px-4 py-3 transition-all ${
-                                                        selected
-                                                            ? 'border-indigo-500 bg-indigo-500/10'
-                                                            : `${inputBorder} ${darkMode ? 'hover:border-gray-600' : 'hover:border-slate-400'}`
-                                                    }`}
-                                                >
-                                                    <p className={`text-[11px] font-black ${textColor}`}>{value.label}</p>
-                                                    <p className={`text-[10px] mt-1 font-bold ${descColor}`}>{value.hint}</p>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <InputField
-                                        label={businessType === 'textile' ? 'Textile Shop / Brand Name' : 'Shop/Business Name'}
-                                        id="shopName"
-                                        icon={<Building className="w-4 h-4" />}
-                                        value={shopName}
-                                        error={shopNameError}
-                                        onChange={(v) => { setShopName(v); setShopNameError(null); }}
-                                        placeholder={businessType === 'textile' ? 'Ex: Trend Weaves' : 'Ex: Sharma Stores'}
-                                        disabled={isProcessing}
-                                        darkMode={darkMode}
-                                    />
-                                </div>
-                                <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); setAccountExistsError(false); setPaymentError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4" />} darkMode={darkMode} />
-                                
-                                <div className="relative" ref={dropdownRef}>
-                                    <label className={`text-[10px] font-black ${labelColor} tracking-widest mb-2 block uppercase transition-colors duration-300`}>Mobile Number</label>
-                                    <div className={`flex ${inputBg} rounded-2xl border transition-all ${phoneError ? 'border-red-500' : `${phoneBorder} ${phoneBorderFocus}`}`}>
-                                        <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`px-3 border-r ${phoneBorder} flex items-center space-x-1 text-sm font-bold ${phoneButtonText} ${phoneButtonHover} rounded-l-2xl transition-colors min-w-[80px]`}>
-                                            <span>{selectedCountry.flag}</span>
-                                            <span>{selectedCountry.code}</span>
-                                        </button>
-                                        <input type="tel" inputMode="numeric" maxLength={10} value={localNumber} onChange={(e) => { handleNumberChange(e); setAccountExistsError(false); setPaymentError(null); }} className={`flex-1 ${phoneInputBg} px-4 py-3.5 sm:py-3 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="9876543210" disabled={isProcessing} />
-                                    </div>
-                                    {isDropdownOpen && (
-                                        <div className={`absolute z-[100] mt-2 w-full max-w-[280px] max-h-60 overflow-y-auto custom-scrollbar ${dropdownBg} border ${dropdownBorder} rounded-2xl shadow-2xl p-2 left-0 top-full transition-colors duration-300`}>
-                                            <input type="text" placeholder="Search country..." className={`w-full ${dropdownSearchBg} border ${dropdownSearchBorder} rounded-xl px-3 py-2 text-xs ${dropdownSearchText} mb-2 outline-none focus:border-indigo-500 transition-colors duration-300`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                                            {filteredCodes.map(c => (
-                                                <div key={c.code} onClick={() => handleSelectCountry(c.code)} className={`flex justify-between p-2 ${dropdownHover} rounded-lg cursor-pointer text-xs font-bold ${dropdownText} transition-colors duration-300`}>
-                                                    <span>{c.flag} {c.name}</span>
-                                                    <span className={darkMode ? 'text-gray-500' : 'text-slate-500'}>{c.code}</span>
+                                ) : (
+                                    <div className="h-full flex flex-col justify-between">
+                                        <div className={`p-8 rounded-[2.5rem] bg-gradient-to-br ${plan.color} relative overflow-hidden shadow-2xl`}>
+                                            <div className="absolute -right-8 -bottom-8 text-white/10 rotate-12">
+                                                <ShoppingCart size={180} />
+                                            </div>
+                                            <div className="relative z-10">
+                                                <span className="text-[10px] font-black tracking-widest bg-white/20 px-3 py-1 rounded-full text-white uppercase backdrop-blur-md">Your Selection</span>
+                                                <h3 className="text-3xl lg:text-4xl font-black text-white mt-4 tracking-tighter">{plan.name}</h3>
+                                                <div className="mt-8 pt-8 border-t border-white/20">
+                                                    <div className="flex justify-between items-end">
+                                                        <div>
+                                                            <p className="text-white/60 text-[10px] font-black uppercase">Monthly Subscription</p>
+                                                            <p className="text-3xl font-black text-white">₹{plan.price}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-white/60 text-[10px] font-black uppercase">Trial Deposit</p>
+                                                            <p className="text-3xl font-black text-white">₹1</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            ))}
+                                            </div>
+                                        </div>
+                                        <div className={`mt-8 p-6 ${infoBg} rounded-3xl border ${infoBorder} backdrop-blur-sm`}>
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                                    <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className={`text-xs font-black ${textColor} uppercase tracking-wider`}>Razorpay Secure</h4>
+                                                    <p className={`text-[10px] font-bold ${infoText} mt-1 leading-relaxed`}>Your payment is processed securely. You can cancel your subscription at any time directly from your Pocket POS settings.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+    
+                        {/* RIGHT SIDE: Account Details Form */}
+                        {!(fromCreateAccount && detailsComplete) && (
+                            <div className={`px-6 py-10 lg:p-16 ${fromCreateAccount && !detailsComplete ? 'lg:col-span-12 max-w-3xl mx-auto' : 'lg:col-span-7'} flex flex-col justify-center`}>
+                                <header className="mb-1">
+                                    <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-4 py-1.5 rounded-full mb-4">
+                                        <Zap className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase">30-Days Free Trail</span>
+                                    </div>
+                                </header>
+    
+                                <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-8">
+                                    {paymentError && (
+                                        <div className="p-4 bg-red-500/10 border-l-4 border-red-500 rounded-r-xl text-red-500 text-[11px] font-bold animate-pulse">
+                                            {paymentError}
                                         </div>
                                     )}
-                                    {phoneError && <p className="text-red-500 text-[9px] mt-1 font-bold">{phoneError}</p>}
-                                </div>
-
-                                <div className="relative md:col-span-2">
-                                    <InputField label="Login Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={(v) => { setPassword(v); setPasswordError(null); }} placeholder="Min 8 characters" disabled={isProcessing} icon={<Lock className="w-4 h-4" />} darkMode={darkMode} />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className={`absolute right-4 top-9 ${iconColor} hover:text-indigo-400 transition-colors`}>
-                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                    </button>
-                                </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                        <div className="md:col-span-2">
+                                            <label className={`text-[11px] font-black ${labelColor} tracking-widest mb-3 block uppercase`}>Business Type</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {Object.entries(BUSINESS_TYPE_CONTENT).map(([key, value]) => {
+                                                    const selected = businessType === key;
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() => setBusinessType(key)}
+                                                            className={`text-left rounded-2xl border-2 p-4 transition-all duration-300 ${
+                                                                selected
+                                                                    ? 'border-indigo-500 bg-indigo-500/5 ring-4 ring-indigo-500/10'
+                                                                    : `${inputBorder} ${darkMode ? 'hover:border-gray-600' : 'hover:border-slate-300'} bg-transparent`
+                                                            }`}
+                                                        >
+                                                            <p className={`text-xs font-black ${textColor}`}>{value.label}</p>
+                                                            <p className={`text-[10px] mt-1 font-bold ${descColor} opacity-70`}>{value.hint}</p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+    
+                                        <div className="md:col-span-2">
+                                            <InputField
+                                                label={businessType === 'textile' ? 'Textile Brand Name' : 'Shop/Business Name'}
+                                                id="shopName"
+                                                icon={<Building className="w-4 h-4 opacity-50" />}
+                                                value={shopName}
+                                                error={shopNameError}
+                                                onChange={(v) => { setShopName(v); setShopNameError(null); }}
+                                                placeholder={businessType === 'textile' ? 'Ex: Trend Weaves' : 'Ex: Sharma Stores'}
+                                                disabled={isProcessing}
+                                                darkMode={darkMode}
+                                            />
+                                        </div>
+    
+                                        <InputField label="Email Address" id="email" type="text" inputMode="email" value={email} error={emailError} onChange={(v) => { setEmail(v); setEmailError(null); setAccountExistsError(false); setPaymentError(null); }} placeholder="owner@business.com" disabled={isProcessing} icon={<Globe className="w-4 h-4 opacity-50" />} darkMode={darkMode} />
+                                        
+                                        <div className="relative" ref={dropdownRef}>
+                                            <label className={`text-[11px] font-black ${labelColor} tracking-widest mb-2 block uppercase`}>Mobile Number</label>
+                                            <div className={`flex ${inputBg} rounded-2xl border-2 transition-all duration-300 ${phoneError ? 'border-red-500' : `${phoneBorder} focus-within:border-indigo-500`}`}>
+                                                <button type="button" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`px-4 border-r ${phoneBorder} flex items-center space-x-2 text-sm font-bold ${phoneButtonText} hover:bg-indigo-500/5 transition-colors min-w-[90px]`}>
+                                                    <span>{selectedCountry.flag}</span>
+                                                    <span>{selectedCountry.code}</span>
+                                                </button>
+                                                <input type="tel" inputMode="numeric" maxLength={10} value={localNumber} onChange={(e) => { handleNumberChange(e); setAccountExistsError(false); setPaymentError(null); }} className={`flex-1 bg-transparent px-4 py-4 text-sm ${phoneInputText} focus:outline-none font-bold`} placeholder="9876543210" disabled={isProcessing} />
+                                            </div>
+                                            {isDropdownOpen && (
+                                                <div className={`absolute z-[100] mt-2 w-full max-w-[300px] max-h-72 overflow-y-auto custom-scrollbar ${dropdownBg} border ${dropdownBorder} rounded-2xl shadow-2xl p-3 left-0 top-full animate-in fade-in zoom-in-95 duration-200`}>
+                                                    <input type="text" placeholder="Search country..." className={`w-full ${dropdownSearchBg} border ${dropdownSearchBorder} rounded-xl px-4 py-2.5 text-xs ${dropdownSearchText} mb-3 outline-none focus:border-indigo-500 transition-colors`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                                    {filteredCodes.map(c => (
+                                                        <div key={c.code} onClick={() => handleSelectCountry(c.code)} className={`flex justify-between items-center p-3 ${dropdownHover} rounded-xl cursor-pointer text-xs font-bold ${dropdownText} transition-all`}>
+                                                            <span>{c.flag} {c.name}</span>
+                                                            <span className="opacity-50">{c.code}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {phoneError && <p className="text-red-500 text-[10px] mt-1.5 font-bold ml-1">{phoneError}</p>}
+                                        </div>
+    
+                                        <div className="relative md:col-span-2">
+                                            <InputField label="Secure Password" id="password" type={showPassword ? 'text' : 'password'} value={password} error={passwordError} onChange={(v) => { setPassword(v); setPasswordError(null); }} placeholder="Create a strong password" disabled={isProcessing} icon={<Lock className="w-4 h-4 opacity-50" />} darkMode={darkMode} />
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className={`absolute right-5 top-11 ${iconColor} hover:text-indigo-500 transition-colors`}>
+                                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+                                        </div>
+                                    </div>
+    
+                                    <div className="pt-8 border-t border-dashed border-gray-500/20">
+                                        <button type="submit" disabled={isProcessing || (detailsComplete && !plan)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-[0.25em] py-5 rounded-[1.25rem] transition-all hover:shadow-[0_20px_40px_-12px_rgba(79,70,229,0.4)] active:scale-[0.97] flex items-center justify-center disabled:opacity-50 text-xs uppercase">
+                                            {isProcessing ? <Loader className="w-6 h-6 animate-spin" /> : (fromCreateAccount && !detailsComplete) ? <><CreditCard className="w-5 h-5 mr-3" /> Select Plan & Continue</> : <><Lock className="w-5 h-5 mr-3" /> Start Free Trial</>}
+                                        </button>
+                                        <div className="flex flex-col items-center gap-4 mt-6">
+                                            <p className={`text-[10px] ${infoText} text-center font-black tracking-widest uppercase opacity-60`}>
+                                                {(fromCreateAccount && !detailsComplete) ? 'Step 1 of 2: Account Creation' : 'Authorization of ₹1 required for security'}
+                                            </p>
+                                            <button type="button" onClick={(e) => { e.preventDefault(); (planKey ? onBackToPlans : onBackToLogin)?.(); }} className={`text-[11px] font-black ${labelColor} hover:text-indigo-500 flex items-center transition-all uppercase tracking-widest group`}>
+                                                <ArrowLeft size={14} className="mr-2 group-hover:-translate-x-1 transition-transform" /> {planKey ? 'Change Plan' : 'Return to Login'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
                             </div>
-
-                            <div className={`pt-6 pb-2 sm:pt-4 sm:pb-0 lg:pt-6 border-t ${sectionBorder} transition-colors duration-300 relative z-10`}>
-                                <button type="submit" disabled={isProcessing || (detailsComplete && !plan)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-widest py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center justify-center cursor-pointer disabled:opacity-50">
-                                    {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : (fromCreateAccount && !detailsComplete) ? <><CreditCard className="w-4 h-4 mr-2" /> Continue to Plan</> : <><Lock className="w-4 h-4 mr-2" /> Start My Free Trial</>}
-                                </button>
-                                <p className={`text-[10px] sm:text-[9px] ${infoText} text-center mt-4 sm:mt-4 font-bold leading-relaxed tracking-tighter uppercase transition-colors duration-300`}>
-                                    {(fromCreateAccount && !detailsComplete) ? 'Next: Select your plan and complete payment.' : 'By proceeding, you authorize a ₹1 verification charge.'}
-                                </p>
-                                <button type="button" onClick={(e) => { e.preventDefault(); (planKey ? onBackToPlans : onBackToLogin)?.(); }} className={`w-full text-center text-[10px] font-black ${labelColor} mt-4 hover:text-indigo-400 flex items-center justify-center cursor-pointer transition-colors uppercase py-3 sm:py-2 -mb-2`}>
-                                    <ArrowLeft size={12} className="mr-1 shrink-0" /> {planKey ? 'Back to Plans' : 'Back to Login'}
-                                </button>
-                            </div>
-                        </form>
+                        )}
                     </div>
-                    )}
-                </div>
-            </section>
+                </section>
             </div>
         </main>
     );

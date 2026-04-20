@@ -57,7 +57,7 @@ const BarcodeScannerModal = ({ isOpen, onClose, onScan, showToast }) => {
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition p-1">
                         <X className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
-                </div>
+                </header>
 
                 <div className="mt-3 sm:mt-4 p-2 sm:p-3 text-center bg-gray-900 rounded-lg flex flex-col items-center justify-center relative flex-1 min-h-0 overflow-hidden">
                     {/* 🌟 NEW ELEMENT: The video feed for the scanner is referenced by 'ref' */}

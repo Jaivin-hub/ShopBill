@@ -6,13 +6,6 @@ import firebaseSwPlugin from './vite-firebase-sw-plugin.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Enable history API fallback for SPA routing
-  server: {
-    historyApiFallback: true,
-  },
-  preview: {
-    historyApiFallback: true,
-  },
   plugins: [
     firebaseSwPlugin(),
     react(),

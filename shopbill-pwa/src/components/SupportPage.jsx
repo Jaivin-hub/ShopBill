@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
-import { Printer, LifeBuoy, ArrowLeft, Mail, Phone, MessageCircle, Clock, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Printer, LifeBuoy, ArrowLeft, Mail, Phone, MessageCircle, Clock, ExternalLink, ChevronDown } from 'lucide-react';
 
 const SupportPage = ({ onBack, origin, darkMode = true }) => {
+  const [openFaq, setOpenFaq] = useState(0);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -49,6 +51,25 @@ const SupportPage = ({ onBack, origin, darkMode = true }) => {
       action: "tel:+919074607140",
       btnText: "Call Now"
     }
+  ];
+
+  const faqItems = [
+    {
+      question: 'Forgot Password?',
+      answer: 'Go to the Login screen and click on "Forgot Password". You will receive a reset link via your registered email.',
+    },
+    {
+      question: 'Printer not connecting?',
+      answer: 'Ensure Bluetooth is on and paired. We support standard 58mm/80mm Thermal Printers.',
+    },
+    {
+      question: 'Data Synchronization',
+      answer: 'Data syncs automatically with internet. If offline, it saves locally and syncs once you are back online.',
+    },
+    {
+      question: 'Can I add more staff?',
+      answer: 'Yes, Owners can add staff via Settings > Team Management and assign roles like Manager or Cashier.',
+    },
   ];
 
   // Structured Data for Support Page
@@ -106,6 +127,43 @@ const SupportPage = ({ onBack, origin, darkMode = true }) => {
           </div>
 
           <div className="p-6 md:p-12 space-y-12">
+            {/* Common Help Topics */}
+            <section className={`rounded-2xl p-6 sm:p-8 border ${faqSectionBg} ${borderCl}`}>
+              <h2 className="text-xl font-bold text-teal-400 mb-6 flex items-center gap-2">
+                 Frequently Asked Questions
+              </h2>
+              <div className="space-y-3">
+                {faqItems.map((item, idx) => {
+                  const isOpen = openFaq === idx;
+                  return (
+                    <article
+                      key={item.question}
+                      className={`rounded-xl border transition-colors ${darkMode ? 'border-gray-800 bg-gray-900/40' : 'border-slate-200 bg-white'}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaq(isOpen ? -1 : idx)}
+                        className={`w-full flex items-center justify-between gap-4 px-4 py-3 text-left ${darkMode ? 'hover:bg-gray-800/50' : 'hover:bg-slate-50'} transition-colors`}
+                        aria-expanded={isOpen}
+                        aria-controls={`faq-answer-${idx}`}
+                      >
+                        <h4 className={`font-bold text-sm sm:text-base ${faqHeading}`}>{item.question}</h4>
+                        <ChevronDown
+                          className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {isOpen && (
+                        <div id={`faq-answer-${idx}`} className="px-4 pb-4">
+                          <p className={`text-sm leading-relaxed ${textDim}`}>{item.answer}</p>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Contact Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {supportContacts.map((contact, idx) => (
@@ -127,31 +185,6 @@ const SupportPage = ({ onBack, origin, darkMode = true }) => {
                 </div>
               ))}
             </div>
-
-            {/* Common Help Topics */}
-            <section className={`rounded-2xl p-6 sm:p-8 border ${faqSectionBg} ${borderCl}`}>
-              <h2 className="text-xl font-bold text-teal-400 mb-6 flex items-center gap-2">
-                 Frequently Asked Questions
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <h4 className={`font-bold ${faqHeading}`}>Forgot Password?</h4>
-                  <p className={`text-sm leading-relaxed ${textDim}`}>Go to the Login screen and click on "Forgot Password". You will receive a reset link via your registered email.</p>
-                </div>
-                <div className="space-y-2">
-                  <h4 className={`font-bold ${faqHeading}`}>Printer not connecting?</h4>
-                  <p className={`text-sm leading-relaxed ${textDim}`}>Ensure Bluetooth is on and paired. We support standard 58mm/80mm Thermal Printers.</p>
-                </div>
-                <div className="space-y-2">
-                  <h4 className={`font-bold ${faqHeading}`}>Data Synchronization</h4>
-                  <p className={`text-sm leading-relaxed ${textDim}`}>Data syncs automatically with internet. If offline, it saves locally and syncs once you are back online.</p>
-                </div>
-                <div className="space-y-2">
-                  <h4 className={`font-bold ${faqHeading}`}>Can I add more staff?</h4>
-                  <p className={`text-sm leading-relaxed ${textDim}`}>Yes, Owners can add staff via Settings &gt; Team Management and assign roles like Manager or Cashier.</p>
-                </div>
-              </div>
-            </section>
 
             {/* Registered Office Info */}
             <div className={`pt-8 border-t text-center ${borderCl}`}>

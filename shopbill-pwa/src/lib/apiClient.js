@@ -1,9 +1,5 @@
 import axios from 'axios';
 
-// Request cache to prevent duplicate calls
-const requestCache = new Map();
-const CACHE_DURATION = 30000; // 30 seconds cache
-
 // Active requests map to cancel duplicates
 const activeRequests = new Map();
 
@@ -213,10 +209,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Utility function to clear cache
-export const clearCache = (pattern = null) => {
-  // requestCache.clear(); // <-- Logic removed as the cache is disabled
-  console.warn("clearCache called, but caching is currently disabled in apiClient.");
+// Utility function to clear cache (response caching is disabled; kept for callers)
+export const clearCache = () => {
+  console.warn('clearCache called, but caching is currently disabled in apiClient.');
 };
 
 // Utility function to cancel all pending requests

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    DollarSign, Eye, EyeOff, Lock, Mail,
+    IndianRupee, Eye, EyeOff, Lock, Mail,
     ArrowLeft, Loader2, AlertCircle,
     CheckCircle2, Smartphone
 } from 'lucide-react';
@@ -307,7 +307,7 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
 
                     <header className={`pt-6 pb-4 px-6 text-center ${headerBg} border-b ${headerBorder} transition-colors duration-300`}>
                         <div className="inline-flex items-center justify-center w-11 h-11 bg-indigo-500/10 rounded-xl mb-2 border border-indigo-500/20">
-                            <DollarSign className="w-5 h-5 text-indigo-500" />
+                            <IndianRupee className="w-5 h-5 text-indigo-500" />
                         </div>
                         <h1 className={`text-base font-black ${titleColor} tracking-[0.2em] transition-colors duration-300`}>Pocket <span className="text-indigo-500">POS</span></h1>
                     </header>

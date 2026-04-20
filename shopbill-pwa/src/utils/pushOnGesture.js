@@ -18,5 +18,7 @@ export async function requestPushFromGesture() {
       await apiClient.post('/user/device-token', { token, platform: 'web' });
       localStorage.setItem(STORAGE_KEY, '1');
     }
-  } catch (e) {}
+  } catch {
+    void 0;
+  }
 }

@@ -151,8 +151,6 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
         return ((newUsers / previousTotal) * 100);
     }, [dashboardData]); // Depend on the whole object to recalculate when data changes
 
-    // These variables are now safe to access after the useMemo call
-    const revenueGrowth = dashboardData?.revenueGrowth || 0;
     const shopsGrowth = dashboardData?.shopsGrowth || 0;
 
     // Determine the total revenue for the trend chart scale

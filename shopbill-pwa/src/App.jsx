@@ -365,7 +365,7 @@ const App = () => {
     return userJson ? JSON.parse(userJson) : null;
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [toast, setToast] = useState(null);
+  const [, setToast] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -871,7 +871,7 @@ useEffect(() => {
               if (planRes.data?.success && planRes.data?.plan) {
                 updatedUser = { ...updatedUser, plan: planRes.data.plan };
               }
-            } catch (_) { /* ignore */ }
+            } catch { /* ignore */ }
           }
           const roleChanged = (currentUser.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
           if (roleChanged || updatedUser.plan !== currentUser.plan || updatedUser.shopName !== currentUser.shopName) {
@@ -1235,26 +1235,28 @@ useEffect(() => {
               </div>
 
               {isPremium && userRole === USER_ROLES.OWNER && (
-                <div className="px-4 mb-4">
+                <div className="mb-4 flex flex-col gap-1.5 px-4">
                   <OutletSelector
                     apiClient={apiClient}
                     currentUser={currentUser}
                     currentOutletId={currentOutletId}
                     onOutletSwitch={handleOutletSwitch}
                     showToast={showToast}
+                    darkMode={darkMode}
                   />
-                        <button
+                  <button
+                    type="button"
                     onClick={() => navigateTo('outlets')}
-                    className={`w-full mt-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    className={`w-full px-3 py-2 rounded-lg text-xs font-bold tracking-tight transition-colors border ${
                       currentPage === 'outlets'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-lg shadow-indigo-900/20'
                         : darkMode
-                        ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-gray-800/90 text-gray-300 hover:bg-gray-700 border-gray-700/80'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
                     }`}
                   >
-                    Manage Outlets
-                        </button>
+                    Manage outlets
+                  </button>
                 </div>
               )}
 

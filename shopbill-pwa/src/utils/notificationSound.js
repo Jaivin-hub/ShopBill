@@ -14,7 +14,9 @@ export const isChatSoundEnabled = () => {
 export const setChatSoundEnabled = (enabled) => {
   try {
     localStorage.setItem(STORAGE_KEY, String(enabled));
-  } catch {}
+  } catch {
+    void 0;
+  }
 };
 
 let audioContext = null;
@@ -81,30 +83,9 @@ const playHtmlAudioFallback = () => {
     htmlAudioFallback.muted = false;
     htmlAudioFallback.currentTime = 0;
     const p = htmlAudioFallback.play();
-    if (p && typeof p.catch === 'function') p.catch(() => {});
-  } catch {}
-};
-
-const playWebAudio = () => {
-  try {
-    const ctx = getAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => playHtmlAudioFallback());
-      if (ctx.state === 'suspended') { playHtmlAudioFallback(); return; }
-    }
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.05);
-    osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
+    if (p && typeof p.catch === 'function') p.catch(() => { void 0; });
   } catch {
-    playHtmlAudioFallback();
+    void 0;
   }
 };
 
@@ -114,7 +95,7 @@ export const unlockAudio = () => {
   audioUnlocked = true;
   try {
     const ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'suspended') ctx.resume().catch(() => { void 0; });
     if (!htmlAudioFallback) {
       htmlAudioFallback = new Audio(getBeepDataUri());
       htmlAudioFallback.playsInline = true;
@@ -123,15 +104,17 @@ export const unlockAudio = () => {
     htmlAudioFallback.volume = 0.5;
     htmlAudioFallback.muted = false;
     htmlAudioFallback.currentTime = 0;
-    htmlAudioFallback.play().then(() => {}).catch(() => {});
-  } catch {}
+    htmlAudioFallback.play().then(() => { void 0; }).catch(() => { void 0; });
+  } catch {
+    void 0;
+  }
 };
 
 /** Setup unlock on first tap/click - call once from App. Use capture so we run before nav. Also triggers push permission on each tap (iOS needs gesture). */
 export const setupAudioUnlock = () => {
   const onInteraction = () => {
     unlockAudio();
-    import('./pushOnGesture.js').then((m) => m.requestPushFromGesture()).catch(() => {});
+    import('./pushOnGesture.js').then((m) => m.requestPushFromGesture()).catch(() => { void 0; });
   };
   const opts = { passive: true, capture: true };
   document.addEventListener('click', onInteraction, opts);
