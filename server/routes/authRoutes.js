@@ -321,8 +321,7 @@ router.get('/profile', protect, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // ALWAYS prioritize user.shopName (registered business name from checkout) over store names
-        // This ensures Basic, Pro, and Premium plans all show the registered business name
+        // Default to user-level identity; for PREMIUM with outlet context we override from store.
         let shopName = user.shopName || '';
         let taxId = user.taxId || '';
         let address = user.address || '';
@@ -334,17 +333,13 @@ router.get('/profile', protect, async (req, res) => {
         const storeId = req.user.storeId || req.user.activeStoreId;
         
         if (storeId && (user.role === 'owner' || user.role === 'superadmin')) {
-            // Fetch outlet-specific business details for additional fields
+            // Fetch outlet-specific business details for active outlet context
             const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
-            
-            // shopName is already set from user.shopName above (registered business name)
-            // Only use store.name as fallback if user.shopName doesn't exist
-            if (!shopName && store) {
-                shopName = store.name || '';
-            }
-            
-            // For taxId and address, prefer store values if available, but fallback to user values
+
+            // PREMIUM multi-outlet: business info must be independent per outlet.
+            // Use store-specific values (with user-level fallback only when missing).
             if (store) {
+                shopName = store.name || user.shopName || '';
                 taxId = store.taxId || user.taxId || '';
                 address = store.address || user.address || '';
             }
@@ -359,14 +354,14 @@ router.get('/profile', protect, async (req, res) => {
                 profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
                 businessType = businessDetails.businessType || businessType;
             }
-            // Staff work in a store: use store's taxId/address so they see same as owner for that outlet
+            // Staff work in a store: use store-specific business info for active outlet context
             const staffStoreId = req.user.storeId || req.user.activeStoreId;
             if (staffStoreId) {
                 const store = await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).lean();
                 if (store) {
+                    if (store.name) shopName = store.name;
                     if (store.taxId) taxId = store.taxId;
                     if (store.address) address = store.address;
-                    if (store.name && !shopName) shopName = store.name;
                 }
             }
         }
