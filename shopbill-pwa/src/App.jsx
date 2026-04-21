@@ -98,13 +98,10 @@ const UpdatePrompt = () => {
         // Show update prompt whenever there's a waiting worker that's different from active
         // This ensures users are prompted for every new production build
         if (waitingVersionId !== currentActiveVersion) {
-          console.log(`📢 New production build detected: ${waitingVersionId} (current active: ${currentActiveVersion})`);
           pendingVersionRef.current = waitingVersionId;
           setRegistration(reg);
           setShow(true);
           return true; // Update available
-        } else {
-          console.log(`✅ Service worker is up to date: ${waitingVersionId}`);
         }
       }
 
@@ -141,10 +138,10 @@ const UpdatePrompt = () => {
       checkForUpdate(true); // Force update check on mount
     }, 2000);
 
-    // Periodic update checks every 1 minute (more frequent for forced updates)
+    // Periodic update checks every 5 minutes for lower overhead.
     checkIntervalRef.current = setInterval(() => {
       checkForUpdate(true);
-    }, 60 * 1000); // 1 minute
+    }, 5 * 60 * 1000);
 
     // Check for updates when page becomes visible (user returns to tab/app)
     const handleVisibilityChange = () => {
@@ -153,13 +150,7 @@ const UpdatePrompt = () => {
       }
     };
 
-    // Check for updates when window gains focus
-    const handleFocus = () => {
-      checkForUpdate(true);
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
 
     // Listen for service worker controller change (new SW activated)
     const handleControllerChange = () => {
@@ -174,7 +165,6 @@ const UpdatePrompt = () => {
     return () => {
       window.removeEventListener('pwa-update-available', onUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       clearTimeout(initialCheck);
       if (checkIntervalRef.current) {
@@ -187,8 +177,6 @@ const UpdatePrompt = () => {
     try {
       if (registration && registration.waiting) {
         const versionId = pendingVersionRef.current || getVersionId(registration.waiting);
-        console.log(`🔄 Updating to new production build: ${versionId}`);
-        
         // Tell the waiting worker to skipWaiting
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         
@@ -205,7 +193,6 @@ const UpdatePrompt = () => {
             const newVersion = getVersionId(e.target);
             if (newVersion) {
               localStorage.setItem('pwa_current_version', newVersion);
-              console.log(`✅ Updated to production build: ${newVersion}`);
             }
             // Clear all caches before reload
             if ('caches' in window) {
@@ -230,7 +217,6 @@ const UpdatePrompt = () => {
             const newVersion = getVersionId(registration.waiting);
             if (newVersion) {
               localStorage.setItem('pwa_current_version', newVersion);
-              console.log(`✅ Updated to production build: ${newVersion} (fallback)`);
             }
             // Clear caches and reload
             if ('caches' in window) {
@@ -374,6 +360,7 @@ const App = () => {
   const currentUserRef = useRef(currentUser);
   const outletRestoredRef = useRef(false);
   const billingRefreshRef = useRef(null); // BillingPOS sets this to fetchRecentSales so we can refresh on new_sale
+  const chatUnreadRefreshTimeoutRef = useRef(null);
 
   const [currentOutlet, setCurrentOutlet] = useState(null);
   const [outlets, setOutlets] = useState([]);
@@ -436,24 +423,31 @@ const App = () => {
     setShowLowStockFilter(true);
     navigateTo('inventory');
   }, [navigateTo]);
+
+  const formatNotificationForRole = useCallback((notification) => {
+    if (!notification) return notification;
+    const role = String(currentUser?.role || '').toLowerCase();
+    const isOwnerOrSuperadmin = role === 'owner' || role === 'superadmin';
+    if (isOwnerOrSuperadmin) return notification;
+
+    const message = typeof notification.message === 'string' ? notification.message : '';
+    // Staff (manager/cashier) do not need outlet prefix like "[Outlet] ..."
+    const messageWithoutOutletPrefix = message.replace(/^\[[^\]]+\]\s*/, '');
+    return { ...notification, message: messageWithoutOutletPrefix };
+  }, [currentUser?.role]);
   
   const fetchNotificationHistory = useCallback(async () => {
     if (!currentUser || !apiClient || !API) {
-      console.log('⚠️ Cannot fetch notifications: missing currentUser, apiClient, or API');
       return;
     }
     try {
-      const response = await apiClient.get(`${API.notificationalert}?t=${Date.now()}`);
-      console.log('📬 Notification API response:', response.data);
+      const response = await apiClient.get(API.notificationalert);
       
       if (response.data) {
         // API returns { count: number, alerts: array }
         const alerts = response.data.alerts || [];
-        setNotifications(alerts);
-        const unreadCount = alerts.filter(a => !a.isRead).length;
-        console.log(`📬 Fetched ${alerts.length} notifications (${unreadCount} unread)`);
-    } else {
-        console.warn('⚠️ Notification API returned no data');
+        setNotifications(alerts.map(formatNotificationForRole));
+      } else {
         setNotifications([]);
       }
     } catch (error) { 
@@ -462,7 +456,7 @@ const App = () => {
       // Only set empty if we have no notifications at all
       // setNotifications([]);
     }
-  }, [currentUser, apiClient, API]);
+  }, [currentUser, apiClient, API, formatNotificationForRole]);
 
   // Fetch a single outlet by ID
   const fetchOutletById = useCallback(async (outletId) => {
@@ -646,10 +640,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (!currentUser) return;
-    
-    // Initial fetch of notifications
-    fetchNotificationHistory();
-    
+
     socketRef.current = io("https://shopbill-3le1.onrender.com", {
       auth: { token: localStorage.getItem('userToken') },
       transports: ['polling', 'websocket'],
@@ -673,22 +664,19 @@ useEffect(() => {
     };
     
     const handleNewNotification = (newAlert) => {
-      console.log('📬 New notification received:', newAlert);
-      
       // Filter out notifications where the current user is the actor
       // Users don't need to see notifications about their own actions
       const actorIdStr = newAlert?.actorId != null ? String(newAlert.actorId) : null;
       const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
       if (actorIdStr && userIdStr && actorIdStr === userIdStr) {
-        console.log('🚫 Filtered out notification (user is actor)');
         return; // Don't add notification if user is the actor
       }
       
       // Ensure isRead is explicitly set to false for new notifications
-      const notificationWithReadStatus = {
+      const notificationWithReadStatus = formatNotificationForRole({
         ...newAlert,
         isRead: false // Explicitly mark as unread for real-time notifications
-      };
+      });
       
       setNotifications(prev => {
         // Check if notification already exists
@@ -698,12 +686,7 @@ useEffect(() => {
           return nId && alertId && nId.toString() === alertId.toString();
         });
         
-        if (exists) {
-          console.log('📬 Notification already exists, skipping');
-          return prev;
-        }
-        
-        console.log('✅ Adding new notification to list (unread)');
+        if (exists) return prev;
         // Add new notification at the beginning with isRead: false
         const updated = [notificationWithReadStatus, ...prev];
         // Limit to last 50 notifications to prevent memory issues
@@ -711,8 +694,8 @@ useEffect(() => {
       });
       
       // Show toast notification
-      if (newAlert.message) {
-        showToast(newAlert.message, 'info');
+      if (notificationWithReadStatus?.message) {
+        showToast(notificationWithReadStatus.message, 'info');
       }
     };
     
@@ -722,7 +705,13 @@ useEffect(() => {
       const myId = me?._id || me?.id;
       const isFromOthers = senderId && senderId.toString() !== (myId?.toString?.() || String(myId));
       if (isFromOthers) playMessageSound();
-      updateChatUnreadCount();
+      // Debounce unread refresh to avoid burst API calls during rapid incoming messages.
+      if (chatUnreadRefreshTimeoutRef.current) {
+        clearTimeout(chatUnreadRefreshTimeoutRef.current);
+      }
+      chatUnreadRefreshTimeoutRef.current = setTimeout(() => {
+        updateChatUnreadCount();
+      }, 800);
     };
     
     const handleNewSale = () => {
@@ -733,24 +722,6 @@ useEffect(() => {
     socket.on('new_message', handleNewMessage);
     socket.on('new_sale', handleNewSale);
     
-    // If already connected, trigger initial fetch
-    if (socket.connected) {
-      handleConnect();
-    }
-    
-    // Periodic notification refresh (every 30 seconds)
-    const notificationInterval = setInterval(() => {
-      fetchNotificationHistory();
-    }, 30000);
-    
-    // Refresh notifications when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden && currentUser) {
-        fetchNotificationHistory();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
     return () => {
       if (socket) {
         socket.off('connect', handleConnect);
@@ -759,8 +730,10 @@ useEffect(() => {
         socket.off('new_sale', handleNewSale);
         socket.disconnect();
       }
-      clearInterval(notificationInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (chatUnreadRefreshTimeoutRef.current) {
+        clearTimeout(chatUnreadRefreshTimeoutRef.current);
+        chatUnreadRefreshTimeoutRef.current = null;
+      }
     };
   }, [currentUser, currentOutletId, fetchNotificationHistory, showToast, updateChatUnreadCount]);
 
@@ -1329,7 +1302,21 @@ useEffect(() => {
               className={`${currentPage === 'chat' && isChatSelected ? 'h-full flex-1 min-h-0' : (currentPage === 'chat' ? 'h-full flex-1 min-h-0' : `max-w-7xl mx-auto w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'} ${showAppUI ? 'overflow-x-hidden' : ''}`}
               {...(showAppUI ? { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } : {})}
             >
-              <div className={`${slideDirection === 'left' ? 'page-slide-from-right' : slideDirection === 'right' ? 'page-slide-from-left' : ''} ${showAppUI && currentPage !== 'chat' && !isChatSelected ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+              <div
+                className={`${
+                  slideDirection === 'left'
+                    ? 'page-slide-from-right'
+                    : slideDirection === 'right'
+                      ? 'page-slide-from-left'
+                      : ''
+                } ${
+                  showAppUI && currentPage === 'chat'
+                    ? 'h-full flex-1 min-h-0 flex flex-col'
+                    : showAppUI && currentPage !== 'chat' && !isChatSelected
+                      ? 'flex-1 min-h-0 flex flex-col'
+                      : ''
+                }`}
+              >
                 {renderContent()}
               </div>
             </div>

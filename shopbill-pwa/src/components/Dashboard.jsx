@@ -108,12 +108,12 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [hasAccess]); // Removed callbacks from dependencies to prevent re-fetches
 
-    // Refresh attendance status periodically (every 30 seconds)
+    // Refresh attendance status periodically
     useEffect(() => {
         if ((userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && apiClient && API) {
             const interval = setInterval(() => {
                 fetchAttendanceStatus();
-            }, 30000); // Every 30 seconds
+            }, 60000); // Every 60 seconds
             return () => clearInterval(interval);
         }
     }, [userRole, apiClient, API, fetchAttendanceStatus]);

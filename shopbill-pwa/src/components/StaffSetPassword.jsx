@@ -16,7 +16,6 @@ const getTokenFromPath = () => {
     // Updated to be more flexible and handle any hex string after /staff-setup/
     const match = path.match(/\/staff-setup\/([a-fA-F0-9]+)/); 
     if (match && match[1]) {
-        console.log('[StaffSetPassword] Token extracted from URL:', match[1]);
         return match[1];
     }
     console.warn('[StaffSetPassword] No token found in URL path:', path);

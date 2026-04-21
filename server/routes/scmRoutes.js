@@ -31,7 +31,12 @@ const getActorNameWithRole = async (req) => {
                        actorRole === 'Manager' ? 'Manager' : 
                        actorRole === 'Cashier' ? 'Cashier' : 
                        actorRole;
-    
+
+    // For owner, don't include name/email in notification text.
+    if (roleDisplay === 'Owner') {
+        return '(Owner)';
+    }
+
     return `${actorName} (${roleDisplay})`;
 };
 

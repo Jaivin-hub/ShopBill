@@ -296,19 +296,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     };
 
     const startRecording = useCallback(async () => {
-        console.log('[startRecording] ========== FUNCTION CALLED ==========');
-        console.log('[startRecording] Current isRecording state:', isRecording);
-        
         // Don't allow recording if already recording
         if (isRecording) {
-            console.log('[startRecording] Already recording, aborting');
             showToast('Recording already in progress', 'info');
             return;
         }
 
         try {
-            console.log('[startRecording] Checking browser support...');
-            
             // Check if MediaRecorder is supported
             if (typeof MediaRecorder === 'undefined') {
                 console.error('[startRecording] MediaRecorder not supported');
@@ -322,8 +316,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 showToast('Microphone access not available in this browser', 'error');
                 return;
             }
-
-            console.log('[startRecording] Browser support OK, proceeding...');
 
             // Clean up any existing stream first
             if (mediaStreamRef.current) {
@@ -341,7 +333,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
 
             // Request microphone access
-            console.log('[startRecording] Requesting microphone access...');
             let stream;
             try {
                 // iOS Safari requires simpler audio constraints
@@ -359,8 +350,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     };
                 
                 stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                console.log('[startRecording] Microphone access granted, stream:', stream);
-                console.log('[startRecording] Stream tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState })));
             } catch (getUserMediaError) {
                 console.error('[startRecording] getUserMedia error:', getUserMediaError);
                 
@@ -410,7 +399,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             for (const type of typesToCheck) {
                 if (MediaRecorder.isTypeSupported(type)) {
                     mimeType = type;
-                    console.log('[startRecording] Selected mimeType:', mimeType, 'for device:', isIOS ? 'iOS' : 'Android/Other');
                     break;
                 }
             }
@@ -422,20 +410,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             }
 
             const options = { mimeType };
-            console.log('[startRecording] Creating MediaRecorder with options:', options);
             let recorder;
             try {
                 recorder = new MediaRecorder(stream, options);
-                console.log('[startRecording] MediaRecorder created successfully');
-                console.log('[startRecording] MediaRecorder state:', recorder.state);
-                console.log('[startRecording] MediaRecorder mimeType:', recorder.mimeType);
             } catch (recorderError) {
                 console.error('[startRecording] Error creating MediaRecorder with options:', recorderError);
                 // Try without options as fallback
-                console.log('[startRecording] Trying without options as fallback...');
                 try {
                     recorder = new MediaRecorder(stream);
-                    console.log('[startRecording] MediaRecorder created with fallback, mimeType:', recorder.mimeType);
                     // Update mimeType to match what MediaRecorder actually supports
                     if (recorder.mimeType) {
                         mimeType = recorder.mimeType;
@@ -448,12 +430,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             
             // Reset chunks array
             recordingChunksRef.current = [];
-            console.log('[startRecording] Chunks array reset');
             
             recorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) {
                     recordingChunksRef.current.push(e.data);
-                    console.log('[startRecording] Data chunk received, size:', e.data.size);
                 }
             };
             
@@ -465,12 +445,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 }
                 
                 const chunks = recordingChunksRef.current;
-                console.log('[startRecording] Recording stopped, chunks count:', chunks.length);
                 if (chunks.length > 0) {
                     // Use the actual mimeType from recorder if available, otherwise use detected one
                     const finalMimeType = recorder.mimeType || mimeType || 'audio/webm';
                     const blob = new Blob(chunks, { type: finalMimeType });
-                    console.log('[startRecording] Blob created, type:', blob.type, 'size:', blob.size);
                     setAudioBlob(blob);
                     const url = URL.createObjectURL(blob);
                     setAudioUrl(url);
@@ -499,22 +477,17 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
             // Start recording with timeslice to ensure data is collected
             try {
-                console.log('[startRecording] Setting MediaRecorder state...');
                 // Set the recorder first
                 setMediaRecorder(recorder);
                 
-                console.log('[startRecording] Starting MediaRecorder...');
                 // Start recording
                 recorder.start(100); // Collect data every 100ms
                 
                 // Small delay to ensure state is updated
                 await new Promise(resolve => setTimeout(resolve, 50));
                 
-                console.log('[startRecording] MediaRecorder state after start:', recorder.state);
-                
                 // Verify recording started
                 if (recorder.state === 'recording') {
-                    console.log('[startRecording] Recording started successfully!');
                     setIsRecording(true);
                     setRecordingTime(0);
                     
@@ -524,7 +497,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     recordingTimerRef.current = setInterval(() => {
                         setRecordingTime(prev => prev + 1);
                     }, 1000);
-                    console.log('[startRecording] Timer started, UI should update now');
                 } else {
                     console.error('[startRecording] MediaRecorder state is not recording:', recorder.state);
                     throw new Error(`MediaRecorder failed to start. State: ${recorder.state}`);
@@ -996,7 +968,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
-                        console.log('[toggleAudio] Audio playback started successfully');
                         setPlayingAudioId(messageId);
                     })
                     .catch(error => {
@@ -1234,7 +1205,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             {/* Main Chat Interface */}
             <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full min-h-0 overflow-hidden relative`}>
                 {selectedChat ? (
-                    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
+                    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden relative">
                         {/* Fixed Header */}
                         <div className="shrink-0 z-50">
                             <ChatHeader
@@ -1253,7 +1224,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         </div>
 
                         {/* Messages area - scrollable */}
-                        <div ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar">
+                        <div ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 pb-32 custom-scrollbar">
                             <ChatMessages
                                 messages={messages}
                                 isLoadingMessages={isLoadingMessages}
@@ -1271,7 +1242,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
                         {/* Fixed Input section - Footer position (hidden when info page is open) */}
                         {!showInfo && (
-                            <div className={`mt-auto shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                            <div className={`absolute bottom-0 left-0 right-0 shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
                                 <ChatInput
                                     messageInput={messageInput}
                                     onMessageChange={setMessageInput}

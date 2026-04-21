@@ -36,7 +36,7 @@ const ChatListSidebar = ({
             {/* Scrollable Container - Required for sticky to work */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {/* Sticky Header Area - Title, Description, Toggle, and Search */}
-                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'bg-white backdrop-blur-xl'} shadow-lg`}>
+                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'border-slate-200 bg-white backdrop-blur-xl'} shadow-lg`}>
                     <div className="p-4 md:p-6 pb-3 md:pb-4">
                         {/* Toggle */}
                         <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>

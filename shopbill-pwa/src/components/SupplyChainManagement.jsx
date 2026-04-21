@@ -182,17 +182,27 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     try {
       if (editingSupplierId) {
         // Update existing supplier
-        await apiClient.put(API.scmSupplierUpdate(editingSupplierId), supplierForm);
+        const updated = await apiClient.put(API.scmSupplierUpdate(editingSupplierId), supplierForm);
         showToast("Vendor updated", "success");
+        const updatedId = updated?.data?._id || updated?.data?.id || editingSupplierId;
+        if (updatedId) {
+          setPurchaseForm(prev => ({ ...prev, supplierId: String(updatedId) }));
+        }
       } else {
         // Create new supplier
-        await apiClient.post(API.scmSuppliers, supplierForm);
+        const created = await apiClient.post(API.scmSuppliers, supplierForm);
         showToast("Vendor added", "success");
+        const createdId = created?.data?._id || created?.data?.id;
+        if (createdId) {
+          setPurchaseForm(prev => ({ ...prev, supplierId: String(createdId) }));
+        }
       }
       setSupplierForm({ name: '', phone: '', email: '', gstin: '' });
       setSupplierErrors({});
       setEditingSupplierId(null);
       setIsSupplierModalOpen(false);
+      setIsSupplierPickerOpen(false);
+      setSearchTerm('');
       fetchSCMData();
     } catch (error) { 
       showToast(editingSupplierId ? "Error updating vendor" : "Error adding vendor", "error"); 
@@ -226,9 +236,14 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     try {
       const res = await apiClient.post(API.inventory, productForm);
       showToast("Product saved", "success");
-      setPurchaseForm(prev => ({ ...prev, productId: res.data._id || res.data.id }));
+      const createdId = res?.data?._id || res?.data?.id || res?.data?.item?._id || res?.data?.item?.id;
+      if (createdId) {
+        setPurchaseForm(prev => ({ ...prev, productId: String(createdId) }));
+      }
       setProductForm({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
       setIsProductModalOpen(false);
+      setIsProductPickerOpen(false);
+      setSearchTerm('');
       fetchSCMData();
     } catch (error) { showToast("Error adding product", "error"); } finally { setIsLoading(false); }
   };
@@ -265,7 +280,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </p>
           </div>
 
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1.5 rounded-2xl border shadow-inner`}>
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
             {[
               { id: 'purchase', label: 'ADD STOCK', icon: PackageCheck },
               { id: 'history', label: 'LOGS', icon: History },
@@ -274,7 +289,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-600')}`}
+                className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-600')}`}
               >
                 <tab.icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
@@ -288,57 +303,57 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         <div className="max-w-7xl mx-auto space-y-8 pb-12">
         {activeTab === 'purchase' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
               <form onSubmit={handlePurchaseSubmit}>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-[11px] font-black text-indigo-500 tracking-[0.2em] ">Arrival Entry</span>
-                  <button type="button" onClick={() => setIsScannerModalOpen(true)} className="flex items-center gap-2.5 px-4 py-2 bg-indigo-600/10 text-indigo-500 rounded-xl border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
+                  <button type="button" onClick={() => setIsScannerModalOpen(true)} className="flex items-center gap-2.5 px-3.5 py-2 bg-indigo-600/10 text-indigo-500 rounded-lg border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
                     <ScanLine className="w-4 h-4" />
                     <span className="text-[10px] font-black tracking-widest ">Scan Code</span>
                   </button>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2.5">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Select Product</label>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => { setIsProductPickerOpen(true); setSearchTerm(''); }} className={`flex-1 ${inputBase} px-4 py-4 rounded-2xl flex items-center justify-between text-left border focus:border-indigo-500 transition-all`}>
-                          <span className={`text-sm font-black truncate ${selectedProduct ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedProduct ? selectedProduct.name : 'Choose Item...'}</span>
+                        <button type="button" onClick={() => { setIsProductPickerOpen(true); setSearchTerm(''); }} className={`flex-1 ${inputBase} px-4 py-3 rounded-xl flex items-center justify-between text-left border focus:border-indigo-500 transition-all`}>
+                          <span className={`text-xs font-black truncate ${selectedProduct ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedProduct ? selectedProduct.name : 'Choose Item...'}</span>
                           <ChevronDown className="w-5 h-5 text-slate-500" />
                         </button>
-                        <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-indigo-600 p-4 rounded-2xl hover:bg-indigo-500 text-white shadow-lg active:scale-95 transition-all"><Plus className="w-5 h-5" /></button>
+                        <button type="button" onClick={() => setIsProductModalOpen(true)} className="bg-indigo-600 p-3 rounded-xl hover:bg-indigo-500 text-white shadow-lg active:scale-95 transition-all"><Plus className="w-5 h-5" /></button>
                       </div>
                     </div>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Select Vendor</label>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => { setIsSupplierPickerOpen(true); setSearchTerm(''); }} className={`flex-1 ${inputBase} px-4 py-4 rounded-2xl flex items-center justify-between text-left border focus:border-indigo-500 transition-all`}>
-                          <span className={`text-sm font-black truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Vendor...'}</span>
+                        <button type="button" onClick={() => { setIsSupplierPickerOpen(true); setSearchTerm(''); }} className={`flex-1 ${inputBase} px-4 py-3 rounded-xl flex items-center justify-between text-left border focus:border-indigo-500 transition-all`}>
+                          <span className={`text-xs font-black truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Vendor...'}</span>
                           <ChevronDown className="w-5 h-5 text-slate-500" />
                         </button>
-                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-4 rounded-2xl hover:text-indigo-400 border transition-all ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-200 border-slate-300'}`}><Plus className="w-5 h-5" /></button>
+                        <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-3 rounded-xl hover:text-indigo-400 border transition-all ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-200 border-slate-300'}`}><Plus className="w-5 h-5" /></button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Arrival Qty</label>
-                      <input type="number" required min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: e.target.value })} className={`w-full ${inputBase} px-4 py-4 rounded-2xl outline-none text-[16px] md:text-sm font-black border focus:border-indigo-500`} placeholder="0" />
+                      <input type="number" required min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-sm font-black border focus:border-indigo-500`} placeholder="0" />
                     </div>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Cost Per Unit</label>
-                      <input type="number" required step="0.01" value={purchaseForm.purchasePrice} onChange={(e) => setPurchaseForm({ ...purchaseForm, purchasePrice: e.target.value })} className={`w-full ${inputBase} px-4 py-4 rounded-2xl outline-none text-[16px] md:text-sm font-black border focus:border-indigo-500`} placeholder="0.00" />
+                      <input type="number" required step="0.01" value={purchaseForm.purchasePrice} onChange={(e) => setPurchaseForm({ ...purchaseForm, purchasePrice: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-sm font-black border focus:border-indigo-500`} placeholder="0.00" />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Invoice Number</label>
-                      <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-4 rounded-2xl outline-none text-[16px] md:text-sm font-mono border focus:border-indigo-500`} placeholder="Optional" />
+                      <input type="text" value={purchaseForm.invoiceNumber} onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })} className={`w-full ${inputBase} px-4 py-3 rounded-xl outline-none text-sm font-mono border focus:border-indigo-500`} placeholder="Optional" />
                     </div>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Arrival Date</label>
                       <div className="relative">
                         <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
@@ -346,7 +361,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           type="date" 
                           value={purchaseForm.date} 
                           onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} 
-                          className={`w-full ${inputBase} ${dateTextColor} pl-10 pr-4 py-4 rounded-2xl outline-none text-[16px] md:text-sm font-black border focus:border-indigo-500 appearance-none`}
+                          className={`w-full ${inputBase} ${dateTextColor} pl-10 pr-4 py-3 rounded-xl outline-none text-sm font-black border focus:border-indigo-500 appearance-none`}
                           style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                         />
                       </div>
@@ -354,23 +369,23 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   </div>
                 </div>
 
-                <div className="pt-6 space-y-4">
-                  <div className="flex justify-between items-center p-5 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                <div className="pt-5 space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
                     <span className="text-[11px] font-black text-indigo-500 tracking-widest ">ENTRY TOTAL</span>
-                    <span className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>₹{(Number(purchaseForm.quantity || 0) * Number(purchaseForm.purchasePrice || 0)).toLocaleString()}</span>
+                    <span className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>₹{(Number(purchaseForm.quantity || 0) * Number(purchaseForm.purchasePrice || 0)).toLocaleString()}</span>
                   </div>
-                  <button disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-[11px] tracking-[0.25em] shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 ">
+                  <button disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-black text-[10px] tracking-[0.22em] shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 ">
                     {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <>Post stock entry <ArrowRight className="w-5 h-5" /></>}
                   </button>
                 </div>
               </form>
 
-              <div className={`hidden lg:flex ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} rounded-3xl overflow-hidden flex-col`}>
-                <div className={`p-6 border-b ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'} space-y-4`}>
+              <div className={`hidden lg:flex ${darkMode ? 'bg-slate-900/20 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} rounded-2xl overflow-hidden flex-col`}>
+                <div className={`p-5 border-b ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'} space-y-3`}>
                   <div className="flex justify-between items-center">
                     <h3 className={`text-[11px] font-black tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'} `}>Live Stock Overview</h3>
                     <div className="flex items-center gap-2">
-                      <select value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} className={`${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-white border-slate-200'} text-[10px] font-black text-indigo-500 px-3 py-1.5 rounded-xl border outline-none cursor-pointer`}>
+                      <select value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} className={`${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-white border-slate-200'} text-[10px] font-black text-indigo-500 px-3 py-1.5 rounded-lg border outline-none cursor-pointer`}>
                         <option value="low-stock">SORT: LOW STOCK</option>
                         <option value="a-z">SORT: A-Z</option>
                       </select>
@@ -379,21 +394,21 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   </div>
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input placeholder="Search items..." value={inventorySearch} onChange={(e) => setInventorySearch(e.target.value)} className={`w-full ${inputBase} py-3.5 pl-11 pr-4 rounded-2xl text-[11px] font-bold border outline-none focus:border-indigo-500 transition-all`} />
+                    <input placeholder="Search items..." value={inventorySearch} onChange={(e) => setInventorySearch(e.target.value)} className={`w-full ${inputBase} py-3 pl-11 pr-4 rounded-xl text-[11px] font-bold border outline-none focus:border-indigo-500 transition-all`} />
                   </div>
                 </div>
-                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto max-h-[500px] custom-scrollbar">
+                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto max-h-[500px] custom-scrollbar">
                   {sortedInventory.map(item => {
                     const isLow = item.quantity <= (item.reorderLevel || 5);
                     const isSelected = purchaseForm.productId === item._id;
                     return (
-                      <button key={item._id} onClick={() => setPurchaseForm(prev => ({ ...prev, productId: item._id }))} className={`p-5 rounded-2xl border text-left transition-all relative group hover:scale-[1.02] active:scale-95 ${isSelected ? 'bg-indigo-600 border-indigo-500 shadow-lg' : isLow ? 'bg-red-500/5 border-red-500/20' : (darkMode ? 'bg-gray-950/50 border-slate-800/50' : 'bg-slate-50 border-slate-200')}`}>
+                      <button key={item._id} onClick={() => setPurchaseForm(prev => ({ ...prev, productId: item._id }))} className={`p-4 rounded-xl border text-left transition-all relative group hover:scale-[1.02] active:scale-95 ${isSelected ? 'bg-indigo-600 border-indigo-500 shadow-lg' : isLow ? 'bg-red-500/5 border-red-500/20' : (darkMode ? 'bg-gray-950/50 border-slate-800/50' : 'bg-slate-50 border-slate-200')}`}>
                         <div className="flex justify-between items-start mb-3 gap-2">
                           <p className={`text-[11px] font-black truncate ${isSelected ? 'text-white' : (darkMode ? 'text-slate-300' : 'text-slate-700')}`}>{item.name}</p>
                           {isLow && <AlertTriangle className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-red-500'} shrink-0`} />}
                         </div>
                         <div className="flex justify-between items-end mb-4">
-                          <p className={`text-2xl font-black tracking-tighter ${isSelected ? 'text-white' : isLow ? 'text-red-500' : 'text-emerald-500'}`}>{item.quantity}</p>
+                          <p className={`text-xl font-black tracking-tighter ${isSelected ? 'text-white' : isLow ? 'text-red-500' : 'text-emerald-500'}`}>{item.quantity}</p>
                           <div className="text-right">
                             <p className={`text-[9px] font-black ${isSelected ? 'text-indigo-100' : 'text-slate-500'} `}>Rate: ₹{item.price}</p>
                           </div>
@@ -413,8 +428,66 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
         {activeTab === 'history' && (
           <div className="flex flex-col animate-in fade-in duration-500 space-y-6">
+            {/* Filters first so KPIs below reflect selected range */}
+            <section className={`${cardBase} rounded-2xl border p-4 md:p-6`}>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h3 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Purchase History
+                  </h3>
+                  <p className={`text-[10px] font-black tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Filter period to update totals and records
+                  </p>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {DATE_FILTERS.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setSelectedFilter(f.id)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
+                          selectedFilter === f.id
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg'
+                            : (darkMode
+                              ? 'text-slate-400 border-slate-700 hover:bg-indigo-500/10'
+                              : 'text-slate-500 border-slate-200 hover:bg-indigo-500/10')
+                        }`}
+                      >
+                        {f.label[0]} {f.label[1]}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedFilter === 'custom' && (
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <div className="relative flex-1 md:w-40">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
+                        <input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
+                        />
+                      </div>
+                      <div className="relative flex-1 md:w-40">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
+                        <input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
             {/* KPI Cards - Matching Dashboard Style */}
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <section className="grid grid-cols-2 gap-4">
               <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
                 <div className="flex justify-between items-start">
                   <div>
@@ -449,7 +522,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
             {/* Purchase History Table - Matching Dashboard Style */}
             <section className={`${cardBase} rounded-2xl border overflow-hidden`}>
-              {/* Header with Filters */}
+              {/* Header */}
               <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex flex-col md:flex-row justify-between items-start md:items-center gap-4`}>
                 <div>
                   <h3 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -458,50 +531,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <p className={`text-[10px] font-black tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     Complete procurement log
                   </p>
-                </div>
-                
-                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                    {DATE_FILTERS.map(f => (
-                      <button 
-                        key={f.id} 
-                        onClick={() => setSelectedFilter(f.id)} 
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
-                          selectedFilter === f.id 
-                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
-                            : (darkMode 
-                              ? 'text-slate-400 border-slate-700 hover:bg-indigo-500/10' 
-                              : 'text-slate-500 border-slate-200 hover:bg-indigo-500/10')
-                        }`}
-                      >
-                        {f.label[0]} {f.label[1]}
-                      </button>
-                    ))}
-                  </div>
-                  {selectedFilter === 'custom' && (
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                      <div className="relative flex-1 md:w-40">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                        <input 
-                          type="date" 
-                          value={customStartDate} 
-                          onChange={(e) => setCustomStartDate(e.target.value)} 
-                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`} 
-                          style={{ colorScheme: darkMode ? 'dark' : 'light' }} 
-                        />
-                      </div>
-                      <div className="relative flex-1 md:w-40">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                        <input 
-                          type="date" 
-                          value={customEndDate} 
-                          onChange={(e) => setCustomEndDate(e.target.value)} 
-                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`} 
-                          style={{ colorScheme: darkMode ? 'dark' : 'light' }} 
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -632,7 +661,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className="animate-in fade-in duration-500">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-20">
               {suppliers.map(s => (
-                <div key={s._id} className={`${cardBase} p-6 rounded-2xl group hover:border-indigo-500/50 transition-all flex flex-col justify-between border shadow-sm`}>
+                <div key={s._id} className={`${cardBase} p-5 rounded-2xl group hover:border-indigo-500/50 transition-all flex flex-col justify-between border shadow-sm`}>
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-lg shadow-indigo-600/20">{s.name ? s.name[0] : 'V'}</div>
@@ -649,8 +678,22 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     </div>
                     <h4 className={`text-sm font-black truncate mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.name}</h4>
                     <div className={`flex items-center gap-3 pt-4 border-t ${darkMode ? 'border-slate-800/50' : 'border-slate-100'}`}>
-                      <Phone className="w-4 h-4 text-indigo-500" />
-                      <span className="text-[11px] font-mono text-slate-500 font-black">{s.phone || 'N/A'}</span>
+                      {s.phone ? (
+                        <a
+                          href={`tel:${String(s.phone).replace(/[^\d+]/g, '')}`}
+                          className={`flex items-center gap-3 text-[11px] font-mono font-black transition-colors ${darkMode ? 'text-slate-300 hover:text-indigo-400' : 'text-slate-600 hover:text-indigo-600'}`}
+                          aria-label={`Call ${s.name}`}
+                          title={`Call ${s.phone}`}
+                        >
+                          <Phone className="w-4 h-4 text-indigo-500" />
+                          <span>{s.phone}</span>
+                        </a>
+                      ) : (
+                        <>
+                          <Phone className="w-4 h-4 text-indigo-500" />
+                          <span className="text-[11px] font-mono text-slate-500 font-black">N/A</span>
+                        </>
+                      )}
                     </div>
                     {s.gstin && (
                        <div className="flex items-center gap-3 mt-2">
@@ -690,7 +733,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
           <form onSubmit={handleQuickAddProduct} className={`relative w-full max-w-lg ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden`}>
             {/* Header */}
-            <div className={`p-6 border-b ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
+            <div className={`p-5 border-b ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-indigo-500/10">
                   <Package className="w-5 h-5 text-indigo-500" />
@@ -714,7 +757,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </div>
 
             {/* Form Fields */}
-            <div className="p-6 space-y-5">
+            <div className="p-5 space-y-4">
               {/* Product Name */}
               <div className="space-y-2">
                 <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -726,7 +769,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   placeholder="Enter product name"
                   value={productForm.name}
                   onChange={e => setProductForm({ ...productForm, name: e.target.value })}
-                  className={`w-full ${inputBase} p-4 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                  className={`w-full ${inputBase} p-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
                 />
               </div>
 
@@ -747,7 +790,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       placeholder="0.00"
                       value={productForm.price}
                       onChange={e => setProductForm({ ...productForm, price: e.target.value })}
-                      className={`w-full pl-8 pr-4 ${inputBase} p-4 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                      className={`w-full pl-8 pr-4 ${inputBase} p-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
                     />
                   </div>
                 </div>
@@ -761,7 +804,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     placeholder="5"
                     value={productForm.reorderLevel}
                     onChange={e => setProductForm({ ...productForm, reorderLevel: e.target.value })}
-                    className={`w-full ${inputBase} p-4 rounded-xl text-[16px] md:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                    className={`w-full ${inputBase} p-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
                   />
                 </div>
               </div>
@@ -777,12 +820,12 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     placeholder="Optional - Enter HSN or scan barcode"
                     value={productForm.hsn}
                     onChange={e => setProductForm({ ...productForm, hsn: e.target.value })}
-                    className={`flex-1 ${inputBase} p-4 rounded-xl text-[16px] md:text-xs font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
+                    className={`flex-1 ${inputBase} p-3 rounded-xl text-sm font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
                   />
                   <button
                     type="button"
                     onClick={() => setIsScannerModalOpen(true)}
-                    className={`p-4 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} rounded-xl border hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500 transition-all`}
+                    className={`p-3 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} rounded-xl border hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500 transition-all`}
                     title="Scan Barcode"
                   >
                     <ScanLine className="w-5 h-5" />
@@ -792,11 +835,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </div>
 
             {/* Footer Actions */}
-            <div className={`p-6 border-t ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
+            <div className={`p-5 border-t ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
               <button
                 type="button"
                 onClick={() => setIsProductModalOpen(false)}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
                   darkMode
                     ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -806,9 +849,17 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </button>
               <button
                 type="submit"
-                className="flex-1 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-lg"
+                disabled={isLoading}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Add Product
+                {isLoading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  'Add Product'
+                )}
               </button>
             </div>
           </form>
@@ -818,15 +869,15 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       {(isProductPickerOpen || isSupplierPickerOpen) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} />
-          <div className={`relative w-full max-w-md ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-3xl border max-h-[75vh] flex flex-col overflow-hidden animate-in zoom-in duration-200 shadow-2xl`}>
-            <div className={`p-6 border-b ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+          <div className={`relative w-full max-w-md ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border max-h-[75vh] flex flex-col overflow-hidden animate-in zoom-in duration-200 shadow-2xl`}>
+            <div className={`p-5 border-b ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-[11px] font-black tracking-[0.25em] text-indigo-500 ">{isProductPickerOpen ? 'Select Product' : 'Select Vendor'}</h3>
                 <X className="w-6 h-6 text-slate-500 cursor-pointer hover:text-red-500" onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} />
               </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input placeholder="Type to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full ${inputBase} p-4 pl-12 rounded-2xl outline-none text-[16px] md:text-sm font-black border focus:border-indigo-500`} />
+                <input placeholder="Type to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full ${inputBase} p-3 pl-12 rounded-xl outline-none text-sm font-black border focus:border-indigo-500`} />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
@@ -834,7 +885,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 const isLow = isProductPickerOpen && (item.quantity <= (item.reorderLevel || 5));
                 const isSelected = (isProductPickerOpen ? purchaseForm.productId : purchaseForm.supplierId) === item._id;
                 return (
-                  <button key={item._id} onClick={() => { setPurchaseForm({ ...purchaseForm, [isProductPickerOpen ? 'productId' : 'supplierId']: item._id }); setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all border ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'hover:bg-indigo-500/10 border-transparent'}`}>
+                  <button key={item._id} onClick={() => { setPurchaseForm({ ...purchaseForm, [isProductPickerOpen ? 'productId' : 'supplierId']: item._id }); setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} className={`w-full flex items-center justify-between p-3 rounded-xl transition-all border ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'hover:bg-indigo-500/10 border-transparent'}`}>
                     <div className="text-left">
                       <p className={`text-sm font-black truncate ${isSelected ? 'text-white' : (darkMode ? 'text-slate-200' : 'text-slate-700')}`}>{item.name}</p>
                       {isProductPickerOpen && <p className={`text-[10px] font-black mt-1  ${isSelected ? 'text-indigo-100' : isLow ? 'text-red-500' : 'text-slate-500'}`}>Stock: {item.quantity} Units</p>}
@@ -851,8 +902,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       {isSupplierModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseSupplierModal} />
-          <form onSubmit={handleAddSupplier} className={`relative w-full max-w-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-8 rounded-3xl border shadow-2xl animate-in zoom-in duration-300`}>
-            <div className="flex justify-between items-center mb-6">
+          <form onSubmit={handleAddSupplier} className={`relative w-full max-w-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl animate-in zoom-in duration-300`}>
+            <div className="flex justify-between items-center mb-5">
               <h3 className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {editingSupplierId ? 'Edit Vendor' : 'Add New Vendor'}
               </h3>
@@ -864,23 +915,23 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Full Name</label>
-                <input required placeholder="Business / Vendor Name" value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className={`w-full ${inputBase} p-4 rounded-2xl outline-none text-[16px] md:text-sm font-black border`} />
+                <input required placeholder="Business / Vendor Name" value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border`} />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Contact No</label>
-                <input required type="tel" placeholder="Phone Number" value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className={`w-full ${inputBase} p-4 rounded-2xl outline-none text-[16px] md:text-sm font-black border`} />
+                <input required type="tel" placeholder="Phone Number" value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border`} />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Identification (GSTIN)</label>
-                <input placeholder="Optional ID" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-4 rounded-2xl outline-none text-[16px] md:text-xs font-mono text-indigo-500 border `} />
+                <input placeholder="Optional ID" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-mono text-indigo-500 border `} />
               </div>
               <button 
                 type="submit"
                 disabled={isLoading}
-                className={`w-full mt-3 py-4 rounded-2xl font-black text-[11px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                className={`w-full mt-2 py-3 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
               >
                 {isLoading ? (
                   <>

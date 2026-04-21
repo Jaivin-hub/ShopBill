@@ -92,12 +92,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                 chartDataArray = chartResponse;
             }
             
-            console.log('Chart data received:', {
-                response: chartResponse,
-                data: chartDataArray,
-                length: chartDataArray.length
-            });
-            
             setChartData(chartDataArray);
             setSuppliers(suppliersRes.data);
             setPurchases(purchasesRes.data);
@@ -280,10 +274,76 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                 </section>
 
                 {/* SECONDARY INSIGHTS */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                    {/* FINANCIAL STANDING */}
+                    <div className={`${cardBase} rounded-xl p-6`}>
+                        <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
+                            <Wallet className="w-4 h-4 text-red-500" />
+                            Liabilities & Equity
+                        </h3>
+                        <div className="space-y-4">
+                            <div className={`p-4 ${darkMode ? 'bg-red-500/5 border-red-500/10' : 'bg-red-50/50 border-red-100 shadow-sm'} border rounded-lg group`}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <p className="text-[9px] font-bold text-red-500  tracking-widest">Credit Outstanding</p>
+                                    <AlertTriangle className="w-3 h-3 text-red-500 opacity-50 group-hover:opacity-100" />
+                                </div>
+                                <p className="text-xl font-bold text-red-500 tracking-tight">{formatCurrency(data.totalCreditOutstanding)}</p>
+                            </div>
+                            <div className={`p-4 ${darkMode ? 'bg-amber-500/5 border-amber-500/10' : 'bg-amber-50/50 border-amber-100 shadow-sm'} border rounded-lg group`}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <p className="text-[9px] font-bold text-amber-600 tracking-widest">Purchased Amount</p>
+                                    <ShoppingCart className="w-3 h-3 text-amber-500 opacity-50 group-hover:opacity-100" />
+                                </div>
+                                <p className="text-xl font-bold text-amber-600 tracking-tight">{formatCurrency(scmInsights.totalStockValue)}</p>
+                            </div>
+                            <div className={`p-4 ${darkMode ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50/50 border-emerald-100 shadow-sm'} border rounded-lg`}>
+                                <p className="text-[9px] font-bold text-emerald-600  tracking-widest mb-1">Lifetime Revenue</p>
+                                <p className="text-xl font-bold text-emerald-600 tracking-tight">{formatCurrency(data.totalAllTimeRevenue)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* TOP ITEMS */}
+                    <div className={`${cardBase} rounded-xl p-6`}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
+                                <TrendingUp className="w-4 h-4 text-sky-500" />
+                                Best Sellers
+                            </h3>
+                            {allBestSellers.length > 5 && (
+                                <button
+                                    onClick={() => setShowAllBestSellers(!showAllBestSellers)}
+                                    className={`text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg transition-all ${
+                                        darkMode 
+                                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    {showAllBestSellers ? 'Show Less' : `View All (${allBestSellers.length})`}
+                                </button>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            {(showAllBestSellers ? allBestSellers : data.topItems).map((item, idx) => (
+                                <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}>
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <span className={`text-[10px] font-bold text-slate-500 w-4 shrink-0`}>#{idx + 1}</span>
+                                        <span className={`text-xs font-bold  truncate ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
+                                    </div>
+                                    <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit{item.quantity !== 1 ? 's' : ''}</span>
+                                </div>
+                            ))}
+                            {showAllBestSellers && allBestSellers.length === 0 && (
+                                <div className={`text-center py-6 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+                                    <p className="text-[11px] font-medium text-gray-400">No products found</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* PROCUREMENT INSIGHTS — hidden for basic plan owner */}
                     {!isBasicPlanOwner && (
-                    <div className={`lg:col-span-2 ${cardBase} rounded-xl p-6`}>
+                    <div className={`${cardBase} rounded-xl p-6`}>
                         <div className="flex items-center justify-between mb-8">
                             <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
                                 <Truck className="w-4 h-4 text-amber-500" />
@@ -331,67 +391,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                         </div>
                     </div>
                     )}
-
-                    <div className={`flex flex-col gap-6 ${isBasicPlanOwner ? 'lg:col-span-3' : ''}`}>
-                        {/* TOP ITEMS */}
-                        <div className={`${cardBase} rounded-xl p-6`}>
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
-                                    <TrendingUp className="w-4 h-4 text-sky-500" />
-                                    Best Sellers
-                                </h3>
-                                {allBestSellers.length > 5 && (
-                                    <button
-                                        onClick={() => setShowAllBestSellers(!showAllBestSellers)}
-                                        className={`text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg transition-all ${
-                                            darkMode 
-                                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
-                                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                                        }`}
-                                    >
-                                        {showAllBestSellers ? 'Show Less' : `View All (${allBestSellers.length})`}
-                                    </button>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                {(showAllBestSellers ? allBestSellers : data.topItems).map((item, idx) => (
-                                    <div key={idx} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}>
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                            <span className={`text-[10px] font-bold text-slate-500 w-4 shrink-0`}>#{idx + 1}</span>
-                                            <span className={`text-xs font-bold  truncate ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</span>
-                                        </div>
-                                        <span className="shrink-0 text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">{item.quantity} Unit{item.quantity !== 1 ? 's' : ''}</span>
-                                    </div>
-                                ))}
-                                {showAllBestSellers && allBestSellers.length === 0 && (
-                                    <div className={`text-center py-6 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
-                                        <p className="text-[11px] font-medium text-gray-400">No products found</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* FINANCIAL STANDING */}
-                        <div className={`${cardBase} rounded-xl p-6`}>
-                            <h3 className={`text-sm font-bold  tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} mb-6 flex items-center gap-2`}>
-                                <Wallet className="w-4 h-4 text-red-500" />
-                                Liabilities & Equity
-                            </h3>
-                            <div className="space-y-4">
-                                <div className={`p-4 ${darkMode ? 'bg-red-500/5 border-red-500/10' : 'bg-red-50/50 border-red-100 shadow-sm'} border rounded-lg group`}>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <p className="text-[9px] font-bold text-red-500  tracking-widest">Credit Outstanding</p>
-                                        <AlertTriangle className="w-3 h-3 text-red-500 opacity-50 group-hover:opacity-100" />
-                                    </div>
-                                    <p className="text-xl font-bold text-red-500 tracking-tight">{formatCurrency(data.totalCreditOutstanding)}</p>
-                                </div>
-                                <div className={`p-4 ${darkMode ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50/50 border-emerald-100 shadow-sm'} border rounded-lg`}>
-                                    <p className="text-[9px] font-bold text-emerald-600  tracking-widest mb-1">Lifetime Revenue</p>
-                                    <p className="text-xl font-bold text-emerald-600 tracking-tight">{formatCurrency(data.totalAllTimeRevenue)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {isTextileShop && (

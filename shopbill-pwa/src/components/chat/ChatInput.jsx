@@ -174,20 +174,14 @@ const ChatInput = ({
                                 e.stopPropagation();
                                 e.nativeEvent.stopImmediatePropagation();
                                 
-                                console.log('[ChatInput] ========== MIC BUTTON CLICKED ==========');
-                                console.log('[ChatInput] onStartRecording exists:', !!onStartRecording);
-                                console.log('[ChatInput] onStartRecording type:', typeof onStartRecording);
-                                
                                 if (!onStartRecording) {
                                     console.error('[ChatInput] ERROR: onStartRecording is not defined!');
                                     alert('Recording function not available. Please refresh the page.');
                                     return;
                                 }
-                                
-                                console.log('[ChatInput] Calling onStartRecording function...');
+
                                 try {
                                     await onStartRecording();
-                                    console.log('[ChatInput] onStartRecording call completed');
                                 } catch (error) {
                                     console.error('[ChatInput] ERROR in onStartRecording:', error);
                                     alert('Error starting recording: ' + error.message);

@@ -12,7 +12,6 @@ const updateSW = registerSW({
   onNeedRefresh() {
     // Only dispatch event when there's actually a new version available
     // This callback is only called when a new service worker is detected
-    console.log('🔄 New service worker detected - update available');
     window.dispatchEvent(new CustomEvent('pwa-update-available', { 
       detail: { 
         updateHandler: updateSW,
@@ -21,34 +20,30 @@ const updateSW = registerSW({
     }));
   },
   onRegistered(registration) {
-    console.log('✅ Pocket POS Service Worker registered!');
     // Store registration globally for UpdatePrompt to access
     window.__swRegistration = registration;
     
-    // Set up periodic update checks - More frequent for forced updates
+    // Set up periodic update checks.
     if (registration) {
-      // Check for updates every 15 seconds to catch new builds quickly
+      // Check for updates every 5 minutes to reduce network/battery overhead.
       setInterval(() => {
         registration.update().catch(err => {
           console.warn('Periodic update check failed:', err);
         });
-      }, 15 * 1000); // 15 seconds
+      }, 5 * 60 * 1000);
     }
   },
   onRegisteredSW(swUrl, registration) {
     // Called when a new service worker is registered
-    console.log('📦 New Service Worker registered at:', swUrl);
     
     // Listen for service worker updates
     if (registration) {
       registration.addEventListener('updatefound', () => {
-        console.log('🔍 Service worker update found');
         const newWorker = registration.installing;
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               // New service worker is waiting
-              console.log('⏳ New service worker is waiting');
               window.dispatchEvent(new CustomEvent('pwa-update-available', { 
                 detail: { 
                   updateHandler: updateSW,

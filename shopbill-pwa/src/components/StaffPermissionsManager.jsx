@@ -637,10 +637,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         fetchStaff();
         fetchActiveStatus();
         
-        // Refresh active status every 30 seconds
+        // Refresh active status every 60 seconds
         const interval = setInterval(() => {
             fetchActiveStatus();
-        }, 30000);
+        }, 60000);
         
         return () => clearInterval(interval);
     }, [fetchStaff, fetchActiveStatus]);

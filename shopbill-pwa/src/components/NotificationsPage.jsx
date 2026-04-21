@@ -121,7 +121,7 @@ const getNotificationTypeDetails = (type) => {
     }
 };
 
-const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
+const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurrentPage }) => {
     const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
     useEffect(() => {
@@ -170,7 +170,29 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
         const date = new Date(timestamp);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
                ' • ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
+    };
+
+    const isJustNow = (timestamp) => {
+        if (!timestamp) return true;
+        const date = new Date(timestamp);
+        const diffMs = Date.now() - date.getTime();
+        return diffMs >= 0 && diffMs < 60 * 1000;
+    };
+
+    const renderHighlightedMessage = (message) => {
+        const text = typeof message === 'string' ? message : '';
+        return text;
+    };
+
+    const getNotificationTargetPage = (notification) => {
+        const type = String(notification?.type || '').toLowerCase();
+        if (type.startsWith('inventory_') || type === 'credit_exceeded') return 'inventory';
+        if (type === 'purchase_recorded') return 'scm';
+        if (type === 'ledger_payment' || type === 'ledger_credit' || type === 'credit_sale' || type === 'customer_added' || type === 'credit_limit_updated') return 'khata';
+        if (type === 'new_shop_registered') return 'superadmin_users';
+        if (type === 'profile_updated') return 'profile';
+        return null;
+    };
 
     // Theme Variables
     const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
@@ -242,11 +264,22 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                         const { icon: Icon, color, bgColor, borderColor, glow, label } = details;
                         const uniqueId = notification._id || notification.id || `notif-${index}`;
                         const isNew = notification.isRead === false;
+                        const targetPage = getNotificationTargetPage(notification);
+                        const isClickable = Boolean(targetPage && typeof setCurrentPage === 'function');
 
                         return (
                             <div 
                                 key={uniqueId} 
-                                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${cardBase(isNew)} ${darkMode ? glow : ''} hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-2`}
+                                role={isClickable ? 'button' : undefined}
+                                tabIndex={isClickable ? 0 : undefined}
+                                onClick={isClickable ? () => setCurrentPage(targetPage) : undefined}
+                                onKeyDown={isClickable ? (e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setCurrentPage(targetPage);
+                                    }
+                                } : undefined}
+                                className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${cardBase(isNew)} ${darkMode ? glow : ''} hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-2 ${isClickable ? 'cursor-pointer' : ''}`}
                                 style={{ animationDelay: `${index * 40}ms` }}
                             >
                                 {/* UNREAD VERTICAL ACCENT */}
@@ -271,10 +304,22 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                                                 <span className="text-[9px] font-bold uppercase tabular-nums">
                                                     {formatTime(notification.createdAt || notification.timestamp)}
                                                 </span>
+                                                {isJustNow(notification.createdAt || notification.timestamp) && (
+                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${
+                                                        darkMode
+                                                            ? 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30'
+                                                            : 'text-indigo-700 bg-indigo-50 border-indigo-200'
+                                                    }`}>
+                                                        Now
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => dismissNotification(uniqueId)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                dismissNotification(uniqueId);
+                                            }}
                                             className={`p-1.5 rounded-md transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-600' : 'hover:bg-slate-200 text-slate-400'} hover:text-rose-500`}
                                         >
                                             <X className="w-4 h-4" />
@@ -282,7 +327,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode }) => {
                                     </div>
 
                                     <p className={`text-sm leading-relaxed tracking-tight ${isNew ? (darkMode ? 'text-white font-medium' : 'text-slate-900 font-semibold') : 'text-gray-500'}`}>
-                                        {notification.message}
+                                        {renderHighlightedMessage(notification.message)}
                                     </p>
 
                                     {isNew && (
