@@ -1232,9 +1232,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             />
 
             {/* Main Chat Interface */}
-            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full overflow-hidden relative`}>
+            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full min-h-0 overflow-hidden relative`}>
                 {selectedChat ? (
-                    <div className="flex flex-col h-full overflow-hidden">
+                    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
                         {/* Fixed Header */}
                         <div className="shrink-0 z-50">
                             <ChatHeader
@@ -1253,7 +1253,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         </div>
 
                         {/* Messages area - scrollable */}
-                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar min-h-0">
+                        <div ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar">
                             <ChatMessages
                                 messages={messages}
                                 isLoadingMessages={isLoadingMessages}
@@ -1271,7 +1271,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
                         {/* Fixed Input section - Footer position (hidden when info page is open) */}
                         {!showInfo && (
-                            <div className={`shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                            <div className={`mt-auto shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
                                 <ChatInput
                                     messageInput={messageInput}
                                     onMessageChange={setMessageInput}

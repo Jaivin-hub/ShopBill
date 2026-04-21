@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
-    ChevronRight, Power, Info, ShieldAlert, Edit3, AlertCircle, Clock, CheckCircle2, XCircle
+    ChevronRight, ChevronDown, Power, Info, ShieldAlert, Edit3, AlertCircle, Clock, CheckCircle2, XCircle
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
@@ -418,7 +418,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
-            <div className={`${modalBg} w-full max-w-lg h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+            <div className={`${modalBg} w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] rounded-xl sm:rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
                 <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
                     <div>
                         <h2 className={`text-lg sm:text-xl font-black tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
@@ -432,7 +432,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </button>
                 </div>
                 
-                <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto custom-scrollbar">
                     {error && (
                         <div className={`flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
                             <div className="flex gap-2 sm:gap-3">
@@ -509,17 +509,20 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                         </div>
 
                         <div className="relative group">
-                            <ShieldCheck className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <ShieldCheck className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                             <select
                                 name="role"
                                 value={formData.role}
                                 onChange={handleChange}
-                                className={`w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none appearance-none cursor-pointer ${inputBg}`}
+                                className={`w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl outline-none appearance-none cursor-pointer transition-all ${inputBg} focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10`}
                                 disabled={isSubmitting}
                             >
                                 <option value="Cashier">Cashier Tier</option>
                                 <option value="Manager">Management Tier</option>
                             </select>
+                            <div className="pointer-events-none absolute right-3 sm:right-4 top-1/2 -translate-y-1/2">
+                                <ChevronDown className={`w-4 h-4 transition-colors ${darkMode ? 'text-slate-400 group-focus-within:text-indigo-400' : 'text-slate-500 group-focus-within:text-indigo-600'}`} />
+                            </div>
                         </div>
                     </div>
 

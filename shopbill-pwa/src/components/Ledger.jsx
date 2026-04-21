@@ -230,20 +230,20 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                       </div>
                       {/* Desktop total outstanding */}
                       <div className="hidden md:flex items-baseline gap-2 shrink-0 pl-2">
-                        <p className={`text-xs font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        <p className={`text-xs font-bold ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
                           Total outstanding:
                         </p>
-                        <p className={`text-lg font-black tabular-nums ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                        <p className={`text-lg font-black tabular-nums ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
                           ₹{totalOutstanding.toLocaleString('en-IN')}
                         </p>
                       </div>
                     </div>
                     {/* Mobile total outstanding - dedicated row to avoid collapse on large amounts */}
                     <div className="md:hidden flex items-center justify-between gap-3">
-                      <p className={`text-[10px] font-bold ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                      <p className={`text-[10px] font-bold ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
                         Total outstanding:
                       </p>
-                      <p className={`text-base font-black tabular-nums truncate text-right ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                      <p className={`text-base font-black tabular-nums truncate text-right ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
                         ₹{totalOutstanding.toLocaleString('en-IN')}
                       </p>
                     </div>

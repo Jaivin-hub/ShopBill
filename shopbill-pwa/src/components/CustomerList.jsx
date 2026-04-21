@@ -139,12 +139,11 @@ const CustomerList = ({
                                     e.stopPropagation();
                                     openPaymentModal(customer);
                                 }}
-                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-[10px] tracking-wider uppercase transition-colors shrink-0 border ${darkMode ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20' : 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'}`}
+                                className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-emerald-400 hover:bg-slate-800' : 'text-slate-600 hover:text-emerald-600 hover:bg-slate-100'}`}
                                 title="Collect payment"
                                 aria-label="Collect payment"
                             >
                                 <Banknote size={18} strokeWidth={2} />
-                                <span className="hidden sm:inline">Collect</span>
                             </button>
                         )}
                         {openEditModal && (

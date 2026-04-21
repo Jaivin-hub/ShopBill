@@ -401,9 +401,10 @@ sendEmail.getLastQueuedDispatchDebug = getLastQueuedDispatchDebug;
 
 // --- Staff-specific mail (all templates + queue live here; staffRoutes only passes data) ---
 
-function buildStaffActivationMail({ to, name, role, activationToken }) {
+function buildStaffActivationMail({ to, name, role, activationToken, shopName }) {
     const clientUrl = String(process.env.CLIENT_URL || '').trim();
     const activationUrl = `${clientUrl}/staff-setup/${activationToken}`;
+    const shopLabel = shopName ? `<p>Shop: <strong>${shopName}</strong></p>` : '';
     return {
         context: 'activation-new-staff',
         to,
@@ -411,6 +412,7 @@ function buildStaffActivationMail({ to, name, role, activationToken }) {
         html: `
             <h1>Welcome to Pocket POS, ${name}!</h1>
             <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
+            ${shopLabel}
             <p>Click below to set your password and activate your account:</p>
             <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
         `,

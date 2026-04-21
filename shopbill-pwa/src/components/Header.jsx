@@ -37,6 +37,9 @@ const Header = ({
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
     const isOwner = userRole?.toLowerCase() === 'owner';
+    const displayedBusinessName = isPremium && isOwner
+        ? (currentOutlet?.name || businessName)
+        : businessName;
 
     // Sync local outlets with prop (always update when prop changes)
     useEffect(() => {
@@ -224,9 +227,9 @@ const Header = ({
                         <h1 className={`text-lg font-bold tracking-tight truncate leading-tight ${logoText}`}>
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
-                        {businessName && (
+                        {displayedBusinessName && (
                             <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
-                                {businessName}
+                                {displayedBusinessName}
                             </p>
                         )}
                     </div>

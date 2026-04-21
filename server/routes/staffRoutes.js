@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const crypto = require('crypto'); // REQUIRED: For secure token generation
 const Staff = require('../models/Staff');
 const User = require('../models/User'); // REQUIRED: To create a login account
+const Store = require('../models/Store');
 const Attendance = require('../models/Attendance');
 const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
@@ -168,6 +169,14 @@ router.post('/', protect, async (req, res) => {
         }
         const storeIdObj = new mongoose.Types.ObjectId(req.user.storeId);
         const owner = await User.findById(req.user.id);
+        // Email display name: default to registered business name; for PREMIUM multi-outlet use active outlet name.
+        let emailShopName = owner?.shopName || '';
+        if (owner?.plan === 'PREMIUM' && req.user.storeId) {
+            const activeStore = await Store.findOne({ _id: req.user.storeId, ownerId: req.user.id }).select('name').lean();
+            if (activeStore?.name) {
+                emailShopName = activeStore.name;
+            }
+        }
         const currentStaffCount = await Staff.countDocuments({ storeId: storeIdObj });
 
         const plan = owner.plan || 'BASIC'; // Fallback to BASIC if null
@@ -325,6 +334,7 @@ router.post('/', protect, async (req, res) => {
             to: newUser.email,
             name,
             role,
+            shopName: emailShopName,
             activationToken,
         });
         res.status(201).json({
