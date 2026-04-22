@@ -7,6 +7,7 @@ import apiClient from '../lib/apiClient';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const STORAGE_KEY = 'push_token_registered';
+const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 export async function requestPushFromGesture() {
   if (!VAPID_KEY || !localStorage.getItem('userToken')) return;
@@ -15,7 +16,7 @@ export async function requestPushFromGesture() {
     if (!(await isPushSupported())) return;
     const token = await requestNotificationPermissionAndToken(VAPID_KEY);
     if (token) {
-      await apiClient.post('/user/device-token', { token, platform: 'web' });
+      await apiClient.post('/user/device-token', { token, platform: isMobile() ? 'ios-web' : 'web' });
       localStorage.setItem(STORAGE_KEY, '1');
     }
   } catch {

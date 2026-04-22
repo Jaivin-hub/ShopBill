@@ -16,17 +16,22 @@ export function usePushNotifications(enabled) {
   useEffect(() => {
     if (!enabled || !VAPID_KEY) return;
     if (!localStorage.getItem('userToken')) return;
-    if (localStorage.getItem('push_token_registered') === '1') return;
-    if (isMobile()) return; // Mobile: push is requested from user gesture (pushOnGesture)
+    if (localStorage.getItem('push_token_registered') === '1' && Notification.permission === 'granted') return;
 
     let cancelled = false;
     const attempt = async () => {
       try {
         if (!(await isPushSupported()) || cancelled) return;
+        // iOS/Android web should still register token automatically after permission is granted.
+        // Do not trigger permission prompt without gesture on mobile.
+        if (isMobile() && Notification.permission !== 'granted') return;
         const fcmToken = await requestNotificationPermissionAndToken(VAPID_KEY);
         if (!fcmToken || cancelled) return;
         if (registeredRef.current) return;
-        await apiClient.post('/user/device-token', { token: fcmToken, platform: 'web' });
+        await apiClient.post('/user/device-token', {
+          token: fcmToken,
+          platform: isMobile() ? 'ios-web' : 'web'
+        });
         registeredRef.current = true;
         localStorage.setItem('push_token_registered', '1');
       } catch (err) {
@@ -34,7 +39,15 @@ export function usePushNotifications(enabled) {
       }
     };
 
-    const t = setTimeout(attempt, 1000);
-    return () => { cancelled = true; clearTimeout(t); };
+    const timers = [
+      setTimeout(attempt, 800),
+      setTimeout(attempt, 3000),
+      setTimeout(attempt, 7000),
+    ];
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
   }, [enabled]);
 }
