@@ -9,7 +9,8 @@ import API from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
-import { playMessageSound, unlockAudio } from './utils/notificationSound';
+import { onForegroundMessage } from './lib/firebase';
+import { playMessageSound, playNotificationSound, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -351,7 +352,7 @@ const App = () => {
     return userJson ? JSON.parse(userJson) : null;
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [, setToast] = useState(null);
+  const [toastStack, setToastStack] = useState([]);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -376,6 +377,7 @@ const App = () => {
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
+  const toastTimersRef = useRef(new Map());
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -387,10 +389,45 @@ const App = () => {
     localStorage.setItem('themePreference', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const showToast = useCallback((message, type = 'info') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-}, []);
+  const dismissToast = useCallback((id) => {
+    setToastStack(prev => prev.filter(t => t.id !== id));
+    const timer = toastTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      toastTimersRef.current.delete(id);
+    }
+  }, []);
+
+  const showToast = useCallback((messageOrOptions, type = 'info') => {
+    const input = typeof messageOrOptions === 'object' && messageOrOptions !== null
+      ? messageOrOptions
+      : { message: messageOrOptions, type };
+    const message = String(input.message || '').trim();
+    if (!message) return;
+
+    const toast = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: input.type || type || 'info',
+      title: input.title || (input.type === 'error' ? 'Error' : input.type === 'success' ? 'Success' : 'Notification'),
+      message,
+      avatar: input.avatar || null
+    };
+
+    setToastStack(prev => [toast, ...prev].slice(0, 4));
+
+    const timer = setTimeout(() => {
+      setToastStack(prev => prev.filter(t => t.id !== toast.id));
+      toastTimersRef.current.delete(toast.id);
+    }, 3400);
+    toastTimersRef.current.set(toast.id, timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      toastTimersRef.current.forEach(timer => clearTimeout(timer));
+      toastTimersRef.current.clear();
+    };
+  }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
   const planUpper = currentUser?.plan?.toUpperCase();
@@ -422,6 +459,36 @@ const App = () => {
   const handleViewAllInventory = useCallback(() => {
     setShowLowStockFilter(true);
     navigateTo('inventory');
+  }, [navigateTo]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onServiceWorkerMessage = (event) => {
+      const data = event?.data || {};
+      if (data.type !== 'notification-click') return;
+      const rawUrl = String(data.url || '').toLowerCase();
+      if (rawUrl.includes('/chat')) {
+        navigateTo('chat');
+        return;
+      }
+      if (rawUrl.includes('/khata') || rawUrl.includes('/ledger')) {
+        navigateTo('khata');
+        return;
+      }
+      if (rawUrl.includes('/inventory')) {
+        navigateTo('inventory');
+        return;
+      }
+      if (rawUrl.includes('/scm') || rawUrl.includes('/supply')) {
+        navigateTo('scm');
+        return;
+      }
+      if (rawUrl.includes('/notification')) {
+        navigateTo('notifications');
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
   }, [navigateTo]);
 
   const formatNotificationForRole = useCallback((notification) => {
@@ -457,6 +524,41 @@ const App = () => {
       // setNotifications([]);
     }
   }, [currentUser, apiClient, API, formatNotificationForRole]);
+
+  const handleIncomingNotification = useCallback((incomingAlert) => {
+    if (!incomingAlert) return;
+
+    // Filter out notifications where current user is the actor.
+    const actorIdStr = incomingAlert?.actorId != null ? String(incomingAlert.actorId) : null;
+    const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
+    if (actorIdStr && userIdStr && actorIdStr === userIdStr) return;
+
+    const notificationWithReadStatus = formatNotificationForRole({
+      ...incomingAlert,
+      isRead: false
+    });
+
+    setNotifications(prev => {
+      const exists = prev.some(n => {
+        const nId = n._id || n.id;
+        const alertId = notificationWithReadStatus._id || notificationWithReadStatus.id;
+        return nId && alertId && nId.toString() === alertId.toString();
+      });
+      if (exists) return prev;
+      return [notificationWithReadStatus, ...prev].slice(0, 50);
+    });
+
+    playNotificationSound();
+
+    if (notificationWithReadStatus?.message) {
+      showToast({
+        type: 'info',
+        title: notificationWithReadStatus.title || 'New notification',
+        message: notificationWithReadStatus.message,
+        avatar: notificationWithReadStatus.storeName || notificationWithReadStatus.title || 'N'
+      });
+    }
+  }, [currentUser, formatNotificationForRole, showToast]);
 
   // Fetch a single outlet by ID
   const fetchOutletById = useCallback(async (outletId) => {
@@ -664,39 +766,7 @@ useEffect(() => {
     };
     
     const handleNewNotification = (newAlert) => {
-      // Filter out notifications where the current user is the actor
-      // Users don't need to see notifications about their own actions
-      const actorIdStr = newAlert?.actorId != null ? String(newAlert.actorId) : null;
-      const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
-      if (actorIdStr && userIdStr && actorIdStr === userIdStr) {
-        return; // Don't add notification if user is the actor
-      }
-      
-      // Ensure isRead is explicitly set to false for new notifications
-      const notificationWithReadStatus = formatNotificationForRole({
-        ...newAlert,
-        isRead: false // Explicitly mark as unread for real-time notifications
-      });
-      
-      setNotifications(prev => {
-        // Check if notification already exists
-        const exists = prev.some(n => {
-          const nId = n._id || n.id;
-          const alertId = notificationWithReadStatus._id || notificationWithReadStatus.id;
-          return nId && alertId && nId.toString() === alertId.toString();
-        });
-        
-        if (exists) return prev;
-        // Add new notification at the beginning with isRead: false
-        const updated = [notificationWithReadStatus, ...prev];
-        // Limit to last 50 notifications to prevent memory issues
-        return updated.slice(0, 50);
-      });
-      
-      // Show toast notification
-      if (notificationWithReadStatus?.message) {
-        showToast(notificationWithReadStatus.message, 'info');
-      }
+      handleIncomingNotification(newAlert);
     };
     
     const handleNewMessage = (data) => {
@@ -735,7 +805,38 @@ useEffect(() => {
         chatUnreadRefreshTimeoutRef.current = null;
       }
     };
-  }, [currentUser, currentOutletId, fetchNotificationHistory, showToast, updateChatUnreadCount]);
+  }, [currentUser, currentOutletId, fetchNotificationHistory, handleIncomingNotification, updateChatUnreadCount]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = onForegroundMessage((payload) => {
+        const data = payload?.data || {};
+        const notification = payload?.notification || {};
+        const fallbackId = `fcm-${Date.now()}`;
+        const synthesizedAlert = {
+          _id: data.notificationId || fallbackId,
+          id: data.notificationId || fallbackId,
+          type: data.notificationType || 'info',
+          category: data.category || 'Info',
+          title: notification.title || 'Pocket POS',
+          message: notification.body || data.body || data.message || 'New notification',
+          createdAt: new Date().toISOString(),
+          actorId: data.actorId || null,
+          metadata: data
+        };
+        handleIncomingNotification(synthesizedAlert);
+      });
+    } catch {
+      void 0;
+    }
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [currentUser, handleIncomingNotification]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('userToken');
@@ -1158,6 +1259,7 @@ useEffect(() => {
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
+  const visibleToasts = toastStack.slice(0, 3);
 
   return (
     <ApiProvider>
@@ -1187,6 +1289,48 @@ useEffect(() => {
             hasModalOpen={hasModalOpen}
             outlets={outlets}
           />
+        )}
+        {visibleToasts.length > 0 && (
+          <div className="pointer-events-none fixed right-3 top-20 md:top-5 z-[140] w-[min(92vw,360px)]">
+            {visibleToasts.map((toast, idx) => (
+              <button
+                key={toast.id}
+                type="button"
+                onClick={() => dismissToast(toast.id)}
+                className={`pointer-events-auto relative mb-2 w-full rounded-2xl border px-3 py-2.5 text-left shadow-xl backdrop-blur-md transition-all ${
+                  darkMode ? 'bg-gray-900/95 border-slate-800 text-slate-100' : 'bg-white/95 border-slate-200 text-slate-900'
+                }`}
+                style={{ transform: `translateY(${idx * 8}px) scale(${1 - idx * 0.03})`, opacity: 1 - idx * 0.15 }}
+                aria-label="Dismiss notification toast"
+              >
+                <div className="flex items-start gap-2.5">
+                  <div className={`mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${
+                    darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
+                  }`}>
+                    {String(toast.avatar || toast.title || 'N').trim().charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-[11px] font-black tracking-tight ${
+                      toast.type === 'error' ? 'text-rose-500' : toast.type === 'success' ? 'text-emerald-500' : 'text-indigo-500'
+                    }`}>
+                      {toast.title}
+                    </p>
+                    <p className={`mt-0.5 line-clamp-2 text-xs font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                      {toast.message}
+                    </p>
+                  </div>
+                  <X className={`h-4 w-4 shrink-0 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                </div>
+                {idx === 0 && toastStack.length > 1 && (
+                  <span className={`absolute -right-2 -top-2 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                    darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
+                  }`}>
+                    +{toastStack.length - 1}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {showAppUI && (

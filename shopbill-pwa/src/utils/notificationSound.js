@@ -128,3 +128,9 @@ export const playMessageSound = () => {
   // Use HTML5 Audio for all platforms - works after unlock on desktop and mobile
   playHtmlAudioFallback();
 };
+
+// Keep notification alert sound consistent with chat sound preferences.
+export const playNotificationSound = () => {
+  if (!isChatSoundEnabled()) return;
+  playHtmlAudioFallback();
+};

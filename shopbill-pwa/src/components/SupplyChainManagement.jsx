@@ -430,16 +430,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className="flex flex-col animate-in fade-in duration-500 space-y-6">
             {/* Filters first so KPIs below reflect selected range */}
             <section className={`${cardBase} rounded-2xl border p-4 md:p-6`}>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <h3 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Purchase History
-                  </h3>
-                  <p className={`text-[10px] font-black tracking-widest mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Filter period to update totals and records
-                  </p>
-                </div>
-
+              <div className="flex flex-col md:flex-row md:justify-end md:items-center gap-3">
                 <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                   <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                     {DATE_FILTERS.map(f => (
