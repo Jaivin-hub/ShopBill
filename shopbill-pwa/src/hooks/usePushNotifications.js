@@ -30,6 +30,7 @@ export function usePushNotifications(enabled) {
           console.log('[Push][Hook] Attempt skipped: unsupported or cancelled');
           return;
         }
+        console.log(`[Push][Hook] Notification.permission=${Notification.permission}`);
         if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
           try {
             const regs = await navigator.serviceWorker.getRegistrations();
@@ -48,6 +49,13 @@ export function usePushNotifications(enabled) {
         if (isMobile() && Notification.permission !== 'granted') {
           console.log(`[Push][Hook] Mobile permission not granted yet (${Notification.permission}), waiting for gesture`);
           return;
+        }
+        try {
+          const readyReg = await navigator.serviceWorker.ready;
+          const sub = await readyReg.pushManager.getSubscription();
+          console.log('[Push][Hook] Existing PushManager subscription:', sub ? { endpointTail: String(sub.endpoint || '').slice(-32) } : null);
+        } catch (pmErr) {
+          console.warn('[Push][Hook] PushManager subscription check failed:', pmErr?.message || pmErr);
         }
         console.log('[Push][Hook] Attempting push token registration...');
         const fcmToken = await requestNotificationPermissionAndToken(VAPID_KEY);
@@ -76,10 +84,22 @@ export function usePushNotifications(enabled) {
       setTimeout(attempt, 3000),
       setTimeout(attempt, 7000),
     ];
+    let interval = null;
+    let retryCount = 0;
+    // Keep retrying in background for delayed iOS SW/token readiness.
+    interval = setInterval(() => {
+      if (cancelled || registeredRef.current || retryCount >= 5) {
+        if (interval) clearInterval(interval);
+        return;
+      }
+      retryCount += 1;
+      attempt();
+    }, 30000);
 
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
+      if (interval) clearInterval(interval);
     };
   }, [enabled]);
 }

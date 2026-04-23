@@ -65,10 +65,11 @@ apiClient.interceptors.request.use(
       /\/auth\/signup/.test(url);
     const isChatMessage = /\/chat\/[^/]+\/message/.test(url);
     const isChatFetch = /\/chat\/(chats|users|[^/]+\/messages)/.test(url);
+    const isDeviceTokenApi = /\/user\/device-token(\/|$|\?)/.test(url);
     // Team / staff: duplicate GET (e.g. strict mode + useEffect) or double POST cancelled the first
     // request — DevTools shows "(canceled)" and the UI fails silently. Never cancel in-flight staff API calls.
     const isStaffApi = /\/staff(\/|$|\?)/.test(url);
-    const skipDuplicateCancel = isPaymentOrSignup || isChatMessage || isChatFetch || isStaffApi;
+    const skipDuplicateCancel = isPaymentOrSignup || isChatMessage || isChatFetch || isStaffApi || isDeviceTokenApi;
 
     // Cancel previous identical request if still pending (skip for payment/signup)
     if (!skipDuplicateCancel && activeRequests.has(cacheKey)) {

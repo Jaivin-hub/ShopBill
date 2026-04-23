@@ -284,6 +284,13 @@ const emitAlert = async (req, storeId, type, data) => {
                     storeName: storeName // Include store name in notification data
                 };
                 
+                // If recipient targeting resolves to nobody (common in single-user shops),
+                // fallback to actor so push diagnostics/alerts are still delivered.
+                if (targetUserIds.size === 0 && actorIdStr) {
+                    targetUserIds.add(actorIdStr);
+                    console.log(`📢 Push fallback applied: no recipients, using actor ${actorIdStr}`);
+                }
+
                 // Emit to specific user rooms instead of broadcasting to all
                 targetUserIds.forEach(userId => {
                     io.to(`user_${userId}`).emit('new_notification', notificationData);
