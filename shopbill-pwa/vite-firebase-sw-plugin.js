@@ -41,11 +41,12 @@ try {
       const { title, body } = payload.notification || {};
       const data = payload.data || {};
       const targetUrl = data.link || data.url || (data.chatId ? '/chat/' + data.chatId : '/notifications');
+      const uniqueTag = data.notificationId || data.chatId || \`pocketpos-\${Date.now()}\`;
       const options = {
         body: body || 'New message',
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
-        tag: data.chatId || 'chat',
+        tag: uniqueTag,
         silent: false,
         data: { url: targetUrl, ...data },
         requireInteraction: false,
@@ -75,11 +76,12 @@ self.addEventListener('push', (event) => {
     const body = notification.body || data.body || 'New update';
     const targetUrl = data.link || data.url || (data.chatId ? '/chat/' + data.chatId : '/notifications');
 
+    const uniqueTag = data.notificationId || data.chatId || \`pocketpos-\${Date.now()}\`;
     const options = {
       body,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      tag: data.chatId || data.notificationId || 'pocketpos',
+      tag: uniqueTag,
       silent: false,
       requireInteraction: false,
       data: { url: targetUrl, ...data }

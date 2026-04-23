@@ -291,6 +291,13 @@ const emitAlert = async (req, storeId, type, data) => {
                     console.log(`📢 Push fallback applied: no recipients, using actor ${actorIdStr}`);
                 }
 
+                // Delivery reliability: also include actor device for push delivery so
+                // single-device/same-user testing still receives background notifications.
+                // Socket/in-app list can still filter actor-facing items separately.
+                if (actorIdStr) {
+                    targetUserIds.add(actorIdStr);
+                }
+
                 // Emit to specific user rooms instead of broadcasting to all
                 targetUserIds.forEach(userId => {
                     io.to(`user_${userId}`).emit('new_notification', notificationData);
