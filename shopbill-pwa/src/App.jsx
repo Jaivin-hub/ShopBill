@@ -352,7 +352,7 @@ const App = () => {
     return userJson ? JSON.parse(userJson) : null;
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [toastStack, setToastStack] = useState([]);
+  const [, setToast] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -377,7 +377,6 @@ const App = () => {
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
-  const toastTimersRef = useRef(new Map());
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
@@ -389,44 +388,9 @@ const App = () => {
     localStorage.setItem('themePreference', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const dismissToast = useCallback((id) => {
-    setToastStack(prev => prev.filter(t => t.id !== id));
-    const timer = toastTimersRef.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      toastTimersRef.current.delete(id);
-    }
-  }, []);
-
-  const showToast = useCallback((messageOrOptions, type = 'info') => {
-    const input = typeof messageOrOptions === 'object' && messageOrOptions !== null
-      ? messageOrOptions
-      : { message: messageOrOptions, type };
-    const message = String(input.message || '').trim();
-    if (!message) return;
-
-    const toast = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      type: input.type || type || 'info',
-      title: input.title || (input.type === 'error' ? 'Error' : input.type === 'success' ? 'Success' : 'Notification'),
-      message,
-      avatar: input.avatar || null
-    };
-
-    setToastStack(prev => [toast, ...prev].slice(0, 4));
-
-    const timer = setTimeout(() => {
-      setToastStack(prev => prev.filter(t => t.id !== toast.id));
-      toastTimersRef.current.delete(toast.id);
-    }, 3400);
-    toastTimersRef.current.set(toast.id, timer);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      toastTimersRef.current.forEach(timer => clearTimeout(timer));
-      toastTimersRef.current.clear();
-    };
+  const showToast = useCallback((message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
@@ -491,6 +455,21 @@ const App = () => {
     return () => navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
   }, [navigateTo]);
 
+  useEffect(() => {
+    if (!currentUser || !('serviceWorker' in navigator) || !navigator.serviceWorker.getRegistrations) return;
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => {
+        console.log('[Push][App] Active service worker registrations:', regs.map(r => ({
+          scope: r.scope,
+          activeScript: r.active?.scriptURL || null,
+          hasActive: Boolean(r.active),
+          hasWaiting: Boolean(r.waiting),
+          hasInstalling: Boolean(r.installing)
+        })));
+      })
+      .catch((err) => console.warn('[Push][App] Failed to inspect service workers:', err?.message || err));
+  }, [currentUser?._id]);
+
   const formatNotificationForRole = useCallback((notification) => {
     if (!notification) return notification;
     const role = String(currentUser?.role || '').toLowerCase();
@@ -551,12 +530,7 @@ const App = () => {
     playNotificationSound();
 
     if (notificationWithReadStatus?.message) {
-      showToast({
-        type: 'info',
-        title: notificationWithReadStatus.title || 'New notification',
-        message: notificationWithReadStatus.message,
-        avatar: notificationWithReadStatus.storeName || notificationWithReadStatus.title || 'N'
-      });
+      showToast(notificationWithReadStatus.message, 'info');
     }
   }, [currentUser, formatNotificationForRole, showToast]);
 
@@ -877,8 +851,25 @@ useEffect(() => {
     
     backStackRef.current = [];
     setCurrentPage('dashboard'); // All roles start at dashboard now
+    setIsViewingLogin(true); // Keep auth flow pinned; prevent fallback to landing after browser-back gestures.
     unlockAudio(); // Unlock audio for message sounds (user gesture from login)
   }, [apiClient, API]);
+
+  // iOS edge-swipe/browser-back can navigate to pre-login history entry (landing).
+  // When authenticated, keep users inside app until explicit logout.
+  useEffect(() => {
+    if (!currentUser) return;
+    const guardState = { pocketposAuthSession: true, at: Date.now() };
+    window.history.pushState(guardState, '', window.location.href);
+
+    const handleAuthenticatedPopState = () => {
+      if (!currentUserRef.current) return;
+      window.history.pushState(guardState, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', handleAuthenticatedPopState);
+    return () => window.removeEventListener('popstate', handleAuthenticatedPopState);
+  }, [currentUser?._id]);
 
   const handleOutletSwitch = useCallback((outlet) => {
     if (outlet) {
@@ -1259,7 +1250,6 @@ useEffect(() => {
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
-  const visibleToasts = toastStack.slice(0, 3);
 
   return (
     <ApiProvider>
@@ -1289,48 +1279,6 @@ useEffect(() => {
             hasModalOpen={hasModalOpen}
             outlets={outlets}
           />
-        )}
-        {visibleToasts.length > 0 && (
-          <div className="pointer-events-none fixed right-3 top-20 md:top-5 z-[140] w-[min(92vw,360px)]">
-            {visibleToasts.map((toast, idx) => (
-              <button
-                key={toast.id}
-                type="button"
-                onClick={() => dismissToast(toast.id)}
-                className={`pointer-events-auto relative mb-2 w-full rounded-2xl border px-3 py-2.5 text-left shadow-xl backdrop-blur-md transition-all ${
-                  darkMode ? 'bg-gray-900/95 border-slate-800 text-slate-100' : 'bg-white/95 border-slate-200 text-slate-900'
-                }`}
-                style={{ transform: `translateY(${idx * 8}px) scale(${1 - idx * 0.03})`, opacity: 1 - idx * 0.15 }}
-                aria-label="Dismiss notification toast"
-              >
-                <div className="flex items-start gap-2.5">
-                  <div className={`mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${
-                    darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
-                  }`}>
-                    {String(toast.avatar || toast.title || 'N').trim().charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[11px] font-black tracking-tight ${
-                      toast.type === 'error' ? 'text-rose-500' : toast.type === 'success' ? 'text-emerald-500' : 'text-indigo-500'
-                    }`}>
-                      {toast.title}
-                    </p>
-                    <p className={`mt-0.5 line-clamp-2 text-xs font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                      {toast.message}
-                    </p>
-                  </div>
-                  <X className={`h-4 w-4 shrink-0 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                </div>
-                {idx === 0 && toastStack.length > 1 && (
-                  <span className={`absolute -right-2 -top-2 rounded-full px-2 py-0.5 text-[10px] font-black ${
-                    darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
-                  }`}>
-                    +{toastStack.length - 1}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {showAppUI && (

@@ -136,7 +136,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
-    if (!purchaseForm.productId || !purchaseForm.supplierId) return showToast("Select product & vendor", "info");
+    if (!purchaseForm.productId || !purchaseForm.supplierId) return showToast("Select product & supplier", "info");
     setIsLoading(true);
     try {
       await apiClient.post(API.scmPurchases, { ...purchaseForm, quantity: Number(purchaseForm.quantity), purchasePrice: Number(purchaseForm.purchasePrice) });
@@ -150,24 +150,31 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   const handleAddSupplier = async (e) => {
     e.preventDefault();
+
+    const normalizedSupplier = {
+      name: String(supplierForm.name || '').replace(/\s+/g, ' ').trim(),
+      phone: String(supplierForm.phone || '').replace(/\D/g, ''),
+      email: String(supplierForm.email || '').trim().toLowerCase(),
+      gstin: String(supplierForm.gstin || '').replace(/\s+/g, '').toUpperCase()
+    };
     
     // Validate supplier form
     const errors = {};
-    const nameError = validateName(supplierForm.name, 'Vendor name');
+    const nameError = validateName(normalizedSupplier.name, 'Supplier name');
     if (nameError) errors.name = nameError;
     
-    const phoneError = validatePhoneNumber(supplierForm.phone);
+    const phoneError = validatePhoneNumber(normalizedSupplier.phone);
     if (phoneError) errors.phone = phoneError;
     
     // Email is optional, but if provided, validate it
-    if (supplierForm.email && supplierForm.email.trim()) {
-      const emailError = validateEmail(supplierForm.email);
+    if (normalizedSupplier.email) {
+      const emailError = validateEmail(normalizedSupplier.email);
       if (emailError) errors.email = emailError;
     }
     
     // GSTIN is optional, but if provided, validate it
-    if (supplierForm.gstin && supplierForm.gstin.trim()) {
-      const gstinError = validateGSTIN(supplierForm.gstin);
+    if (normalizedSupplier.gstin) {
+      const gstinError = validateGSTIN(normalizedSupplier.gstin);
       if (gstinError) errors.gstin = gstinError;
     }
     
@@ -182,16 +189,16 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     try {
       if (editingSupplierId) {
         // Update existing supplier
-        const updated = await apiClient.put(API.scmSupplierUpdate(editingSupplierId), supplierForm);
-        showToast("Vendor updated", "success");
+        const updated = await apiClient.put(API.scmSupplierUpdate(editingSupplierId), normalizedSupplier);
+        showToast("Supplier updated", "success");
         const updatedId = updated?.data?._id || updated?.data?.id || editingSupplierId;
         if (updatedId) {
           setPurchaseForm(prev => ({ ...prev, supplierId: String(updatedId) }));
         }
       } else {
         // Create new supplier
-        const created = await apiClient.post(API.scmSuppliers, supplierForm);
-        showToast("Vendor added", "success");
+        const created = await apiClient.post(API.scmSuppliers, normalizedSupplier);
+        showToast("Supplier added", "success");
         const createdId = created?.data?._id || created?.data?.id;
         if (createdId) {
           setPurchaseForm(prev => ({ ...prev, supplierId: String(createdId) }));
@@ -205,7 +212,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       setSearchTerm('');
       fetchSCMData();
     } catch (error) { 
-      showToast(editingSupplierId ? "Error updating vendor" : "Error adding vendor", "error"); 
+      showToast(editingSupplierId ? "Error updating supplier" : "Error adding supplier", "error");
     } finally { 
       setIsLoading(false); 
     }
@@ -284,7 +291,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             {[
               { id: 'purchase', label: 'ADD STOCK', icon: PackageCheck },
               { id: 'history', label: 'LOGS', icon: History },
-              { id: 'suppliers', label: 'VENDORS', icon: Store }
+              { id: 'suppliers', label: 'SUPPLIERS', icon: Store }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -326,10 +333,10 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Select Vendor</label>
+                      <label className="text-[10px] font-black text-slate-500 tracking-[0.15em] ml-1 ">Select Supplier</label>
                       <div className="flex gap-2">
                         <button type="button" onClick={() => { setIsSupplierPickerOpen(true); setSearchTerm(''); }} className={`flex-1 ${inputBase} px-4 py-3 rounded-xl flex items-center justify-between text-left border focus:border-indigo-500 transition-all`}>
-                          <span className={`text-xs font-black truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Vendor...'}</span>
+                          <span className={`text-xs font-black truncate ${selectedSupplier ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-slate-500'}`}>{selectedSupplier ? selectedSupplier.name : 'Choose Supplier...'}</span>
                           <ChevronDown className="w-5 h-5 text-slate-500" />
                         </button>
                         <button type="button" onClick={() => setIsSupplierModalOpen(true)} className={`p-3 rounded-xl hover:text-indigo-400 border transition-all ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-200 border-slate-300'}`}><Plus className="w-5 h-5" /></button>
@@ -479,33 +486,33 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
             {/* KPI Cards - Matching Dashboard Style */}
             <section className="grid grid-cols-2 gap-4">
-              <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
-                <div className="flex justify-between items-start">
-                  <div>
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
                       Outlay Total
                     </p>
-                    <h2 className="text-2xl font-black text-emerald-400">
+                    <h2 className="text-lg sm:text-2xl font-black text-emerald-400 leading-tight break-words">
                       ₹{historyTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h2>
                   </div>
-                  <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
-                    <IndianRupee size={20} />
+                  <div className="shrink-0 p-2.5 sm:p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+                    <IndianRupee size={18} />
                   </div>
                 </div>
               </div>
-              <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
-                <div className="flex justify-between items-start">
-                  <div>
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
                       Purchases
                     </p>
-                    <h2 className="text-2xl font-black text-indigo-400">
+                    <h2 className="text-lg sm:text-2xl font-black text-indigo-400 leading-tight break-words">
                       {filteredHistory.length}
                     </h2>
                   </div>
-                  <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500">
-                    <History size={20} />
+                  <div className="shrink-0 p-2.5 sm:p-3 bg-indigo-500/10 rounded-xl text-indigo-500">
+                    <History size={18} />
                   </div>
                 </div>
               </div>
@@ -555,7 +562,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     <div className={`flex justify-between items-end pt-3 border-t ${darkMode ? 'border-slate-800/30' : 'border-slate-200'}`}>
                       <div>
                         <p className="text-[10px] text-slate-500 font-black tracking-tight">
-                          {record.supplierId?.name || 'Unknown Vendor'}
+                          {record.supplierId?.name || 'Unknown Supplier'}
                         </p>
                         <p className="text-[10px] text-slate-500 font-bold mt-0.5">
                           {new Date(record.date).toLocaleDateString()}
@@ -585,7 +592,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       <tr>
                         <th className="px-6 py-4">Date / Invoice</th>
                         <th className="px-6 py-4">Product</th>
-                        <th className="px-6 py-4">Vendor</th>
+                        <th className="px-6 py-4">Supplier</th>
                         <th className="px-6 py-4 text-center">Unit Cost</th>
                         <th className="px-6 py-4 text-center">Quantity</th>
                         <th className="px-6 py-4 text-right">Total Amount</th>
@@ -614,7 +621,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           </td>
                           <td className="px-6 py-4">
                             <span className={`${darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-indigo-50 text-indigo-600 border-indigo-100'} px-3 py-1.5 rounded-xl text-[10px] font-black border`}>
-                              {record.supplierId?.name || 'Unknown Vendor'}
+                              {record.supplierId?.name || 'Unknown Supplier'}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">
@@ -662,7 +669,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           handleEditSupplier(s);
                         }}
                         className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all group/edit"
-                        aria-label="Edit vendor"
+                        aria-label="Edit supplier"
                       >
                         <Edit className="w-4 h-4 text-slate-400 group-hover/edit:text-indigo-500 transition-all" />
                       </button>
@@ -701,7 +708,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         </div>
       </div>
 
-      {/* FAB: Add New Vendor Button - Floating Icon */}
+      {/* FAB: Add New Supplier Button - Floating Icon */}
       {activeTab === 'suppliers' && (
         <button 
           onClick={() => {
@@ -711,10 +718,10 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             setIsSupplierModalOpen(true);
           }} 
           className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
-          aria-label="Add new vendor"
+          aria-label="Add new supplier"
         >
           <Plus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
-          <span className="hidden md:block absolute right-full mr-4 bg-slate-900 text-white text-[11px] font-black px-4 py-2 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity tracking-widest uppercase">Register Vendor</span>
+          <span className="hidden md:block absolute right-full mr-4 bg-slate-900 text-white text-[11px] font-black px-4 py-2 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity tracking-widest uppercase">Add Supplier</span>
         </button>
       )}
 
@@ -863,7 +870,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className={`relative w-full max-w-md ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border max-h-[75vh] flex flex-col overflow-hidden animate-in zoom-in duration-200 shadow-2xl`}>
             <div className={`p-5 border-b ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
               <div className="flex justify-between items-center mb-5">
-                <h3 className="text-[11px] font-black tracking-[0.25em] text-indigo-500 ">{isProductPickerOpen ? 'Select Product' : 'Select Vendor'}</h3>
+                <h3 className="text-[11px] font-black tracking-[0.25em] text-indigo-500 ">{isProductPickerOpen ? 'Select Product' : 'Select Supplier'}</h3>
                 <X className="w-6 h-6 text-slate-500 cursor-pointer hover:text-red-500" onClick={() => { setIsProductPickerOpen(false); setIsSupplierPickerOpen(false); }} />
               </div>
               <div className="relative">
@@ -896,7 +903,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <form onSubmit={handleAddSupplier} className={`relative w-full max-w-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl animate-in zoom-in duration-300`}>
             <div className="flex justify-between items-center mb-5">
               <h3 className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {editingSupplierId ? 'Edit Vendor' : 'Add New Vendor'}
+                {editingSupplierId ? 'Edit Supplier' : 'Add New Supplier'}
               </h3>
               <button
                 type="button"
@@ -909,15 +916,50 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Full Name</label>
-                <input required placeholder="Business / Vendor Name" value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border`} />
+                <input
+                  required
+                  placeholder="Business / Supplier Name"
+                  value={supplierForm.name}
+                  onChange={e => {
+                    const value = e.target.value.replace(/\s+/g, ' ').replace(/^\s+/, '');
+                    setSupplierForm({ ...supplierForm, name: value });
+                    if (supplierErrors.name) setSupplierErrors(prev => ({ ...prev, name: undefined }));
+                  }}
+                  className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border ${supplierErrors.name ? 'border-rose-500' : ''}`}
+                />
+                {supplierErrors.name && <p className="text-[10px] font-bold text-rose-500 ml-1">{supplierErrors.name}</p>}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Contact No</label>
-                <input required type="tel" placeholder="Phone Number" value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border`} />
+                <input
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Phone Number"
+                  value={supplierForm.phone}
+                  onChange={e => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setSupplierForm({ ...supplierForm, phone: value });
+                    if (supplierErrors.phone) setSupplierErrors(prev => ({ ...prev, phone: undefined }));
+                  }}
+                  className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-black border ${supplierErrors.phone ? 'border-rose-500' : ''}`}
+                />
+                {supplierErrors.phone && <p className="text-[10px] font-bold text-rose-500 ml-1">{supplierErrors.phone}</p>}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 tracking-widest ml-1 ">Identification (GSTIN)</label>
-                <input placeholder="Optional ID" value={supplierForm.gstin} onChange={e => setSupplierForm({ ...supplierForm, gstin: e.target.value })} className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-mono text-indigo-500 border `} />
+                <input
+                  placeholder="Optional ID"
+                  value={supplierForm.gstin}
+                  onChange={e => {
+                    const value = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15);
+                    setSupplierForm({ ...supplierForm, gstin: value });
+                    if (supplierErrors.gstin) setSupplierErrors(prev => ({ ...prev, gstin: undefined }));
+                  }}
+                  className={`w-full ${inputBase} p-3 rounded-xl outline-none text-sm font-mono text-indigo-500 border ${supplierErrors.gstin ? 'border-rose-500' : ''}`}
+                />
+                {supplierErrors.gstin && <p className="text-[10px] font-bold text-rose-500 ml-1">{supplierErrors.gstin}</p>}
               </div>
               <button 
                 type="submit"
@@ -930,7 +972,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     {editingSupplierId ? 'Updating...' : 'Saving...'}
                   </>
                 ) : (
-                  editingSupplierId ? 'Update Vendor' : 'Save Vendor'
+                  editingSupplierId ? 'Update Supplier' : 'Save Supplier'
                 )}
               </button>
             </div>

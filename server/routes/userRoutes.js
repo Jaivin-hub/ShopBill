@@ -78,6 +78,7 @@ router.post('/device-token', protect, async (req, res) => {
         if (!token || typeof token !== 'string') {
             return res.status(400).json({ error: 'Device token is required.' });
         }
+        console.log(`[Push] ${ts()} device-token incoming platform=${platform} tokenLength=${token.length} tokenTail=...${token.slice(-12)}`);
         const user = await User.findById(req.user.id);
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });

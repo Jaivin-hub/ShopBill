@@ -10,16 +10,25 @@ const STORAGE_KEY = 'push_token_registered';
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 export async function requestPushFromGesture() {
-  if (!VAPID_KEY || !localStorage.getItem('userToken')) return;
+  if (!VAPID_KEY || !localStorage.getItem('userToken')) {
+    console.log('[Push][Gesture] Skipping: missing VAPID or auth token');
+    return;
+  }
   try {
-    if (localStorage.getItem(STORAGE_KEY) === '1') return;
-    if (!(await isPushSupported())) return;
+    if (!(await isPushSupported())) {
+      console.log('[Push][Gesture] Push unsupported on this browser/device');
+      return;
+    }
+    console.log('[Push][Gesture] User gesture detected, requesting token...');
     const token = await requestNotificationPermissionAndToken(VAPID_KEY);
     if (token) {
       await apiClient.post('/user/device-token', { token, platform: isMobile() ? 'ios-web' : 'web' });
       localStorage.setItem(STORAGE_KEY, '1');
+      console.log(`[Push][Gesture] Device token registered tokenTail=...${token.slice(-12)}`);
+    } else {
+      console.log('[Push][Gesture] No token returned after gesture');
     }
-  } catch {
-    void 0;
+  } catch (error) {
+    console.warn('[Push][Gesture] Registration failed:', error?.message || error);
   }
 }

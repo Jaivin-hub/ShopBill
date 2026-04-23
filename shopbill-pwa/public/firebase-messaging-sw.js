@@ -20,14 +20,13 @@ try {
     messaging.onBackgroundMessage((payload) => {
       const { title, body } = payload.notification || {};
       const data = payload.data || {};
-      const targetUrl = data.link || data.url || (data.chatId ? '/chat/' + data.chatId : '/notifications');
       const options = {
         body: body || 'New message',
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
         tag: data.chatId || 'chat',
         silent: false,
-        data: { url: targetUrl, ...data },
+        data: { url: data.chatId ? '/chat/' + data.chatId : '/', ...data },
         requireInteraction: false,
       };
       return self.registration.showNotification(title || 'Pocket POS', options);
@@ -36,20 +35,3 @@ try {
 } catch (e) {
   console.warn('[firebase-messaging-sw] Init failed:', e);
 }
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const targetUrl = event.notification?.data?.url || '/notifications';
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) {
-          client.postMessage({ type: 'notification-click', url: targetUrl });
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
-      return null;
-    })
-  );
-});

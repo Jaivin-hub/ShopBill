@@ -410,11 +410,36 @@ function buildStaffActivationMail({ to, name, role, activationToken, shopName })
         to,
         subject: 'Pocket POS Account Activation',
         html: `
-            <h1>Welcome to Pocket POS, ${name}!</h1>
-            <p>Your shop owner has added you as a <strong>${role}</strong>.</p>
-            ${shopLabel}
-            <p>Click below to set your password and activate your account:</p>
-            <a href="${activationUrl}" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #4f46e5; border-radius: 8px; text-decoration: none; font-weight: bold;">Set Up My Password</a>
+            <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #111827;">
+                <h1 style="margin: 0 0 12px;">Welcome to Pocket POS, ${name}!</h1>
+                <p style="margin: 0 0 10px;">Your shop owner has added you as a <strong>${role}</strong>.</p>
+                ${shopLabel}
+                <p style="margin: 0 0 14px;">Tap below to set your password and activate your account:</p>
+
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 0 14px;">
+                    <tr>
+                        <td bgcolor="#4f46e5" style="border-radius: 8px; text-align: center;">
+                            <a
+                                href="${activationUrl}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style="display: inline-block; padding: 12px 24px; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;"
+                            >
+                                Set Up My Password
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+
+                <p style="margin: 0; font-size: 13px; color: #4b5563;">
+                    If the button does not open on your phone, copy and open this link:
+                </p>
+                <p style="margin: 6px 0 0; font-size: 13px; word-break: break-all;">
+                    <a href="${activationUrl}" target="_blank" rel="noopener noreferrer" style="color: #4f46e5; text-decoration: underline;">
+                        ${activationUrl}
+                    </a>
+                </p>
+            </div>
         `,
         activationTokenLengthChars: activationToken.length,
         activationLinkUsesClientUrl: !!clientUrl,

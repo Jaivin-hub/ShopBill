@@ -14,24 +14,56 @@ export function usePushNotifications(enabled) {
   const registeredRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !VAPID_KEY) return;
-    if (!localStorage.getItem('userToken')) return;
-    if (localStorage.getItem('push_token_registered') === '1' && Notification.permission === 'granted') return;
+    if (!enabled || !VAPID_KEY) {
+      console.log('[Push][Hook] Skipping: disabled or missing VAPID key');
+      return;
+    }
+    if (!localStorage.getItem('userToken')) {
+      console.log('[Push][Hook] Skipping: no auth token in storage');
+      return;
+    }
 
     let cancelled = false;
     const attempt = async () => {
       try {
-        if (!(await isPushSupported()) || cancelled) return;
+        if (!(await isPushSupported()) || cancelled) {
+          console.log('[Push][Hook] Attempt skipped: unsupported or cancelled');
+          return;
+        }
+        if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            console.log('[Push][Hook] SW registrations:', regs.map(r => ({
+              scope: r.scope,
+              hasActive: Boolean(r.active),
+              hasWaiting: Boolean(r.waiting),
+              hasInstalling: Boolean(r.installing),
+            })));
+          } catch (swErr) {
+            console.warn('[Push][Hook] Could not read service worker registrations:', swErr?.message || swErr);
+          }
+        }
         // iOS/Android web should still register token automatically after permission is granted.
         // Do not trigger permission prompt without gesture on mobile.
-        if (isMobile() && Notification.permission !== 'granted') return;
+        if (isMobile() && Notification.permission !== 'granted') {
+          console.log(`[Push][Hook] Mobile permission not granted yet (${Notification.permission}), waiting for gesture`);
+          return;
+        }
+        console.log('[Push][Hook] Attempting push token registration...');
         const fcmToken = await requestNotificationPermissionAndToken(VAPID_KEY);
-        if (!fcmToken || cancelled) return;
-        if (registeredRef.current) return;
+        if (!fcmToken || cancelled) {
+          console.log('[Push][Hook] No token generated or attempt cancelled');
+          return;
+        }
+        if (registeredRef.current) {
+          console.log('[Push][Hook] Token already registered in this session');
+          return;
+        }
         await apiClient.post('/user/device-token', {
           token: fcmToken,
           platform: isMobile() ? 'ios-web' : 'web'
         });
+        console.log(`[Push][Hook] Device token registered tokenTail=...${fcmToken.slice(-12)}`);
         registeredRef.current = true;
         localStorage.setItem('push_token_registered', '1');
       } catch (err) {

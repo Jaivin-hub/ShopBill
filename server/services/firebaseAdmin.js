@@ -44,21 +44,54 @@ async function sendPushNotification(tokens, payload) {
     const ts = new Date().toISOString();
     console.log(`[Push] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
     try {
+        const normalizedData = Object.fromEntries(
+            Object.entries(data).map(([k, v]) => [String(k), String(v ?? '')])
+        );
+        const baseClientUrl = String(process.env.CLIENT_URL || '').trim().replace(/\/+$/, '');
+        const rawLink = normalizedData.link || (normalizedData.chatId ? `/chat/${normalizedData.chatId}` : '/notifications');
+        const link = rawLink.startsWith('http')
+            ? rawLink
+            : (baseClientUrl ? `${baseClientUrl}${rawLink.startsWith('/') ? '' : '/'}${rawLink}` : rawLink);
+        console.log(`[Push] WebPush target link="${link}" raw="${rawLink}" clientUrl="${baseClientUrl || '(missing)'}"`);
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
             notification: { title, body, sound: 'default' },
+            android: {
+                priority: 'high',
+                notification: { sound: 'default', channelId: 'default' },
+                ttl: 60 * 60 * 1000
+            },
             webpush: {
-                notification: { title, body, requireInteraction: false },
+                headers: {
+                    Urgency: 'high',
+                    TTL: String(60 * 60 * 24) // 24h
+                },
+                notification: {
+                    title,
+                    body,
+                    icon: '/pwa-192x192.png',
+                    badge: '/pwa-192x192.png',
+                    requireInteraction: false,
+                    silent: false
+                },
                 fcmOptions: {
-                    link: data.link || (data.chatId ? '/chat/' + data.chatId : '/'),
+                    link,
                 },
             },
             apns: {
-                payload: { aps: { sound: 'default', contentAvailable: false } },
+                headers: {
+                    'apns-priority': '10',
+                    'apns-push-type': 'alert'
+                },
+                payload: {
+                    aps: {
+                        sound: 'default',
+                        badge: 1,
+                        contentAvailable: false
+                    }
+                },
             },
-            data: Object.fromEntries(
-                Object.entries(data).map(([k, v]) => [String(k), String(v ?? '')])
-            ),
+            data: normalizedData,
         });
         console.log(`[Push] ${new Date().toISOString()} firebaseAdmin RESULT: success=${result.successCount} failure=${result.failureCount} total=${deduped.length}`);
         if (result.failureCount > 0 && result.responses) {
@@ -66,6 +99,8 @@ async function sendPushNotification(tokens, payload) {
                 if (!resp.success) {
                     const err = resp.error;
                     console.warn(`[Push] Failed token ${i + 1}/${deduped.length}: ${err?.code || err?.message} | token preview: ...${(deduped[i] || '').slice(-12)}`);
+                } else {
+                    console.log(`[Push] Delivered token ${i + 1}/${deduped.length} tokenTail=...${(deduped[i] || '').slice(-12)}`);
                 }
             });
         }
