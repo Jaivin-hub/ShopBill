@@ -40,6 +40,10 @@ const StaffSchema = new Schema({
         enum: allowedRoles,
         default: 'Cashier'
     },
+    // Owner-configurable per-staff access toggles
+    permissions: {
+        reports: { type: Boolean, default: false }
+    },
     // Status to enable/disable access without deletion
     active: {
         type: Boolean,

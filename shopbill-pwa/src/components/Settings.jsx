@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
     User, Lock, Globe, Check, Bell, RefreshCw, Users, LogOut, MessageCircle, 
     UploadCloud, CheckCircle, Link, Mail, Crown, LifeBuoy, 
@@ -9,12 +9,55 @@ import {
 } from 'lucide-react'; 
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
-import StaffPermissionsManager from './StaffPermissionsManager';
-import ChangePasswordForm from './ChangePasswordForm';
-import PlanUpgrade from './PlanUpgrade';
 import API from '../config/api';
 import { isChatSoundEnabled, setChatSoundEnabled, playMessageSound, unlockAudio } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
+
+const PERMISSION_PAGE_LABELS = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'billing', label: 'Billing' },
+    { id: 'khata', label: 'Ledger' },
+    { id: 'inventory', label: 'Stock Management' },
+    { id: 'scm', label: 'Supply Chain' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'chat', label: 'Messages' },
+    { id: 'notifications', label: 'Notifications' },
+    { id: 'profile', label: 'Profile' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'staffPermissions', label: 'Team Management' }
+];
+
+const ROLE_DEFAULT_ACCESS = {
+    manager: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: true,
+        scm: true,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: true,
+        staffPermissions: false
+    },
+    cashier: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: false,
+        scm: false,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: false,
+        staffPermissions: false
+    }
+};
+
+// Temporarily disabled: role permissions page/entry points.
+const ENABLE_ROLE_PERMISSIONS_UI = false;
 
 // --- MODAL: Cloud Upload Confirmation ---
 const CloudUploadConfirmationModal = ({ 
@@ -120,6 +163,126 @@ const ConfirmationModal = ({ message, onConfirm, onCancel, darkMode }) => (
         </div>
     </div>
 );
+
+const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
+    const [permissions, setPermissions] = useState({
+        manager: { ...ROLE_DEFAULT_ACCESS.manager },
+        cashier: { ...ROLE_DEFAULT_ACCESS.cashier }
+    });
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        const fetchPermissions = async () => {
+            setIsLoading(true);
+            try {
+                const response = await apiClient.get(API.staffRolePermissions);
+                if (response.data?.permissions) {
+                    setPermissions({
+                        manager: { ...ROLE_DEFAULT_ACCESS.manager, ...(response.data.permissions.manager || {}) },
+                        cashier: { ...ROLE_DEFAULT_ACCESS.cashier, ...(response.data.permissions.cashier || {}) }
+                    });
+                }
+            } catch (error) {
+                if (showToast) showToast(error.response?.data?.error || 'Failed to load page permissions.', 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchPermissions();
+    }, [apiClient, showToast]);
+
+    const togglePermission = (roleKey, pageKey) => {
+        setPermissions((prev) => ({
+            ...prev,
+            [roleKey]: {
+                ...prev[roleKey],
+                [pageKey]: !prev[roleKey][pageKey]
+            }
+        }));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await apiClient.put(API.staffRolePermissions, permissions);
+            if (showToast) showToast('Role page permissions updated.', 'success');
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to save page permissions.', 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const cardClass = darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200';
+    const mutedClass = darkMode ? 'text-gray-400' : 'text-slate-500';
+    const managerAccessList = PERMISSION_PAGE_LABELS
+        .filter((page) => permissions.manager[page.id] === true)
+        .map((page) => page.label);
+    const cashierAccessList = PERMISSION_PAGE_LABELS
+        .filter((page) => permissions.cashier[page.id] === true)
+        .map((page) => page.label);
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-4">
+            <div className={`${cardClass} border rounded-2xl p-4 md:p-6`}>
+                <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>Manager & Cashier Page Access</h3>
+                <p className={`text-xs mt-1 ${mutedClass}`}>Enable or disable each app page for roles in this outlet. Unticked means blocked.</p>
+            </div>
+            <div className={`${cardClass} border rounded-2xl overflow-hidden`}>
+                <div className={`grid grid-cols-12 px-4 py-3 border-b text-[10px] font-black tracking-widest uppercase ${darkMode ? 'border-gray-800 text-gray-400 bg-gray-950/60' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
+                    <div className="col-span-6">Page</div>
+                    <div className="col-span-3 text-center">Manager</div>
+                    <div className="col-span-3 text-center">Cashier</div>
+                </div>
+                {isLoading ? (
+                    <div className="p-8 text-center">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto text-indigo-500" />
+                    </div>
+                ) : (
+                    PERMISSION_PAGE_LABELS.map((page) => (
+                        <div key={page.id} className={`grid grid-cols-12 items-center px-4 py-3 border-b last:border-b-0 ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
+                            <div className={`col-span-6 text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{page.label}</div>
+                            <div className="col-span-3 flex justify-center">
+                                <input type="checkbox" checked={permissions.manager[page.id] === true} onChange={() => togglePermission('manager', page.id)} className="h-4 w-4 accent-indigo-600" />
+                            </div>
+                            <div className="col-span-3 flex justify-center">
+                                <input type="checkbox" checked={permissions.cashier[page.id] === true} onChange={() => togglePermission('cashier', page.id)} className="h-4 w-4 accent-indigo-600" />
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+            <div className={`${cardClass} border rounded-2xl p-4 md:p-6`}>
+                <h4 className={`text-xs font-black tracking-widest uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Current Access</h4>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'}`}>
+                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>Manager</p>
+                        <p className={`text-[11px] mt-1 ${mutedClass}`}>
+                            {managerAccessList.length > 0 ? managerAccessList.join(', ') : 'No pages allowed.'}
+                        </p>
+                    </div>
+                    <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'}`}>
+                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>Cashier</p>
+                        <p className={`text-[11px] mt-1 ${mutedClass}`}>
+                            {cashierAccessList.length > 0 ? cashierAccessList.join(', ') : 'No pages allowed.'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div className="flex justify-end">
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isLoading || isSaving}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black tracking-widest hover:bg-indigo-500 disabled:opacity-50"
+                >
+                    {isSaving ? 'Saving...' : 'Save Permissions'}
+                </button>
+            </div>
+        </div>
+    );
+};
 
 function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, setDarkMode, currentUser, currentOutletId, onOutletSwitch }) { 
     const [currentView, setCurrentView] = useState(() => {
@@ -244,6 +407,16 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                                 accentColor="text-amber-600"
                                 darkMode={darkMode}
                             />
+                            {ENABLE_ROLE_PERMISSIONS_UI && (
+                                <SettingItem
+                                    icon={ShieldCheck}
+                                    title="Page Access Control"
+                                    description="Choose which pages Managers and Cashiers can access."
+                                    onClick={() => setCurrentView('rolePermissions')}
+                                    accentColor="text-indigo-500"
+                                    darkMode={darkMode}
+                                />
+                            )}
                         </>
                     )}
                     <SettingItem 
@@ -354,6 +527,9 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     onOutletSwitch={onOutletSwitch}
                     currentOutletId={currentOutletId}
                 />;
+            case 'rolePermissions':
+                if (!ENABLE_ROLE_PERMISSIONS_UI || currentUser?.role?.toLowerCase() !== 'owner') return renderSettingsList();
+                return <RolePermissionsPanel apiClient={apiClient} showToast={showToast} darkMode={darkMode} />;
             case 'main':
             default:
                 return renderSettingsList();
@@ -378,10 +554,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                         )}
                         <div>
                             <h1 className={`text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
-                                {currentView === 'storeControl' ? 'Store' : 'Control'} <span className="text-indigo-600">{currentView === 'storeControl' ? 'Management' : 'Center'}</span>
+                                {currentView === 'storeControl' ? 'Store' : currentView === 'rolePermissions' ? 'Page' : 'Control'} <span className="text-indigo-600">{currentView === 'storeControl' ? 'Management' : currentView === 'rolePermissions' ? 'Permissions' : 'Center'}</span>
                             </h1>
                             <p className={`text-[9px] font-bold  tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
-                                {currentView === 'storeControl' ? 'ACTIVE NODES: ' + stores.length : 'System Governance Active'}
+                                {currentView === 'storeControl' ? 'ACTIVE NODES: ' + stores.length : currentView === 'rolePermissions' ? 'Role Access Configuration' : 'System Governance Active'}
                             </p>
                         </div>
                     </div>

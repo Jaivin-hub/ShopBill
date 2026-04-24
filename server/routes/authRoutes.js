@@ -13,6 +13,50 @@ const { emitAlert, notifySuperadminsNewShop } = require('./notificationRoutes');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const DEFAULT_ROLE_PAGE_PERMISSIONS = {
+    manager: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: true,
+        scm: true,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: true,
+        staffPermissions: false
+    },
+    cashier: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: false,
+        scm: false,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: false,
+        staffPermissions: false
+    }
+};
+
+const resolveRolePagePermissions = (storeRolePermissions = {}, role = '') => {
+    const normalizedRole = String(role || '').toLowerCase();
+    if (normalizedRole === 'manager') {
+        return { ...DEFAULT_ROLE_PAGE_PERMISSIONS.manager, ...(storeRolePermissions.manager || {}) };
+    }
+    if (normalizedRole === 'cashier') {
+        return { ...DEFAULT_ROLE_PAGE_PERMISSIONS.cashier, ...(storeRolePermissions.cashier || {}) };
+    }
+    const allEnabled = Object.keys(DEFAULT_ROLE_PAGE_PERMISSIONS.manager).reduce((acc, key) => {
+        acc[key] = true;
+        return acc;
+    }, {});
+    return allEnabled;
+};
+
 // Function from server.js
 const generateToken = (id, shopId, role) => {
     return jwt.sign({ id, shopId, role }, JWT_SECRET, {
@@ -328,6 +372,10 @@ router.get('/profile', protect, async (req, res) => {
         let currency = user.currency || 'INR';
         let profileImageUrl = user.profileImageUrl;
         let businessType = user.businessType || 'grocery';
+        let effectivePermissions = {
+            reports: user.role === 'owner' || user.role === 'superadmin',
+            pages: resolveRolePagePermissions({}, user.role)
+        };
 
         // Check if we have an active outlet/store context (for Premium plans)
         const storeId = req.user.storeId || req.user.activeStoreId;
@@ -364,6 +412,15 @@ router.get('/profile', protect, async (req, res) => {
                     if (store.address) address = store.address;
                 }
             }
+            const staffStore = staffStoreId
+                ? await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).select('settings').lean()
+                : null;
+            const storeRolePermissions = staffStore?.settings?.rolePagePermissions || {};
+            const rolePages = resolveRolePagePermissions(storeRolePermissions, user.role);
+            effectivePermissions = {
+                reports: rolePages.reports === true,
+                pages: rolePages
+            };
         }
 
         res.json({
@@ -382,7 +439,8 @@ router.get('/profile', protect, async (req, res) => {
                 timezone: user.timezone,
                 plan: user.plan,
                 planEndDate: user.planEndDate,
-                businessType: businessType
+                businessType: businessType,
+                permissions: effectivePermissions
             }
         });
     } catch (error) {

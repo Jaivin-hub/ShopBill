@@ -23,6 +23,7 @@ const API = {
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,
+    staffRolePermissions: API_BASE_URL + '/staff/role-permissions',
     
     // Attendance/Punch In-Out Endpoints
     attendancePunchIn: API_BASE_URL + '/attendance/punch-in', // POST

@@ -6,8 +6,20 @@ const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
+const Store = require('../models/Store');
 
 const router = express.Router();
+
+const canAccessReports = async (req) => {
+    const role = req.user?.role;
+    if (role === 'owner' || role === 'superadmin') return true;
+    if (role !== 'Manager' && role !== 'Cashier') return false;
+    if (!req.user?.storeId) return false;
+    const store = await Store.findById(req.user.storeId).select('settings.rolePagePermissions').lean();
+    const pagePermissions = store?.settings?.rolePagePermissions || {};
+    const roleKey = role === 'Manager' ? 'manager' : 'cashier';
+    return pagePermissions?.[roleKey]?.reports === true;
+};
 
 // --- HELPER 1: Date Range Filter ---
 const getSalesDateFilter = (req) => {
@@ -65,6 +77,10 @@ const getChartAggregation = (viewType) => {
 // --- API ENDPOINT: SUMMARY ---
 router.get('/summary', protect, async (req, res) => {
     try {
+        const hasAccess = await canAccessReports(req);
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'Access denied. Reports access is disabled for your account.' });
+        }
         const dateFilter = getSalesDateFilter(req);
         
         // SCOPED QUERY: Add shopId to dateFilter for sales
@@ -214,6 +230,10 @@ router.get('/summary', protect, async (req, res) => {
 // --- API ENDPOINT: CHART DATA ---
 router.get('/chart-data', protect, async (req, res) => {
     try {
+        const hasAccess = await canAccessReports(req);
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'Access denied. Reports access is disabled for your account.' });
+        }
         const dateFilter = getSalesDateFilter(req);
         const { viewType } = req.query; 
         

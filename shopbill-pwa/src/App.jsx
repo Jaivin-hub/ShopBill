@@ -312,6 +312,35 @@ const SUPERADMIN_NAV_ITEMS = [
     { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
+const DEFAULT_ROLE_PAGE_ACCESS = {
+  manager: {
+    dashboard: true,
+    billing: true,
+    khata: true,
+    inventory: true,
+    scm: true,
+    reports: false,
+    chat: true,
+    notifications: true,
+    profile: true,
+    settings: true,
+    staffPermissions: false,
+  },
+  cashier: {
+    dashboard: true,
+    billing: true,
+    khata: true,
+    inventory: false,
+    scm: false,
+    reports: false,
+    chat: true,
+    notifications: true,
+    profile: true,
+    settings: false,
+    staffPermissions: false,
+  },
+};
+
 const checkDeepLinkPath = () => {
     const path = window.location.pathname;
     if (path.startsWith('/staff-setup/')) {
@@ -397,6 +426,18 @@ const App = () => {
   const planUpper = currentUser?.plan?.toUpperCase();
   const isPremium = planUpper === 'PREMIUM';
   const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
+  const rolePageDefaults = userRole === USER_ROLES.MANAGER ? DEFAULT_ROLE_PAGE_ACCESS.manager : DEFAULT_ROLE_PAGE_ACCESS.cashier;
+  const rolePagePermissions = useMemo(() => {
+    if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return null;
+    return {
+      ...rolePageDefaults,
+      ...(currentUser?.permissions?.pages || {}),
+    };
+  }, [userRole, currentUser?.permissions?.pages, rolePageDefaults]);
+  const canAccessPage = useCallback((pageId) => {
+    if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return true;
+    return rolePagePermissions?.[pageId] === true;
+  }, [userRole, rolePagePermissions]);
   usePushNotifications(!!currentUser);
 
   // Calculate unread count - updates in real-time when notifications change via Socket.IO
@@ -828,7 +869,7 @@ useEffect(() => {
   }, []); 
 
   const handleLoginSuccess = useCallback(async (user, token) => {
-    const normalizedUser = { ...user, role: user.role.toLowerCase() };
+    const normalizedUser = { ...user, role: user.role.toLowerCase(), permissions: user.permissions || {} };
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
@@ -928,6 +969,7 @@ useEffect(() => {
             shopName: serverUser.shopName ?? currentUser.shopName,
             id: serverUser.id ?? currentUser.id,
             _id: serverUser.id ?? currentUser._id,
+            permissions: serverUser.permissions || currentUser.permissions || {},
           };
           // For staff, effective plan comes from owner (current-plan API)
           if (updatedUser.role !== 'owner' && updatedUser.role !== 'superadmin') {
@@ -939,7 +981,8 @@ useEffect(() => {
             } catch { /* ignore */ }
           }
           const roleChanged = (currentUser.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
-          if (roleChanged || updatedUser.plan !== currentUser.plan || updatedUser.shopName !== currentUser.shopName) {
+          const permissionsChanged = JSON.stringify(updatedUser.permissions || {}) !== JSON.stringify(currentUser.permissions || {});
+          if (roleChanged || updatedUser.plan !== currentUser.plan || updatedUser.shopName !== currentUser.shopName || permissionsChanged) {
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));
             setCurrentUser(updatedUser);
           }
@@ -965,11 +1008,11 @@ useEffect(() => {
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
       { id: 'inventory', name: 'Stock', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
       ...(hasSupplyChainAccess ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: null, cashier: null } }] : []),
-      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER], displayOrder: { owner: 4, manager: null, cashier: null } },
+      { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 4, manager: null, cashier: null } },
       ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 3, manager: null, cashier: null } }] : []),
     ];
-    return standardNav.filter(item => item.roles.includes(userRole));
-  }, [userRole, hasSupplyChainAccess, currentUser]);
+    return standardNav.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
+  }, [userRole, hasSupplyChainAccess, currentUser?.plan, canAccessPage]);
 
   // Split nav items into primary (footer) and secondary (more menu) based on role and plan
   const { primaryNavItems, secondaryNavItems } = useMemo(() => {
@@ -1076,18 +1119,18 @@ useEffect(() => {
   }, [handleSwipeNavigation]);
 
   const utilityNavItems = useMemo(() => {
-    const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
+    const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
     return filtered.sort((a, b) => {
       const priorityA = a.priority ?? 999;
       const priorityB = b.priority ?? 999;
       if (priorityA !== priorityB) return priorityA - priorityB;
       return a.name.localeCompare(b.name);
     });
-  }, [userRole]);
+  }, [userRole, canAccessPage]);
 
   // Footer More menu: for owner exclude Notifications & Profile (in header); Settings always last
   const moreMenuUtilityItems = useMemo(() => {
-    let items = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole));
+    let items = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
     if (userRole === USER_ROLES.OWNER) {
       items = items.filter(item => item.id !== 'notifications' && item.id !== 'profile');
     }
@@ -1099,7 +1142,7 @@ useEffect(() => {
       if (priorityA !== priorityB) return priorityA - priorityB;
       return a.name.localeCompare(b.name);
     });
-  }, [userRole]);
+  }, [userRole, canAccessPage]);
 
   // Owner footer More menu: Team management, Supply chain, Inventory, Billing, Settings (Pro/Premium order)
   const footerMoreMenuItems = useMemo(() => {
@@ -1112,6 +1155,14 @@ useEffect(() => {
     secondary.forEach(item => byId.set(item.id, item));
     return order.map(id => byId.get(id)).filter(Boolean);
   }, [userRole, moreMenuUtilityItems, secondaryNavItems]);
+
+  useEffect(() => {
+    if (!currentUser || userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return;
+    if (!canAccessPage(currentPage)) {
+      navigateTo('dashboard', { replace: true });
+      showToast('Access restricted by owner permissions.', 'info');
+    }
+  }, [currentUser, userRole, currentPage, canAccessPage, navigateTo, showToast]);
 
   const handleBackToOrigin = () => {
     navigateTo(pageOrigin || 'dashboard', { replace: true });
@@ -1129,7 +1180,7 @@ useEffect(() => {
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
-    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} />;
+    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }} />;
     if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} onLogout={logout} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {

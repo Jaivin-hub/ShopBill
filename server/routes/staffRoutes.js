@@ -12,6 +12,69 @@ const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
 
+const ROLE_PAGE_PERMISSION_KEYS = [
+    'dashboard',
+    'billing',
+    'khata',
+    'inventory',
+    'scm',
+    'reports',
+    'chat',
+    'notifications',
+    'profile',
+    'settings',
+    'staffPermissions'
+];
+
+const DEFAULT_ROLE_PAGE_PERMISSIONS = {
+    manager: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: true,
+        scm: true,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: true,
+        staffPermissions: false
+    },
+    cashier: {
+        dashboard: true,
+        billing: true,
+        khata: true,
+        inventory: false,
+        scm: false,
+        reports: false,
+        chat: true,
+        notifications: true,
+        profile: true,
+        settings: false,
+        staffPermissions: false
+    }
+};
+
+const normalizeRolePermissionPayload = (payload = {}) => {
+    const managerPayload = payload.manager || {};
+    const cashierPayload = payload.cashier || {};
+    const normalized = { manager: {}, cashier: {} };
+    for (const key of ROLE_PAGE_PERMISSION_KEYS) {
+        normalized.manager[key] = typeof managerPayload[key] === 'boolean'
+            ? managerPayload[key]
+            : DEFAULT_ROLE_PAGE_PERMISSIONS.manager[key];
+        normalized.cashier[key] = typeof cashierPayload[key] === 'boolean'
+            ? cashierPayload[key]
+            : DEFAULT_ROLE_PAGE_PERMISSIONS.cashier[key];
+    }
+    return normalized;
+};
+
+const getStoreRolePermissions = (storeDoc) => {
+    const existing = storeDoc?.settings?.rolePagePermissions || {};
+    return normalizeRolePermissionPayload(existing);
+};
+
 // Helper to check if the user is the owner
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
 // to match the convention established in authRoutes.js and StaffSchema.
@@ -30,7 +93,7 @@ function enrichStaffMember(staff) {
 
 async function enrichStaffById(staffId) {
     const staff = await Staff.findById(staffId)
-        .select('name email role phone active storeId userId')
+        .select('name email role phone active storeId userId permissions')
         .populate('userId', 'resetPasswordToken')
         .lean();
     return enrichStaffMember(staff);
@@ -118,7 +181,7 @@ router.get('/', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffList = await Staff.find({ storeId: req.user.storeId })
-            .select('name email role phone active storeId userId')
+            .select('name email role phone active storeId userId permissions')
             .populate('userId', 'resetPasswordToken')
             .lean()
             .sort({ role: -1, name: 1 });
@@ -698,6 +761,119 @@ router.put('/:id/role', protect, async (req, res) => {
         console.error('[staffRoutes] PUT /api/staff/:id/role → 500', error.message);
         console.error('Staff role update error:', error.message);
         res.status(500).json({ error: 'Failed to update staff role.' });
+    }
+});
+
+// ====================================================================
+// @route   GET /api/staff/role-permissions
+// @desc    Get outlet-level page permissions for Manager and Cashier
+// @access  Private (owner-only)
+// ====================================================================
+router.get('/role-permissions', protect, async (req, res) => {
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can view role permissions.' });
+    }
+
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+
+        const store = await Store.findOne({ _id: req.user.storeId, ownerId: req.user.id }).select('settings').lean();
+        if (!store) {
+            return res.status(404).json({ error: 'Active outlet not found.' });
+        }
+
+        return res.json({
+            permissions: getStoreRolePermissions(store),
+            pages: ROLE_PAGE_PERMISSION_KEYS
+        });
+    } catch (error) {
+        console.error('Role permissions fetch error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch role permissions.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/role-permissions
+// @desc    Update outlet-level page permissions for Manager and Cashier
+// @access  Private (owner-only)
+// ====================================================================
+router.put('/role-permissions', protect, async (req, res) => {
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can update role permissions.' });
+    }
+
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+
+        const nextPermissions = normalizeRolePermissionPayload(req.body || {});
+        const updatedStore = await Store.findOneAndUpdate(
+            { _id: req.user.storeId, ownerId: req.user.id },
+            { $set: { 'settings.rolePagePermissions': nextPermissions } },
+            { new: true, runValidators: true }
+        ).select('settings').lean();
+
+        if (!updatedStore) {
+            return res.status(404).json({ error: 'Active outlet not found.' });
+        }
+
+        return res.json({
+            message: 'Role page permissions updated successfully.',
+            permissions: getStoreRolePermissions(updatedStore),
+            pages: ROLE_PAGE_PERMISSION_KEYS
+        });
+    } catch (error) {
+        console.error('Role permissions update error:', error.message);
+        return res.status(500).json({ error: 'Failed to update role permissions.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/:id/permissions
+// @desc    Update owner-controlled staff permissions
+// @access  Private (owner-only)
+// ====================================================================
+router.put('/:id/permissions', protect, async (req, res) => {
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can update staff permissions.' });
+    }
+
+    const staffId = req.params.id;
+    const { reports } = req.body || {};
+    if (typeof reports !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid payload. Expected { reports: boolean }.' });
+    }
+
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
+        if (!staffMember) {
+            return res.status(404).json({ error: 'Staff member not found.' });
+        }
+        if (isowner(staffMember.role)) {
+            return res.status(400).json({ error: 'Owner permissions cannot be changed here.' });
+        }
+
+        staffMember.permissions = {
+            ...(staffMember.permissions || {}),
+            reports
+        };
+        await staffMember.save();
+
+        const refreshed = await enrichStaffById(staffMember._id);
+        return res.json({
+            message: `Reports access ${reports ? 'enabled' : 'disabled'} for ${staffMember.name}.`,
+            staff: refreshed
+        });
+    } catch (error) {
+        console.error('Staff permissions update error:', error.message);
+        return res.status(500).json({ error: 'Failed to update staff permissions.' });
     }
 });
 

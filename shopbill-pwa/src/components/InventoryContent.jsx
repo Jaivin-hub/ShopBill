@@ -672,6 +672,16 @@ const InventoryContent = ({
                                 <div className={`col-span-full text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest">No Records Found</p>
+                                    {!readOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={openAddModal}
+                                            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[10px] font-black tracking-[0.18em] rounded-xl hover:bg-indigo-500 transition-all"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Add Product
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -685,6 +695,16 @@ const InventoryContent = ({
                                 <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest">No Records Found</p>
+                                    {!readOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={openAddModal}
+                                            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[10px] font-black tracking-[0.18em] rounded-xl hover:bg-indigo-500 transition-all"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Add Product
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
