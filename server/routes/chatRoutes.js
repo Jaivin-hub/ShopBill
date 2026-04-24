@@ -851,9 +851,10 @@ router.post('/:chatId/message', (req, res, next) => {
             });
             console.log('[Push] Chat message: total', recipientIds.length, 'recipient(s),', allTokens.length, 'device token(s). Will send push:', allTokens.length > 0);
             if (allTokens.length > 0) {
+                const dedupedTokens = [...new Set(allTokens.filter(Boolean))];
                 const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
                 console.log('[Push] Calling sendPushNotification now...');
-                sendPushNotification(allTokens, {
+                const pushResult = await sendPushNotification(dedupedTokens, {
                     title: senderName,
                     body: contentPreview,
                     data: {
@@ -863,11 +864,18 @@ router.post('/:chatId/message', (req, res, next) => {
                         senderName,
                         type: 'chat_message'
                     }
-                }).then(r => {
-                    console.log('[Push] Chat push RESULT: success=', r.success, 'failure=', r.failure);
-                }).catch(err => {
-                    console.error('[Push] Chat push ERROR:', err?.message || err, err?.stack);
                 });
+                console.log('[Push] Chat push RESULT: success=', pushResult.success, 'failure=', pushResult.failure, 'trace=', pushResult.traceId || 'n/a');
+                if (pushResult.failed?.length) {
+                    console.warn('[Push] Chat push FAILED TOKENS:', pushResult.failed);
+                }
+                if (pushResult.invalidTokens?.length) {
+                    console.warn('[Push] Chat push removing invalid tokens count=', pushResult.invalidTokens.length);
+                    await User.updateMany(
+                        { 'deviceTokens.token': { $in: pushResult.invalidTokens } },
+                        { $pull: { deviceTokens: { token: { $in: pushResult.invalidTokens } } } }
+                    );
+                }
             } else {
                 console.log('[Push] SKIP: No device tokens for chat recipients - users must register tokens first');
             }

@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Store = require('../models/Store');
+const { getAdmin, sendPushNotification } = require('../services/firebaseAdmin');
 
 const router = express.Router();
 
@@ -120,6 +121,107 @@ router.delete('/device-token', protect, async (req, res) => {
     } catch (error) {
         console.error('Device Token Remove Error:', error);
         res.status(500).json({ error: 'Failed to remove device token.' });
+    }
+});
+
+/**
+ * @route GET /api/user/device-token/status
+ * @desc Quick push diagnostics for current user
+ * @access Private
+ */
+router.get('/device-token/status', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('deviceTokens email role activeStoreId').lean();
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        const hasFirebaseEnv = Boolean(
+            process.env.FIREBASE_PROJECT_ID &&
+            process.env.FIREBASE_CLIENT_EMAIL &&
+            process.env.FIREBASE_PRIVATE_KEY
+        );
+        const fbAdmin = getAdmin();
+
+        const tokens = (user.deviceTokens || []).map((d) => ({
+            platform: d.platform || 'web',
+            updatedAt: d.updatedAt || null,
+            tokenTail: `...${String(d.token || '').slice(-12)}`
+        }));
+
+        res.json({
+            success: true,
+            diagnostics: {
+                userId: String(user._id),
+                email: user.email,
+                role: user.role,
+                activeStoreId: user.activeStoreId ? String(user.activeStoreId) : null,
+                firebaseConfigured: hasFirebaseEnv,
+                firebaseInitialized: !!fbAdmin,
+                tokenCount: tokens.length,
+                tokens
+            }
+        });
+    } catch (error) {
+        console.error('[Push] device-token/status error:', error);
+        res.status(500).json({ error: 'Failed to fetch push diagnostics.' });
+    }
+});
+
+/**
+ * @route POST /api/user/device-token/test
+ * @desc Send a direct test push to current user tokens
+ * @access Private
+ */
+router.post('/device-token/test', protect, async (req, res) => {
+    const ts = new Date().toISOString();
+    try {
+        const user = await User.findById(req.user.id).select('deviceTokens email role').lean();
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        const tokens = [...new Set((user.deviceTokens || []).map(d => d.token).filter(Boolean))];
+        if (tokens.length === 0) {
+            return res.status(400).json({
+                error: 'No device tokens found for this user.',
+                diagnostics: { tokenCount: 0, userId: String(req.user.id) }
+            });
+        }
+
+        const title = req.body?.title || 'Pocket POS Test Push';
+        const body = req.body?.body || `Push test at ${ts}`;
+        const link = req.body?.link || '/notifications';
+        const pushResult = await sendPushNotification(tokens, {
+            title,
+            body,
+            data: {
+                type: 'notification',
+                link,
+                notificationType: 'push_test',
+                requestedBy: String(req.user.id)
+            }
+        });
+
+        if (pushResult.invalidTokens?.length) {
+            await User.updateMany(
+                { 'deviceTokens.token': { $in: pushResult.invalidTokens } },
+                { $pull: { deviceTokens: { token: { $in: pushResult.invalidTokens } } } }
+            );
+        }
+
+        return res.json({
+            success: true,
+            message: 'Test push attempted.',
+            diagnostics: {
+                userId: String(req.user.id),
+                tokenCount: tokens.length,
+                success: pushResult.success,
+                failure: pushResult.failure,
+                invalidRemoved: pushResult.invalidTokens?.length || 0,
+                failed: pushResult.failed || [],
+                traceId: pushResult.traceId || null
+            }
+        });
+    } catch (error) {
+        console.error('[Push] device-token/test error:', error);
+        return res.status(500).json({ error: 'Failed to send test push.' });
     }
 });
 
