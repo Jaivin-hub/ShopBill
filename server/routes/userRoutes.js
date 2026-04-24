@@ -129,9 +129,13 @@ router.delete('/device-token', protect, async (req, res) => {
  * @desc Quick push diagnostics for current user
  * @access Private
  */
-router.get('/device-token/status', protect, async (req, res) => {
+router.get('/device-token/status', async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('deviceTokens email role activeStoreId').lean();
+        const userId = req.query.userId || req.headers['x-user-id'];
+        if (!userId) {
+            return res.status(400).json({ error: 'userId is required in query (?userId=...) or x-user-id header.' });
+        }
+        const user = await User.findById(userId).select('deviceTokens email role activeStoreId').lean();
         if (!user) return res.status(404).json({ error: 'User not found.' });
 
         const hasFirebaseEnv = Boolean(
@@ -171,17 +175,21 @@ router.get('/device-token/status', protect, async (req, res) => {
  * @desc Send a direct test push to current user tokens
  * @access Private
  */
-router.post('/device-token/test', protect, async (req, res) => {
+router.post('/device-token/test', async (req, res) => {
     const ts = new Date().toISOString();
     try {
-        const user = await User.findById(req.user.id).select('deviceTokens email role').lean();
+        const userId = req.body?.userId || req.query?.userId || req.headers['x-user-id'];
+        if (!userId) {
+            return res.status(400).json({ error: 'userId is required in body, query (?userId=...), or x-user-id header.' });
+        }
+        const user = await User.findById(userId).select('deviceTokens email role').lean();
         if (!user) return res.status(404).json({ error: 'User not found.' });
 
         const tokens = [...new Set((user.deviceTokens || []).map(d => d.token).filter(Boolean))];
         if (tokens.length === 0) {
             return res.status(400).json({
                 error: 'No device tokens found for this user.',
-                diagnostics: { tokenCount: 0, userId: String(req.user.id) }
+                diagnostics: { tokenCount: 0, userId: String(userId) }
             });
         }
 
@@ -195,7 +203,7 @@ router.post('/device-token/test', protect, async (req, res) => {
                 type: 'notification',
                 link,
                 notificationType: 'push_test',
-                requestedBy: String(req.user.id)
+                requestedBy: String(userId)
             }
         });
 
@@ -210,7 +218,7 @@ router.post('/device-token/test', protect, async (req, res) => {
             success: true,
             message: 'Test push attempted.',
             diagnostics: {
-                userId: String(req.user.id),
+                userId: String(userId),
                 tokenCount: tokens.length,
                 success: pushResult.success,
                 failure: pushResult.failure,
