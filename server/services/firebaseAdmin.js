@@ -42,7 +42,8 @@ async function sendPushNotification(tokens, payload) {
     const deduped = [...new Set(tokens)];
     const { title, body, data = {} } = payload;
     const ts = new Date().toISOString();
-    console.log(`[Push] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
+    const traceId = `push-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    console.log(`[Push][${traceId}] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
     try {
         const normalizedData = Object.fromEntries(
             Object.entries(data).map(([k, v]) => [String(k), String(v ?? '')])
@@ -52,7 +53,7 @@ async function sendPushNotification(tokens, payload) {
         const link = rawLink.startsWith('http')
             ? rawLink
             : (baseClientUrl ? `${baseClientUrl}${rawLink.startsWith('/') ? '' : '/'}${rawLink}` : rawLink);
-        console.log(`[Push] WebPush target link="${link}" raw="${rawLink}" clientUrl="${baseClientUrl || '(missing)'}"`);
+        console.log(`[Push][${traceId}] WebPush target link="${link}" raw="${rawLink}" clientUrl="${baseClientUrl || '(missing)'}"`);
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
             notification: { title, body, sound: 'default' },
@@ -93,21 +94,35 @@ async function sendPushNotification(tokens, payload) {
             },
             data: normalizedData,
         });
-        console.log(`[Push] ${new Date().toISOString()} firebaseAdmin RESULT: success=${result.successCount} failure=${result.failureCount} total=${deduped.length}`);
+        console.log(`[Push][${traceId}] ${new Date().toISOString()} firebaseAdmin RESULT: success=${result.successCount} failure=${result.failureCount} total=${deduped.length}`);
+        const invalidTokens = [];
+        const failed = [];
         if (result.failureCount > 0 && result.responses) {
             result.responses.forEach((resp, i) => {
                 if (!resp.success) {
                     const err = resp.error;
-                    console.warn(`[Push] Failed token ${i + 1}/${deduped.length}: ${err?.code || err?.message} | token preview: ...${(deduped[i] || '').slice(-12)}`);
+                    const code = err?.code || err?.message || 'unknown_error';
+                    const tokenTail = (deduped[i] || '').slice(-12);
+                    failed.push({ index: i, code, tokenTail });
+                    if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+                        invalidTokens.push(deduped[i]);
+                    }
+                    console.warn(`[Push][${traceId}] Failed token ${i + 1}/${deduped.length}: ${code} | token preview: ...${tokenTail}`);
                 } else {
-                    console.log(`[Push] Delivered token ${i + 1}/${deduped.length} tokenTail=...${(deduped[i] || '').slice(-12)}`);
+                    console.log(`[Push][${traceId}] Delivered token ${i + 1}/${deduped.length} tokenTail=...${(deduped[i] || '').slice(-12)}`);
                 }
             });
         }
-        return { success: result.successCount, failure: result.failureCount };
+        return {
+            success: result.successCount,
+            failure: result.failureCount,
+            invalidTokens,
+            failed,
+            traceId
+        };
     } catch (err) {
-        console.error('[Push] Send error:', err.message, err.code || '', err.stack);
-        return { success: 0, failure: deduped.length };
+        console.error(`[Push][${traceId}] Send error:`, err.message, err.code || '', err.stack);
+        return { success: 0, failure: deduped.length, invalidTokens: [], failed: [{ code: err.code || err.message || 'send_error' }], traceId };
     }
 }
 

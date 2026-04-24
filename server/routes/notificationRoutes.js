@@ -22,6 +22,8 @@ const emitAlert = async (req, storeId, type, data) => {
     let metadata = {};
     const storeIdStr = storeId.toString();
     const actorId = req.user._id; // Track who performed the action
+    const pushTraceId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    console.log(`[Push][${pushTraceId}] emitAlert start type=${type} store=${storeIdStr} actor=${actorId?.toString?.() || 'unknown'} role=${req.user?.role || 'unknown'}`);
     
     // Always get ownerId from the store to ensure accuracy (especially for staff actions)
     // This will be set after we fetch the store below
@@ -306,12 +308,21 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Push notifications to target users
                 if (targetUserIds.size > 0) {
                     const recipients = await User.find({ _id: { $in: [...targetUserIds] } })
-                        .select('deviceTokens')
+                        .select('deviceTokens email role')
                         .lean();
                     const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
-                    console.log(`[Push] Notification: ${targetUserIds.size} target users, ${recipients.length} recipients, ${allTokens.length} device token(s)`);
+                    const dedupedTokens = [...new Set(allTokens.filter(Boolean))];
+                    const recipientSummary = recipients.map((u) => ({
+                        user: u._id?.toString?.() || '',
+                        role: u.role || '',
+                        email: u.email || '',
+                        tokenCount: Array.isArray(u.deviceTokens) ? u.deviceTokens.length : 0,
+                        tokenTails: (u.deviceTokens || []).map(dt => `...${String(dt.token || '').slice(-10)}`)
+                    }));
+                    console.log(`[Push][${pushTraceId}] Notification targets=${targetUserIds.size} recipientDocs=${recipients.length} rawTokens=${allTokens.length} uniqueTokens=${dedupedTokens.length}`);
+                    console.log(`[Push][${pushTraceId}] Recipient token map:`, recipientSummary);
                     if (allTokens.length > 0) {
-                        sendPushNotification(allTokens, {
+                        const pushResult = await sendPushNotification(dedupedTokens, {
                             title: title || 'Pocket POS',
                             body: finalMessage?.slice(0, 120) || message?.slice(0, 120) || 'New notification',
                             data: {
@@ -322,9 +333,20 @@ const emitAlert = async (req, storeId, type, data) => {
                                 notificationType: type,
                                 category,
                             },
-                        }).then(r => console.log(`[Push] Notification delivered: ${r.success} ok, ${r.failure} failed`)).catch(err => console.error('[Push] Notification error:', err));
+                        });
+                        console.log(`[Push][${pushTraceId}] Notification delivered: ${pushResult.success} ok, ${pushResult.failure} failed, firebaseTrace=${pushResult.traceId}`);
+                        if (pushResult.failed?.length) {
+                            console.warn(`[Push][${pushTraceId}] Failed token results:`, pushResult.failed);
+                        }
+                        if (pushResult.invalidTokens?.length) {
+                            console.warn(`[Push][${pushTraceId}] Removing invalid tokens count=${pushResult.invalidTokens.length}`);
+                            await User.updateMany(
+                                { 'deviceTokens.token': { $in: pushResult.invalidTokens } },
+                                { $pull: { deviceTokens: { token: { $in: pushResult.invalidTokens } } } }
+                            );
+                        }
                     } else {
-                        console.log('[Push] No device tokens for notification recipients - users may need to enable notifications in the app');
+                        console.log(`[Push][${pushTraceId}] No device tokens for notification recipients - users may need to enable notifications in the app`);
                     }
                 }
 
