@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react';
 import InventoryContent from './InventoryContent';
 import { useDebounce } from '../hooks/useDebounce';
+import { exportRowsToExcel } from '../utils/exportExcel';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
@@ -333,6 +334,36 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             });
     }, [inventory, debouncedSearchTerm, sortOption, isTextileShop]);
 
+    const handleDownloadReport = useCallback(() => {
+        const rows = [
+            ['Name', 'HSN', 'Price', 'Quantity', 'Reorder Level', 'Has Variants']
+        ];
+        sortedAndFilteredInventory.forEach((item) => {
+            rows.push([
+                item.name || '',
+                item.hsn || '',
+                item.price ?? '',
+                item.quantity ?? '',
+                item.reorderLevel ?? 5,
+                item.variants && item.variants.length > 0 ? 'Yes' : 'No'
+            ]);
+            if (item.variants && item.variants.length > 0) {
+                item.variants.forEach((v) => {
+                    rows.push([
+                        `  - Variant: ${v.label || v.variantlabel || [v.size, v.color].filter(Boolean).join('/') || 'Variant'}`,
+                        v.hsn || '',
+                        v.price ?? '',
+                        v.quantity ?? '',
+                        v.reorderLevel ?? item.reorderLevel ?? 5,
+                        'Variant'
+                    ]);
+                });
+            }
+        });
+        exportRowsToExcel(rows, `inventory-report-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Inventory');
+        showToast('Inventory report downloaded as Excel.', 'success');
+    }, [showToast, sortedAndFilteredInventory]);
+
     // --- Render States ---
     if (!hasAccess) {
         return (
@@ -376,6 +407,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             setFormData={setFormData}
             openAddModal={openAddModal}
             openBulkUploadModal={openBulkUploadModal}
+            handleDownloadReport={handleDownloadReport}
             closeBulkUploadModal={closeBulkUploadModal}
             handleBulkUpload={handleBulkUpload}
             handleEditClick={handleEditClick}

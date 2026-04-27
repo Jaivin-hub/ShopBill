@@ -39,7 +39,7 @@ const ROLE_DEFAULT_ACCESS = {
         notifications: true,
         profile: true,
         settings: true,
-        staffPermissions: false
+        staffPermissions: true
     },
     cashier: {
         dashboard: true,

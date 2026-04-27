@@ -38,7 +38,7 @@ const DEFAULT_ROLE_PAGE_PERMISSIONS = {
         notifications: true,
         profile: true,
         settings: true,
-        staffPermissions: false
+        staffPermissions: true
     },
     cashier: {
         dashboard: true,
@@ -200,18 +200,21 @@ router.get('/', protect, async (req, res) => {
 // ====================================================================
 // @route   POST /api/staff
 // @desc    Add a new staff member (Creates User + Staff record and sends activation email)
-// @access  Private (owner-only access for security)
+// @access  Private (owner/manager access)
 // ====================================================================
 router.post('/', protect, async (req, res) => {
     console.log('[staffRoutes] POST /api/staff req.body', req.body);
 
-    if (!isowner(req.user.role)) {
-        console.log('[staffRoutes] POST /api/staff → 403 not owner', { role: req.user.role });
-        return res.status(403).json({ error: 'Access denied. Only the owner can add new staff.' });
+    const actorRole = req.user.role;
+    const canAddStaff = isowner(actorRole) || actorRole === 'Manager';
+    if (!canAddStaff) {
+        console.log('[staffRoutes] POST /api/staff → 403 not owner/manager', { role: actorRole });
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can add new staff.' });
     }
     
     const { name, email, role, phone } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    let ownerIdResolved = req.user.id;
 
     if (!name || !email || !role) {
         return res.status(400).json({ error: 'Please provide name, email, and role.' });
@@ -231,11 +234,19 @@ router.post('/', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const storeIdObj = new mongoose.Types.ObjectId(req.user.storeId);
-        const owner = await User.findById(req.user.id);
+        const storeForOwner = await Store.findById(req.user.storeId).select('ownerId').lean();
+        if (!storeForOwner?.ownerId) {
+            return res.status(404).json({ error: 'Store owner not found for this outlet.' });
+        }
+        ownerIdResolved = storeForOwner.ownerId.toString();
+        const owner = await User.findById(ownerIdResolved);
+        if (!owner) {
+            return res.status(404).json({ error: 'Owner account not found for this outlet.' });
+        }
         // Email display name: default to registered business name; for PREMIUM multi-outlet use active outlet name.
         let emailShopName = owner?.shopName || '';
         if (owner?.plan === 'PREMIUM' && req.user.storeId) {
-            const activeStore = await Store.findOne({ _id: req.user.storeId, ownerId: req.user.id }).select('name').lean();
+            const activeStore = await Store.findOne({ _id: req.user.storeId, ownerId: ownerIdResolved }).select('name').lean();
             if (activeStore?.name) {
                 emailShopName = activeStore.name;
             }
@@ -340,7 +351,7 @@ router.post('/', protect, async (req, res) => {
             // Re-link login context to this owner's shop/store.
             await User.findByIdAndUpdate(existingUser._id, {
                 role,
-                shopId: req.user.id,
+                shopId: ownerIdResolved,
                 activeStoreId: storeIdForStaff,
                 isActive: true,
             });
@@ -357,8 +368,8 @@ router.post('/', protect, async (req, res) => {
         }
 
         // --- 2. Create the User Login Record (new email) ---
-        // Get the owner's ID (req.user.id is the owner who is creating the staff)
-        const ownerId = req.user.id;
+        // Use outlet owner as shop owner context even when actor is a manager.
+        const ownerId = ownerIdResolved;
         
         const newUser = await User.create({
             email: normalizedEmail,
@@ -474,7 +485,7 @@ router.post('/', protect, async (req, res) => {
                     }
                     await User.findByIdAndUpdate(existingUser._id, {
                         role,
-                        shopId: req.user.id,
+                        shopId: ownerIdResolved,
                         activeStoreId: storeIdForStaff,
                         isActive: true,
                     });

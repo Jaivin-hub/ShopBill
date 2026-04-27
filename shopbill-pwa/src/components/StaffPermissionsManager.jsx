@@ -599,7 +599,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
+const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -613,9 +613,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     void onOpenRolePermissions;
 
     // Ensure we have write/read access
-    const effectiveRole = currentUserRole || 'owner'; 
-    const hasWriteAccess = effectiveRole === 'owner';
-    const hasReadAccess = effectiveRole === 'owner' || effectiveRole === 'Manager';
+    const effectiveRole = (currentUserRole || currentUser?.role || 'owner').toLowerCase();
+    const hasWriteAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
+    const hasReadAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
 
     const fetchStaff = useCallback(async () => {
         if (!hasReadAccess || !apiClient) {

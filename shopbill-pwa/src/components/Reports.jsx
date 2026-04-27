@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Loader, Truck, AlertTriangle, ShoppingCart, Users,
-    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check
+    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download
 } from 'lucide-react';
 import SalesChart from './SalesChart';
+import { exportRowsToExcel } from '../utils/exportExcel';
 
 // --- Constants ---
 const DATE_FILTERS = [
@@ -117,6 +118,31 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
 
     const formatCurrency = (amount) => `₹${(amount || 0).toLocaleString('en-IN')}`;
 
+    const handleDownloadReport = useCallback(() => {
+        const rows = [];
+        rows.push(['Metric', 'Value']);
+        rows.push(['Revenue', data.revenue || 0]);
+        rows.push(['Invoices', data.billsRaised || 0]);
+        rows.push(['Average Bill Value', data.averageBillValue || 0]);
+        rows.push(['Items Sold', data.volume || 0]);
+        rows.push(['Credit Outstanding', data.totalCreditOutstanding || 0]);
+        rows.push(['All Time Revenue', data.totalAllTimeRevenue || 0]);
+        rows.push(['All Time Bills', data.totalAllTimeBills || 0]);
+        rows.push([]);
+        rows.push(['Top Items']);
+        rows.push(['Name', 'Quantity']);
+        (showAllBestSellers ? allBestSellers : (data.topItems || [])).forEach((item) => {
+            rows.push([item.name || '', item.quantity || 0]);
+        });
+        rows.push([]);
+        rows.push(['Purchase Insights']);
+        rows.push(['Total Purchased Value', scmInsights.totalStockValue || 0]);
+        rows.push(['Active Suppliers', scmInsights.activeSuppliers || 0]);
+        rows.push(['Purchases (Filtered)', scmInsights.filteredPurchaseCount || 0]);
+        exportRowsToExcel(rows, `reports-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Reports');
+        showToast('Reports downloaded as Excel.', 'success');
+    }, [allBestSellers, data, scmInsights, showAllBestSellers, showToast]);
+
     const scmInsights = useMemo(() => {
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
         const filteredPurchases = purchases.filter(p => {
@@ -178,6 +204,26 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                                     </button>
                                 ))}
                             </div>
+                            <button
+                                onClick={fetchReportData}
+                                disabled={isLoading}
+                                className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                                title="Refresh Reports"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button
+                                onClick={handleDownloadReport}
+                                className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                                title="Download Reports"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Download className="w-4 h-4" />
+                                    <span className="hidden md:inline text-[10px] font-black tracking-[0.18em]">
+                                        DOWNLOAD REPORT
+                                    </span>
+                                </span>
+                            </button>
                             <button onClick={() => window.print()} className={`p-2.5 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'} rounded-lg hover:text-indigo-500 transition-all`}>
                                 <Printer className="w-4 h-4" />
                             </button>

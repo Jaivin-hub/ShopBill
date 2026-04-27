@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
-  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit
+  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
+import { exportRowsToExcel } from '../utils/exportExcel';
 
 const DATE_FILTERS = [
   { id: '24h', label: ['24', 'Hrs'], days: 1 },
@@ -274,6 +275,43 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const selectedProduct = inventory.find(p => p._id === purchaseForm.productId);
   const selectedSupplier = suppliers.find(s => s._id === purchaseForm.supplierId);
 
+  const handleDownloadReport = useCallback(() => {
+    const rows = [];
+    if (activeTab === 'history') {
+      rows.push(['Date', 'Product', 'Supplier', 'Quantity', 'Purchase Price', 'Invoice']);
+      filteredHistory.forEach((entry) => {
+        rows.push([
+          new Date(entry.date || entry.createdAt || '').toLocaleDateString('en-IN'),
+          entry.productId?.name || entry.productName || '',
+          entry.supplierId?.name || entry.supplierName || '',
+          entry.quantity || 0,
+          entry.purchasePrice || entry.price || 0,
+          entry.invoiceNumber || ''
+        ]);
+      });
+    } else if (activeTab === 'suppliers') {
+      rows.push(['Supplier', 'Phone', 'Email', 'GSTIN']);
+      suppliers.forEach((s) => {
+        rows.push([s.name || '', s.phone || '', s.email || '', s.gstin || '']);
+      });
+    } else {
+      rows.push(['Product', 'HSN', 'Quantity', 'Reorder Level', 'Status']);
+      sortedInventory.forEach((item) => {
+        const qty = Number(item.quantity || 0);
+        const reorder = Number(item.reorderLevel || 5);
+        rows.push([
+          item.name || '',
+          item.hsn || '',
+          qty,
+          reorder,
+          qty <= reorder ? 'Low Stock' : 'Healthy'
+        ]);
+      });
+    }
+    exportRowsToExcel(rows, `supply-chain-${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`, 'SupplyChain');
+    showToast('Supply Chain report downloaded as Excel.', 'success');
+  }, [activeTab, filteredHistory, showToast, sortedInventory, suppliers]);
+
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
@@ -287,7 +325,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </p>
           </div>
 
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadReport}
+              className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+              title="Download Supply Chain Report"
+            >
+              <span className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                <span className="hidden md:inline text-[10px] font-black tracking-[0.18em]">
+                  DOWNLOAD REPORT
+                </span>
+              </span>
+            </button>
+            <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
             {[
               { id: 'purchase', label: 'ADD STOCK', icon: PackageCheck },
               { id: 'history', label: 'LOGS', icon: History },
@@ -302,6 +353,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                 <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
+            </div>
           </div>
         </div>
       </header>

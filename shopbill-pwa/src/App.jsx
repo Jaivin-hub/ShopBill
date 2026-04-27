@@ -299,7 +299,7 @@ const UpdatePrompt = () => {
 
 const UTILITY_NAV_ITEMS_CONFIG = [
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
-  { id: 'staffPermissions', name: 'Team Management', icon: Users, roles: [USER_ROLES.OWNER], priority: 1 },
+  { id: 'staffPermissions', name: 'Team Management', icon: Users, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
   { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 },
     { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
@@ -324,7 +324,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     notifications: true,
     profile: true,
     settings: true,
-    staffPermissions: false,
+    staffPermissions: true,
   },
   cashier: {
     dashboard: true,
@@ -336,7 +336,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     chat: true,
     notifications: true,
     profile: true,
-    settings: false,
+    settings: true,
     staffPermissions: false,
   },
 };
@@ -436,6 +436,9 @@ const App = () => {
   }, [userRole, currentUser?.permissions?.pages, rolePageDefaults]);
   const canAccessPage = useCallback((pageId) => {
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return true;
+    // Always allow utility settings and sales history access for staff.
+    if (pageId === 'settings' || pageId === 'salesActivity') return true;
+    if (userRole === USER_ROLES.MANAGER && pageId === 'staffPermissions') return true;
     return rolePagePermissions?.[pageId] === true;
   }, [userRole, rolePagePermissions]);
   usePushNotifications(!!currentUser);

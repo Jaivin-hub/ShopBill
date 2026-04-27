@@ -38,7 +38,7 @@ const StoreSchema = new mongoose.Schema({
                 notifications: { type: Boolean, default: true },
                 profile: { type: Boolean, default: true },
                 settings: { type: Boolean, default: true },
-                staffPermissions: { type: Boolean, default: false }
+                staffPermissions: { type: Boolean, default: true }
             },
             cashier: {
                 dashboard: { type: Boolean, default: true },

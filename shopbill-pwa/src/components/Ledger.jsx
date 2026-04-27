@@ -2,9 +2,10 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import {
   UserPlus, Loader, Search, X,
-  Bell, ShieldCheck, Filter, ChevronRight,
+  Bell, ShieldCheck, Filter, ChevronRight, RefreshCw, Download,
   Sparkles, LayoutGrid
 } from 'lucide-react';
+import { exportRowsToExcel } from '../utils/exportExcel';
 import CustomerList from './CustomerList';
 import { 
   PaymentModal, 
@@ -86,6 +87,21 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
   }, [apiClient, API.customers]);
 
   const totalOutstanding = useMemo(() => customers.reduce((sum, c) => sum + (c.outstandingCredit || 0), 0), [customers]);
+
+  const handleDownloadReport = useCallback(() => {
+    const rows = [
+      ['Customer Name', 'Phone', 'Credit Limit', 'Outstanding', 'Status'],
+      ...customers.map((c) => [
+        c.name || '',
+        c.phone || '',
+        Number(c.creditLimit || 0).toFixed(2),
+        Number(c.outstandingCredit || 0).toFixed(2),
+        Number(c.outstandingCredit || 0) > 0 ? 'Due' : 'Settled'
+      ])
+    ];
+    exportRowsToExcel(rows, `ledger-report-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Ledger');
+    if (showToast) showToast('Ledger report downloaded as Excel.', 'success');
+  }, [customers, showToast]);
 
   const handleRecordPayment = async () => {
     const amount = parseFloat(paymentAmount);
@@ -228,6 +244,26 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                           Customer account management system.
                         </p>
                       </div>
+                      <button
+                        onClick={fetchCustomers}
+                        disabled={loading}
+                        className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                        title="Refresh Ledger"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'} ${loading ? 'animate-spin' : ''}`} />
+                      </button>
+                      <button
+                        onClick={handleDownloadReport}
+                        className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                        title="Download Ledger Report"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Download className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`} />
+                          <span className={`hidden md:inline text-[10px] font-black tracking-[0.18em] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            DOWNLOAD REPORT
+                          </span>
+                        </span>
+                      </button>
                       {/* Desktop total outstanding */}
                       <div className="hidden md:flex items-baseline gap-2 shrink-0 pl-2">
                         <p className={`text-xs font-bold ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>

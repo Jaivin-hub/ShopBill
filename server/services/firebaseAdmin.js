@@ -4,6 +4,27 @@
  */
 let admin = null;
 
+function normalizePrivateKey(input) {
+    if (!input || typeof input !== 'string') return '';
+    let key = input.trim();
+    // Strip accidental wrapping quotes from env panels
+    key = key.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+    // Support escaped newlines from env values
+    key = key.replace(/\\n/g, '\n');
+    // Support base64-encoded private key as fallback
+    if (!key.includes('BEGIN PRIVATE KEY')) {
+        try {
+            const decoded = Buffer.from(key, 'base64').toString('utf8');
+            if (decoded.includes('BEGIN PRIVATE KEY')) {
+                key = decoded;
+            }
+        } catch {
+            // keep original key if decode fails
+        }
+    }
+    return key;
+}
+
 function getAdmin() {
     if (admin) return admin;
     if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
@@ -11,16 +32,20 @@ function getAdmin() {
         return null;
     }
     try {
+        const projectId = String(process.env.FIREBASE_PROJECT_ID || '').trim();
+        const clientEmail = String(process.env.FIREBASE_CLIENT_EMAIL || '').trim();
+        const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+        console.log(`[Push] Firebase env check project=${projectId} email=${clientEmail} keyHeader=${privateKey.slice(0, 26)} keyLen=${privateKey.length}`);
         admin = require('firebase-admin');
         if (!admin.apps.length) {
             admin.initializeApp({
                 credential: admin.credential.cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                    projectId,
+                    clientEmail,
+                    privateKey,
                 }),
             });
-            console.log(`[Push] Firebase Admin initialized for project: ${process.env.FIREBASE_PROJECT_ID}`);
+            console.log(`[Push] Firebase Admin initialized for project: ${projectId}`);
         }
         return admin;
     } catch (err) {

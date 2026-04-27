@@ -25,6 +25,7 @@ const ScannerModal = ({
     const lastScannedCodeRef = useRef(null); 
     const isProcessingRef = useRef(false); 
     const [isScannerInitialized, setIsScannerInitialized] = useState(false);
+    const [scannerRetryKey, setScannerRetryKey] = useState(0);
 
     // Hardware Logic: Focus Trigger
     const triggerFocus = useCallback(async () => {
@@ -68,6 +69,26 @@ const ScannerModal = ({
         setLookupError(null);
     }, []); 
 
+    const getCameraStartErrorMessage = useCallback((err) => {
+        const name = err?.name || '';
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+            return 'Camera permission denied. Please allow camera access in browser/app settings.';
+        }
+        if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+            return 'No camera found on this device.';
+        }
+        if (name === 'NotReadableError' || name === 'TrackStartError') {
+            return 'Camera is busy in another app. Close other apps using camera and retry.';
+        }
+        if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
+            return 'Back camera not available. Trying fallback camera...';
+        }
+        if (name === 'SecurityError') {
+            return 'Camera access blocked by browser security policy.';
+        }
+        return 'Unable to start camera on this device. Tap Retry.';
+    }, []);
+
     const handleScanResult = useCallback((decodedText) => {
         if (isProcessingRef.current || decodedText === lastScannedCodeRef.current) return;
         isProcessingRef.current = true; 
@@ -104,6 +125,7 @@ const ScannerModal = ({
         if (!isOpen) { resetScannerState(); return; }
         if (lookupStatus !== 'idle' || isProcessingRef.current || !ZXing || !videoRef.current) return;
         setLookupStatus('initializing');
+        setLookupError(null);
         codeReaderRef.current = new ZXing.BrowserMultiFormatReader();
         const hints = new Map();
         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
@@ -113,32 +135,67 @@ const ScannerModal = ({
             ZXing.BarcodeFormat.UPC_A
         ]);
         hints.set(ZXing.DecodeHintType.TRY_HARDER, true); 
-        codeReaderRef.current.decodeFromVideoDevice(
-            null, 
-            videoRef.current, 
-            (result, err) => {
-                if (videoRef.current?.srcObject && !streamRef.current) {
-                    streamRef.current = videoRef.current.srcObject;
-                    setTimeout(triggerFocus, 1000);
-                }
-                if (result) handleScanResult(result.getText()); 
-            }, 
-            hints
-        ) 
-        .then(() => {
-            setIsScannerInitialized(true);
-            setLookupStatus('scanning');
-        })
-        .catch(err => {
-            setLookupStatus('notFound'); 
-            if (onScanError && typeof onScanError === 'function') {
-                onScanError("Camera access failed."); 
-            } else {
-                console.error("Scanner error:", err);
+        const callbacks = (result) => {
+            if (videoRef.current?.srcObject && !streamRef.current) {
+                streamRef.current = videoRef.current.srcObject;
+                setTimeout(triggerFocus, 1000);
             }
-        });
+            if (result) handleScanResult(result.getText());
+        };
+
+        const cameraConstraintsFallback = [
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+            { video: { facingMode: 'environment' }, audio: false },
+            { video: { facingMode: { ideal: 'user' } }, audio: false },
+            { video: true, audio: false }
+        ];
+
+        const startScanner = async () => {
+            let lastErr = null;
+            for (let i = 0; i < cameraConstraintsFallback.length; i += 1) {
+                try {
+                    if (typeof codeReaderRef.current.decodeFromConstraints === 'function') {
+                        await codeReaderRef.current.decodeFromConstraints(
+                            cameraConstraintsFallback[i],
+                            videoRef.current,
+                            callbacks,
+                            hints
+                        );
+                    } else {
+                        // Legacy fallback for older ZXing builds
+                        await codeReaderRef.current.decodeFromVideoDevice(
+                            null,
+                            videoRef.current,
+                            callbacks,
+                            hints
+                        );
+                    }
+                    setIsScannerInitialized(true);
+                    setLookupStatus('scanning');
+                    setLookupError(null);
+                    return;
+                } catch (err) {
+                    lastErr = err;
+                    const maybeMsg = getCameraStartErrorMessage(err);
+                    console.warn(`[Scanner] Attempt ${i + 1} failed:`, err?.name || err?.message || err);
+                    if (maybeMsg.toLowerCase().includes('fallback')) {
+                        setLookupError(maybeMsg);
+                    }
+                }
+            }
+            const finalMessage = getCameraStartErrorMessage(lastErr);
+            setLookupStatus('notFound');
+            setLookupError(finalMessage);
+            if (onScanError && typeof onScanError === 'function') {
+                onScanError(finalMessage);
+            } else {
+                console.error('Scanner error:', lastErr);
+            }
+        };
+
+        startScanner();
         return () => resetScannerState();
-    }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus]); 
+    }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus, lookupStatus, getCameraStartErrorMessage, scannerRetryKey]); 
 
     if (!isOpen) return null;
 
@@ -235,6 +292,18 @@ const ScannerModal = ({
                         {lookupStatus === 'notFound' && lookupError}
                         {(lookupStatus === 'idle' || lookupStatus === 'initializing') && 'Position barcode in frame'}
                     </p>
+                    {lookupStatus === 'notFound' && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                resetScannerState();
+                                setScannerRetryKey(prev => prev + 1);
+                            }}
+                            className={`w-full py-2.5 sm:py-3 rounded-xl text-sm font-black transition-all active:scale-[0.98] ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 border border-indigo-500/40' : 'bg-indigo-600 text-white hover:bg-indigo-500 border border-indigo-500/40'}`}
+                        >
+                            Retry Camera
+                        </button>
+                    )}
                     <button 
                         onClick={onClose}
                         className={`w-full py-2.5 sm:py-3 rounded-xl text-sm font-black transition-all active:scale-[0.98] ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'}`}
