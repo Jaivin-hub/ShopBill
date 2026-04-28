@@ -27,10 +27,16 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
     const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState('');
     const [formErrors, setFormErrors] = useState({});
 
+    const formatAmountInput = (value) => {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '0.00';
+        return num.toFixed(2);
+    };
+
     // Only set defaults when modal opens. Do NOT re-run when user selects a customer—otherwise partial pay (Cash/UPI/Card + 200) would get overwritten to Credit + full amount.
     useEffect(() => {
         if (isOpen) {
-            setAmountPaidInput(totalAmount.toString());
+            setAmountPaidInput(formatAmountInput(totalAmount));
             setPaymentType('UPI');
             setSearchTerm(''); 
             setCreditError(null); 
@@ -394,9 +400,17 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <div className="relative group">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xs text-slate-400 group-focus-within:text-indigo-500 transition-colors">₹</span>
                                 <input 
-                                    type="number" 
+                                    type="text"
+                                    inputMode="decimal"
                                     value={amountPaidInput} 
-                                    onChange={e => {setAmountPaidInput(e.target.value); setCreditError(null);}}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                                            setAmountPaidInput(val);
+                                            setCreditError(null);
+                                        }
+                                    }}
+                                    onBlur={() => setAmountPaidInput(formatAmountInput(amountPaidInput))}
                                     className={`w-full border rounded-xl py-3.5 pl-8 pr-4 text-sm font-black outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${theme.input}`}
                                     style={{ fontSize: '16px' }}
                                 />

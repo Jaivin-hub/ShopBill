@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
-  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download
+  Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download, Settings2, Trash2
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
@@ -15,6 +15,15 @@ const DATE_FILTERS = [
   { id: 'all', label: ['All', 'Time'], days: Infinity },
   { id: 'custom', label: ['Custom', 'Range'], days: 0 },
 ];
+
+const EMPTY_PRODUCT_FORM = {
+  name: '',
+  price: '',
+  quantity: 0,
+  reorderLevel: 5,
+  hsn: '',
+  variants: []
+};
 
 const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [activeTab, setActiveTab] = useState('purchase');
@@ -35,6 +44,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [historyProductFilter, setHistoryProductFilter] = useState('all');
+  const [historySupplierFilter, setHistorySupplierFilter] = useState('all');
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isSupplierPickerOpen, setIsSupplierPickerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,7 +60,9 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   });
 
   const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '', gstin: '' });
-  const [productForm, setProductForm] = useState({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
+  const [productForm, setProductForm] = useState(EMPTY_PRODUCT_FORM);
+  const [hasProductVariants, setHasProductVariants] = useState(false);
+  const [editingProductVariantIndex, setEditingProductVariantIndex] = useState(null);
   const [supplierErrors, setSupplierErrors] = useState({});
   const [productErrors, setProductErrors] = useState({});
 
@@ -109,7 +122,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     return result;
   }, [inventory, inventorySort, inventorySearch]);
 
-  const filteredHistory = useMemo(() => {
+  const dateScopedHistory = useMemo(() => {
     return purchaseHistory.filter(item => {
       const itemDate = new Date(item.date);
       const now = new Date();
@@ -126,6 +139,44 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       return diffInDays <= filter.days;
     });
   }, [purchaseHistory, selectedFilter, customStartDate, customEndDate]);
+
+  const historyProductOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    dateScopedHistory.forEach((item) => {
+      const productId = item.productId?._id || item.productId || item.itemId || item.productName;
+      const productName = item.productId?.name || item.productName || 'Unknown Product';
+      const key = String(productId || '').trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      options.push({ id: key, name: productName });
+    });
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [dateScopedHistory]);
+
+  const historySupplierOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    dateScopedHistory.forEach((item) => {
+      const supplierId = item.supplierId?._id || item.supplierId || item.supplierName;
+      const supplierName = item.supplierId?.name || item.supplierName || 'Unknown Supplier';
+      const key = String(supplierId || '').trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      options.push({ id: key, name: supplierName });
+    });
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [dateScopedHistory]);
+
+  const filteredHistory = useMemo(() => {
+    return dateScopedHistory.filter((item) => {
+      const productId = String(item.productId?._id || item.productId || item.itemId || item.productName || '');
+      const supplierId = String(item.supplierId?._id || item.supplierId || item.supplierName || '');
+      const productMatch = historyProductFilter === 'all' || productId === historyProductFilter;
+      const supplierMatch = historySupplierFilter === 'all' || supplierId === historySupplierFilter;
+      return productMatch && supplierMatch;
+    });
+  }, [dateScopedHistory, historyProductFilter, historySupplierFilter]);
 
   const historyTotals = useMemo(() => {
     return filteredHistory.reduce((acc, curr) => {
@@ -242,18 +293,64 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await apiClient.post(API.inventory, productForm);
+      const payload = { ...productForm };
+      if (hasProductVariants && Array.isArray(payload.variants) && payload.variants.length > 0) {
+        payload.variants = payload.variants.map((v) => ({
+          label: String(v.label || '').trim(),
+          price: Number(v.price || 0),
+          quantity: Number(v.quantity || 0),
+          reorderLevel: v.reorderLevel === '' || v.reorderLevel == null ? null : Number(v.reorderLevel),
+          hsn: String(v.hsn || '').trim()
+        })).filter((v) => v.label && Number.isFinite(v.price));
+        payload.price = null;
+        payload.quantity = null;
+      } else {
+        payload.price = Number(payload.price || 0);
+        payload.quantity = Number(payload.quantity || 0);
+        payload.variants = [];
+      }
+      const res = await apiClient.post(API.inventory, payload);
       showToast("Product saved", "success");
       const createdId = res?.data?._id || res?.data?.id || res?.data?.item?._id || res?.data?.item?.id;
       if (createdId) {
         setPurchaseForm(prev => ({ ...prev, productId: String(createdId) }));
       }
-      setProductForm({ name: '', price: '', quantity: 0, reorderLevel: 5, hsn: '' });
+      setProductForm(EMPTY_PRODUCT_FORM);
+      setHasProductVariants(false);
+      setEditingProductVariantIndex(null);
       setIsProductModalOpen(false);
       setIsProductPickerOpen(false);
       setSearchTerm('');
       fetchSCMData();
     } catch (error) { showToast("Error adding product", "error"); } finally { setIsLoading(false); }
+  };
+
+  const addQuickVariant = () => {
+    const newVariant = {
+      _id: `scm-var-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      label: '',
+      price: '',
+      quantity: 0,
+      reorderLevel: productForm.reorderLevel || 5,
+      hsn: productForm.hsn || ''
+    };
+    const currentCount = (productForm.variants || []).length;
+    setProductForm((prev) => ({ ...prev, variants: [...(prev.variants || []), newVariant] }));
+    setEditingProductVariantIndex(currentCount);
+  };
+
+  const updateQuickVariant = (index, field, value) => {
+    setProductForm((prev) => {
+      const variants = [...(prev.variants || [])];
+      variants[index] = { ...variants[index], [field]: value };
+      return { ...prev, variants };
+    });
+  };
+
+  const removeQuickVariant = (index) => {
+    setProductForm((prev) => ({ ...prev, variants: (prev.variants || []).filter((_, i) => i !== index) }));
+    if (editingProductVariantIndex === index) setEditingProductVariantIndex(null);
+    else if (editingProductVariantIndex !== null && index < editingProductVariantIndex) setEditingProductVariantIndex(editingProductVariantIndex - 1);
   };
 
   const handleScanSuccess = (scannedItem) => {
@@ -326,18 +423,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownloadReport}
-              className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
-              title="Download Supply Chain Report"
-            >
-              <span className="flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                <span className="hidden md:inline text-[10px] font-black tracking-[0.18em]">
-                  DOWNLOAD REPORT
+            {activeTab === 'history' && (
+              <button
+                onClick={handleDownloadReport}
+                className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                title="Download Supply Chain Report"
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden md:inline text-[10px] font-black tracking-[0.18em]">
+                    DOWNLOAD REPORT
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            )}
             <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
             {[
               { id: 'purchase', label: 'ADD STOCK', icon: PackageCheck },
@@ -489,9 +588,9 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           <div className="flex flex-col animate-in fade-in duration-500 space-y-6">
             {/* Filters first so KPIs below reflect selected range */}
             <section className={`${cardBase} rounded-2xl border p-4 md:p-6`}>
-              <div className="flex flex-col md:flex-row md:justify-end md:items-center gap-3">
-                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              <div className="space-y-3">
+                <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 xl:flex-1">
                     {DATE_FILTERS.map(f => (
                       <button
                         key={f.id}
@@ -509,8 +608,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     ))}
                   </div>
                   {selectedFilter === 'custom' && (
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                      <div className="relative flex-1 md:w-40">
+                    <div className="flex items-center gap-2 w-full xl:w-auto">
+                      <div className="relative flex-1 xl:w-40">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
                         <input
                           type="date"
@@ -520,7 +619,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                           style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                         />
                       </div>
-                      <div className="relative flex-1 md:w-40">
+                      <div className="relative flex-1 xl:w-40">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
                         <input
                           type="date"
@@ -532,6 +631,32 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       </div>
                     </div>
                   )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 md:ml-auto md:max-w-[430px]">
+                  <select
+                    value={historyProductFilter}
+                    onChange={(e) => setHistoryProductFilter(e.target.value)}
+                    className={`w-full ${inputBase} ${dateTextColor} text-[13px] md:text-xs font-black p-2.5 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
+                  >
+                    <option value="all">All Products</option>
+                    {historyProductOptions.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={historySupplierFilter}
+                    onChange={(e) => setHistorySupplierFilter(e.target.value)}
+                    className={`w-full ${inputBase} ${dateTextColor} text-[13px] md:text-xs font-black p-2.5 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
+                  >
+                    <option value="all">All Suppliers</option>
+                    {historySupplierOptions.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </section>
@@ -571,7 +696,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </section>
 
             {/* Purchase History Table - Matching Dashboard Style */}
-            <section className={`${cardBase} rounded-2xl border overflow-hidden`}>
+            <section className={`${cardBase} rounded-2xl border overflow-hidden flex flex-col max-h-[72vh]`}>
               {/* Header */}
               <div className={`p-4 md:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex flex-col md:flex-row justify-between items-start md:items-center gap-4`}>
                 <div>
@@ -585,7 +710,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </div>
 
               {/* Mobile View */}
-              <div className="md:hidden p-4 space-y-3 overflow-y-auto max-h-[60vh] custom-scrollbar">
+              <div className="md:hidden p-4 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                 {filteredHistory.length === 0 ? (
                   <div className="text-center py-12">
                     <Package className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
@@ -632,7 +757,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </div>
 
               {/* Desktop Table View */}
-              <div className="hidden md:block overflow-auto custom-scrollbar">
+              <div className="hidden md:block overflow-auto custom-scrollbar flex-1 min-h-0">
                 {filteredHistory.length === 0 ? (
                   <div className="text-center py-16">
                     <Package className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
@@ -780,8 +905,16 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       {/* --- MODALS --- */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
-          <form onSubmit={handleQuickAddProduct} className={`relative w-full max-w-lg ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden`}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => {
+            setIsProductModalOpen(false);
+            setProductForm(EMPTY_PRODUCT_FORM);
+            setHasProductVariants(false);
+            setEditingProductVariantIndex(null);
+          }} />
+          <form
+            onSubmit={handleQuickAddProduct}
+            className={`relative w-full max-w-lg ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] md:max-h-[88vh] flex flex-col`}
+          >
             {/* Header */}
             <div className={`p-5 border-b ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
               <div className="flex items-center gap-3">
@@ -799,7 +932,12 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsProductModalOpen(false)}
+                onClick={() => {
+                  setIsProductModalOpen(false);
+                  setProductForm(EMPTY_PRODUCT_FORM);
+                  setHasProductVariants(false);
+                  setEditingProductVariantIndex(null);
+                }}
                 className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -807,7 +945,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             </div>
 
             {/* Form Fields */}
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto min-h-0 flex-1 custom-scrollbar">
               {/* Product Name */}
               <div className="space-y-2">
                 <label className={`text-xs font-bold tracking-wide flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -836,7 +974,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       type="number"
                       step="0.01"
                       min="0"
-                      required
+                      required={!hasProductVariants}
                       placeholder="0.00"
                       value={productForm.price}
                       onChange={e => setProductForm({ ...productForm, price: e.target.value })}
@@ -857,6 +995,108 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     className={`w-full ${inputBase} p-3 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400`}
                   />
                 </div>
+              </div>
+
+              {/* Variants toggle + list */}
+              <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className={`w-4 h-4 ${hasProductVariants ? 'text-indigo-500' : 'text-slate-500'}`} />
+                    <p className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Enable Variants</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (hasProductVariants) {
+                        setHasProductVariants(false);
+                        setProductForm((prev) => ({ ...prev, variants: [] }));
+                        setEditingProductVariantIndex(null);
+                      } else {
+                        setHasProductVariants(true);
+                        addQuickVariant();
+                      }
+                    }}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${hasProductVariants ? 'bg-indigo-600' : 'bg-slate-400'}`}
+                  >
+                    <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${hasProductVariants ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+
+                {hasProductVariants && (
+                  <div className="mt-4 space-y-3">
+                    <button
+                      type="button"
+                      onClick={addQuickVariant}
+                      className="px-3 py-2 bg-indigo-600 text-white text-[10px] font-black rounded-lg hover:bg-indigo-500 transition-all flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Add Variant
+                    </button>
+                    {(productForm.variants || []).map((variant, index) => (
+                      <div key={variant._id || `scm-v-${index}`} className={`p-3 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingProductVariantIndex((prev) => (prev === index ? null : index))}
+                            className={`flex items-center gap-2 text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}
+                          >
+                            <span>{(variant.label || '').trim() || `Variant ${index + 1}`}</span>
+                            <span className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                              (₹{Number(variant.price || 0).toFixed(2)} · Qty {variant.quantity || 0})
+                            </span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${editingProductVariantIndex === index ? 'rotate-180' : ''}`} />
+                          </button>
+                          <button type="button" onClick={() => removeQuickVariant(index)} className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {editingProductVariantIndex === index && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              placeholder="Variant label"
+                              value={variant.label}
+                              onChange={(e) => updateQuickVariant(index, 'label', e.target.value)}
+                              className={`w-full ${inputBase} p-2.5 rounded-lg text-xs border focus:outline-none focus:border-indigo-500`}
+                            />
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="Price"
+                              value={variant.price ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) updateQuickVariant(index, 'price', val);
+                              }}
+                              className={`w-full ${inputBase} p-2.5 rounded-lg text-xs border focus:outline-none focus:border-indigo-500`}
+                            />
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Quantity"
+                              value={variant.quantity === 0 ? '' : variant.quantity}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d+$/.test(val)) updateQuickVariant(index, 'quantity', val === '' ? 0 : Number(val));
+                              }}
+                              className={`w-full ${inputBase} p-2.5 rounded-lg text-xs border focus:outline-none focus:border-indigo-500`}
+                            />
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Reorder level"
+                              value={variant.reorderLevel ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d+$/.test(val)) updateQuickVariant(index, 'reorderLevel', val === '' ? null : Number(val));
+                              }}
+                              className={`w-full ${inputBase} p-2.5 rounded-lg text-xs border focus:outline-none focus:border-indigo-500`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* HSN / Barcode */}
@@ -888,7 +1128,12 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <div className={`p-5 border-t ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
               <button
                 type="button"
-                onClick={() => setIsProductModalOpen(false)}
+                onClick={() => {
+                  setIsProductModalOpen(false);
+                  setProductForm(EMPTY_PRODUCT_FORM);
+                  setHasProductVariants(false);
+                  setEditingProductVariantIndex(null);
+                }}
                 className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
                   darkMode
                     ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -899,7 +1144,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !String(productForm.name || '').trim() || (!hasProductVariants && !String(productForm.price || '').trim()) || (hasProductVariants && !(productForm.variants || []).some(v => String(v.label || '').trim() && String(v.price || '').trim()))}
                 className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoading ? (

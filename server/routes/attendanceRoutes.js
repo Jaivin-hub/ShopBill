@@ -3,8 +3,16 @@ const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
+const { emitAlert } = require('./notificationRoutes');
 
 const router = express.Router();
+
+const getActorNameWithRole = (staffRecord, reqUser) => {
+    const role = staffRecord?.role || reqUser?.role || 'Staff';
+    const displayRole = role === 'owner' ? 'Owner' : role;
+    const name = staffRecord?.name || reqUser?.name || reqUser?.email || 'Staff';
+    return `${name} (${displayRole})`;
+};
 
 /**
  * @route POST /api/attendance/punch-in
@@ -263,6 +271,18 @@ router.post('/punch-in', protect, async (req, res) => {
         const mins = minutesWorked % 60;
 
         // Return response in the same format as /current endpoint for consistency
+        try {
+            const actorNameWithRole = getActorNameWithRole(staff, req.user);
+            await emitAlert(req, req.user.storeId, 'attendance_punch_in', {
+                staffId: staff._id,
+                staffName: staff.name || req.user.name || req.user.email || 'Staff',
+                attendanceId: attendance._id,
+                message: `${actorNameWithRole} punched in.`
+            });
+        } catch (notifErr) {
+            console.error('Attendance punch-in notification error:', notifErr);
+        }
+
         res.status(201).json({
             success: true,
             message: 'Punched in successfully',
@@ -428,6 +448,19 @@ router.post('/punch-out', protect, async (req, res) => {
         const hours = Math.floor(attendance.workingHours / 60);
         const minutes = attendance.workingHours % 60;
 
+        try {
+            const actorNameWithRole = getActorNameWithRole(staff, req.user);
+            await emitAlert(req, req.user.storeId, 'attendance_punch_out', {
+                staffId: staff._id,
+                staffName: staff.name || req.user.name || req.user.email || 'Staff',
+                attendanceId: attendance._id,
+                workingMinutes: attendance.workingHours,
+                message: `${actorNameWithRole} punched out after ${hours}h ${minutes}m.`
+            });
+        } catch (notifErr) {
+            console.error('Attendance punch-out notification error:', notifErr);
+        }
+
         res.json({
             success: true,
             message: 'Punched out successfully',
@@ -515,6 +548,18 @@ router.post('/break-start', protect, async (req, res) => {
         attendance.onBreak = true;
 
         await attendance.save();
+
+        try {
+            const actorNameWithRole = getActorNameWithRole(staff, req.user);
+            await emitAlert(req, req.user.storeId, 'attendance_break_start', {
+                staffId: staff._id,
+                staffName: staff.name || req.user.name || req.user.email || 'Staff',
+                attendanceId: attendance._id,
+                message: `${actorNameWithRole} started a break.`
+            });
+        } catch (notifErr) {
+            console.error('Attendance break-start notification error:', notifErr);
+        }
 
         res.json({
             success: true,
@@ -612,6 +657,19 @@ router.post('/break-end', protect, async (req, res) => {
         attendance.onBreak = false;
 
         await attendance.save();
+
+        try {
+            const actorNameWithRole = getActorNameWithRole(staff, req.user);
+            await emitAlert(req, req.user.storeId, 'attendance_break_end', {
+                staffId: staff._id,
+                staffName: staff.name || req.user.name || req.user.email || 'Staff',
+                attendanceId: attendance._id,
+                breakMinutes: activeBreak.breakDuration || 0,
+                message: `${actorNameWithRole} ended break (${activeBreak.breakDuration || 0} min).`
+            });
+        } catch (notifErr) {
+            console.error('Attendance break-end notification error:', notifErr);
+        }
 
         // Calculate current working hours (excluding breaks)
         const totalDiff = new Date() - attendance.punchIn;

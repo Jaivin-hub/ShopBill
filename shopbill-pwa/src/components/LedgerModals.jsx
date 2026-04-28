@@ -463,7 +463,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                                 </div>
                                             </div>
                                             <div className={`font-black text-sm sm:text-base shrink-0 whitespace-nowrap ml-2 ${isCredit ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                {isCredit ? '+' : '-'} ₹{t.amount?.toLocaleString('en-IN')}
+                                                {isCredit ? '+' : '-'} ₹{Number(t.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </div>
                                         </div>
                                     )

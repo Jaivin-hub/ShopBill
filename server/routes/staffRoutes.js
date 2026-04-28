@@ -16,6 +16,7 @@ const ROLE_PAGE_PERMISSION_KEYS = [
     'dashboard',
     'billing',
     'khata',
+    'salesActivity',
     'inventory',
     'scm',
     'reports',
@@ -31,6 +32,7 @@ const DEFAULT_ROLE_PAGE_PERMISSIONS = {
         dashboard: true,
         billing: true,
         khata: true,
+        salesActivity: true,
         inventory: true,
         scm: true,
         reports: false,
@@ -44,6 +46,7 @@ const DEFAULT_ROLE_PAGE_PERMISSIONS = {
         dashboard: true,
         billing: true,
         khata: true,
+        salesActivity: true,
         inventory: false,
         scm: false,
         reports: false,
@@ -516,7 +519,7 @@ router.post('/', protect, async (req, res) => {
 // @route   PUT /api/staff/:id/active
 // @desc    Set staff active flag explicitly (idempotent; avoids double-toggle bugs)
 // @body    { "active": true | false }
-// @access  Private (owner-only)
+// @access  Private (owner/manager)
 // ====================================================================
 router.put('/:id/active', protect, async (req, res) => {
     console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id/active', new Date().toISOString(), {
@@ -525,9 +528,9 @@ router.put('/:id/active', protect, async (req, res) => {
         userId: req.user?.id?.toString?.(),
         storeId: req.user?.storeId?.toString?.() || null,
     });
-    if (!isowner(req.user.role)) {
-        console.log('[staffRoutes] PUT /:id/active → 403 not owner');
-        return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] PUT /:id/active → 403 not owner/manager');
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff status.' });
     }
 
     const { active: targetActive } = req.body;
@@ -576,7 +579,7 @@ router.put('/:id/active', protect, async (req, res) => {
 // ====================================================================
 // @route   PUT /api/staff/:id/toggle
 // @desc    Toggle active (legacy). Prefer PUT /:id/active with explicit boolean.
-// @access  Private (owner-only access)
+// @access  Private (owner/manager access)
 // ====================================================================
 router.put('/:id/toggle', protect, async (req, res) => {
     console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id/toggle', new Date().toISOString(), {
@@ -584,9 +587,9 @@ router.put('/:id/toggle', protect, async (req, res) => {
         userId: req.user?.id?.toString?.(),
         storeId: req.user?.storeId?.toString?.() || null,
     });
-    if (!isowner(req.user.role)) {
-        console.log('[staffRoutes] PUT /:id/toggle → 403 not owner');
-        return res.status(403).json({ error: 'Access denied. Only the owner can update staff status.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] PUT /:id/toggle → 403 not owner/manager');
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff status.' });
     }
 
     const staffId = req.params.id;
@@ -646,7 +649,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
 // ====================================================================
 // @route   DELETE /api/staff/:id
 // @desc    Remove a staff member (Requires cleanup in User model)
-// @access  Private (owner-only access)
+// @access  Private (owner/manager access)
 // ====================================================================
 router.delete('/:id', protect, async (req, res) => {
     console.log('[staffRoutes] ROUTE HIT DELETE /api/staff/:id', new Date().toISOString(), {
@@ -655,9 +658,9 @@ router.delete('/:id', protect, async (req, res) => {
         storeId: req.user?.storeId?.toString?.() || null,
     });
     // FIX: Use the corrected helper function 'isowner'
-    if (!isowner(req.user.role)) {
-        console.log('[staffRoutes] DELETE /:id → 403 not owner');
-        return res.status(403).json({ error: 'Access denied. Only the owner can remove staff.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] DELETE /:id → 403 not owner/manager');
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can remove staff.' });
     }
     
     const staffId = req.params.id;
@@ -717,9 +720,9 @@ router.put('/:id/role', protect, async (req, res) => {
         body: req.body,
         userId: req.user?.id?.toString?.(),
     });
-    if (!isowner(req.user.role)) {
-        console.log('[staffRoutes] PUT /:id/role → 403 not owner');
-        return res.status(403).json({ error: 'Access denied. Only the owner can change roles.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        console.log('[staffRoutes] PUT /:id/role → 403 not owner/manager');
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can change roles.' });
     }
 
     const { role: newRole } = req.body;
@@ -845,11 +848,11 @@ router.put('/role-permissions', protect, async (req, res) => {
 // ====================================================================
 // @route   PUT /api/staff/:id/permissions
 // @desc    Update owner-controlled staff permissions
-// @access  Private (owner-only)
+// @access  Private (owner/manager)
 // ====================================================================
 router.put('/:id/permissions', protect, async (req, res) => {
-    if (!isowner(req.user.role)) {
-        return res.status(403).json({ error: 'Access denied. Only the owner can update staff permissions.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff permissions.' });
     }
 
     const staffId = req.params.id;

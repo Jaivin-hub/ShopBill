@@ -322,6 +322,9 @@ router.put('/:id', protect, async (req, res) => {
             let stockChanged = false;
             let oldQty = 0;
             let newQty = 0;
+            const oldPrice = Number(oldItem.price || 0);
+            const newPrice = Number(updatedItem.price || 0);
+            const priceChanged = Number.isFinite(oldPrice) && Number.isFinite(newPrice) && oldPrice !== newPrice;
 
             // Check regular quantity (for items without variants)
             if (!oldItem.variants || oldItem.variants.length === 0) {
@@ -367,6 +370,22 @@ router.put('/:id', protect, async (req, res) => {
                     });
                 } catch (err) {
                     console.error("❌ Error sending inventory stock updated notification:", err);
+                }
+            }
+
+            // Separate notification for price changes so owner + managers can be notified reliably.
+            if (priceChanged) {
+                try {
+                    const actorNameWithRole = await getActorNameWithRole(req);
+                    await emitAlert(req, req.user.storeId, 'inventory_price_updated', {
+                        _id: updatedItem._id,
+                        name: updatedItem.name,
+                        oldPrice,
+                        newPrice,
+                        message: `${updatedItem.name} price updated by ${actorNameWithRole} (₹${oldPrice.toFixed(2)} → ₹${newPrice.toFixed(2)})`
+                    });
+                } catch (err) {
+                    console.error("❌ Error sending inventory price updated notification:", err);
                 }
             }
             

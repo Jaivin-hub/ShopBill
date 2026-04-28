@@ -105,6 +105,13 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     // --- Modal & Form Handlers ---
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
+        if (name === 'price') {
+            // Keep price as typed string so values like 9.00 remain visible while editing.
+            if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                setFormData(prev => ({ ...prev, [name]: value }));
+            }
+            return;
+        }
         setFormData(prev => ({
             ...prev,
             [name]: type === 'number' && name !== 'hsn' ? (value === '' ? '' : parseFloat(value)) : value

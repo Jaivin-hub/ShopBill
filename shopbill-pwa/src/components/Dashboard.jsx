@@ -419,7 +419,10 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
                     {/* KPI CARDS */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                        <button
+                            onClick={() => setCurrentPage('salesActivity')}
+                            className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] text-left w-full ${cardBase}`}
+                        >
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
@@ -431,8 +434,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                 </div>
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><TrendingUp size={20} /></div>
                             </div>
-                        </div>
-                        <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage('khata')}
+                            className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] text-left w-full ${cardBase}`}
+                        >
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
@@ -444,8 +450,11 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                 </div>
                                 <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CreditCard size={20} /></div>
                             </div>
-                        </div>
-                        <div className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage('khata')}
+                            className={`p-5 rounded-2xl border transition-all hover:scale-[1.01] text-left w-full ${cardBase}`}
+                        >
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1 ">Outstanding Ledger</p>
@@ -453,7 +462,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                                 </div>
                                 <div className="p-3 bg-rose-500/10 rounded-xl text-rose-500"><Users size={20} /></div>
                             </div>
-                        </div>
+                        </button>
                     </section>
 
                     {/* ACTION BUTTONS */}

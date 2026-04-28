@@ -317,6 +317,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     dashboard: true,
     billing: true,
     khata: true,
+    salesActivity: true,
     inventory: true,
     scm: true,
     reports: false,
@@ -330,6 +331,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     dashboard: true,
     billing: true,
     khata: true,
+    salesActivity: true,
     inventory: false,
     scm: false,
     reports: false,
@@ -404,6 +406,10 @@ const App = () => {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [hasModalOpen, setHasModalOpen] = useState(false);
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
+  const [showStaffPunchPrompt, setShowStaffPunchPrompt] = useState(false);
+  const [hasStaffPunchedIn, setHasStaffPunchedIn] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
+  const [isPromptPunchingIn, setIsPromptPunchingIn] = useState(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
@@ -423,6 +429,7 @@ const App = () => {
   }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
+  const isStaffUser = userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
   const planUpper = currentUser?.plan?.toUpperCase();
   const isPremium = planUpper === 'PREMIUM';
   const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
@@ -452,14 +459,81 @@ const App = () => {
     return count;
   }, [notifications]);
 
+  const ATTENDANCE_REQUIRED_PAGES = useMemo(() => new Set([
+    'billing',
+    'inventory',
+    'khata',
+    'salesActivity',
+    'reports',
+    'scm',
+  ]), []);
+
+  const shouldRequireAttendancePrompt = useCallback((page) => {
+    return isStaffUser && !hasStaffPunchedIn && ATTENDANCE_REQUIRED_PAGES.has(page);
+  }, [isStaffUser, hasStaffPunchedIn, ATTENDANCE_REQUIRED_PAGES]);
+
   // Navigate and push current page to back stack (so swipe-back can return). Use opts.replace to clear stack (e.g. logout, back-to-origin).
   const navigateTo = useCallback((page, opts) => {
+    if (!opts?.bypassPunchPrompt && shouldRequireAttendancePrompt(page)) {
+      setPendingNavigation({ page, opts: opts || null });
+      setShowStaffPunchPrompt(true);
+      return;
+    }
     if (opts?.replace) backStackRef.current = [];
     if (page !== currentPage) {
       if (!opts?.replace) backStackRef.current = [...backStackRef.current, currentPage];
       setCurrentPage(page);
     }
-  }, [currentPage]);
+  }, [currentPage, shouldRequireAttendancePrompt]);
+
+  const proceedAfterPrompt = useCallback((navData) => {
+    if (!navData?.page) return;
+    navigateTo(navData.page, { ...(navData.opts || {}), bypassPunchPrompt: true });
+  }, [navigateTo]);
+
+  const handleStaffPromptSkip = useCallback(() => {
+    setShowStaffPunchPrompt(false);
+    const navData = pendingNavigation;
+    setPendingNavigation(null);
+    if (navData?.page) {
+      proceedAfterPrompt(navData);
+    }
+  }, [pendingNavigation, proceedAfterPrompt]);
+
+  const handleStaffPromptPunchIn = useCallback(async () => {
+    if (!apiClient || !API?.attendancePunchIn || isPromptPunchingIn) return;
+    try {
+      setIsPromptPunchingIn(true);
+      const now = new Date();
+      const localDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const timezoneOffset = now.getTimezoneOffset();
+      await apiClient.post(API.attendancePunchIn, {
+        localDate: localDateString,
+        timezoneOffset,
+        clientTime: now.toISOString(),
+      });
+      showToast('Punched in successfully!', 'success');
+      setHasStaffPunchedIn(true);
+      setShowStaffPunchPrompt(false);
+      const navData = pendingNavigation;
+      setPendingNavigation(null);
+      if (navData?.page) {
+        proceedAfterPrompt(navData);
+      }
+    } catch (error) {
+      const message = error.response?.data?.error || error.message || 'Unable to punch in now';
+      showToast(message, 'error');
+    } finally {
+      setIsPromptPunchingIn(false);
+    }
+  }, [apiClient, API, isPromptPunchingIn, pendingNavigation, proceedAfterPrompt, showToast]);
+
+  useEffect(() => {
+    setHasStaffPunchedIn(false);
+    setShowStaffPunchPrompt(false);
+    setPendingNavigation(null);
+    setIsPromptPunchingIn(false);
+  }, [currentUser?._id]);
 
   const handleViewAllSales = useCallback(() => navigateTo('salesActivity'), [navigateTo]);
   const handleViewAllCredit = useCallback(() => navigateTo('khata'), [navigateTo]);
@@ -1007,6 +1081,7 @@ useEffect(() => {
     const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 1, manager: 1, cashier: 1 } },
+      { id: 'salesActivity', name: 'Sales History', icon: FileText, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: null } },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
       { id: 'inventory', name: 'Stock', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
@@ -1032,8 +1107,8 @@ useEffect(() => {
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
       [USER_ROLES.MANAGER]: isBasicManager
-        ? ['dashboard', 'inventory', 'khata', 'billing'] // Basic: only these four in footer
-        : ['dashboard', 'inventory', 'scm', 'khata', 'chat'], // Premium/Pro: Dashboard, Inventory, Supply Chain, Ledger, Messages
+        ? ['dashboard', 'salesActivity', 'inventory', 'khata', 'billing'] // Basic: include sales history access
+        : ['dashboard', 'salesActivity', 'inventory', 'scm', 'khata', 'chat'], // Premium/Pro: include sales history access
       [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
 
@@ -1265,7 +1340,7 @@ useEffect(() => {
             case 'khata': return <Ledger key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
             case 'inventory': return <InventoryManager key={componentKey} {...commonProps} initialSortOption={showLowStockFilter ? 'low-stock' : null} onSortOptionSet={() => setShowLowStockFilter(false)} />;
             case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
-            case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} />;
+            case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} onOpenSalesHistory={handleViewAllSales} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
             case 'settings': return <SettingsPage key={componentKey} {...commonProps} setDarkMode={setDarkMode} />;
             case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} />;
@@ -1311,6 +1386,34 @@ useEffect(() => {
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div className={`h-screen w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
+        {showAppUI && showStaffPunchPrompt && isStaffUser && (
+          <div className="fixed inset-0 z-[220] bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-4">
+            <div className={`w-full max-w-md rounded-2xl border p-5 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-200 shadow-2xl'}`}>
+              <h3 className="text-base font-black tracking-tight">Punch in before continuing?</h3>
+              <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
+                You can punch in now, or skip and continue.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleStaffPromptSkip}
+                  className={`py-2.5 rounded-xl text-xs font-black tracking-wider border transition-all ${
+                    darkMode ? 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleStaffPromptPunchIn}
+                  disabled={isPromptPunchingIn}
+                  className="py-2.5 rounded-xl text-xs font-black tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isPromptPunchingIn ? <Loader className="w-4 h-4 animate-spin" /> : null}
+                  {isPromptPunchingIn ? 'Punching...' : 'Punch In'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {showAppUI && !isChatSelected && (
             <Header
                 companyName="Pocket POS"

@@ -38,6 +38,7 @@ const PAGE_ACCESS_LABELS = {
     dashboard: 'Dashboard',
     billing: 'Billing',
     khata: 'Ledger',
+    salesActivity: 'Sales History',
     inventory: 'Stock',
     scm: 'Supply Chain',
     reports: 'Reports',

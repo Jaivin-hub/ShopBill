@@ -56,6 +56,16 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || `${data.name || 'Item'} updated in inventory.`;
             metadata = data._id ? { itemId: data._id } : {};
             break;
+        case 'inventory_price_updated':
+            title = 'Price Updated';
+            category = 'Info';
+            message = data.message || `${data.name || 'Item'} price was updated.`;
+            metadata = {
+                ...(data._id ? { itemId: data._id } : {}),
+                oldPrice: data.oldPrice ?? null,
+                newPrice: data.newPrice ?? null
+            };
+            break;
         case 'inventory_deleted':
             title = 'Inventory Deleted';
             category = 'Info';
@@ -129,6 +139,44 @@ const emitAlert = async (req, storeId, type, data) => {
             message = data.message || `Credit limit for ${data.customerName || 'customer'} updated to ₹${(data.newLimit ?? 0).toLocaleString('en-IN')} by ${data.actorName || 'user'}.`;
             metadata = data.customerId ? { customerId: data.customerId } : {};
             break;
+        case 'attendance_punch_in':
+            title = 'Attendance Update';
+            category = 'Info';
+            message = data.message || `${data.staffName || 'Staff'} punched in.`;
+            metadata = {
+                attendanceId: data.attendanceId || null,
+                staffId: data.staffId || null
+            };
+            break;
+        case 'attendance_break_start':
+            title = 'Attendance Update';
+            category = 'Info';
+            message = data.message || `${data.staffName || 'Staff'} started a break.`;
+            metadata = {
+                attendanceId: data.attendanceId || null,
+                staffId: data.staffId || null
+            };
+            break;
+        case 'attendance_break_end':
+            title = 'Attendance Update';
+            category = 'Info';
+            message = data.message || `${data.staffName || 'Staff'} ended break.`;
+            metadata = {
+                attendanceId: data.attendanceId || null,
+                staffId: data.staffId || null,
+                breakMinutes: data.breakMinutes ?? null
+            };
+            break;
+        case 'attendance_punch_out':
+            title = 'Attendance Update';
+            category = 'Info';
+            message = data.message || `${data.staffName || 'Staff'} punched out.`;
+            metadata = {
+                attendanceId: data.attendanceId || null,
+                staffId: data.staffId || null,
+                workingMinutes: data.workingMinutes ?? null
+            };
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -173,14 +221,20 @@ const emitAlert = async (req, storeId, type, data) => {
                 const actorIdStr = actorId.toString();
                 const actorRole = req.user.role || null; // 'owner', 'Manager', 'Cashier'
 
-                // Ledger payment: role-based targeting — who reported decides who gets notified
+                // Ledger payment: notify owner + all active staff
                 const isLedgerPayment = type === 'ledger_payment';
-                const managerReported = isLedgerPayment && actorRole === 'Manager';
-                const cashierReported = isLedgerPayment && actorRole === 'Cashier';
                 // Credit sale: notify only owner and manager(s), not cashiers
                 const isCreditSale = type === 'credit_sale';
                 const isBulkUpload = type === 'inventory_bulk_upload';
                 const isCreditLimitUpdated = type === 'credit_limit_updated';
+                const isInventoryPriceUpdated = type === 'inventory_price_updated';
+                const isInventoryFieldUpdate = type === 'inventory_updated' || type === 'inventory_price_updated';
+                const isAttendanceEvent = [
+                    'attendance_punch_in',
+                    'attendance_break_start',
+                    'attendance_break_end',
+                    'attendance_punch_out'
+                ].includes(type);
                 const actorRoleLower = (actorRole || '').toLowerCase();
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
@@ -196,6 +250,24 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Low stock: notify ALL users including the actor (person who added/updated should also be informed)
                 if (isLowStockAlert) {
                     if (store && store.ownerId) targetUserIds.add(store.ownerId.toString());
+                    staffMembers.forEach(staff => {
+                        if (staff.userId) targetUserIds.add(staff.userId.toString());
+                    });
+                }
+
+                // Price update: notify owner + all managers, including actor (owner/manager).
+                if (!isLowStockAlert && isInventoryPriceUpdated && store && store.ownerId) {
+                    targetUserIds.add(store.ownerId.toString());
+                    staffMembers.forEach(staff => {
+                        if (staff.role === 'Manager' && staff.userId) {
+                            targetUserIds.add(staff.userId.toString());
+                        }
+                    });
+                }
+
+                // Inventory field updates (price/reorder/stock): always notify owner + all staff.
+                if (!isLowStockAlert && isInventoryFieldUpdate && store && store.ownerId) {
+                    targetUserIds.add(store.ownerId.toString());
                     staffMembers.forEach(staff => {
                         if (staff.userId) targetUserIds.add(staff.userId.toString());
                     });
@@ -236,14 +308,12 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
-                // Owner: for ledger_payment when Manager reported → only owner; otherwise owner gets it if not actor
-                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && store && store.ownerId) {
+                // Owner default targeting (ledger payments handled separately).
+                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
-                    if (ownerIdStr !== actorIdStr) {
+                    if (isAttendanceEvent || isLedgerPayment || ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
-                        if (managerReported) {
-                            console.log(`📢 Ledger payment (Manager reported): Owner ${ownerIdStr} will receive notification (paid amount in message).`);
-                        } else if (isCreditSale) {
+                        if (isCreditSale) {
                             console.log(`📢 Credit sale: Owner ${ownerIdStr} will receive notification.`);
                         } else {
                             console.log(`📢 Owner ${ownerIdStr} will receive notification (actor: ${actorIdStr})`);
@@ -255,12 +325,22 @@ const emitAlert = async (req, storeId, type, data) => {
                     console.warn(`⚠️ Store ${storeIdStr} has no ownerId, owner will not receive notification`);
                 }
 
-                // Staff: for Manager-reported ledger payment, do NOT notify any staff (owner only)
-                // For credit_sale, notify only managers (not cashiers). Skip for bulk upload and credit_limit_updated (handled above).
-                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !managerReported) {
+                // Staff targeting:
+                // - ledger_payment: notify all staff (manager + cashier)
+                // - credit_sale: notify only managers (not cashiers)
+                // Skip for bulk upload and credit_limit_updated (handled above).
+                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated) {
                     staffMembers.forEach(staff => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();
+                            if (isAttendanceEvent) {
+                                targetUserIds.add(staffUserIdStr);
+                                return;
+                            }
+                            if (isLedgerPayment) {
+                                targetUserIds.add(staffUserIdStr);
+                                return;
+                            }
                             if (staffUserIdStr !== actorIdStr) {
                                 // Credit sale: only add managers, not cashiers
                                 if (isCreditSale) {
@@ -271,8 +351,14 @@ const emitAlert = async (req, storeId, type, data) => {
                             }
                         }
                     });
-                    if (cashierReported) {
-                        console.log(`📢 Ledger payment (Cashier reported): Manager(s) and Cashier(s) will receive notification (paid amount in message).`);
+                    if (isLedgerPayment) {
+                        console.log('📢 Ledger payment: Owner and all active staff will receive notification.');
+                    }
+                    if (isAttendanceEvent) {
+                        console.log('📢 Attendance event: Owner and all active staff will receive notification.');
+                    }
+                    if (isInventoryFieldUpdate) {
+                        console.log('📢 Inventory update: Owner and all active staff will receive notification.');
                     }
                     if (isCreditSale) {
                         console.log(`📢 Credit sale: Manager(s) will receive notification.`);
@@ -296,7 +382,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Delivery reliability: also include actor device for push delivery so
                 // single-device/same-user testing still receives background notifications.
                 // Socket/in-app list can still filter actor-facing items separately.
-                if (actorIdStr) {
+                if (actorIdStr && !isInventoryPriceUpdated) {
                     targetUserIds.add(actorIdStr);
                 }
 
@@ -490,7 +576,7 @@ router.get('/alerts', protect, async (req, res) => {
         // Users don't need to see notifications about their own actions
         const filteredNotifications = notifications.filter(n => {
             // If actorId exists and matches current user, exclude this notification
-            if (n.actorId && n.actorId.toString() === req.user._id.toString()) {
+            if (n.actorId && n.actorId.toString() === req.user._id.toString() && n.type !== 'inventory_price_updated') {
                 return false;
             }
             return true;

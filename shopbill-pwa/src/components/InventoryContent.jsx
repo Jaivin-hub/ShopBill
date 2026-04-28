@@ -472,7 +472,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                             <div className={`text-center p-1.5 rounded ${darkMode ? 'bg-gray-950/30' : 'bg-slate-100'}`}>
                                                 <p className={`text-[7px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                                                 <p className="text-xs font-black text-emerald-500 tabular-nums">
-                                                    ₹{variant.price?.toLocaleString() || '0'}
+                                                    ₹{Number(variant.price || 0).toLocaleString('en-IN')}
                                                 </p>
                                             </div>
                                         </div>
@@ -507,7 +507,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                             <div className="text-center">
                                                 <p className={`text-[8px] font-black tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
                                                 <p className="text-sm font-black text-emerald-500 tabular-nums">
-                                                    ₹{variant.price?.toLocaleString() || '0'}
+                                                    ₹{Number(variant.price || 0).toLocaleString('en-IN')}
                                                 </p>
                                             </div>
                                         </div>
@@ -603,7 +603,7 @@ const InventoryContent = ({
         const newVariant = {
             _id: `variant-${Date.now()}-${Math.random()}`, // Unique ID for stable key
             label: '',
-            price: 0,
+            price: '',
             quantity: 0,
             reorderLevel: formData.reorderLevel || 5,
             hsn: formData.hsn || '',
@@ -611,11 +611,12 @@ const InventoryContent = ({
             size: '',
             color: '',
         };
+        const currentCount = (formData.variants || []).length;
         setFormData(prev => ({
             ...prev,
-            variants: [newVariant, ...(prev.variants || [])]
+            variants: [...(prev.variants || []), newVariant]
         }));
-        setEditingVariantIndex(0);
+        setEditingVariantIndex(currentCount);
     };
 
     const updateVariant = (index, field, value) => {
@@ -631,7 +632,11 @@ const InventoryContent = ({
             ...prev,
             variants: (prev.variants || []).filter((_, i) => i !== index)
         }));
-        if (editingVariantIndex === index) setEditingVariantIndex(null);
+        if (editingVariantIndex === index) {
+            setEditingVariantIndex(null);
+        } else if (editingVariantIndex !== null && index < editingVariantIndex) {
+            setEditingVariantIndex(editingVariantIndex - 1);
+        }
     };
 
     const toggleVariants = () => {
@@ -873,9 +878,8 @@ const InventoryContent = ({
                                             <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>₹</span>
                                             <input
                                                 name="price"
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
+                                                type="text"
+                                                inputMode="decimal"
                                                 value={formData.price}
                                                 onChange={handleInputChange}
                                                 placeholder="0.00"
@@ -922,9 +926,17 @@ const InventoryContent = ({
                                         {(formData.variants || []).map((variant, index) => (
                                             <div key={variant._id || `variant-${index}`} className={`p-4 rounded-xl border transition-all overflow-x-hidden ${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-white border-slate-200'}`}>
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <span className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                        Variant {index + 1}
-                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingVariantIndex(prev => (prev === index ? null : index))}
+                                                        className={`flex items-center gap-2 text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}
+                                                    >
+                                                        <span>{(variant.label || '').trim() || `Variant ${index + 1}`}</span>
+                                                        <span className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                            (₹{Number(variant.price || 0).toFixed(2)} · Qty {variant.quantity || 0})
+                                                        </span>
+                                                        <ChevronDown className={`w-4 h-4 transition-transform ${editingVariantIndex === index ? 'rotate-180' : ''}`} />
+                                                    </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeVariant(index)}
@@ -933,6 +945,7 @@ const InventoryContent = ({
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </div>
+                                                {editingVariantIndex === index && (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                     <div>
                                                         <label className={`text-[10px] font-bold mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -982,13 +995,11 @@ const InventoryContent = ({
                                                         <input
                                                             type="text"
                                                             inputMode="decimal"
-                                                            value={variant.price === 0 ? '' : variant.price}
+                                                            value={variant.price ?? ''}
                                                             onChange={(e) => {
                                                                 const val = e.target.value;
-                                                                if (val === '' || val === '0') {
-                                                                    updateVariant(index, 'price', 0);
-                                                                } else if (/^\d*\.?\d*$/.test(val)) {
-                                                                    updateVariant(index, 'price', parseFloat(val) || 0);
+                                                                if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                                                                    updateVariant(index, 'price', val);
                                                                 }
                                                             }}
                                                             placeholder="0.00"
@@ -1038,6 +1049,7 @@ const InventoryContent = ({
                                                         />
                                                     </div>
                                                 </div>
+                                                )}
                                             </div>
                                         ))}
                                         {(!formData.variants || formData.variants.length === 0) && (

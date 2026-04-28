@@ -195,7 +195,7 @@ const ScannerModal = ({
 
         startScanner();
         return () => resetScannerState();
-    }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus, lookupStatus, getCameraStartErrorMessage, scannerRetryKey]); 
+    }, [isOpen, ZXing, handleScanResult, resetScannerState, onScanError, triggerFocus, getCameraStartErrorMessage, scannerRetryKey]); 
 
     if (!isOpen) return null;
 

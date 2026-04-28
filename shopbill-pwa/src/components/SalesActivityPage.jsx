@@ -287,6 +287,11 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
 };
 
 const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }) => {
+    const BILL_STATUS_FILTERS = {
+        ALL: 'all',
+        CREDIT: 'credit',
+        CLEARED: 'cleared',
+    };
     const [sales, setSales] = useState(salesData || []);
     const [userProfile, setUserProfile] = useState(null);
     const [isLoadingSales, setIsLoadingSales] = useState(false);
@@ -295,6 +300,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
     // UI State for Toggles
     const [showSearch, setShowSearch] = useState(false);
     const [showFilter, setShowFilter] = useState(false);
+    const [billStatusFilter, setBillStatusFilter] = useState(BILL_STATUS_FILTERS.ALL);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
@@ -367,6 +373,13 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
 
     const filteredSales = useMemo(() => {
         let list = Array.isArray(sales) ? [...sales] : [];
+
+        if (billStatusFilter === BILL_STATUS_FILTERS.CREDIT) {
+            list = list.filter((s) => (Number(s.amountCredited) || 0) > 0);
+        } else if (billStatusFilter === BILL_STATUS_FILTERS.CLEARED) {
+            list = list.filter((s) => (Number(s.amountCredited) || 0) <= 0);
+        }
+
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             list = list.filter(s => 
@@ -374,7 +387,7 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
             );
         }
         return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    }, [sales, searchQuery]);
+    }, [sales, searchQuery, billStatusFilter]);
 
     const mainBg = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black';
     const cardBg = darkMode ? 'bg-gray-900/30 border-gray-800/40 hover:bg-gray-900/60' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm';
@@ -411,7 +424,10 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                             <button 
                                 onClick={() => {
                                     setShowFilter(!showFilter);
-                                    if(showFilter) setDateRange({ startDate: defaultStartDate, endDate: defaultEndDate });
+                                    if(showFilter) {
+                                        setDateRange({ startDate: defaultStartDate, endDate: defaultEndDate });
+                                        setBillStatusFilter(BILL_STATUS_FILTERS.ALL);
+                                    }
                                 }} 
                                 className={btnClass(showFilter)}
                             >
@@ -439,6 +455,26 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                     {showFilter && (
                         <div className="animate-in slide-in-from-top-2 duration-200">
                             <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                                <button
+                                    onClick={() => setBillStatusFilter(BILL_STATUS_FILTERS.ALL)}
+                                    className={btnClass(billStatusFilter === BILL_STATUS_FILTERS.ALL)}
+                                >
+                                    <span className="text-[10px] font-black tracking-wider">All</span>
+                                </button>
+                                <button
+                                    onClick={() => setBillStatusFilter(BILL_STATUS_FILTERS.CREDIT)}
+                                    className={btnClass(billStatusFilter === BILL_STATUS_FILTERS.CREDIT)}
+                                >
+                                    <span className="text-[10px] font-black tracking-wider">Credit</span>
+                                </button>
+                                <button
+                                    onClick={() => setBillStatusFilter(BILL_STATUS_FILTERS.CLEARED)}
+                                    className={btnClass(billStatusFilter === BILL_STATUS_FILTERS.CLEARED)}
+                                >
+                                    <span className="text-[10px] font-black tracking-wider">Cleared</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

@@ -46,7 +46,7 @@ const getFilterDateStrings = (filterId, startStr, endStr) => {
     return getFilterDateStrings('7d', null, null);
 };
 
-const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole }) => {
+const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, onOpenSalesHistory, setCurrentPage }) => {
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
     const [chartYAxis, setChartYAxis] = useState('revenue');
@@ -59,6 +59,20 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
     const [purchases, setPurchases] = useState([]);
     const [showAllBestSellers, setShowAllBestSellers] = useState(false);
     const [allBestSellers, setAllBestSellers] = useState([]);
+    const handleOpenSalesHistory = useCallback(() => {
+        try {
+            if (typeof onOpenSalesHistory === 'function') {
+                onOpenSalesHistory();
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to open sales history via callback:', error);
+        }
+
+        if (typeof setCurrentPage === 'function') {
+            setCurrentPage('salesActivity');
+        }
+    }, [onOpenSalesHistory, setCurrentPage]);
 
     // Theme Variables
     const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
@@ -272,11 +286,16 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                         { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
-                        { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500" },
+                        { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500", onClick: handleOpenSalesHistory },
                         { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
                         { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
                     ].map((m, i) => (
-                        <div key={i} className={`${cardBase} p-5 rounded-xl transition-all border-l-4 border-l-transparent hover:border-l-indigo-500`}>
+                        <button
+                            key={i}
+                            onClick={m.onClick}
+                            disabled={!m.onClick}
+                            className={`${cardBase} p-5 rounded-xl transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 text-left ${m.onClick ? 'cursor-pointer active:scale-[0.99]' : 'cursor-default'}`}
+                        >
                             <div className="flex justify-between items-start mb-3">
                                 <p className="text-[10px] font-bold text-gray-500  tracking-widest">{m.title}</p>
                                 <m.icon className={`w-4 h-4 ${m.color}`} />
@@ -284,7 +303,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole })
                             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
                                 {isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value}
                             </h2>
-                        </div>
+                        </button>
                     ))}
                 </section>
 
