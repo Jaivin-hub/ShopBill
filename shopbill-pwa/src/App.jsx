@@ -13,7 +13,6 @@ import { onForegroundMessage } from './lib/firebase';
 import { playMessageSound, playNotificationSound, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
-import PageErrorBoundary from './components/PageErrorBoundary';
 import SEO from './components/SEO';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
@@ -409,8 +408,10 @@ const App = () => {
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
   const [showStaffPunchPrompt, setShowStaffPunchPrompt] = useState(false);
   const [hasStaffPunchedIn, setHasStaffPunchedIn] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState(null);
   const [isPromptPunchingIn, setIsPromptPunchingIn] = useState(false);
+  const pendingActionRef = useRef(null);
+  const isStaffUserRef = useRef(false);
+  const hasStaffPunchedInRef = useRef(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
@@ -460,46 +461,51 @@ const App = () => {
     return count;
   }, [notifications]);
 
-  const ATTENDANCE_REQUIRED_PAGES = useMemo(() => new Set([
-    'billing',
-    'inventory',
-    'khata',
-    'salesActivity',
-    'reports',
-    'scm',
-  ]), []);
+  useEffect(() => {
+    isStaffUserRef.current = isStaffUser;
+    hasStaffPunchedInRef.current = hasStaffPunchedIn;
+  }, [isStaffUser, hasStaffPunchedIn]);
 
-  const shouldRequireAttendancePrompt = useCallback((page) => {
-    return isStaffUser && !hasStaffPunchedIn && ATTENDANCE_REQUIRED_PAGES.has(page);
-  }, [isStaffUser, hasStaffPunchedIn, ATTENDANCE_REQUIRED_PAGES]);
+  useEffect(() => {
+    if (!apiClient?.interceptors?.request) return undefined;
+    const interceptorId = apiClient.interceptors.request.use((config) => {
+      const method = String(config?.method || 'get').toLowerCase();
+      const isMutation = ['post', 'put', 'patch', 'delete'].includes(method);
+      if (!isMutation) return config;
+
+      const url = String(config?.url || '').toLowerCase();
+      const isAttendanceApi = url.includes('/attendance/');
+      const isBypass = config?.headers?.['x-skip-attendance-prompt'] === '1';
+      if (isAttendanceApi || isBypass) return config;
+      if (!isStaffUserRef.current || hasStaffPunchedInRef.current) return config;
+
+      return new Promise((resolve, reject) => {
+        pendingActionRef.current = { resolve, reject, config };
+        setShowStaffPunchPrompt(true);
+      });
+    });
+
+    return () => {
+      apiClient.interceptors.request.eject(interceptorId);
+    };
+  }, [apiClient]);
 
   // Navigate and push current page to back stack (so swipe-back can return). Use opts.replace to clear stack (e.g. logout, back-to-origin).
   const navigateTo = useCallback((page, opts) => {
-    if (!opts?.bypassPunchPrompt && shouldRequireAttendancePrompt(page)) {
-      setPendingNavigation({ page, opts: opts || null });
-      setShowStaffPunchPrompt(true);
-      return;
-    }
     if (opts?.replace) backStackRef.current = [];
     if (page !== currentPage) {
       if (!opts?.replace) backStackRef.current = [...backStackRef.current, currentPage];
       setCurrentPage(page);
     }
-  }, [currentPage, shouldRequireAttendancePrompt]);
-
-  const proceedAfterPrompt = useCallback((navData) => {
-    if (!navData?.page) return;
-    navigateTo(navData.page, { ...(navData.opts || {}), bypassPunchPrompt: true });
-  }, [navigateTo]);
+  }, [currentPage]);
 
   const handleStaffPromptSkip = useCallback(() => {
     setShowStaffPunchPrompt(false);
-    const navData = pendingNavigation;
-    setPendingNavigation(null);
-    if (navData?.page) {
-      proceedAfterPrompt(navData);
+    if (pendingActionRef.current?.resolve) {
+      pendingActionRef.current.resolve(pendingActionRef.current.config);
     }
-  }, [pendingNavigation, proceedAfterPrompt]);
+    pendingActionRef.current = null;
+  }, []);
 
   const handleStaffPromptPunchIn = useCallback(async () => {
     if (!apiClient || !API?.attendancePunchIn || isPromptPunchingIn) return;
@@ -512,28 +518,32 @@ const App = () => {
         localDate: localDateString,
         timezoneOffset,
         clientTime: now.toISOString(),
-      });
+      }, { headers: { 'x-skip-attendance-prompt': '1' } });
       showToast('Punched in successfully!', 'success');
       setHasStaffPunchedIn(true);
       setShowStaffPunchPrompt(false);
-      const navData = pendingNavigation;
-      setPendingNavigation(null);
-      if (navData?.page) {
-        proceedAfterPrompt(navData);
+      if (pendingActionRef.current?.resolve) {
+        pendingActionRef.current.resolve(pendingActionRef.current.config);
       }
+      pendingActionRef.current = null;
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Unable to punch in now';
       showToast(message, 'error');
     } finally {
       setIsPromptPunchingIn(false);
     }
-  }, [apiClient, API, isPromptPunchingIn, pendingNavigation, proceedAfterPrompt, showToast]);
+  }, [apiClient, API, isPromptPunchingIn, showToast]);
 
   useEffect(() => {
     setHasStaffPunchedIn(false);
     setShowStaffPunchPrompt(false);
-    setPendingNavigation(null);
     setIsPromptPunchingIn(false);
+    if (pendingActionRef.current?.reject) {
+      const err = new Error('Attendance prompt reset');
+      err.cancelled = true;
+      pendingActionRef.current.reject(err);
+    }
+    pendingActionRef.current = null;
   }, [currentUser?._id]);
 
   const handleViewAllSales = useCallback(() => navigateTo('salesActivity'), [navigateTo]);
@@ -1576,9 +1586,7 @@ useEffect(() => {
                       : ''
                 }`}
               >
-                <PageErrorBoundary darkMode={darkMode}>
-                  {renderContent()}
-                </PageErrorBoundary>
+                {renderContent()}
               </div>
             </div>
         </main>

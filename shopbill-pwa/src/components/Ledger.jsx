@@ -94,6 +94,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     if (!Array.isArray(customers)) return 0;
     return customers.reduce((sum, c) => sum + (c.outstandingCredit || 0), 0);
   }, [customers]);
+  const dueCustomers = useMemo(
+    () => (Array.isArray(customers) ? customers.filter((c) => Number(c.outstandingCredit || 0) > 0) : []),
+    [customers]
+  );
 
   const handleDownloadReport = useCallback(() => {
     const rows = [
@@ -382,7 +386,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
               <LedgerSkeleton />
             ) : (
               <CustomerList
-                customersList={customers}
+                customersList={dueCustomers}
                 searchTerm={debouncedSearchTerm}
                 sortBy={sortBy}
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}

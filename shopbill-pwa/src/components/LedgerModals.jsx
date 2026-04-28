@@ -453,6 +453,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                 ledgerEntries.map(t => {
                                     const styles = getTypeStyles(t.type, darkMode);
                                     const isCredit = t.type === 'credit_sale' || t.type === 'initial_due';
+                                    const saleItems = Array.isArray(t.sale?.items) ? t.sale.items : [];
                                     return (
                                         <div key={t._id} className={`flex items-center p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border transition-all hover:translate-x-1 ${styles.color}`}>
                                             <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl mr-3 sm:mr-4 shrink-0 ${darkMode ? 'bg-gray-900/50' : 'bg-white shadow-sm'}`}>{styles.icon}</div>
@@ -461,6 +462,26 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                                 <div className="flex items-center text-[8px] sm:text-[9px] font-bold text-slate-400 mt-1 uppercase">
                                                     <Calendar size={9} className="sm:w-[10px] sm:h-[10px] mr-1" /> {formatDateWithTime(t.timestamp)}
                                                 </div>
+                                                {t.details && (
+                                                    <p className={`mt-1 text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                        {t.details}
+                                                    </p>
+                                                )}
+                                                {t.type === 'credit_sale' && t.sale && (
+                                                    <div className={`mt-2 text-[9px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                        <p>
+                                                            Bill: ₹{Number(t.sale.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            {' | '}Paid: ₹{Number(t.sale.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            {' | '}Credit: ₹{Number(t.sale.amountCredited || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </p>
+                                                        {saleItems.length > 0 && (
+                                                            <p className="mt-1 truncate">
+                                                                Items: {saleItems.slice(0, 3).map((item) => `${item.name} x${item.quantity}`).join(', ')}
+                                                                {saleItems.length > 3 ? ` +${saleItems.length - 3} more` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className={`font-black text-sm sm:text-base shrink-0 whitespace-nowrap ml-2 ${isCredit ? 'text-rose-500' : 'text-emerald-500'}`}>
                                                 {isCredit ? '+' : '-'} ₹{Number(t.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

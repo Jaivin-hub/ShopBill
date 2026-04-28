@@ -5,13 +5,23 @@ import {
 } from 'recharts';
 import { TrendingUp, BarChart3 } from 'lucide-react'; 
 
+const safeFormatNumber = (value, options = {}) => {
+    const num = Number(value || 0);
+    try {
+        return num.toLocaleString('en-IN', options);
+    } catch (error) {
+        // Older WebViews may not support Intl options like notation: 'compact'
+        return num.toLocaleString('en-IN');
+    }
+};
+
 const CHART_CONFIG = {
     revenue: {
         yAxisId: 'left',
         dataKey: 'revenue',
         name: 'REVENUE',
         color: '#6366f1', // Indigo 500
-        formatter: (value) => `₹${value.toLocaleString('en-IN', { notation: 'compact' })}`, 
+        formatter: (value) => `₹${safeFormatNumber(value, { notation: 'compact' })}`, 
         transactionDataKey: 'bills',
         transactionName: 'BILL COUNT',
         transactionColor: '#10b981' // Emerald 500
@@ -21,7 +31,7 @@ const CHART_CONFIG = {
         dataKey: 'bills',
         name: 'BILL COUNT',
         color: '#10b981', // Emerald 500
-        formatter: (value) => value.toLocaleString('en-IN', { notation: 'compact' }),
+        formatter: (value) => safeFormatNumber(value, { notation: 'compact' }),
         secondaryDataKey: 'revenue',
         secondaryName: 'REVENUE',
         secondaryColor: '#6366f1' // Indigo 500
@@ -103,9 +113,10 @@ const SalesChart = ({ data, viewType, yAxisKey, darkMode = true }) => {
     };
 
     const tooltipFormatter = (value, name) => {
+        const numValue = Number(value || 0);
         const displayValue = name.includes('REVENUE') 
-            ? `₹${value.toLocaleString('en-IN')}` 
-            : value.toLocaleString('en-IN');
+            ? `₹${safeFormatNumber(numValue)}` 
+            : safeFormatNumber(numValue);
         return [displayValue, name];
     };
     
@@ -131,6 +142,22 @@ const SalesChart = ({ data, viewType, yAxisKey, darkMode = true }) => {
                     </div>
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600">
                         No Sales Data Found
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const hasResizeObserver = typeof window === 'undefined' || typeof window.ResizeObserver !== 'undefined';
+    if (!hasResizeObserver) {
+        return (
+            <div className="h-full min-h-[300px] flex items-center justify-center bg-gray-900/20 rounded-[2rem] border border-dashed border-gray-800">
+                <div className="text-center">
+                    <div className="bg-gray-900 p-4 rounded-2xl w-fit mx-auto mb-4 border border-gray-800">
+                        <TrendingUp className="w-8 h-8 text-gray-700" />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600">
+                        Chart view not supported on this device
                     </p>
                 </div>
             </div>
@@ -181,7 +208,7 @@ const SalesChart = ({ data, viewType, yAxisKey, darkMode = true }) => {
                     stroke={secondaryConfig.color} 
                     fontSize={10}
                     fontWeight={800}
-                    tickFormatter={(value) => value.toLocaleString('en-IN', { notation: 'compact' })}
+                    tickFormatter={(value) => safeFormatNumber(value, { notation: 'compact' })}
                 />
                 
                 <Tooltip

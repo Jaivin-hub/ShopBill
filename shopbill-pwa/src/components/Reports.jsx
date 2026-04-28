@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Loader, Truck, AlertTriangle, ShoppingCart, Users,
@@ -46,6 +46,12 @@ const getFilterDateStrings = (filterId, startStr, endStr) => {
     return getFilterDateStrings('7d', null, null);
 };
 
+const toIsoDateSafe = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+};
+
 const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, onOpenSalesHistory, setCurrentPage }) => {
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
@@ -53,7 +59,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const [customStartDate, setCustomStartDate] = useState(getDateXDaysAgo(7));
     const [customEndDate, setCustomEndDate] = useState(getTodayDateString());
     const [summaryData, setSummaryData] = useState(null);
-    const [chartData, setChartData] = useState(null);
+    const [chartData, setChartData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [purchases, setPurchases] = useState([]);
@@ -81,6 +87,10 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const headerBase = darkMode ? 'bg-gray-950 border-gray-800/60' : 'bg-white border-slate-200 shadow-sm';
 
     const fetchReportData = useCallback(async () => {
+        if (!apiClient || !API?.reportsSummary || !API?.reportsChartData) {
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
         const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
         const queryParams = { ...(startDate && { startDate }), ...(endDate && { endDate }) };
@@ -132,17 +142,49 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
         }
     }, [selectedFilter, customStartDate, customEndDate, viewType, apiClient, API, showToast]);
 
-    // Only fetch when filter/date changes, not when callback changes
-    const hasFetchedRef = useRef(false);
+    // Fetch whenever query parameters change (callback identity changes with dependencies)
     useEffect(() => {
-        // Fetch on mount or when filter/date changes
-        if (!hasFetchedRef.current || selectedFilter || customStartDate || customEndDate || viewType) {
-            hasFetchedRef.current = true;
-            fetchReportData();
-        }
-    }, [selectedFilter, customStartDate, customEndDate, viewType]);
+        fetchReportData();
+    }, [fetchReportData]);
 
     const formatCurrency = (amount) => `₹${(amount || 0).toLocaleString('en-IN')}`;
+
+    const scmInsights = useMemo(() => {
+        const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
+        const filteredPurchases = purchases.filter(p => {
+            if (!startDate || !endDate) return true;
+            const purchaseDate = toIsoDateSafe(p?.date || p?.createdAt);
+            if (!purchaseDate) return false;
+            return purchaseDate >= startDate && purchaseDate <= endDate;
+        });
+
+        const totalInvestment = filteredPurchases.reduce((acc, curr) => {
+            const quantity = Number(curr?.quantity || 0);
+            const purchasePrice = Number(curr?.purchasePrice || 0);
+            return acc + (purchasePrice * quantity);
+        }, 0);
+        const supplierSpendMap = filteredPurchases.reduce((acc, curr) => {
+            const sId = curr.supplierId?._id || 'unknown';
+            const sName = curr.supplierId?.name || 'Unknown Vendor';
+            if (!acc[sId]) acc[sId] = { name: sName, totalSpent: 0, orders: 0 };
+            acc[sId].totalSpent += (Number(curr?.purchasePrice || 0) * Number(curr?.quantity || 0));
+            acc[sId].orders += 1;
+            return acc;
+        }, {});
+
+        return {
+            totalStockValue: totalInvestment,
+            activeSuppliers: suppliers.length,
+            filteredPurchaseCount: filteredPurchases.length,
+            topSuppliers: Object.values(supplierSpendMap).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5)
+        };
+    }, [purchases, suppliers, selectedFilter, customStartDate, customEndDate]);
+
+    const data = summaryData || {
+        revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
+        topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
+        textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
+    };
 
     const handleDownloadReport = useCallback(() => {
         const rows = [];
@@ -168,38 +210,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
         exportRowsToExcel(rows, `reports-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Reports');
         showToast('Reports downloaded as Excel.', 'success');
     }, [allBestSellers, data, scmInsights, showAllBestSellers, showToast]);
-
-    const scmInsights = useMemo(() => {
-        const { startDate, endDate } = getFilterDateStrings(selectedFilter, customStartDate, customEndDate);
-        const filteredPurchases = purchases.filter(p => {
-            if (!startDate || !endDate) return true;
-            const purchaseDate = new Date(p.date || p.createdAt).toISOString().split('T')[0];
-            return purchaseDate >= startDate && purchaseDate <= endDate;
-        });
-
-        const totalInvestment = filteredPurchases.reduce((acc, curr) => acc + (curr.purchasePrice * curr.quantity), 0);
-        const supplierSpendMap = filteredPurchases.reduce((acc, curr) => {
-            const sId = curr.supplierId?._id || 'unknown';
-            const sName = curr.supplierId?.name || 'Unknown Vendor';
-            if (!acc[sId]) acc[sId] = { name: sName, totalSpent: 0, orders: 0 };
-            acc[sId].totalSpent += (curr.purchasePrice * curr.quantity);
-            acc[sId].orders += 1;
-            return acc;
-        }, {});
-
-        return {
-            totalStockValue: totalInvestment,
-            activeSuppliers: suppliers.length,
-            filteredPurchaseCount: filteredPurchases.length,
-            topSuppliers: Object.values(supplierSpendMap).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5)
-        };
-    }, [purchases, suppliers, selectedFilter, customStartDate, customEndDate]);
-
-    const data = summaryData || {
-        revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
-        topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
-        textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
-    };
 
     const plan = currentUser?.plan?.toUpperCase();
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';

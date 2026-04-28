@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Customer = require('../models/Customer');
 const KhataTransaction = require('../models/KhataTransaction');
+const Sale = require('../models/Sale');
 const Staff = require('../models/Staff');
 const Shop = require('../models/User'); // Ensure this matches your model file name
 const mongoose = require('mongoose');
@@ -73,7 +74,57 @@ router.get('/:id/history', protect, async (req, res) => {
         .sort({ timestamp: -1 })
         .limit(100); // Limit to last 100 transactions for performance
 
-        res.json(transactions);
+        // Include credit sales (bill-level details) so ledger history shows both
+        // payment records and the actual credited sale information.
+        const creditSales = await Sale.find({
+            customerId: customerId,
+            storeId: req.user.storeId,
+            amountCredited: { $gt: 0 }
+        })
+            .select('timestamp createdAt totalAmount amountPaid amountCredited paymentMethod items')
+            .lean()
+            .sort({ timestamp: -1 })
+            .limit(100);
+
+        const creditSaleEntries = (creditSales || []).map((sale) => {
+            const itemSummary = Array.isArray(sale.items)
+                ? sale.items
+                    .slice(0, 3)
+                    .map((item) => `${item.name} x${item.quantity}`)
+                    .join(', ')
+                : '';
+            const moreItemsCount = Math.max(0, (sale.items || []).length - 3);
+
+            return {
+                _id: `sale-${sale._id}`,
+                amount: Number(sale.amountCredited || 0),
+                type: 'credit_sale',
+                details: itemSummary
+                    ? `Credit bill | ${itemSummary}${moreItemsCount > 0 ? ` +${moreItemsCount} more` : ''}`
+                    : 'Credit bill',
+                timestamp: sale.timestamp || sale.createdAt || new Date(),
+                createdAt: sale.createdAt || sale.timestamp || new Date(),
+                saleId: sale._id,
+                sale: {
+                    totalAmount: Number(sale.totalAmount || 0),
+                    amountPaid: Number(sale.amountPaid || 0),
+                    amountCredited: Number(sale.amountCredited || 0),
+                    paymentMethod: sale.paymentMethod || 'Mixed',
+                    items: Array.isArray(sale.items) ? sale.items.map((item) => ({
+                        name: item.name || 'Item',
+                        quantity: Number(item.quantity || 0),
+                        price: Number(item.price || 0),
+                        variantLabel: item.variantLabel || ''
+                    })) : []
+                }
+            };
+        });
+
+        const merged = [...(transactions || []), ...creditSaleEntries]
+            .sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt))
+            .slice(0, 200);
+
+        res.json(merged);
     } catch (error) {
         console.error('Customer History GET Error:', error);
         res.status(500).json({ error: 'Failed to fetch customer history.' });
