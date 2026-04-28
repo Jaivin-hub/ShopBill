@@ -98,7 +98,19 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                 apiClient.get(API.reportsSummary, { params: { ...queryParams, topItemsLimit: 100 } }) // Fetch all best sellers
             ]);
 
-            setSummaryData(summaryResponse.data);
+            const rawSummary = summaryResponse?.data || {};
+            const normalizedSummary = {
+                revenue: Number(rawSummary.revenue || 0),
+                billsRaised: Number(rawSummary.billsRaised || 0),
+                averageBillValue: Number(rawSummary.averageBillValue || 0),
+                volume: Number(rawSummary.volume || 0),
+                topItems: Array.isArray(rawSummary.topItems) ? rawSummary.topItems : [],
+                totalCreditOutstanding: Number(rawSummary.totalCreditOutstanding || 0),
+                totalAllTimeBills: Number(rawSummary.totalAllTimeBills || 0),
+                totalAllTimeRevenue: Number(rawSummary.totalAllTimeRevenue || 0),
+                textileInsights: rawSummary.textileInsights || { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
+            };
+            setSummaryData(normalizedSummary);
             // Ensure chartData is an array - handle both 200 and 204 responses
             let chartDataArray = [];
             if (chartResponse && chartResponse.data) {
@@ -108,12 +120,12 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             }
             
             setChartData(chartDataArray);
-            setSuppliers(suppliersRes.data);
-            setPurchases(purchasesRes.data);
-            setAllBestSellers(allBestSellersRes.data.topItems || []);
+            setSuppliers(Array.isArray(suppliersRes?.data) ? suppliersRes.data : []);
+            setPurchases(Array.isArray(purchasesRes?.data) ? purchasesRes.data : []);
+            setAllBestSellers(Array.isArray(allBestSellersRes?.data?.topItems) ? allBestSellersRes.data.topItems : []);
         } catch (error) {
             console.error('Failed to fetch report data:', error);
-            showToast({ message: "Failed to sync report data.", type: 'error' });
+            showToast('Failed to sync report data.', 'error');
             setChartData([]); // Set empty array on error
         } finally {
             setIsLoading(false);
@@ -192,6 +204,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const plan = currentUser?.plan?.toUpperCase();
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
     const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
+    const showInitialSkeleton = isLoading && !summaryData;
 
     return (
         <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
@@ -284,12 +297,17 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-20">
                 {/* KPI DASHBOARD */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
+                    {(showInitialSkeleton ? [
+                        { title: "Net Revenue", value: '...', icon: IndianRupee, color: "text-emerald-500" },
+                        { title: "Total Invoices", value: '...', icon: List, color: "text-indigo-500" },
+                        { title: "Avg Order Value", value: '...', icon: Activity, color: "text-amber-500" },
+                        { title: "Items Sold", value: '...', icon: Package, color: "text-sky-500" }
+                    ] : [
                         { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
                         { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500", onClick: handleOpenSalesHistory },
                         { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
                         { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
-                    ].map((m, i) => (
+                    ]).map((m, i) => (
                         <button
                             key={i}
                             onClick={m.onClick}
@@ -301,7 +319,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                                 <m.icon className={`w-4 h-4 ${m.color}`} />
                             </div>
                             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                                {isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value}
+                                {showInitialSkeleton ? <span className="animate-pulse opacity-60">...</span> : (isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value)}
                             </h2>
                         </button>
                     ))}

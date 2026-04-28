@@ -13,6 +13,7 @@ import { onForegroundMessage } from './lib/firebase';
 import { playMessageSound, playNotificationSound, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
+import PageErrorBoundary from './components/PageErrorBoundary';
 import SEO from './components/SEO';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
@@ -1000,6 +1001,15 @@ useEffect(() => {
     }
   }, [currentUser]);
 
+  const handleProfileUpdated = useCallback((updatedData) => {
+    if (!updatedData) return;
+    setCurrentUser((prevUser) => {
+      const mergedUser = { ...(prevUser || {}), ...updatedData };
+      localStorage.setItem('currentUser', JSON.stringify(mergedUser));
+      return mergedUser;
+    });
+  }, []);
+
   const handleRegistrationComplete = useCallback(() => {
     backStackRef.current = [];
     setCurrentPage('dashboard');
@@ -1343,7 +1353,7 @@ useEffect(() => {
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} onOpenSalesHistory={handleViewAllSales} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
             case 'settings': return <SettingsPage key={componentKey} {...commonProps} setDarkMode={setDarkMode} />;
-            case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} />;
+            case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} onProfileUpdated={handleProfileUpdated} />;
             case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} />;
@@ -1566,7 +1576,9 @@ useEffect(() => {
                       : ''
                 }`}
               >
-                {renderContent()}
+                <PageErrorBoundary darkMode={darkMode}>
+                  {renderContent()}
+                </PageErrorBoundary>
               </div>
             </div>
         </main>

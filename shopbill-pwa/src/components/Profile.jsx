@@ -54,7 +54,7 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
     </div>
 );
 
-function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) {
+function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, onProfileUpdated }) {
     const [profile, setProfile] = useState({
         email: '',
         phone: '',
@@ -147,6 +147,9 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole }) 
             
             const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
             localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
+            if (typeof onProfileUpdated === 'function') {
+                onProfileUpdated(updatedData);
+            }
 
             setIsEditing(false);
             setValidationErrors({});

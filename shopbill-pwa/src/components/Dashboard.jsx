@@ -238,7 +238,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         const managerSupplyChainOrder = hasPremiumPlan ? 4 : null;
         
         const allActions = [
-            { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER], order: { owner: 1, manager: null, cashier: null } },
+            { label: 'Team Management', icon: ShieldCheck, color: 'bg-teal-500', page: 'staffPermissions', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], order: { owner: 1, manager: 2, cashier: null } },
             { label: 'Recent Sales', icon: ShoppingCart, color: 'bg-emerald-500', page: 'salesActivity', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 2, manager: 3, cashier: 3 } },
             { label: 'Ledger', icon: Users, color: 'bg-blue-500', page: 'khata', roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], order: { owner: 3, manager: 2, cashier: 2 } },
             ...(hasPremiumPlan 

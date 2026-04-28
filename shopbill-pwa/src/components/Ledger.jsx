@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import {
-  UserPlus, Loader, Search, X,
+  UserPlus, Search, X,
   Bell, ShieldCheck, Filter, ChevronRight, RefreshCw, Download,
   Sparkles, LayoutGrid
 } from 'lucide-react';
@@ -70,7 +70,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     setLoading(true);
     try {
       const response = await apiClient.get(API.customers);
-      setCustomers(response.data || []);
+      const payload = response?.data;
+      const normalizedCustomers = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.customers) ? payload.customers : []);
+      setCustomers(normalizedCustomers);
     } catch (error) { 
       if(showToast) showToast('Error loading Ledger.', 'error'); 
     }
@@ -86,7 +90,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     return response.data;
   }, [apiClient, API.customers]);
 
-  const totalOutstanding = useMemo(() => customers.reduce((sum, c) => sum + (c.outstandingCredit || 0), 0), [customers]);
+  const totalOutstanding = useMemo(() => {
+    if (!Array.isArray(customers)) return 0;
+    return customers.reduce((sum, c) => sum + (c.outstandingCredit || 0), 0);
+  }, [customers]);
 
   const handleDownloadReport = useCallback(() => {
     const rows = [
@@ -216,6 +223,16 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
   const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
   const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
+  const LedgerSkeleton = () => (
+    <div className="p-4 md:p-6 space-y-3 animate-pulse">
+      {[...Array(6)].map((_, idx) => (
+        <div
+          key={`ledger-skeleton-${idx}`}
+          className={`h-16 rounded-xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-100 border-slate-200'}`}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div className={`flex flex-col ${themeBase} w-full h-full overflow-hidden`}>
@@ -362,10 +379,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
           {/* Scrollable Content Area - Customer List */}
           <div className="min-h-0">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader className={`w-8 h-8 animate-spin mb-4 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                <p className={`text-[10px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>Loading Accounts...</p>
-              </div>
+              <LedgerSkeleton />
             ) : (
               <CustomerList
                 customersList={customers}
