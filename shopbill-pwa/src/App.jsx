@@ -408,10 +408,12 @@ const App = () => {
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
   const [showStaffPunchPrompt, setShowStaffPunchPrompt] = useState(false);
   const [hasStaffPunchedIn, setHasStaffPunchedIn] = useState(false);
+  const [hasResolvedAttendanceStatus, setHasResolvedAttendanceStatus] = useState(false);
   const [isPromptPunchingIn, setIsPromptPunchingIn] = useState(false);
   const pendingActionRef = useRef(null);
   const isStaffUserRef = useRef(false);
   const hasStaffPunchedInRef = useRef(false);
+  const hasResolvedAttendanceStatusRef = useRef(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
@@ -464,7 +466,43 @@ const App = () => {
   useEffect(() => {
     isStaffUserRef.current = isStaffUser;
     hasStaffPunchedInRef.current = hasStaffPunchedIn;
-  }, [isStaffUser, hasStaffPunchedIn]);
+    hasResolvedAttendanceStatusRef.current = hasResolvedAttendanceStatus;
+  }, [isStaffUser, hasStaffPunchedIn, hasResolvedAttendanceStatus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncAttendanceStatus = async () => {
+      if (!isStaffUser || !currentUser || !apiClient || !API?.attendanceCurrent) {
+        if (!cancelled) {
+          setHasStaffPunchedIn(false);
+          setHasResolvedAttendanceStatus(true);
+        }
+        return;
+      }
+      try {
+        const response = await apiClient.get(API.attendanceCurrent, {
+          headers: { 'x-skip-attendance-prompt': '1' }
+        });
+        const attendance = response?.data?.attendance;
+        const isActive = !!attendance && attendance.status === 'active' && !attendance.punchOut;
+        if (!cancelled) {
+          setHasStaffPunchedIn(isActive);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setHasStaffPunchedIn(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setHasResolvedAttendanceStatus(true);
+        }
+      }
+    };
+    syncAttendanceStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [isStaffUser, currentUser?._id, currentOutletId, apiClient, API]);
 
   useEffect(() => {
     if (!apiClient?.interceptors?.request) return undefined;
@@ -478,6 +516,7 @@ const App = () => {
       const isBypass = config?.headers?.['x-skip-attendance-prompt'] === '1';
       if (isAttendanceApi || isBypass) return config;
       if (!isStaffUserRef.current || hasStaffPunchedInRef.current) return config;
+      if (!hasResolvedAttendanceStatusRef.current) return config;
 
       return new Promise((resolve, reject) => {
         pendingActionRef.current = { resolve, reject, config };
@@ -521,6 +560,7 @@ const App = () => {
       }, { headers: { 'x-skip-attendance-prompt': '1' } });
       showToast('Punched in successfully!', 'success');
       setHasStaffPunchedIn(true);
+      setHasResolvedAttendanceStatus(true);
       setShowStaffPunchPrompt(false);
       if (pendingActionRef.current?.resolve) {
         pendingActionRef.current.resolve(pendingActionRef.current.config);
@@ -536,6 +576,7 @@ const App = () => {
 
   useEffect(() => {
     setHasStaffPunchedIn(false);
+    setHasResolvedAttendanceStatus(false);
     setShowStaffPunchPrompt(false);
     setIsPromptPunchingIn(false);
     if (pendingActionRef.current?.reject) {
