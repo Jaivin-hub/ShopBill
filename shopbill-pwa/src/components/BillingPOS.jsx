@@ -1012,7 +1012,13 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Payment Method</span>
                       <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {selectedSale.paymentMethod === 'Mixed'
-                          ? `Mixed${selectedSale.paidVia ? ` (Paid via ${selectedSale.paidVia})` : ''}`
+                          ? (() => {
+                              const paidVia = String(selectedSale.paidVia || '').trim();
+                              const hasCredit = Number(selectedSale.amountCredited || 0) > 0;
+                              if (paidVia && hasCredit) return `${paidVia} & Credit`;
+                              if (paidVia) return paidVia;
+                              return 'Mixed Payment';
+                            })()
                           : selectedSale.paymentMethod}
                       </span>
                       {selectedSale.paymentMethod === 'Mixed' && (
