@@ -59,7 +59,7 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
   <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
-    <section className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[550px] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+    <section className={`w-full max-w-md max-h-[85vh] sm:max-h-[80vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
       {/* Header */}
       <header className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100 bg-slate-50/50'}`}>
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -364,7 +364,7 @@ export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, s
 export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode, showReminderTab = true }) => {
     const [history, setHistory] = React.useState([]);
     const [isLoading, setIsLoading] = React.useState(true);
-    const [activeTab, setActiveTab] = React.useState('ledger'); // 'ledger' or 'reminders'
+    const [activeTab, setActiveTab] = React.useState('creditBills'); // 'creditBills' | 'payments' | 'reminders'
 
     React.useEffect(() => {
         const loadHistory = async () => {
@@ -377,8 +377,9 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
         if (customer?._id) loadHistory();
     }, [customer, fetchCustomerHistory]);
 
-    // Separate the data
-    const ledgerEntries = history.filter(t => t.type !== 'reminder_sent');
+    // Separate the data by requested tabs
+    const creditBillEntries = history.filter(t => t.type === 'credit_sale');
+    const paymentEntries = history.filter(t => t.type === 'payment_received');
     const reminderEntries = history.filter(t => t.type === 'reminder_sent');
 
     const tabBtnBase = "flex-1 py-3 text-[10px] font-black tracking-[0.2em] transition-all duration-300 rounded-xl flex items-center justify-center gap-2";
@@ -422,19 +423,23 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                     {/* Tab Switcher - hide Reminders tab for Basic plan */}
                     <div className={`flex p-1 rounded-xl sm:rounded-2xl border mb-3 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-100 shadow-inner'}`}>
                         <button 
-                            onClick={() => setActiveTab('ledger')}
-                            className={`${tabBtnBase} ${activeTab === 'ledger' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-600'} ${!showReminderTab ? 'flex-1' : ''}`}
+                            onClick={() => setActiveTab('creditBills')}
+                            className={`${tabBtnBase} ${activeTab === 'creditBills' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <DollarSign size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">FINANCIALS</span><span className="sm:hidden">FIN</span>
+                            <DollarSign size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">CREDIT BILL</span><span className="sm:hidden">CREDIT</span>
                         </button>
-                        {showReminderTab && (
-                            <button 
-                                onClick={() => setActiveTab('reminders')}
-                                className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDERS</span><span className="sm:hidden">REM</span>
-                            </button>
-                        )}
+                        <button 
+                            onClick={() => setActiveTab('payments')}
+                            className={`${tabBtnBase} ${activeTab === 'payments' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <CheckCircle size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">PAYMENT HISTORY</span><span className="sm:hidden">PAY</span>
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('reminders')}
+                            className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDER HISTORY</span><span className="sm:hidden">REM</span>
+                        </button>
                     </div>
                 </div>
 
@@ -446,14 +451,65 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                 <RefreshCcw className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
                                 <p className="text-[10px] font-black tracking-widest uppercase">Syncing Records...</p>
                             </div>
-                        ) : (activeTab === 'ledger' || !showReminderTab) ? (
-                            ledgerEntries.length === 0 ? (
-                                <EmptyState message="No transactions found" darkMode={darkMode} />
+                        ) : activeTab === 'creditBills' ? (
+                            creditBillEntries.length === 0 ? (
+                                <EmptyState message="No credit bills found" darkMode={darkMode} />
                             ) : (
-                                ledgerEntries.map(t => {
+                                creditBillEntries.map(t => {
                                     const styles = getTypeStyles(t.type, darkMode);
                                     const isCredit = t.type === 'credit_sale' || t.type === 'initial_due';
                                     const saleItems = Array.isArray(t.sale?.items) ? t.sale.items : [];
+                                    if (t.type === 'credit_sale') {
+                                        return (
+                                            <div
+                                                key={t._id}
+                                                className={`p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border transition-all ${
+                                                    darkMode
+                                                        ? 'bg-rose-500/8 border-rose-500/20'
+                                                        : 'bg-rose-50/70 border-rose-200'
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className={`font-black text-[10px] tracking-widest uppercase ${darkMode ? 'text-rose-300' : 'text-rose-700'}`}>
+                                                            Credit Bill Added
+                                                        </p>
+                                                        <p className="mt-1 text-[10px] font-bold text-slate-500">
+                                                            {formatDateWithTime(t.timestamp)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Added to Due</p>
+                                                        <p className="text-sm sm:text-base font-black text-rose-500">
+                                                            + ₹{Number(t.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {t.sale && (
+                                                    <div className={`mt-3 grid grid-cols-3 gap-2 text-[9px] font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                        <div className={`rounded-lg p-2 border ${darkMode ? 'bg-gray-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                                            <p className="text-[8px] uppercase tracking-wider text-slate-500">Bill Total</p>
+                                                            <p className="mt-1">₹{Number(t.sale.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                        </div>
+                                                        <div className={`rounded-lg p-2 border ${darkMode ? 'bg-gray-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                                            <p className="text-[8px] uppercase tracking-wider text-slate-500">Paid</p>
+                                                            <p className="mt-1 text-emerald-500">₹{Number(t.sale.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                        </div>
+                                                        <div className={`rounded-lg p-2 border ${darkMode ? 'bg-gray-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                                            <p className="text-[8px] uppercase tracking-wider text-slate-500">Credit</p>
+                                                            <p className="mt-1 text-rose-500">₹{Number(t.sale.amountCredited || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {saleItems.length > 0 && (
+                                                    <p className={`mt-2 text-[10px] font-bold truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                        Items: {saleItems.slice(0, 3).map((item) => `${item.name} x${item.quantity}`).join(', ')}
+                                                        {saleItems.length > 3 ? ` +${saleItems.length - 3} more` : ''}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    }
                                     return (
                                         <div key={t._id} className={`flex items-center p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border transition-all hover:translate-x-1 ${styles.color}`}>
                                             <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl mr-3 sm:mr-4 shrink-0 ${darkMode ? 'bg-gray-900/50' : 'bg-white shadow-sm'}`}>{styles.icon}</div>
@@ -490,7 +546,34 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                                     )
                                 })
                             )
-                        ) : (activeTab === 'reminders' && showReminderTab) ? (
+                        ) : activeTab === 'payments' ? (
+                            paymentEntries.length === 0 ? (
+                                <EmptyState message="No payment history found" darkMode={darkMode} />
+                            ) : (
+                                paymentEntries.map(t => {
+                                    const styles = getTypeStyles(t.type, darkMode);
+                                    return (
+                                        <div key={t._id} className={`flex items-center p-3 sm:p-4 mb-2 sm:mb-3 rounded-xl sm:rounded-2xl border transition-all hover:translate-x-1 ${styles.color}`}>
+                                            <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl mr-3 sm:mr-4 shrink-0 ${darkMode ? 'bg-gray-900/50' : 'bg-white shadow-sm'}`}>{styles.icon}</div>
+                                            <div className="flex-grow min-w-0">
+                                                <p className={`font-black text-[9px] sm:text-[10px] tracking-widest uppercase truncate ${darkMode ? 'text-white' : 'text-slate-800'}`}>{styles.label}</p>
+                                                <div className="flex items-center text-[8px] sm:text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                                                    <Calendar size={9} className="sm:w-[10px] sm:h-[10px] mr-1" /> {formatDateWithTime(t.timestamp)}
+                                                </div>
+                                                {t.details && (
+                                                    <p className={`mt-1 text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                        {t.details}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="font-black text-sm sm:text-base shrink-0 whitespace-nowrap ml-2 text-emerald-500">
+                                                - ₹{Number(t.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )
+                        ) : activeTab === 'reminders' ? (
                             reminderEntries.length === 0 ? (
                                 <EmptyState message="No reminders sent yet" darkMode={darkMode} />
                             ) : (

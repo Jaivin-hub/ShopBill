@@ -31,6 +31,7 @@ const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const StaffSetPassword = lazy(() => import('./components/StaffSetPassword'));
 const SalesActivityPage = lazy(() => import('./components/SalesActivityPage'));
+const OffersManager = lazy(() => import('./components/OffersManager'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const SuperAdminDashboard = lazy(() => import('./components/superAdminDashboard'));
 const SystemConfig = lazy(() => import('./components/SystemConfig'));
@@ -300,7 +301,8 @@ const UpdatePrompt = () => {
 const UTILITY_NAV_ITEMS_CONFIG = [
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
   { id: 'staffPermissions', name: 'Team Management', icon: Users, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 1 },
-  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 2 },
+  { id: 'offers', name: 'Offers', icon: FileText, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], priority: 2 },
+  { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], priority: 3 },
     { id: 'profile', name: 'Profile', icon: User, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
 ];
 
@@ -326,6 +328,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     profile: true,
     settings: true,
     staffPermissions: true,
+    offers: true,
   },
   cashier: {
     dashboard: true,
@@ -340,6 +343,7 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
     profile: true,
     settings: true,
     staffPermissions: false,
+    offers: false,
   },
 };
 
@@ -411,6 +415,7 @@ const App = () => {
   const [hasResolvedAttendanceStatus, setHasResolvedAttendanceStatus] = useState(false);
   const [isPromptPunchingIn, setIsPromptPunchingIn] = useState(false);
   const pendingActionRef = useRef(null);
+  const pendingAttendancePromptResolveRef = useRef(null);
   const isStaffUserRef = useRef(false);
   const hasStaffPunchedInRef = useRef(false);
   const hasResolvedAttendanceStatusRef = useRef(false);
@@ -544,12 +549,18 @@ const App = () => {
       pendingActionRef.current.resolve(pendingActionRef.current.config);
     }
     pendingActionRef.current = null;
+    if (pendingAttendancePromptResolveRef.current) {
+      pendingAttendancePromptResolveRef.current(true);
+      pendingAttendancePromptResolveRef.current = null;
+    }
   }, []);
 
   const handleStaffPromptPunchIn = useCallback(async () => {
     if (!apiClient || !API?.attendancePunchIn || isPromptPunchingIn) return;
     try {
       setIsPromptPunchingIn(true);
+      // Close immediately on tap for better UX.
+      setShowStaffPunchPrompt(false);
       const now = new Date();
       const localDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const timezoneOffset = now.getTimezoneOffset();
@@ -566,13 +577,28 @@ const App = () => {
         pendingActionRef.current.resolve(pendingActionRef.current.config);
       }
       pendingActionRef.current = null;
+      if (pendingAttendancePromptResolveRef.current) {
+        pendingAttendancePromptResolveRef.current(true);
+        pendingAttendancePromptResolveRef.current = null;
+      }
     } catch (error) {
       const message = error.response?.data?.error || error.message || 'Unable to punch in now';
       showToast(message, 'error');
+      setShowStaffPunchPrompt(true);
     } finally {
       setIsPromptPunchingIn(false);
     }
   }, [apiClient, API, isPromptPunchingIn, showToast]);
+
+  const requestAttendanceDecision = useCallback(() => {
+    const shouldPrompt = isStaffUserRef.current && !hasStaffPunchedInRef.current && hasResolvedAttendanceStatusRef.current;
+    if (!shouldPrompt) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      pendingAttendancePromptResolveRef.current = resolve;
+      setShowStaffPunchPrompt(true);
+    });
+  }, []);
 
   useEffect(() => {
     setHasStaffPunchedIn(false);
@@ -585,6 +611,10 @@ const App = () => {
       pendingActionRef.current.reject(err);
     }
     pendingActionRef.current = null;
+    if (pendingAttendancePromptResolveRef.current) {
+      pendingAttendancePromptResolveRef.current(false);
+      pendingAttendancePromptResolveRef.current = null;
+    }
   }, [currentUser?._id]);
 
   const handleViewAllSales = useCallback(() => navigateTo('salesActivity'), [navigateTo]);
@@ -1142,7 +1172,6 @@ useEffect(() => {
     const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 1, manager: 1, cashier: 1 } },
-      { id: 'salesActivity', name: 'Sales History', icon: FileText, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: null } },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
       { id: 'khata', name: 'Ledger', icon: CreditCard, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 2, manager: 3, cashier: 2 } },
       { id: 'inventory', name: 'Stock', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
@@ -1168,8 +1197,8 @@ useEffect(() => {
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
       [USER_ROLES.MANAGER]: isBasicManager
-        ? ['dashboard', 'salesActivity', 'inventory', 'khata', 'billing'] // Basic: include sales history access
-        : ['dashboard', 'salesActivity', 'inventory', 'scm', 'khata', 'chat'], // Premium/Pro: include sales history access
+        ? ['dashboard', 'inventory', 'khata', 'billing']
+        : ['dashboard', 'inventory', 'scm', 'khata', 'chat'],
       [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
 
@@ -1387,7 +1416,8 @@ useEffect(() => {
       setPageOrigin,
       currentOutlet,
       currentOutletId,
-      onOutletSwitch: handleOutletSwitch
+      onOutletSwitch: handleOutletSwitch,
+      requestAttendanceDecision
     };
 
     const componentKey = `${currentPage}-${currentOutletId}`;
@@ -1409,6 +1439,7 @@ useEffect(() => {
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => navigateTo('dashboard', { replace: true })} />;
+            case 'offers': return <OffersManager key={componentKey} {...commonProps} />;
             case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={() => setCurrentPage('staffPermissions')} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }

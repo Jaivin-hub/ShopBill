@@ -53,6 +53,11 @@ const API = {
     scmPurchases: API_BASE_URL + '/scm/purchases',    // GET (Purchase History), POST (Record Purchase & Update Stock)
     // ------------------------------------------
 
+    // Offers Management
+    offers: API_BASE_URL + '/offers', // GET, POST
+    offerById: (id) => `${API_BASE_URL}/offers/${id}`, // PUT, DELETE
+    // ------------------------------------------
+
     // 💥 NEW: SUPERADMIN MANAGEMENT ENDPOINTS 💥
     superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)
     superadminShopDetails: (id) => `${API_BASE_URL}/superadmin/shops/${id}`, // GET (Single Shop), PUT (Update Shop), DELETE (Delete Shop)

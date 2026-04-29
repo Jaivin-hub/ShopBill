@@ -24,6 +24,8 @@ const webhookRouter = require('./routes/webhookRouter');
 const scmRoutes = require('./routes/scmRoutes');
 const outletRoutes = require('./routes/outletRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const offersRoutes = require('./routes/offersRoutes');
+const offersRoutes = require('./routes/offersRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -100,6 +102,8 @@ app.use('/api/webhooks', webhookRouter);
 app.use('/api/scm', scmRoutes);
 app.use('/api/outlets', outletRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/offers', offersRoutes);
+app.use('/api/offers', offersRoutes);
 
 // Serve uploads via API (works when reverse proxy only forwards /api)
 // Filenames are unguessable (timestamp+random); optional: add token validation later

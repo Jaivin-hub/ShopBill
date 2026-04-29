@@ -89,7 +89,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         if (amountCredited <= 0 || localSelectedCustomer.id === WALK_IN_CUSTOMER.id) return null;
         const due = parseFloat(localSelectedCustomer.outstandingCredit) || 0;
         const limit = parseFloat(localSelectedCustomer.creditLimit) || 0;
-        if (limit <= 0) return null; // No limit set
+        if (limit <= 0) return null; // no limit configured
         const newTotal = due + amountCredited;
         if (newTotal > limit) {
             return {
@@ -154,13 +154,16 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         } finally { setIsSubmitting(false); }
     };
 
-    const handleConfirmPayment = async (force = false) => {
+    const handleConfirmPayment = async () => {
         if (amountCredited > 0 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id) {
             return showToast('Select a credit customer from the dropdown to finalize.', 'error');
         }
+        if (creditLimitExceeded) {
+            return showToast('Customer exceeds credit limit. Collect more amount or reduce items.', 'error');
+        }
         setIsSubmitting(true);
         try {
-            await processPayment(effectiveAmountPaid, amountCredited, backendMethod, localSelectedCustomer, force);
+            await processPayment(effectiveAmountPaid, amountCredited, backendMethod, localSelectedCustomer);
             setCreditError(null);
             onClose();
         } catch (error) {
@@ -466,11 +469,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                     )}
                     
                     <button 
-                        onClick={() => handleConfirmPayment(!!(creditError || creditLimitExceeded))} 
-                        disabled={isSubmitting || (amountCredited > 0.01 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
+                        onClick={() => handleConfirmPayment()} 
+                        disabled={isSubmitting || !!creditLimitExceeded || (amountCredited > 0.01 && localSelectedCustomer.id === WALK_IN_CUSTOMER.id)}
                         className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-[0.97] shadow-xl ${
-                            (creditError || creditLimitExceeded) 
-                                ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20' 
+                            creditLimitExceeded
+                                ? 'bg-rose-400 shadow-rose-500/10 cursor-not-allowed'
                                 : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
                         } text-white disabled:opacity-50`}
                     >
@@ -478,8 +481,8 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                             <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
-                                <span className="hidden sm:inline">{(creditError || creditLimitExceeded) ? 'Bypass & Process' : 'Finalize Transaction'}</span>
-                                <span className="sm:hidden">{(creditError || creditLimitExceeded) ? 'Bypass' : 'Finalize'}</span>
+                                <span className="hidden sm:inline">Finalize Transaction</span>
+                                <span className="sm:hidden">Finalize</span>
                                 <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                             </>
                         )}

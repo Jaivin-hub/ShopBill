@@ -283,6 +283,27 @@ router.post('/', protect, async (req, res) => {
 
         // --- 5. Update Customer Credit & Notify ---
         if (saleAmountCredited > 0 && saleCustomerId) { 
+            const customerBeforeCredit = await Customer.findOne({ _id: saleCustomerId, storeId }).lean();
+            if (!customerBeforeCredit) {
+                throw new Error('Selected customer not found for credit update.');
+            }
+
+            const limit = Number(customerBeforeCredit.creditLimit || 0);
+            const dueBefore = Number(customerBeforeCredit.outstandingCredit || 0);
+            const dueAfter = dueBefore + saleAmountCredited;
+            if (limit > 0 && dueAfter > limit) {
+                return res.status(400).json({
+                    error: `Credit limit reached (₹${limit.toLocaleString('en-IN')}). Current due: ₹${dueBefore.toLocaleString('en-IN')}.`,
+                    code: 'CREDIT_LIMIT_EXCEEDED',
+                    customerId: customerBeforeCredit._id,
+                    customerName: customerBeforeCredit.name,
+                    creditLimit: limit,
+                    outstandingCredit: dueBefore,
+                    attemptedCredit: saleAmountCredited,
+                    projectedOutstanding: dueAfter
+                });
+            }
+
             const updatedCustomer = await Customer.findOneAndUpdate(
                 { _id: saleCustomerId, storeId },
                 { $inc: { outstandingCredit: saleAmountCredited } },

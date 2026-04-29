@@ -26,6 +26,7 @@ const PERMISSION_PAGE_LABELS = [
     { id: 'profile', label: 'Profile' },
     { id: 'settings', label: 'Settings' },
     { id: 'staffPermissions', label: 'Team Management' }
+    ,{ id: 'offers', label: 'Offers' }
 ];
 
 const ROLE_DEFAULT_ACCESS = {
@@ -42,6 +43,7 @@ const ROLE_DEFAULT_ACCESS = {
         profile: true,
         settings: true,
         staffPermissions: true
+        ,offers: true
     },
     cashier: {
         dashboard: true,
@@ -56,6 +58,7 @@ const ROLE_DEFAULT_ACCESS = {
         profile: true,
         settings: false,
         staffPermissions: false
+        ,offers: false
     }
 };
 

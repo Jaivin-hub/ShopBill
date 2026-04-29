@@ -4,7 +4,7 @@ import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
 
-const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser }) => {
+const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser, requestAttendanceDecision }) => {
   const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -322,6 +322,17 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     showToast("Transaction Discarded", "info");
   };
 
+  const handleOpenPaymentModal = useCallback(async () => {
+    try {
+      const allowed = typeof requestAttendanceDecision === 'function'
+        ? await requestAttendanceDecision()
+        : true;
+      if (allowed !== false) setIsPaymentModalOpen(true);
+    } catch (error) {
+      // ignore: prompt flow already handles UX
+    }
+  }, [requestAttendanceDecision]);
+
   const scrollToCart = () => {
     const cartSection = document.getElementById('billing-list-section');
     if (cartSection) {
@@ -330,7 +341,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   };
 
   // UPDATED: Process Payment now handles mixed/split data correctly
-  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, force = false) => {
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
     if (totalAmount <= 0) return;
     
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
@@ -354,12 +365,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // Ensure these are numbers
       amountPaid: parseFloat(amountPaid) || 0,
       amountCredited: parseFloat(amountCredited) || 0,
-      forceProceed: force,
-      forceOverride: force 
     };
 
     try {
-      const response = await apiClient.post(API.sales, saleData);
+      const response = await apiClient.post(API.sales, saleData, { headers: { 'x-skip-attendance-prompt': '1' } });
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
@@ -613,7 +622,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
               </button>
 
               <button
-                onClick={() => setIsPaymentModalOpen(true)}
+                onClick={handleOpenPaymentModal}
                 className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-[11px] tracking-[0.15em] md:tracking-[0.2em] flex items-center justify-center gap-2 md:gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95 min-w-0"
               >
                 Collect Payment <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
