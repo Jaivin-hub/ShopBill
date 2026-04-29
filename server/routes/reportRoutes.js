@@ -91,7 +91,7 @@ router.get('/summary', protect, async (req, res) => {
         
         // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS (all scoped) - Optimized with lean and projections
         const [filteredSales, customers, inventoryItems, allTimeSales] = await Promise.all([
-            Sale.find(salesFilter).select('totalAmount timestamp items paymentMethod amountPaid amountCredited').lean(),
+            Sale.find(salesFilter).select('totalAmount timestamp items paymentMethod paidVia amountPaid amountCredited').lean(),
             Customer.find({ storeId: req.user.storeId }).select('name outstandingCredit').lean(), // Scoped
             Inventory.find({ storeId: req.user.storeId }).select('name price _id textileMeta').lean(), // Scoped — textileMeta for fabric/brand sold
             Sale.find({ storeId: req.user.storeId }).select('totalAmount timestamp').lean(), // Scoped for all-time stats
@@ -121,12 +121,11 @@ router.get('/summary', protect, async (req, res) => {
         let upiTotal = 0;
         let cardTotal = 0;
         let creditTotal = 0;
-        let mixedPaidTotal = 0;
-        let mixedCreditTotal = 0;
 
         filteredSales.forEach(sale => {
             revenue += sale.totalAmount;
             const method = String(sale.paymentMethod || '').trim();
+            const paidVia = String(sale.paidVia || '').trim();
             const amountPaid = Number(sale.amountPaid || 0);
             const amountCredited = Number(sale.amountCredited || 0);
 
@@ -135,8 +134,9 @@ router.get('/summary', protect, async (req, res) => {
             else if (method === 'Card') cardTotal += Number(sale.totalAmount || 0);
             else if (method === 'Credit') creditTotal += Number(sale.totalAmount || 0);
             else if (method === 'Mixed') {
-                mixedPaidTotal += amountPaid;
-                mixedCreditTotal += amountCredited;
+                if (paidVia === 'Cash') cashTotal += amountPaid;
+                else if (paidVia === 'Card') cardTotal += amountPaid;
+                else if (paidVia === 'UPI') upiTotal += amountPaid;
                 creditTotal += amountCredited;
             }
             
@@ -236,8 +236,6 @@ router.get('/summary', protect, async (req, res) => {
                 upiTotal,
                 cardTotal,
                 creditTotal,
-                mixedPaidTotal,
-                mixedCreditTotal,
             },
             textileInsights: {
                 topSizes,

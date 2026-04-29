@@ -131,8 +131,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                     upiTotal: Number(rawSummary?.paymentTotals?.upiTotal || 0),
                     cardTotal: Number(rawSummary?.paymentTotals?.cardTotal || 0),
                     creditTotal: Number(rawSummary?.paymentTotals?.creditTotal || 0),
-                    mixedPaidTotal: Number(rawSummary?.paymentTotals?.mixedPaidTotal || 0),
-                    mixedCreditTotal: Number(rawSummary?.paymentTotals?.mixedCreditTotal || 0),
                 },
                 textileInsights: rawSummary.textileInsights || { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
             };
@@ -199,7 +197,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const data = summaryData || {
         revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
         topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
-        paymentTotals: { cashTotal: 0, upiTotal: 0, cardTotal: 0, creditTotal: 0, mixedPaidTotal: 0, mixedCreditTotal: 0 },
+        paymentTotals: { cashTotal: 0, upiTotal: 0, cardTotal: 0, creditTotal: 0 },
         textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
     };
     const selectedPaymentMetric = useMemo(() => {
@@ -226,7 +224,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
         rows.push(['UPI Total', data.paymentTotals?.upiTotal || 0]);
         rows.push(['Card Total', data.paymentTotals?.cardTotal || 0]);
         rows.push(['Credit Total', data.paymentTotals?.creditTotal || 0]);
-        rows.push(['Mixed Paid (Unattributed Mode)', data.paymentTotals?.mixedPaidTotal || 0]);
         rows.push([]);
         rows.push(['Top Items']);
         rows.push(['Name', 'Quantity']);
@@ -381,13 +378,12 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                                 ))}
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             {[
                                 { label: 'Cash', value: data.paymentTotals?.cashTotal || 0, color: 'text-emerald-500' },
                                 { label: 'UPI', value: data.paymentTotals?.upiTotal || 0, color: 'text-indigo-500' },
                                 { label: 'Card', value: data.paymentTotals?.cardTotal || 0, color: 'text-sky-500' },
                                 { label: 'Credit', value: data.paymentTotals?.creditTotal || 0, color: 'text-rose-500' },
-                                { label: 'Mixed Paid', value: data.paymentTotals?.mixedPaidTotal || 0, color: 'text-amber-500' },
                             ].map((row) => (
                                 <div key={row.label} className={`rounded-lg border p-3 ${subCardBase}`}>
                                     <p className="text-[9px] font-bold tracking-widest text-gray-500">{row.label}</p>

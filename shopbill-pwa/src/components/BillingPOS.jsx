@@ -413,7 +413,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   };
 
   // UPDATED: Process Payment now handles mixed/split data correctly
-  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer) => {
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, paidVia = null) => {
     if (totalAmount <= 0) return;
     
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
@@ -422,6 +422,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     const saleData = {
       totalAmount: totalAmount,
       paymentMethod: paymentMethod, // 'Split Payment', 'Cash/UPI', or 'Credit'
+      paidVia: paymentMethod === 'Mixed' ? paidVia : null,
       customer: customerToBill.name,
       customerId: (customerToBill._id || customerToBill.id),
       items: cart.map(item => ({ 

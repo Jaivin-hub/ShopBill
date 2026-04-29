@@ -140,7 +140,7 @@ router.get('/:id', protect, async (req, res) => {
 // POST a new sale
 router.post('/', protect, async (req, res) => {
     // Accept forceProceed or forceOverride (frontend may send either)
-    const { totalAmount, paymentMethod, customerId, items, amountCredited, amountPaid, forceProceed: fp, forceOverride: fo } = req.body;
+    const { totalAmount, paymentMethod, paidVia, customerId, items, amountCredited, amountPaid, forceProceed: fp, forceOverride: fo } = req.body;
     const forceProceed = !!(fp || fo);
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
@@ -228,6 +228,7 @@ router.post('/', protect, async (req, res) => {
         const newSale = await Sale.create({
             totalAmount,
             paymentMethod,
+            paidVia: paymentMethod === 'Mixed' && ['Cash', 'Card', 'UPI'].includes(paidVia) ? paidVia : null,
             customerId: saleCustomerId, 
             items: normalizedItems,
             amountPaid,

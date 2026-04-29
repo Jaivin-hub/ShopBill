@@ -163,7 +163,7 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
         }
         setIsSubmitting(true);
         try {
-            await processPayment(effectiveAmountPaid, amountCredited, backendMethod, localSelectedCustomer);
+            await processPayment(effectiveAmountPaid, amountCredited, backendMethod, localSelectedCustomer, paymentType);
             setCreditError(null);
             onClose();
         } catch (error) {

@@ -484,6 +484,7 @@ const App = () => {
         }
         return;
       }
+      let requestCancelled = false;
       try {
         const response = await apiClient.get(API.attendanceCurrent, {
           headers: { 'x-skip-attendance-prompt': '1' }
@@ -492,13 +493,30 @@ const App = () => {
         const isActive = !!attendance && attendance.status === 'active' && !attendance.punchOut;
         if (!cancelled) {
           setHasStaffPunchedIn(isActive);
+          if (isActive) {
+            setShowStaffPunchPrompt(false);
+            if (pendingActionRef.current?.resolve) {
+              pendingActionRef.current.resolve(pendingActionRef.current.config);
+            }
+            pendingActionRef.current = null;
+            if (pendingAttendancePromptResolveRef.current) {
+              pendingAttendancePromptResolveRef.current(true);
+              pendingAttendancePromptResolveRef.current = null;
+            }
+          }
         }
       } catch (error) {
+        const isRequestCancelled = error?.cancelled || error?.message?.includes?.('cancelled');
+        if (isRequestCancelled) {
+          requestCancelled = true;
+          return;
+        }
         if (!cancelled) {
-          setHasStaffPunchedIn(false);
+          // Preserve previous status on transient API failures; avoid false re-prompt conflicts.
+          console.warn('Attendance status sync failed, keeping previous punch-in state.');
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !requestCancelled) {
           setHasResolvedAttendanceStatus(true);
         }
       }
@@ -710,7 +728,9 @@ const App = () => {
     // Filter out notifications where current user is the actor.
     const actorIdStr = incomingAlert?.actorId != null ? String(incomingAlert.actorId) : null;
     const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
-    if (actorIdStr && userIdStr && actorIdStr === userIdStr) return;
+    const alertType = String(incomingAlert?.type || '');
+    const isAttendanceEvent = alertType.startsWith('attendance_');
+    if (!isAttendanceEvent && actorIdStr && userIdStr && actorIdStr === userIdStr) return;
 
     const notificationWithReadStatus = formatNotificationForRole({
       ...incomingAlert,
