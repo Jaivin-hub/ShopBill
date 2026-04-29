@@ -249,6 +249,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   }, [inventory, debouncedSearchTerm, scannedBarcode, isTextileShop]);
 
   const allCustomers = useMemo(() => [WALK_IN_CUSTOMER, ...customers.filter(c => (c._id || c.id) !== WALK_IN_CUSTOMER.id)], [customers]);
+  const resolvePaidMethod = useCallback((sale) => {
+    const direct = String(sale?.paidVia || '').trim();
+    if (direct) return direct;
+    if (String(sale?.paymentMethod || '') === 'Mixed' && Number(sale?.amountPaid || 0) > 0) return 'UPI';
+    return '';
+  }, []);
 
   const getVariantDescriptor = useCallback((variant) => {
     if (!isTextileShop || !variant) return '';
@@ -1013,7 +1019,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {selectedSale.paymentMethod === 'Mixed'
                           ? (() => {
-                              const paidVia = String(selectedSale.paidVia || '').trim();
+                              const paidVia = resolvePaidMethod(selectedSale);
                               const hasCredit = Number(selectedSale.amountCredited || 0) > 0;
                               if (paidVia && hasCredit) return `${paidVia} & Credit`;
                               if (paidVia) return paidVia;
@@ -1025,7 +1031,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {Number(selectedSale.amountPaid || 0) > 0 && (
                             <span className="text-[10px] font-bold text-emerald-600">
-                              {selectedSale.paidVia || 'Paid'}: ₹{Number(selectedSale.amountPaid || 0).toLocaleString('en-IN')}
+                              {resolvePaidMethod(selectedSale) || 'Paid'}: ₹{Number(selectedSale.amountPaid || 0).toLocaleString('en-IN')}
                             </span>
                           )}
                           {Number(selectedSale.amountCredited || 0) > 0 && (
@@ -1086,7 +1092,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       {selectedSale.amountCredited > 0 && (
                         <div className="flex flex-col items-end gap-0.5">
                           {selectedSale.amountPaid > 0 && (
-                            <span className="text-[10px] font-bold text-emerald-600">Paid: ₹{selectedSale.amountPaid?.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-emerald-600">
+                              {selectedSale.paymentMethod === 'Mixed' && resolvePaidMethod(selectedSale)
+                                ? `${resolvePaidMethod(selectedSale)}:`
+                                : 'Paid:'} ₹{selectedSale.amountPaid?.toLocaleString()}
+                            </span>
                           )}
                           <span className="text-[10px] font-bold text-rose-500">Balance: ₹{selectedSale.amountCredited?.toLocaleString()}</span>
                         </div>

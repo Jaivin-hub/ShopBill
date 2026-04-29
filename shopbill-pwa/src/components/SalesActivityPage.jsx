@@ -54,6 +54,13 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
 
     const isCredit = sale.amountCredited > 0;
     const customerName = sale.customerName || sale.customerId?.name || 'Standard Client';
+    const resolvedPaidMethod = useMemo(() => {
+        const direct = String(sale?.paidVia || '').trim();
+        if (direct) return direct;
+        // Legacy mixed bills may not have paidVia persisted.
+        if (sale?.paymentMethod === 'Mixed' && Number(sale?.amountPaid || 0) > 0) return 'UPI';
+        return '';
+    }, [sale]);
     
     const modalBg = darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200 shadow-2xl';
     const headerBg = darkMode ? 'bg-gray-950/50' : 'bg-slate-50';
@@ -216,8 +223,17 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                                 {sale.paymentMethod === 'UPI' && '📱 UPI'}
                                 {sale.paymentMethod === 'Card' && '💳 Card'}
                                 {sale.paymentMethod === 'Credit' && '📝 Credit'}
-                                {sale.paymentMethod === 'Mixed' && '🔀 Mixed Payment'}
+                                {sale.paymentMethod === 'Mixed' && (
+                                    (() => {
+                                        const paidVia = resolvedPaidMethod;
+                                        const hasCredit = Number(sale.amountCredited || 0) > 0;
+                                        if (paidVia && hasCredit) return `🔀 ${paidVia} & Credit`;
+                                        if (paidVia) return `🔀 ${paidVia}`;
+                                        return '🔀 Mixed Payment';
+                                    })()
+                                )}
                             </span>
+                            
                         </div>
                     )}
 
@@ -258,7 +274,9 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                             {isCredit && (
                                 <div className="flex flex-col items-end gap-0.5">
                                     {sale.amountPaid > 0 && (
-                                        <span className="text-[10px] font-bold text-emerald-600">Paid: ₹{sale.amountPaid.toLocaleString()}</span>
+                                        <span className="text-[10px] font-bold text-emerald-600">
+                                            Paid{sale.paymentMethod === 'Mixed' && resolvedPaidMethod ? ` (${resolvedPaidMethod})` : ''}: ₹{sale.amountPaid.toLocaleString()}
+                                        </span>
                                     )}
                                     <span className="text-[10px] font-bold text-rose-500">Balance: ₹{sale.amountCredited.toLocaleString()}</span>
                                 </div>
