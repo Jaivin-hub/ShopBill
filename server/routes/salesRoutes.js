@@ -65,7 +65,7 @@ router.get('/', protect, async (req, res) => {
         const skip = (page - 1) * limit;
         
         const sales = await Sale.find(filter)
-            .select('totalAmount paymentMethod customerId timestamp amountPaid amountCredited items')
+            .select('totalAmount paymentMethod paidVia customerId timestamp amountPaid amountCredited items')
             .populate('customerId', 'name')
             .lean()
             .sort({ timestamp: -1 })

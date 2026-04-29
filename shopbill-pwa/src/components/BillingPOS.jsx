@@ -1011,8 +1011,24 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     <div className={`flex flex-col gap-1 p-3.5 rounded-lg border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                       <span className={`text-[9px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Payment Method</span>
                       <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {selectedSale.paymentMethod}
+                        {selectedSale.paymentMethod === 'Mixed'
+                          ? `Mixed${selectedSale.paidVia ? ` (Paid via ${selectedSale.paidVia})` : ''}`
+                          : selectedSale.paymentMethod}
                       </span>
+                      {selectedSale.paymentMethod === 'Mixed' && (
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {Number(selectedSale.amountPaid || 0) > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-600">
+                              {selectedSale.paidVia || 'Paid'}: ₹{Number(selectedSale.amountPaid || 0).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          {Number(selectedSale.amountCredited || 0) > 0 && (
+                            <span className="text-[10px] font-bold text-rose-500">
+                              Credit: ₹{Number(selectedSale.amountCredited || 0).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
