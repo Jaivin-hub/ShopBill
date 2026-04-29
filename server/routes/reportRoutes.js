@@ -137,6 +137,7 @@ router.get('/summary', protect, async (req, res) => {
                 if (paidVia === 'Cash') cashTotal += amountPaid;
                 else if (paidVia === 'Card') cardTotal += amountPaid;
                 else if (paidVia === 'UPI') upiTotal += amountPaid;
+                else upiTotal += amountPaid; // Backward compatibility for older mixed sales without paidVia
                 creditTotal += amountCredited;
             }
             
