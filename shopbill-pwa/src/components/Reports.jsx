@@ -17,6 +17,13 @@ const DATE_FILTERS = [
 ];
 
 const VIEW_TYPES = ['Day', 'Week', 'Month'];
+const PAYMENT_VIEWS = [
+    { id: 'overall', label: 'Overall' },
+    { id: 'cash', label: 'Cash' },
+    { id: 'upi', label: 'UPI' },
+    { id: 'card', label: 'Card' },
+    { id: 'credit', label: 'Credit' },
+];
 
 // --- Utility Functions ---
 const getLocalFormattedDate = (date) => {
@@ -56,6 +63,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
     const [chartYAxis, setChartYAxis] = useState('revenue');
+    const [selectedPaymentView, setSelectedPaymentView] = useState('overall');
     const [customStartDate, setCustomStartDate] = useState(getDateXDaysAgo(7));
     const [customEndDate, setCustomEndDate] = useState(getTodayDateString());
     const [summaryData, setSummaryData] = useState(null);
@@ -118,6 +126,14 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                 totalCreditOutstanding: Number(rawSummary.totalCreditOutstanding || 0),
                 totalAllTimeBills: Number(rawSummary.totalAllTimeBills || 0),
                 totalAllTimeRevenue: Number(rawSummary.totalAllTimeRevenue || 0),
+                paymentTotals: {
+                    cashTotal: Number(rawSummary?.paymentTotals?.cashTotal || 0),
+                    upiTotal: Number(rawSummary?.paymentTotals?.upiTotal || 0),
+                    cardTotal: Number(rawSummary?.paymentTotals?.cardTotal || 0),
+                    creditTotal: Number(rawSummary?.paymentTotals?.creditTotal || 0),
+                    mixedPaidTotal: Number(rawSummary?.paymentTotals?.mixedPaidTotal || 0),
+                    mixedCreditTotal: Number(rawSummary?.paymentTotals?.mixedCreditTotal || 0),
+                },
                 textileInsights: rawSummary.textileInsights || { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
             };
             setSummaryData(normalizedSummary);
@@ -183,8 +199,16 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const data = summaryData || {
         revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
         topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
+        paymentTotals: { cashTotal: 0, upiTotal: 0, cardTotal: 0, creditTotal: 0, mixedPaidTotal: 0, mixedCreditTotal: 0 },
         textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
     };
+    const selectedPaymentMetric = useMemo(() => {
+        if (selectedPaymentView === 'cash') return data.paymentTotals?.cashTotal || 0;
+        if (selectedPaymentView === 'upi') return data.paymentTotals?.upiTotal || 0;
+        if (selectedPaymentView === 'card') return data.paymentTotals?.cardTotal || 0;
+        if (selectedPaymentView === 'credit') return data.paymentTotals?.creditTotal || 0;
+        return data.revenue || 0;
+    }, [selectedPaymentView, data]);
 
     const handleDownloadReport = useCallback(() => {
         const rows = [];
@@ -196,6 +220,13 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
         rows.push(['Credit Outstanding', data.totalCreditOutstanding || 0]);
         rows.push(['All Time Revenue', data.totalAllTimeRevenue || 0]);
         rows.push(['All Time Bills', data.totalAllTimeBills || 0]);
+        rows.push([]);
+        rows.push(['Payment Breakdown']);
+        rows.push(['Cash Total', data.paymentTotals?.cashTotal || 0]);
+        rows.push(['UPI Total', data.paymentTotals?.upiTotal || 0]);
+        rows.push(['Card Total', data.paymentTotals?.cardTotal || 0]);
+        rows.push(['Credit Total', data.paymentTotals?.creditTotal || 0]);
+        rows.push(['Mixed Paid (Unattributed Mode)', data.paymentTotals?.mixedPaidTotal || 0]);
         rows.push([]);
         rows.push(['Top Items']);
         rows.push(['Name', 'Quantity']);
@@ -313,7 +344,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                         { title: "Avg Order Value", value: '...', icon: Activity, color: "text-amber-500" },
                         { title: "Items Sold", value: '...', icon: Package, color: "text-sky-500" }
                     ] : [
-                        { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
+                        { title: selectedPaymentView === 'overall' ? "Net Revenue" : `${selectedPaymentView.toUpperCase()} Total`, value: formatCurrency(selectedPaymentMetric), icon: IndianRupee, color: "text-emerald-500" },
                         { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500", onClick: handleOpenSalesHistory },
                         { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
                         { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
@@ -333,6 +364,38 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                             </h2>
                         </button>
                     ))}
+                </section>
+                <section className={`${cardBase} rounded-xl p-4 md:p-5`}>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[10px] font-bold text-gray-500 tracking-widest">PAYMENT VIEW</p>
+                            <div className={`flex ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200 shadow-inner'} p-1 rounded-md border`}>
+                                {PAYMENT_VIEWS.map((entry) => (
+                                    <button
+                                        key={entry.id}
+                                        onClick={() => setSelectedPaymentView(entry.id)}
+                                        className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${selectedPaymentView === entry.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        {entry.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            {[
+                                { label: 'Cash', value: data.paymentTotals?.cashTotal || 0, color: 'text-emerald-500' },
+                                { label: 'UPI', value: data.paymentTotals?.upiTotal || 0, color: 'text-indigo-500' },
+                                { label: 'Card', value: data.paymentTotals?.cardTotal || 0, color: 'text-sky-500' },
+                                { label: 'Credit', value: data.paymentTotals?.creditTotal || 0, color: 'text-rose-500' },
+                                { label: 'Mixed Paid', value: data.paymentTotals?.mixedPaidTotal || 0, color: 'text-amber-500' },
+                            ].map((row) => (
+                                <div key={row.label} className={`rounded-lg border p-3 ${subCardBase}`}>
+                                    <p className="text-[9px] font-bold tracking-widest text-gray-500">{row.label}</p>
+                                    <p className={`text-sm md:text-base font-bold mt-1 ${row.color}`}>{formatCurrency(row.value)}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </section>
 
                 {/* SALES PERFORMANCE CHART */}

@@ -1312,10 +1312,10 @@ useEffect(() => {
     });
   }, [userRole, canAccessPage]);
 
-  // Owner footer More menu: Team management, Supply chain, Inventory, Billing, Settings (Pro/Premium order)
+  // Owner footer More menu: Team management, offers, supply chain, inventory, billing, settings
   const footerMoreMenuItems = useMemo(() => {
     if (userRole !== USER_ROLES.OWNER) return null;
-    const order = ['staffPermissions', 'scm', 'inventory', 'billing', 'settings'];
+    const order = ['staffPermissions', 'offers', 'scm', 'inventory', 'billing', 'settings'];
     const utility = moreMenuUtilityItems; // Team Management, Settings (no notifications/profile)
     const secondary = secondaryNavItems;  // e.g. scm, inventory, billing
     const byId = new Map();
