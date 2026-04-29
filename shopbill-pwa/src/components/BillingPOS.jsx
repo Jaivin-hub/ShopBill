@@ -13,6 +13,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastAddedId, setLastAddedId] = useState(null);
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
@@ -30,18 +31,23 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [invResponse, custResponse] = await Promise.all([
+      const [invResponse, custResponse, offersResponse] = await Promise.all([
         apiClient.get(API.inventory),
         apiClient.get(API.customers),
+        apiClient.get(API.offers).catch(() => ({ data: { offers: [] } })),
       ]);
       setInventory(invResponse.data || []);
       setCustomers(custResponse.data || []);
+      const loadedOffers = Array.isArray(offersResponse?.data)
+        ? offersResponse.data
+        : (Array.isArray(offersResponse?.data?.offers) ? offersResponse.data.offers : []);
+      setOffers(loadedOffers);
     } catch (error) {
       showToast('Error loading POS data.', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, API.inventory, API.customers, showToast]);
+  }, [apiClient, API.inventory, API.customers, API.offers, showToast]);
 
   // Only fetch on mount, not when fetchData callback changes
   const hasFetchedRef = useRef(false);
@@ -164,6 +170,56 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
 
   // --- Core POS Logic ---
   const totalAmount = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+  const activeOffers = useMemo(() => {
+    const now = Date.now();
+    return offers.filter((offer) => {
+      if (!offer || offer.isActive === false) return false;
+      const start = new Date(offer.startDate).getTime();
+      const end = new Date(offer.endDate).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+      return start <= now && now <= end;
+    });
+  }, [offers]);
+
+  const getApplicableOffer = useCallback((itemId) => {
+    const normalizedItemId = String(itemId || '');
+    const productOffer = activeOffers.find((offer) => (
+      offer.offerType === 'product' && String(offer.productId || '') === normalizedItemId
+    ));
+    if (productOffer) return productOffer;
+    return activeOffers.find((offer) => offer.offerType === 'all_products') || null;
+  }, [activeOffers]);
+
+  const getDiscountedUnitPrice = useCallback((basePrice, itemId) => {
+    const numericPrice = Number(basePrice) || 0;
+    const appliedOffer = getApplicableOffer(itemId);
+    if (!appliedOffer || numericPrice <= 0) {
+      return {
+        finalPrice: numericPrice,
+        originalPrice: numericPrice,
+        discountAmount: 0,
+        appliedOffer: null,
+      };
+    }
+
+    const discountValue = Number(appliedOffer.discountValue) || 0;
+    let discountAmount = 0;
+    if (appliedOffer.discountType === 'percentage') {
+      discountAmount = (numericPrice * discountValue) / 100;
+    } else {
+      discountAmount = discountValue;
+    }
+
+    const finalPrice = Math.max(0, Number((numericPrice - discountAmount).toFixed(2)));
+    const normalizedDiscountAmount = Number((numericPrice - finalPrice).toFixed(2));
+
+    return {
+      finalPrice,
+      originalPrice: numericPrice,
+      discountAmount: normalizedDiscountAmount,
+      appliedOffer,
+    };
+  }, [getApplicableOffer]);
 
   // Debounce search term for better performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -236,18 +292,34 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
 
       // Add new item to cart
       const variantDescriptor = getVariantDescriptor(variant);
+      const priceInfo = getDiscountedUnitPrice(
+        variant ? variant.price : itemToAdd.price,
+        itemToAdd._id,
+      );
       const cartItem = variant 
         ? {
             _id: itemToAdd._id,
             name: `${itemToAdd.name} (${variant.label}${variantDescriptor ? ` • ${variantDescriptor}` : ''})`,
-            price: variant.price,
+            price: priceInfo.finalPrice,
+            originalPrice: priceInfo.originalPrice,
+            discountAmount: priceInfo.discountAmount,
+            appliedOfferId: priceInfo.appliedOffer?._id || null,
+            appliedOfferTitle: priceInfo.appliedOffer?.title || '',
             quantity: 1,
             variantId: variant._id,
             variantLabel: variant.label,
             variantSize: variant.size || '',
             variantColor: variant.color || ''
           }
-        : { ...itemToAdd, quantity: 1 };
+        : {
+            ...itemToAdd,
+            price: priceInfo.finalPrice,
+            originalPrice: priceInfo.originalPrice,
+            discountAmount: priceInfo.discountAmount,
+            appliedOfferId: priceInfo.appliedOffer?._id || null,
+            appliedOfferTitle: priceInfo.appliedOffer?.title || '',
+            quantity: 1,
+          };
 
       return [...prevCart, cartItem];
     });
@@ -255,7 +327,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     setLastAddedId(itemToAdd._id);
     setTimeout(() => setLastAddedId(null), 500);
     setVariantSelectorItem(null);
-  }, [inventory, showToast, getVariantDescriptor]);
+  }, [inventory, showToast, getVariantDescriptor, getDiscountedUnitPrice]);
 
   const updateCartQuantity = useCallback((itemId, amount, variantId = null) => {
     setCart(prevCart => {
@@ -357,6 +429,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         name: item.name, 
         quantity: item.quantity, 
         price: item.price,
+        originalPrice: item.originalPrice ?? item.price,
+        discountAmount: item.discountAmount || 0,
+        appliedOfferId: item.appliedOfferId || null,
+        appliedOfferTitle: item.appliedOfferTitle || null,
         variantId: item.variantId || null,
         variantLabel: item.variantLabel || null,
         variantSize: item.variantSize || null,
@@ -490,18 +566,21 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
                     {filteredInventory.map(item => {
                       const hasVariants = item.variants && item.variants.length > 0;
+                      const itemOffer = getApplicableOffer(item._id);
                       const totalStock = hasVariants 
                         ? item.variants.reduce((sum, v) => sum + (v.quantity || 0), 0)
                         : (item.quantity || 0);
                       const priceDisplay = hasVariants
                         ? (() => {
-                            const prices = item.variants.map(v => v.price).filter(p => p !== undefined && p !== null);
+                            const prices = item.variants
+                              .map(v => getDiscountedUnitPrice(v.price, item._id).finalPrice)
+                              .filter(p => p !== undefined && p !== null);
                             if (prices.length === 0) return 'N/A';
                             const minPrice = Math.min(...prices);
                             const maxPrice = Math.max(...prices);
                             return minPrice === maxPrice ? `₹${minPrice}` : `₹${minPrice}-${maxPrice}`;
                           })()
-                        : `₹${item.price || 0}`;
+                        : `₹${getDiscountedUnitPrice(item.price || 0, item._id).finalPrice}`;
 
                       return (
                         <button
@@ -515,6 +594,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                               {hasVariants && (
                                 <span className={`text-[6px] font-black px-1 py-0.5 rounded flex-shrink-0 ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
                                   {item.variants.length}V
+                                </span>
+                              )}
+                              {itemOffer && (
+                                <span className={`text-[6px] font-black px-1 py-0.5 rounded flex-shrink-0 ${darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  OFF
                                 </span>
                               )}
                             </div>
@@ -544,6 +628,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                         <div className="flex-1 truncate pr-2 md:pr-4 min-w-0">
                           <p className="text-xs font-black truncate mb-0.5">{item.name}</p>
                           <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
+                          {item.discountAmount > 0 && item.originalPrice > item.price && (
+                            <p className="text-[8px] font-bold text-emerald-500 tracking-wider">
+                              Offer: ₹{item.originalPrice.toLocaleString()} - ₹{item.discountAmount.toLocaleString()}
+                            </p>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-2 md:gap-4 md:gap-8 flex-shrink-0">
@@ -1055,7 +1144,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                           <div className="flex items-center gap-3 md:gap-4 mt-2">
                             <div>
                               <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Price</p>
-                              <p className="text-sm md:text-base font-black text-emerald-500">₹{variant.price?.toLocaleString() || '0'}</p>
+                              <p className="text-sm md:text-base font-black text-emerald-500">
+                                ₹{getDiscountedUnitPrice(variant.price, variantSelectorItem._id).finalPrice?.toLocaleString() || '0'}
+                              </p>
                             </div>
                             <div>
                               <p className={`text-[8px] md:text-[9px] font-black tracking-widest mb-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Stock</p>
