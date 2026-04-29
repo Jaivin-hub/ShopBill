@@ -311,7 +311,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Owner default targeting (ledger payments handled separately).
                 if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
-                    if (isAttendanceEvent || isLedgerPayment || ownerIdStr !== actorIdStr) {
+                    if (isLedgerPayment || ownerIdStr !== actorIdStr) {
                         targetUserIds.add(ownerIdStr);
                         if (isCreditSale) {
                             console.log(`📢 Credit sale: Owner ${ownerIdStr} will receive notification.`);
@@ -334,11 +334,11 @@ const emitAlert = async (req, storeId, type, data) => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();
                             if (isAttendanceEvent) {
-                                targetUserIds.add(staffUserIdStr);
+                                if (staffUserIdStr !== actorIdStr) targetUserIds.add(staffUserIdStr);
                                 return;
                             }
                             if (isLedgerPayment) {
-                                targetUserIds.add(staffUserIdStr);
+                                if (staffUserIdStr !== actorIdStr) targetUserIds.add(staffUserIdStr);
                                 return;
                             }
                             if (staffUserIdStr !== actorIdStr) {
@@ -372,18 +372,8 @@ const emitAlert = async (req, storeId, type, data) => {
                     storeName: storeName // Include store name in notification data
                 };
                 
-                // If recipient targeting resolves to nobody (common in single-user shops),
-                // fallback to actor so push diagnostics/alerts are still delivered.
-                if (targetUserIds.size === 0 && actorIdStr) {
-                    targetUserIds.add(actorIdStr);
-                    console.log(`📢 Push fallback applied: no recipients, using actor ${actorIdStr}`);
-                }
-
-                // Delivery reliability: also include actor device for push delivery so
-                // single-device/same-user testing still receives background notifications.
-                // Socket/in-app list can still filter actor-facing items separately.
-                if (actorIdStr && !isInventoryPriceUpdated) {
-                    targetUserIds.add(actorIdStr);
+                if (targetUserIds.size === 0) {
+                    console.log('📢 No notification recipients after actor exclusion.');
                 }
 
                 // Emit to specific user rooms instead of broadcasting to all

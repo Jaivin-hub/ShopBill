@@ -728,9 +728,7 @@ const App = () => {
     // Filter out notifications where current user is the actor.
     const actorIdStr = incomingAlert?.actorId != null ? String(incomingAlert.actorId) : null;
     const userIdStr = currentUser?._id != null ? String(currentUser._id) : (currentUser?.id != null ? String(currentUser.id) : null);
-    const alertType = String(incomingAlert?.type || '');
-    const isAttendanceEvent = alertType.startsWith('attendance_');
-    if (!isAttendanceEvent && actorIdStr && userIdStr && actorIdStr === userIdStr) return;
+    if (actorIdStr && userIdStr && actorIdStr === userIdStr) return;
 
     const notificationWithReadStatus = formatNotificationForRole({
       ...incomingAlert,
