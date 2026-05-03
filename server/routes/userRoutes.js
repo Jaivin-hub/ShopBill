@@ -196,9 +196,14 @@ router.post('/device-token/test', async (req, res) => {
         const title = req.body?.title || 'Pocket POS Test Push';
         const body = req.body?.body || `Push test at ${ts}`;
         const link = req.body?.link || '/notifications';
+        const rawCat = req.body?.soundCategory || 'alert';
+        const soundCategory = ['chat', 'alert', 'ledger', 'attendance', 'default'].includes(String(rawCat).toLowerCase())
+            ? String(rawCat).toLowerCase()
+            : 'alert';
         const pushResult = await sendPushNotification(tokens, {
             title,
             body,
+            soundCategory,
             data: {
                 type: 'notification',
                 link,

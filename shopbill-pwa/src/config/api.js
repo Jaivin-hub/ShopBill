@@ -3,8 +3,19 @@
 // Use environment variable if available, otherwise fallback to production
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
 
-/** Socket.IO origin (HTTPS, no path). Nginx should proxy /socket.io to the Node server. */
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://server.pocketpos.io';
+/**
+ * Socket.IO origin only (HTTPS, no /api path, no port). Nginx must proxy /socket.io to Node.
+ * Default is AWS backend; set VITE_SOCKET_URL at build time if it differs.
+ */
+export const SOCKET_URL = 'https://server.pocketpos.io';
+
+/** Shared socket.io-client options (add auth: { token } at connect time). */
+export const SOCKET_IO_CLIENT_BASE = {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],
+  withCredentials: true,
+  reconnection: true,
+};
 
 const API = {
     // New Authentication Endpoints

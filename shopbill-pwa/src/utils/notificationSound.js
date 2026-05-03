@@ -30,11 +30,14 @@ const getAudioContext = () => {
   return audioContext;
 };
 
-/** Minimal WAV for beep - works on iOS/mobile where Web Audio is restricted */
-const getBeepDataUri = () => {
+/**
+ * Minimal WAV for beep - works on iOS/mobile where Web Audio is restricted.
+ * @param {number} freq - Hz
+ * @param {number} duration - seconds
+ * @param {number} decayExp - envelope decay
+ */
+const getBeepDataUri = (freq = 880, duration = 0.2, decayExp = 5) => {
   const sampleRate = 8000;
-  const duration = 0.2;
-  const freq = 880;
   const numSamples = Math.floor(sampleRate * duration);
   const numChannels = 1;
   const bitsPerSample = 8;
@@ -62,13 +65,29 @@ const getBeepDataUri = () => {
   write(40, dataSize);
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
-    const sample = Math.floor(127 + 80 * Math.sin(2 * Math.PI * freq * t) * Math.exp(-5 * t));
+    const sample = Math.floor(127 + 80 * Math.sin(2 * Math.PI * freq * t) * Math.exp(-decayExp * t));
     view.setUint8(44 + i, Math.max(0, Math.min(255, sample)));
   }
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return 'data:audio/wav;base64,' + btoa(binary);
+};
+
+const playHtmlAudioFromUri = (dataUri, volume = 0.7) => {
+  try {
+    const a = new Audio(dataUri);
+    a.setAttribute?.('playsinline', 'true');
+    a.playsInline = true;
+    a.preload = 'auto';
+    a.volume = volume;
+    a.muted = false;
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && typeof p.catch === 'function') p.catch(() => { void 0; });
+  } catch {
+    void 0;
+  }
 };
 
 const playHtmlAudioFallback = () => {
@@ -129,8 +148,35 @@ export const playMessageSound = () => {
   playHtmlAudioFallback();
 };
 
-// Keep notification alert sound consistent with chat sound preferences.
+/** In-app / foreground push sounds: distinct per category (synthetic WAV; OS may still use its own sound when app is backgrounded). */
+export const playPushSoundCategory = (category) => {
+  if (!isChatSoundEnabled()) return;
+  const c = String(category || 'default').toLowerCase();
+  if (c === 'chat') {
+    playHtmlAudioFromUri(getBeepDataUri(880, 0.18, 6), 0.65);
+    return;
+  }
+  if (c === 'alert') {
+    playHtmlAudioFromUri(getBeepDataUri(392, 0.35, 3), 0.85);
+    setTimeout(() => playHtmlAudioFromUri(getBeepDataUri(330, 0.35, 3), 0.85), 200);
+    return;
+  }
+  if (c === 'ledger') {
+    playHtmlAudioFromUri(getBeepDataUri(523, 0.11, 9), 0.55);
+    setTimeout(() => playHtmlAudioFromUri(getBeepDataUri(659, 0.11, 9), 0.55), 130);
+    return;
+  }
+  if (c === 'attendance') {
+    playHtmlAudioFromUri(getBeepDataUri(440, 0.07, 11), 0.5);
+    setTimeout(() => playHtmlAudioFromUri(getBeepDataUri(440, 0.07, 11), 0.5), 110);
+    setTimeout(() => playHtmlAudioFromUri(getBeepDataUri(554, 0.13, 8), 0.55), 230);
+    return;
+  }
+  playHtmlAudioFromUri(getBeepDataUri(660, 0.14, 7), 0.6);
+};
+
+// General notification (socket) — medium ping, distinct from chat
 export const playNotificationSound = () => {
   if (!isChatSoundEnabled()) return;
-  playHtmlAudioFallback();
+  playPushSoundCategory('default');
 };

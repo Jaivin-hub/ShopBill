@@ -365,11 +365,30 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
+                const pushSoundCategory = (() => {
+                    if (type === 'inventory_low' || type === 'credit_exceeded') return 'alert';
+                    if (
+                        type === 'attendance_punch_in' ||
+                        type === 'attendance_break_start' ||
+                        type === 'attendance_break_end' ||
+                        type === 'attendance_punch_out'
+                    ) return 'attendance';
+                    if (
+                        type === 'ledger_payment' ||
+                        type === 'ledger_credit' ||
+                        type === 'credit_sale' ||
+                        type === 'credit_limit_updated' ||
+                        type === 'customer_added'
+                    ) return 'ledger';
+                    return 'default';
+                })();
+
                 // Prepare notification data with store name
                 const notificationData = { 
                     ...newNotification.toObject(), 
                     isRead: false,
-                    storeName: storeName // Include store name in notification data
+                    storeName: storeName, // Include store name in notification data
+                    soundCategory: pushSoundCategory,
                 };
                 
                 if (targetUserIds.size === 0) {
@@ -401,6 +420,7 @@ const emitAlert = async (req, storeId, type, data) => {
                         const pushResult = await sendPushNotification(dedupedTokens, {
                             title: title || 'Pocket POS',
                             body: finalMessage?.slice(0, 120) || message?.slice(0, 120) || 'New notification',
+                            soundCategory: pushSoundCategory,
                             data: {
                                 type: 'notification',
                                 link: '/notifications',
@@ -408,6 +428,8 @@ const emitAlert = async (req, storeId, type, data) => {
                                 storeId: storeIdStr,
                                 notificationType: type,
                                 category,
+                                actorId: actorId?.toString?.() || '',
+                                soundCategory: pushSoundCategory,
                             },
                         });
                         console.log(`[Push][${pushTraceId}] Notification delivered: ${pushResult.success} ok, ${pushResult.failure} failed, firebaseTrace=${pushResult.traceId}`);
@@ -524,6 +546,7 @@ const notifySuperadminsNewShop = async (req, newOwner) => {
                 sendPushNotification(allTokens, {
                     title: title,
                     body: message.slice(0, 120),
+                    soundCategory: 'alert',
                     data: { type: 'notification', link: '/notifications', notificationType: 'new_shop_registered' }
                 }).catch(err => console.error('[Push] Superadmin new-shop notification error:', err));
             }

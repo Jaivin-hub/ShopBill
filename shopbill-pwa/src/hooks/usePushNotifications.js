@@ -4,23 +4,37 @@
  * On mobile (iOS): requires user gesture - handled by pushOnGesture on first tap.
  */
 import { useEffect, useRef } from 'react';
-import { requestNotificationPermissionAndToken, isPushSupported } from '../lib/firebase';
+import { requestNotificationPermissionAndToken, isPushSupported, ensureFcmServiceWorkerReady } from '../lib/firebase';
 import apiClient from '../lib/apiClient';
+import { FIREBASE_VAPID_KEY, isPushConfigured } from '../config/pushEnv';
 
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-export function usePushNotifications(enabled) {
-  const registeredRef = useRef(false);
+/**
+ * @param {boolean} enabled — e.g. !!currentUser
+ * @param {string|undefined} userKey — user id; when it changes, token is re-posted for the new account
+ */
+export function usePushNotifications(enabled, userKey) {
+  /** Last FCM token POSTed to API this session (token refresh must re-register). */
+  const lastPostedTokenRef = useRef('');
+  const lastUserKeyRef = useRef('');
 
   useEffect(() => {
-    if (!enabled || !VAPID_KEY) {
-      console.log('[Push][Hook] Skipping: disabled or missing VAPID key');
+    if (!enabled) {
+      return;
+    }
+    if (!isPushConfigured()) {
+      console.error('[Push][Hook] VITE_FIREBASE_VAPID_KEY is missing or invalid in this build — web push cannot register. Add it in .env / hosting env and rebuild.');
       return;
     }
     if (!localStorage.getItem('userToken')) {
       console.log('[Push][Hook] Skipping: no auth token in storage');
       return;
+    }
+
+    if (userKey != null && lastUserKeyRef.current !== String(userKey)) {
+      lastPostedTokenRef.current = '';
+      lastUserKeyRef.current = String(userKey);
     }
 
     let cancelled = false;
@@ -51,28 +65,35 @@ export function usePushNotifications(enabled) {
           return;
         }
         try {
-          const readyReg = await navigator.serviceWorker.ready;
-          const sub = await readyReg.pushManager.getSubscription();
-          console.log('[Push][Hook] Existing PushManager subscription:', sub ? { endpointTail: String(sub.endpoint || '').slice(-32) } : null);
+          const fcmReg = await ensureFcmServiceWorkerReady();
+          if (!fcmReg?.active) {
+            console.warn('[Push][Hook] FCM SW not active yet; getToken will register/wait (separate scope from Workbox)');
+          }
+          if (fcmReg) {
+            const sub = await fcmReg.pushManager.getSubscription();
+            console.log('[Push][Hook] FCM scope PushManager subscription:', sub ? { endpointTail: String(sub.endpoint || '').slice(-32) } : null);
+          }
         } catch (pmErr) {
           console.warn('[Push][Hook] PushManager subscription check failed:', pmErr?.message || pmErr);
         }
         console.log('[Push][Hook] Attempting push token registration...');
-        const fcmToken = await requestNotificationPermissionAndToken(VAPID_KEY);
+        const fcmToken = await requestNotificationPermissionAndToken(FIREBASE_VAPID_KEY);
         if (!fcmToken || cancelled) {
           console.log('[Push][Hook] No token generated or attempt cancelled');
           return;
         }
-        if (registeredRef.current) {
-          console.log('[Push][Hook] Token already registered in this session');
+        if (lastPostedTokenRef.current === fcmToken) {
+          console.log('[Push][Hook] Token unchanged since last POST, skipping duplicate register');
           return;
         }
         await apiClient.post('/user/device-token', {
           token: fcmToken,
           platform: isMobile() ? 'ios-web' : 'web'
+        }, {
+          headers: { 'x-skip-attendance-prompt': '1' }
         });
         console.log(`[Push][Hook] Device token registered tokenTail=...${fcmToken.slice(-12)}`);
-        registeredRef.current = true;
+        lastPostedTokenRef.current = fcmToken;
         localStorage.setItem('push_token_registered', '1');
       } catch (err) {
         if (!cancelled) console.warn('[Push] Register failed:', err?.message || err);
@@ -88,7 +109,7 @@ export function usePushNotifications(enabled) {
     let retryCount = 0;
     // Keep retrying in background for delayed iOS SW/token readiness.
     interval = setInterval(() => {
-      if (cancelled || registeredRef.current || retryCount >= 5) {
+      if (cancelled || lastPostedTokenRef.current || retryCount >= 5) {
         if (interval) clearInterval(interval);
         return;
       }
@@ -96,10 +117,19 @@ export function usePushNotifications(enabled) {
       attempt();
     }, 30000);
 
+    const onVisibleOrFocus = () => {
+      if (cancelled || lastPostedTokenRef.current) return;
+      if (document.visibilityState === 'visible') attempt();
+    };
+    window.addEventListener('focus', onVisibleOrFocus);
+    document.addEventListener('visibilitychange', onVisibleOrFocus);
+
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
       if (interval) clearInterval(interval);
+      window.removeEventListener('focus', onVisibleOrFocus);
+      document.removeEventListener('visibilitychange', onVisibleOrFocus);
     };
-  }, [enabled]);
+  }, [enabled, userKey]);
 }

@@ -857,12 +857,17 @@ router.post('/:chatId/message', (req, res, next) => {
                 const pushResult = await sendPushNotification(dedupedTokens, {
                     title: senderName,
                     body: contentPreview,
+                    soundCategory: 'chat',
                     data: {
                         chatId: chat._id.toString(),
                         messageId: populatedMessage._id?.toString() || '',
                         senderId: req.user.id.toString(),
+                        actorId: req.user.id.toString(),
                         senderName,
-                        type: 'chat_message'
+                        type: 'chat_message',
+                        notificationType: 'chat_message',
+                        soundCategory: 'chat',
+                        link: `/chat/${chat._id}`,
                     }
                 });
                 console.log('[Push] Chat push RESULT: success=', pushResult.success, 'failure=', pushResult.failure, 'trace=', pushResult.traceId || 'n/a');

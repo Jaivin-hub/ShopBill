@@ -54,6 +54,45 @@ function getAdmin() {
     }
 }
 
+const ALLOWED_SOUND = new Set(['chat', 'alert', 'ledger', 'attendance', 'default']);
+
+/** FCM `data` must be string → string; objects as values cause send failures or empty client payloads. */
+function stringifyDataMap(obj) {
+    const out = {};
+    if (!obj || typeof obj !== 'object') return out;
+    for (const [k, v] of Object.entries(obj)) {
+        const key = String(k);
+        if (v == null) {
+            out[key] = '';
+            continue;
+        }
+        if (typeof v === 'object') {
+            try {
+                out[key] = JSON.stringify(v);
+            } catch {
+                out[key] = String(v);
+            }
+            continue;
+        }
+        out[key] = String(v);
+    }
+    return out;
+}
+
+function normalizeSoundCategory(raw) {
+    const s = String(raw || 'default').toLowerCase();
+    return ALLOWED_SOUND.has(s) ? s : 'default';
+}
+
+/** Android notification channel id (native/TWA; ignored on pure web). */
+function androidChannelForSound(soundCategory) {
+    if (soundCategory === 'chat') return 'pocketpos_chat';
+    if (soundCategory === 'alert') return 'pocketpos_alerts';
+    if (soundCategory === 'ledger') return 'pocketpos_ledger';
+    if (soundCategory === 'attendance') return 'pocketpos_attendance';
+    return 'pocketpos_default';
+}
+
 async function sendPushNotification(tokens, payload) {
     const fb = getAdmin();
     if (!fb) {
@@ -65,40 +104,68 @@ async function sendPushNotification(tokens, payload) {
         return { success: 0, failure: 0 };
     }
     const deduped = [...new Set(tokens)];
-    const { title, body, data = {} } = payload;
+    const { title, body, data = {}, soundCategory: rawSound = 'default' } = payload;
+    const soundCategory = normalizeSoundCategory(rawSound);
+    const androidChannelId = androidChannelForSound(soundCategory);
     const ts = new Date().toISOString();
     const traceId = `push-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    console.log(`[Push][${traceId}] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
+    console.log(`[Push][${traceId}] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | sound=${soundCategory} | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
     try {
-        const normalizedData = Object.fromEntries(
-            Object.entries(data).map(([k, v]) => [String(k), String(v ?? '')])
-        );
-        const baseClientUrl = String(process.env.CLIENT_URL || '').trim().replace(/\/+$/, '');
-        const rawLink = normalizedData.link || (normalizedData.chatId ? `/chat/${normalizedData.chatId}` : '/notifications');
+        const baseClientUrl = String(process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://pocketpos.io').trim().replace(/\/+$/, '');
+        const preData = stringifyDataMap({ ...data, soundCategory });
+        const rawLink = preData.link || (preData.chatId ? `/chat/${preData.chatId}` : '/notifications');
         const link = rawLink.startsWith('http')
             ? rawLink
             : (baseClientUrl ? `${baseClientUrl}${rawLink.startsWith('/') ? '' : '/'}${rawLink}` : rawLink);
+        const linkPath = rawLink.startsWith('http') ? rawLink : (rawLink.startsWith('/') ? rawLink : `/${rawLink}`);
         console.log(`[Push][${traceId}] WebPush target link="${link}" raw="${rawLink}" clientUrl="${baseClientUrl || '(missing)'}"`);
+        const normalizedData = stringifyDataMap({
+            ...preData,
+            title: String(title || preData.title || ''),
+            body: String(body || preData.body || ''),
+            soundCategory,
+            link: preData.link || linkPath,
+        });
+        const webpushData = stringifyDataMap({
+            ...normalizedData,
+            title: String(title || normalizedData.title || ''),
+            body: String(body || normalizedData.body || ''),
+            soundCategory,
+            link: normalizedData.link || linkPath,
+        });
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
-            notification: { title, body, sound: 'default' },
+            notification: { title, body },
             android: {
                 priority: 'high',
-                notification: { sound: 'default', channelId: 'default' },
+                notification: {
+                    title,
+                    body,
+                    sound: 'default',
+                    channelId: androidChannelId,
+                    defaultSound: true,
+                    defaultVibrateTimings: true,
+                },
                 ttl: 60 * 60 * 1000
             },
             webpush: {
                 headers: {
                     Urgency: 'high',
-                    TTL: String(60 * 60 * 24) // 24h
+                    TTL: String(60 * 60 * 24), // 24h
                 },
+                data: webpushData,
                 notification: {
                     title,
                     body,
                     icon: '/pwa-192x192.png',
                     badge: '/pwa-192x192.png',
                     requireInteraction: false,
-                    silent: false
+                    silent: false,
+                    tag: normalizedData.notificationId
+                        ? `pp-${soundCategory}-${normalizedData.notificationId}`
+                        : normalizedData.chatId
+                            ? `pp-chat-${normalizedData.chatId}`
+                            : `pp-${soundCategory}-${traceId.slice(-6)}`,
                 },
                 fcmOptions: {
                     link,

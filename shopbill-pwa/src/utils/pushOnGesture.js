@@ -4,14 +4,16 @@
  */
 import { requestNotificationPermissionAndToken, isPushSupported } from '../lib/firebase';
 import apiClient from '../lib/apiClient';
+import { FIREBASE_VAPID_KEY, isPushConfigured } from '../config/pushEnv';
 
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const STORAGE_KEY = 'push_token_registered';
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 export async function requestPushFromGesture() {
-  if (!VAPID_KEY || !localStorage.getItem('userToken')) {
-    console.log('[Push][Gesture] Skipping: missing VAPID or auth token');
+  if (!isPushConfigured() || !localStorage.getItem('userToken')) {
+    if (!isPushConfigured()) {
+      console.warn('[Push][Gesture] Skipping: VITE_FIREBASE_VAPID_KEY not set in build');
+    }
     return;
   }
   try {
@@ -20,9 +22,11 @@ export async function requestPushFromGesture() {
       return;
     }
     console.log('[Push][Gesture] User gesture detected, requesting token...');
-    const token = await requestNotificationPermissionAndToken(VAPID_KEY);
+    const token = await requestNotificationPermissionAndToken(FIREBASE_VAPID_KEY);
     if (token) {
-      await apiClient.post('/user/device-token', { token, platform: isMobile() ? 'ios-web' : 'web' });
+      await apiClient.post('/user/device-token', { token, platform: isMobile() ? 'ios-web' : 'web' }, {
+        headers: { 'x-skip-attendance-prompt': '1' }
+      });
       localStorage.setItem(STORAGE_KEY, '1');
       console.log(`[Push][Gesture] Device token registered tokenTail=...${token.slice(-12)}`);
     } else {

@@ -6,12 +6,12 @@ import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || undefined,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyD3r9_7L1TttIFFiP9lXEnatE22p5m9SRk',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'pocketpos-d0f89.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'pocketpos-d0f89',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'pocketpos-d0f89.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '918619248030',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:918619248030:web:05b66603fe70426211728f',
 };
 
 let app = null;
@@ -50,15 +50,21 @@ async function getFCMServiceWorkerRegistration() {
     console.warn('[Push][Firebase] serviceWorker not available');
     return null;
   }
-  let reg = await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE);
+  const scopeNorm = FCM_SW_SCOPE.endsWith('/') ? FCM_SW_SCOPE : `${FCM_SW_SCOPE}/`;
+  let reg = await navigator.serviceWorker.getRegistration(scopeNorm);
   if (reg?.active) {
     console.log('[Push][Firebase] Reusing active FCM SW registration');
     return reg;
   }
   try {
-    console.log('[Push][Firebase] Registering FCM service worker...');
-    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: FCM_SW_SCOPE });
+    console.log('[Push][Firebase] Registering FCM service worker scope=', scopeNorm);
+    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: scopeNorm, updateViaCache: 'none' });
     console.log('[Push][Firebase] FCM service worker register call succeeded');
+    try {
+      await reg.update();
+    } catch (updErr) {
+      console.warn('[Push][Firebase] reg.update():', updErr?.message || updErr);
+    }
   } catch (e) {
     console.warn('[Firebase] SW register failed:', e?.message);
     return null;
@@ -82,6 +88,11 @@ async function getFCMServiceWorkerRegistration() {
   return reg;
 }
 
+/** Wait until the Firebase messaging SW (separate scope from Workbox) is active — required for getToken. */
+export async function ensureFcmServiceWorkerReady() {
+  return getFCMServiceWorkerRegistration();
+}
+
 export async function requestNotificationPermissionAndToken(vapidKey) {
   if (!('Notification' in window)) {
     console.warn('[Push][Firebase] Notification API unavailable');
@@ -96,7 +107,14 @@ export async function requestNotificationPermissionAndToken(vapidKey) {
       console.warn('[Push][Firebase] Firebase messaging unsupported in this browser');
       return null;
     }
-    const permission = await Notification.requestPermission();
+    if (Notification.permission === 'denied') {
+      console.warn('[Push][Firebase] Notifications are blocked; enable them in browser settings for this site');
+      return null;
+    }
+    let permission = Notification.permission;
+    if (permission === 'default') {
+      permission = await Notification.requestPermission();
+    }
     console.log(`[Push][Firebase] Notification permission result=${permission}`);
     if (permission !== 'granted') return null;
     const swReg = await getFCMServiceWorkerRegistration();

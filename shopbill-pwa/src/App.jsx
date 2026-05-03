@@ -5,12 +5,12 @@ import {
 import { io } from 'socket.io-client';
 
 // Core Component Imports
-import API, { SOCKET_URL } from './config/api';
+import API, { SOCKET_URL, SOCKET_IO_CLIENT_BASE } from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { onForegroundMessage } from './lib/firebase';
-import { playMessageSound, playNotificationSound, unlockAudio } from './utils/notificationSound';
+import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -457,7 +457,19 @@ const App = () => {
     if (userRole === USER_ROLES.MANAGER && pageId === 'staffPermissions') return true;
     return rolePagePermissions?.[pageId] === true;
   }, [userRole, rolePagePermissions]);
-  usePushNotifications(!!currentUser);
+  usePushNotifications(!!currentUser, currentUser?._id || currentUser?.id);
+
+  /** FCM SW plays OS notification; open clients get distinct synthetic sounds via postMessage. */
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onSwMessage = (event) => {
+      if (event?.data?.type === 'play-push-sound' && event.data.category) {
+        playPushSoundCategory(event.data.category);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
+  }, []);
 
   // Calculate unread count - updates in real-time when notifications change via Socket.IO
   const unreadCount = useMemo(() => {
@@ -536,8 +548,9 @@ const App = () => {
 
       const url = String(config?.url || '').toLowerCase();
       const isAttendanceApi = url.includes('/attendance/');
+      const isPushDeviceTokenApi = url.includes('/user/device-token');
       const isBypass = config?.headers?.['x-skip-attendance-prompt'] === '1';
-      if (isAttendanceApi || isBypass) return config;
+      if (isAttendanceApi || isPushDeviceTokenApi || isBypass) return config;
       if (!isStaffUserRef.current || hasStaffPunchedInRef.current) return config;
       if (!hasResolvedAttendanceStatusRef.current) return config;
 
@@ -745,7 +758,11 @@ const App = () => {
       return [notificationWithReadStatus, ...prev].slice(0, 50);
     });
 
-    playNotificationSound();
+    const soundCategory =
+      notificationWithReadStatus?.soundCategory ||
+      notificationWithReadStatus?.metadata?.soundCategory ||
+      'default';
+    playPushSoundCategory(soundCategory);
 
     if (notificationWithReadStatus?.message) {
       showToast(notificationWithReadStatus.message, 'info');
@@ -936,10 +953,8 @@ useEffect(() => {
     if (!currentUser) return;
 
     socketRef.current = io(SOCKET_URL, {
+      ...SOCKET_IO_CLIENT_BASE,
       auth: { token: localStorage.getItem('userToken') },
-      transports: ['polling', 'websocket'],
-      withCredentials: true,
-      reconnection: true
     });
     const socket = socketRef.current;
     
@@ -1008,16 +1023,29 @@ useEffect(() => {
         const data = payload?.data || {};
         const notification = payload?.notification || {};
         const fallbackId = `fcm-${Date.now()}`;
+        const notifType = data.notificationType || data.type || '';
+        const inferredSound =
+          notifType === 'chat_message' || data.type === 'chat_message'
+            ? 'chat'
+            : String(notifType).startsWith('attendance_')
+              ? 'attendance'
+              : ['ledger_payment', 'ledger_credit', 'credit_sale', 'credit_limit_updated', 'customer_added'].includes(String(notifType))
+                ? 'ledger'
+                : ['inventory_low', 'credit_exceeded'].includes(String(notifType))
+                  ? 'alert'
+                  : 'default';
+        const soundCategory = data.soundCategory || inferredSound;
         const synthesizedAlert = {
-          _id: data.notificationId || fallbackId,
-          id: data.notificationId || fallbackId,
-          type: data.notificationType || 'info',
+          _id: data.notificationId || data.messageId || fallbackId,
+          id: data.notificationId || data.messageId || fallbackId,
+          type: data.notificationType || data.type || 'info',
           category: data.category || 'Info',
-          title: notification.title || 'Pocket POS',
+          title: notification.title || data.title || 'Pocket POS',
           message: notification.body || data.body || data.message || 'New notification',
           createdAt: new Date().toISOString(),
-          actorId: data.actorId || null,
-          metadata: data
+          actorId: data.actorId || data.senderId || null,
+          soundCategory,
+          metadata: { ...data, soundCategory },
         };
         handleIncomingNotification(synthesizedAlert);
       });
