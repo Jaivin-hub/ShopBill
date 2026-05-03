@@ -363,6 +363,40 @@ router.put('/:customerId', protect, async (req, res) => {
     }
 });
 
+// --- DELETE CUSTOMER ---
+router.delete('/:customerId', protect, async (req, res) => {
+    const { customerId } = req.params;
+
+    if (!req.user.storeId) {
+        return res.status(400).json({ error: 'No active outlet selected.' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid Customer ID.' });
+    }
+
+    try {
+        const customer = await Customer.findOne({ _id: customerId, storeId: req.user.storeId }).lean();
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found or does not belong to this shop.' });
+        }
+
+        const hasOutstanding = Number(customer.outstandingCredit || 0) > 0;
+        if (hasOutstanding) {
+            return res.status(400).json({ error: 'Cannot delete customer with outstanding amount. Clear dues first.' });
+        }
+
+        await Promise.all([
+            Customer.deleteOne({ _id: customerId, storeId: req.user.storeId }),
+            KhataTransaction.deleteMany({ customerId, storeId: req.user.storeId }),
+        ]);
+
+        return res.json({ success: true, message: 'Customer deleted successfully.' });
+    } catch (error) {
+        console.error('Customer DELETE Error:', error);
+        return res.status(500).json({ error: 'Failed to delete customer.' });
+    }
+});
+
 // --- SEND REMINDER (WHATSAPP + SMS) ---
 // MAKE SURE THIS IS AT THE TOP OF YOUR FILE:
 // const User = require('../models/User'); 

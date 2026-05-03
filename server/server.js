@@ -103,6 +103,8 @@ app.use('/api/outlets', outletRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/offers', offersRoutes);
 
+app.get('/api/test', (req, res) => res.send('API is working!'));
+
 // Serve uploads via API (works when reverse proxy only forwards /api)
 // Filenames are unguessable (timestamp+random); optional: add token validation later
 app.get('/api/uploads/audio/:filename', (req, res) => {
@@ -191,13 +193,14 @@ io.on('connection', (socket) => {
 const startServer = async () => {
     try {
         await connectDB();
-        // Initialize Firebase Admin early so push logs appear on first notification
         const fb = getAdmin();
-        console.log(`[Push] Debugging: ${fb ? 'Firebase Admin ready' : 'Firebase Admin NOT configured (check .env FIREBASE_*)'}`);
-        server.listen(PORT, () => {
+        console.log(`[Push] Debugging: ${fb ? 'Firebase Admin ready' : 'Firebase Admin NOT configured'}`);
+
+        // Change: Explicitly add '0.0.0.0' to accept external AWS traffic
+        server.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`📡 Socket.io Active for Alerts & Resolutions`);
-            console.log(`[Push] Push notification logs: [Push] prefix = firebase, device-token, notification, chat`);
+            console.log(`📡 Listening on 0.0.0.0 (All Interfaces)`);
+            console.log(`[Push] Push notification logs active.`);
         });
     } catch (error) {
         console.error('Startup Error:', error);

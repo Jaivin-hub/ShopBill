@@ -3,6 +3,9 @@
 // Use environment variable if available, otherwise fallback to production
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
 
+/** Socket.IO origin (HTTPS, no path). Nginx should proxy /socket.io to the Node server. */
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://server.pocketpos.io';
+
 const API = {
     // New Authentication Endpoints
     login: API_BASE_URL + '/auth/login',

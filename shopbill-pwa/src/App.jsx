@@ -5,7 +5,7 @@ import {
 import { io } from 'socket.io-client';
 
 // Core Component Imports
-import API from './config/api';
+import API, { SOCKET_URL } from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
@@ -935,7 +935,7 @@ useEffect(() => {
   useEffect(() => {
     if (!currentUser) return;
 
-    socketRef.current = io("https://shopbill-3le1.onrender.com", {
+    socketRef.current = io(SOCKET_URL, {
       auth: { token: localStorage.getItem('userToken') },
       transports: ['polling', 'websocket'],
       withCredentials: true,

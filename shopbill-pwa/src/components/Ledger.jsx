@@ -214,6 +214,26 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     }
   };
 
+  const handleDeleteCustomer = useCallback(async (customer) => {
+    if (!customer?._id) return;
+    if (!window.confirm(`Delete customer "${customer.name}"? This cannot be undone.`)) return;
+    setIsProcessing(true);
+    try {
+      await apiClient.delete(`${API.customers}/${customer._id}`);
+      if (showToast) showToast('Customer deleted', 'success');
+      await fetchCustomers();
+      if (selectedCustomer?._id === customer._id) {
+        setSelectedCustomer(null);
+        setActiveModal(null);
+      }
+    } catch (error) {
+      const msg = error?.response?.data?.error || 'Failed to delete customer';
+      if (showToast) showToast(msg, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [apiClient, API.customers, showToast, fetchCustomers, selectedCustomer?._id]);
+
   const openRemindModal = (customer) => {
     setSelectedCustomer(customer);
     setReminderType('whatsapp'); 
@@ -390,12 +410,13 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
               <LedgerSkeleton />
             ) : (
               <CustomerList
-                customersList={dueCustomers}
+                customersList={customers}
                 searchTerm={debouncedSearchTerm}
                 sortBy={sortBy}
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
                 openEditModal={(c) => { setSelectedCustomer(c); setActiveModal('edit'); }}
+                openDeleteModal={handleDeleteCustomer}
                 openRemindModal={openRemindModal}
                 showRemindOption={showRemindOption}
                 isProcessing={isProcessing}

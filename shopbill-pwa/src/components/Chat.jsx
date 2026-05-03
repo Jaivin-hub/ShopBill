@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, Loader2, ShieldCheck, Plus } from 'lucide-react';
 import { io } from 'socket.io-client';
-import API from '../config/api';
+import { SOCKET_URL } from '../config/api';
 import ChatListSidebar from './chat/ChatListSidebar';
 import ChatHeader from './chat/ChatHeader';
 import ChatMessages from './chat/ChatMessages';
@@ -87,7 +87,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         if (!hasChatAccess) return;
 
         const token = localStorage.getItem('userToken');
-        socketRef.current = io("https://shopbill-3le1.onrender.com", {
+        socketRef.current = io(SOCKET_URL, {
             auth: { token },
             transports: ['polling', 'websocket'],
             withCredentials: true,

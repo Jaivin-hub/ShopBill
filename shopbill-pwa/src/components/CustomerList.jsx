@@ -1,7 +1,7 @@
 import React, { useMemo, memo } from 'react'; 
 import { 
     History, Search, ShieldAlert, CheckCircle2, UserCircle2, BellRing,
-    AlertCircle, Pencil, Banknote
+    AlertCircle, Pencil, Banknote, Trash2
 } from 'lucide-react';
 
 const CustomerList = ({ 
@@ -12,6 +12,7 @@ const CustomerList = ({
     isProcessing,
     openHistoryModal,
     openEditModal,
+    openDeleteModal,
     darkMode,
     openRemindModal,
     showRemindOption = true,
@@ -157,6 +158,19 @@ const CustomerList = ({
                                 aria-label="Edit name, phone, or limit"
                             >
                                 <Pencil size={16} strokeWidth={2} />
+                            </button>
+                        )}
+                        {openDeleteModal && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDeleteModal(customer);
+                                }}
+                                className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-rose-400 hover:bg-slate-800' : 'text-slate-600 hover:text-rose-600 hover:bg-slate-100'}`}
+                                title="Delete customer"
+                                aria-label="Delete customer"
+                            >
+                                <Trash2 size={16} strokeWidth={2} />
                             </button>
                         )}
                         <button
