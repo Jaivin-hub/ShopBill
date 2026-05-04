@@ -7,14 +7,18 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://server.pocket
  * Socket.IO origin only (HTTPS, no /api path, no port). Nginx must proxy /socket.io to Node.
  * Default is AWS backend; set VITE_SOCKET_URL at build time if it differs.
  */
-export const SOCKET_URL = 'https://server.pocketpos.io';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://server.pocketpos.io';
 
 /** Shared socket.io-client options (add auth: { token } at connect time). */
 export const SOCKET_IO_CLIENT_BASE = {
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
+  // Polling first: many Nginx / CDN setups break WS upgrade; long-polling still gives real-time.
+  transports: ['polling', 'websocket'],
   withCredentials: true,
   reconnection: true,
+  reconnectionAttempts: 12,
+  reconnectionDelay: 1500,
+  timeout: 20000,
 };
 
 const API = {

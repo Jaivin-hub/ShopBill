@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertTriangle, Loader2, PackageSearch } from 'lucide-react';
+import { AlertTriangle, PackageSearch } from 'lucide-react';
 import InventoryContent from './InventoryContent';
+import { StockHubInitialSkeleton } from './skeletons/PageSkeletons';
 import { useDebounce } from '../hooks/useDebounce';
 import { exportRowsToExcel } from '../utils/exportExcel';
 
@@ -39,7 +40,9 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
 
     // --- Data States ---
     const [inventory, setInventory] = useState([]);
-    const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+    /** Inventory GET in flight — drives full-page skeleton first load, grid skeleton on refresh. */
+    const [dataLoading, setDataLoading] = useState(true);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // --- UI/Form States ---
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -67,8 +70,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     }, [initialSortOption, onSortOptionSet]);
 
     // --- Data Fetching Logic (Memoized for Pattern Consistency) ---
-    const fetchInventory = useCallback(async (isSilent = false) => {
-        if (!isSilent) setIsProcessing(true);
+    const fetchInventory = useCallback(async () => {
+        setDataLoading(true);
         try {
             const response = await apiClient.get(API.inventory);
             setInventory(response.data);
@@ -76,8 +79,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             console.error("Inventory Fetch Error:", error);
             showToast('System Link Failure: Could not sync inventory.', 'error');
         } finally {
-            setIsProcessing(false);
-            setIsLoadingInitial(false);
+            setDataLoading(false);
+            setHasLoadedOnce(true);
         }
     }, [apiClient, API.inventory, showToast]);
 
@@ -85,7 +88,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         if (hasAccess) {
             fetchInventory();
         } else {
-            setIsLoadingInitial(false);
+            setDataLoading(false);
+            setHasLoadedOnce(true);
         }
     }, [hasAccess, fetchInventory]);
 
@@ -170,7 +174,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
                 ? `${response.data.insertedCount} added, ${response.data.updatedCount} updated.`
                 : `${response.data.insertedCount} items integrated.`;
             showToast(`Batch processed: ${msg}`, 'success');
-            await fetchInventory(true);
+            await fetchInventory();
             closeBulkUploadModal();
         } catch (error) {
             showToast(error.response?.data?.error || 'Batch integration failed.', 'error');
@@ -215,7 +219,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             
             await apiClient.post(API.inventory, dataToSend);
             showToast(`Catalog Entry Created: ${formData.name}`, 'success');
-            await fetchInventory(true);
+            await fetchInventory();
             closeFormModal();
         } catch (error) {
             console.error('Add item error:', error.response?.data || error);
@@ -262,7 +266,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             
             await apiClient.put(`${API.inventory}/${itemId}`, dataToSend);
             showToast(`Entry Reconfigured: ${formData.name}`, 'success');
-            await fetchInventory(true);
+            await fetchInventory();
             closeFormModal();
         } catch (error) {
             console.error('Update item error:', error.response?.data || error);
@@ -284,7 +288,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         try {
             await apiClient.delete(`${API.inventory}/${itemId}`);
             showToast(`Deleted: ${itemName}`, 'success');
-            await fetchInventory(true);
+            await fetchInventory();
             setIsConfirmModalOpen(false);
             setItemToDelete(null);
         } catch (error) {
@@ -386,19 +390,15 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         );
     }
 
-    if (isLoadingInitial) {
-        return (
-            <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-                <p className="text-xs font-black opacity-40 tracking-widest ">Syncing Inventory...</p>
-            </div>
-        );
+    if (dataLoading && !hasLoadedOnce) {
+        return <StockHubInitialSkeleton darkMode={darkMode} />;
     }
 
     return (
         <InventoryContent
             isTextileShop={isTextileShop}
             inventory={sortedAndFilteredInventory}
+            listSyncing={dataLoading && hasLoadedOnce}
             loading={isProcessing}
             isFormModalOpen={isFormModalOpen}
             isConfirmModalOpen={isConfirmModalOpen}

@@ -8,6 +8,7 @@ import ChatMessages from './chat/ChatMessages';
 import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
+import { ChatInitialSkeleton } from './skeletons/PageSkeletons';
 
 const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange, onNavigateToStaffPermissions }) => {
     // Styling Vars matching Dashboard architecture
@@ -1177,6 +1178,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             <p className="text-xs font-bold text-indigo-500/60 uppercase tracking-widest mt-1">Upgrade to PRO or PREMIUM</p>
         </div>
     );
+
+    if (isLoading && chats.length === 0 && !selectedChat) {
+        return <ChatInitialSkeleton darkMode={darkMode} />;
+    }
 
     return (
         <div className={`flex flex-col md:flex-row ${themeBase} w-full h-full overflow-hidden`}>

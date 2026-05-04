@@ -67,16 +67,12 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-d66633d6'], (function (workbox) { 'use strict';
+define(['./workbox-3c4d4363'], (function (workbox) { 'use strict';
 
   workbox.setCacheNameDetails({
-    prefix: "pocket-pos-v1"
+    prefix: "pocket-pos-v3"
   });
-  self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-      self.skipWaiting();
-    }
-  });
+  self.skipWaiting();
   workbox.clientsClaim();
 
   /**
@@ -89,13 +85,25 @@ define(['./workbox-d66633d6'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.1m21gecskn"
+    "revision": "0.v6cu5murjeg"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/],
     denylist: [/^\/api/, /^\/_/, /^\/socket.io/]
   }));
+  workbox.registerRoute(({
+    url
+  }) => url.pathname.startsWith("/assets/"), new workbox.NetworkFirst({
+    "cacheName": "assets-network-first",
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 80,
+      maxAgeSeconds: 604800
+    }), new workbox.CacheableResponsePlugin({
+      statuses: [0, 200]
+    })]
+  }), 'GET');
   workbox.registerRoute(/^https?:\/\/.*\/.*\.html$/i, new workbox.NetworkFirst({
     "cacheName": "html-cache",
     "networkTimeoutSeconds": 3,

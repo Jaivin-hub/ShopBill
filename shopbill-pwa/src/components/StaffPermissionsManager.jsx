@@ -7,6 +7,7 @@ import {
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
 import ConfirmationModal from './ConfirmationModal';
+import { TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -603,6 +604,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -621,6 +623,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const fetchStaff = useCallback(async () => {
         if (!hasReadAccess || !apiClient) {
             setIsLoading(false);
+            setHasLoadedOnce(true);
             return;
         }
         setIsLoading(true);
@@ -638,6 +641,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             if (showToast) showToast('Failed to sync directory.', 'error');
         } finally {
             setIsLoading(false);
+            setHasLoadedOnce(true);
         }
     }, [apiClient, hasReadAccess, showToast]);
 
@@ -869,6 +873,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
 
+    if (isLoading && !hasLoadedOnce) {
+        return <TeamManagementInitialSkeleton darkMode={darkMode} />;
+    }
+
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
@@ -929,9 +937,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 )}
                 {/* Staff List */}
                 {isLoading ? (
-                    <div className={`flex flex-col items-center justify-center p-12 md:p-20 rounded-xl md:rounded-2xl border ${cardBase}`}>
-                        <Loader2 className="w-8 h-8 md:w-10 md:h-10 text-indigo-500 animate-spin mb-4" />
-                        <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Synchronizing Directory...</p>
+                    <div className={`flex flex-col items-center justify-center p-8 md:p-12 rounded-xl md:rounded-2xl border ${cardBase}`}>
+                        <Loader2 className="w-8 h-8 md:w-10 md:h-10 text-indigo-500 animate-spin mb-3" />
+                        <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Refreshing directory...</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-3 md:gap-4">

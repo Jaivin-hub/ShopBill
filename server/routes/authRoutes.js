@@ -61,9 +61,11 @@ const resolveRolePagePermissions = (storeRolePermissions = {}, role = '') => {
 
 // Function from server.js
 const generateToken = (id, shopId, role) => {
-    return jwt.sign({ id, shopId, role }, JWT_SECRET, {
-        expiresIn: '30d',
-    });
+    return jwt.sign(
+        { id: String(id), shopId: shopId != null ? String(shopId) : '', role },
+        JWT_SECRET,
+        { expiresIn: '30d' }
+    );
 };
 
 // --- Existing Routes ---
@@ -432,6 +434,8 @@ router.get('/profile', protect, async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                shopId: user.shopId || null,
+                activeStoreId: user.activeStoreId || null,
                 // Business Details (outlet-specific for owners, user-level for others)
                 shopName: shopName,
                 taxId: taxId,
@@ -487,6 +491,9 @@ router.put('/profile', protect, async (req, res) => {
                 if (taxId !== undefined) store.taxId = taxId;
                 if (address !== undefined) store.address = address;
                 await store.save();
+                // Keep user-level business identity in sync so UI areas reading currentUser.shopName stay fresh.
+                if (shopName !== undefined) user.shopName = store.name;
+                await user.save();
                 return res.json({
                     success: true,
                     message: 'Profile updated successfully',
@@ -514,6 +521,8 @@ router.put('/profile', protect, async (req, res) => {
                 if (taxId !== undefined) store.taxId = taxId;
                 if (address !== undefined) store.address = address;
                 await store.save();
+                // Persist personal fields (phone/profileImageUrl) for manager account too.
+                await user.save();
                 // Notify owner that a manager updated business information
                 try {
                     const staffRecord = await Staff.findOne({ userId: user._id, storeId }).select('name').lean();

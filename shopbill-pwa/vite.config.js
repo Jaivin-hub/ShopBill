@@ -6,6 +6,16 @@ import firebaseSwPlugin from './vite-firebase-sw-plugin.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/lucide-react')) return 'vendor-lucide';
+        },
+      },
+    },
+  },
   plugins: [
     firebaseSwPlugin(),
     react(),
@@ -19,7 +29,8 @@ export default defineConfig({
     // ----------------------------------------------------------------------
     
     VitePWA({
-      registerType: 'prompt',
+      // Auto-apply new SW so precached index + hashed chunks stay one consistent build (avoids lazy-chunk 404s after deploy).
+      registerType: 'autoUpdate',
       devOptions: {
         enabled: true,
         type: 'module', 
@@ -55,9 +66,8 @@ export default defineConfig({
       },
       
       workbox: {
-        // Don't skip waiting - let the user confirm the update first
-        skipWaiting: false, // User must confirm update
-        clientsClaim: true, // Take control of all clients immediately after activation
+        skipWaiting: true,
+        clientsClaim: true,
         
         // Use network-first strategy for HTML to ensure fresh content
         navigateFallback: '/index.html',
@@ -65,16 +75,27 @@ export default defineConfig({
         
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],
         
-        // Add cache versioning to force cache invalidation on updates
-        cacheId: 'pocket-pos-v1',
+        // Bump when you need to invalidate all Workbox caches in the field (deploy mismatch recovery).
+        cacheId: 'pocket-pos-v3',
         
         // Clean up old caches on update
         cleanupOutdatedCaches: true,
         
-        // Maximum cache size
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        // Lazy route chunks can exceed 5MB in large apps; keep them precached so offline + SW stay consistent
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         
         runtimeCaching: [
+          {
+            // Same-origin built assets: prefer network so a new deploy’s chunks load even if an old precache entry lingers briefly
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'assets-network-first',
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              networkTimeoutSeconds: 5,
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // Network-first for HTML to get fresh content
             urlPattern: /^https?:\/\/.*\/.*\.html$/i,

@@ -18,6 +18,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [customers, setCustomers] = useState([]);
     const [sales, setSales] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    /** After first successful (or failed) fetch, show dashboard shell + refresh spinner instead of full-page skeleton */
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [isAttendanceExpanded, setIsAttendanceExpanded] = useState(false); // Collapsed by default to save space
     const [currentAttendance, setCurrentAttendance] = useState(null); // Track attendance status for indicator
     const [isAddressMissing, setIsAddressMissing] = useState(false);
@@ -288,12 +290,71 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         </div>
     );
 
-    if (isLoading) return (
-        <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-            <p className="text-xs font-black opacity-40 tracking-widest ">Syncing Dashboard...</p>
-        </div>
-    );
+    const skelBlock = (className = '') =>
+        `rounded-xl animate-pulse ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} ${className}`;
+
+    if (isLoading && !hasLoadedOnce) {
+        return (
+            <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
+                <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+                    <div className="max-w-7xl mx-auto flex justify-between items-center">
+                        <div className="space-y-2.5">
+                            <div className={`h-8 w-52 md:w-64 ${skelBlock()}`} />
+                            <div className={`h-2.5 w-40 ${skelBlock()}`} />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className={`h-10 w-10 ${skelBlock('rounded-xl')}`} />
+                            <div className={`hidden md:block h-9 w-36 ${skelBlock('rounded-xl')}`} />
+                        </div>
+                    </div>
+                </header>
+                <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
+                    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+                        {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (
+                            <div className={`h-[72px] rounded-2xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'} ${skelBlock('rounded-2xl')}`} />
+                        )}
+                        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className={`p-5 rounded-2xl border ${cardBase}`}>
+                                    <div className={`h-2.5 w-24 mb-4 ${skelBlock()}`} />
+                                    <div className="flex justify-between items-start gap-3">
+                                        <div className={`h-9 w-32 ${skelBlock()}`} />
+                                        <div className={`h-12 w-12 shrink-0 ${skelBlock('rounded-xl')}`} />
+                                    </div>
+                                </div>
+                            ))}
+                        </section>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                            {Array.from({ length: 8 }, (_, i) => (
+                                <div key={i} className={`p-3 rounded-2xl border flex items-center gap-3 ${cardBase}`}>
+                                    <div className={`h-10 w-10 shrink-0 ${skelBlock('rounded-xl')}`} />
+                                    <div className={`h-3 flex-1 max-w-[100px] ${skelBlock()}`} />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className={`rounded-3xl border flex flex-col overflow-hidden min-h-[220px] ${cardBase}`}>
+                                    <div className={`px-6 py-5 border-b border-inherit flex items-center gap-2 ${darkMode ? 'bg-slate-800/30' : 'bg-slate-100/80'}`}>
+                                        <div className={`h-4 w-4 ${skelBlock('rounded')}`} />
+                                        <div className={`h-3 w-28 ${skelBlock()}`} />
+                                    </div>
+                                    <div className="p-5 space-y-3 flex-1">
+                                        {[1, 2, 3].map((row) => (
+                                            <div key={row} className="flex justify-between gap-2">
+                                                <div className={`h-4 flex-1 ${skelBlock()}`} />
+                                                <div className={`h-4 w-16 ${skelBlock()}`} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>

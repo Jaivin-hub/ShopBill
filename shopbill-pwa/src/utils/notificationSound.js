@@ -1,5 +1,7 @@
 // Message notification sound - short pleasant beep
-// Uses HTML5 Audio fallback for mobile (iOS PWA) where Web Audio API is unreliable
+// Uses HTML5 Audio only (no AudioContext) to avoid autoplay / user-gesture warnings on Chrome.
+import { requestPushFromGesture } from './pushOnGesture.js';
+
 const STORAGE_KEY = 'chat_sound_enabled';
 
 export const isChatSoundEnabled = () => {
@@ -19,16 +21,25 @@ export const setChatSoundEnabled = (enabled) => {
   }
 };
 
-let audioContext = null;
+export const isPushInAppSoundEnabled = () => {
+  try {
+    const v = localStorage.getItem(PUSH_IN_APP_KEY);
+    return v === null || v === 'true';
+  } catch {
+    return true;
+  }
+};
+
+export const setPushInAppSoundEnabled = (enabled) => {
+  try {
+    localStorage.setItem(PUSH_IN_APP_KEY, String(enabled));
+  } catch {
+    void 0;
+  }
+};
+
 let audioUnlocked = false;
 let htmlAudioFallback = null;
-
-const getAudioContext = () => {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  return audioContext;
-};
 
 /**
  * Minimal WAV for beep - works on iOS/mobile where Web Audio is restricted.
@@ -113,8 +124,6 @@ export const unlockAudio = () => {
   if (audioUnlocked) return;
   audioUnlocked = true;
   try {
-    const ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => { void 0; });
     if (!htmlAudioFallback) {
       htmlAudioFallback = new Audio(getBeepDataUri());
       htmlAudioFallback.playsInline = true;
@@ -133,7 +142,7 @@ export const unlockAudio = () => {
 export const setupAudioUnlock = () => {
   const onInteraction = () => {
     unlockAudio();
-    import('./pushOnGesture.js').then((m) => m.requestPushFromGesture()).catch(() => { void 0; });
+    requestPushFromGesture();
   };
   const opts = { passive: true, capture: true };
   document.addEventListener('click', onInteraction, opts);
@@ -145,12 +154,16 @@ export const setupAudioUnlock = () => {
 export const playMessageSound = () => {
   if (!isChatSoundEnabled()) return;
   // Use HTML5 Audio for all platforms - works after unlock on desktop and mobile
-  playHtmlAudioFallback();
+  try {
+    playHtmlAudioFallback();
+  } catch {
+    void 0;
+  }
 };
 
-/** In-app / foreground push sounds: distinct per category (synthetic WAV; OS may still use its own sound when app is backgrounded). */
+/** In-app / foreground push + alert sounds (not gated by chat socket toggle so push still works if chat beeps are off). */
 export const playPushSoundCategory = (category) => {
-  if (!isChatSoundEnabled()) return;
+  if (!isPushInAppSoundEnabled()) return;
   const c = String(category || 'default').toLowerCase();
   if (c === 'chat') {
     playHtmlAudioFromUri(getBeepDataUri(880, 0.18, 6), 0.65);
@@ -177,6 +190,5 @@ export const playPushSoundCategory = (category) => {
 
 // General notification (socket) — medium ping, distinct from chat
 export const playNotificationSound = () => {
-  if (!isChatSoundEnabled()) return;
   playPushSoundCategory('default');
 };

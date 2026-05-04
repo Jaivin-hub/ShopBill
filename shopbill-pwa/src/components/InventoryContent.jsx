@@ -5,6 +5,7 @@ import {
     ChevronDown, ChevronUp, Settings2, ChevronRight, Download
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import { StockHubListSkeleton } from './skeletons/PageSkeletons';
 
 const ScrollbarStyles = ({ darkMode }) => (
     <style dangerouslySetInnerHTML={{
@@ -539,7 +540,7 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
 const EMPTY_TEXTILE_META = { brand: '', fabric: '', season: '', collection: '' };
 
 const InventoryContent = ({
-    inventory, loading, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
+    inventory, loading, listSyncing = false, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
     isTextileShop = false,
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
@@ -726,6 +727,9 @@ const InventoryContent = ({
                 <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
                     {/* Desktop & Tablet: Enhanced Card Grid Layout */}
                     <section className="hidden md:block pb-6">
+                        {listSyncing ? (
+                            <StockHubListSkeleton darkMode={darkMode} />
+                        ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                             {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
@@ -745,10 +749,14 @@ const InventoryContent = ({
                                 </div>
                             )}
                         </div>
+                        )}
                     </section>
 
                     {/* Mobile: Compact Card Layout */}
                     <section className="md:hidden pb-20">
+                        {listSyncing ? (
+                            <StockHubListSkeleton darkMode={darkMode} />
+                        ) : (
                         <div className="grid grid-cols-1 gap-4">
                             {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
@@ -768,6 +776,7 @@ const InventoryContent = ({
                                 </div>
                             )}
                         </div>
+                        )}
                     </section>
                 </div>
             </main>
@@ -1185,7 +1194,7 @@ const InventoryContent = ({
                 </section>
             )}
 
-            {loading && !isFormModalOpen && !isBulkUploadModalOpen && (
+            {loading && !listSyncing && !isFormModalOpen && !isBulkUploadModalOpen && (
                 <div className="fixed bottom-6 right-6 bg-indigo-600 text-white px-6 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in fade-in slide-in-from-bottom-5">
                     <Loader2 className="w-4 h-4 animate-spin" /><span className="text-[9px] font-black  tracking-[0.2em]">Synchronizing Records</span>
                 </div>

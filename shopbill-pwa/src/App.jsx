@@ -9,7 +9,7 @@ import API, { SOCKET_URL, SOCKET_IO_CLIENT_BASE } from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
-import { onForegroundMessage } from './lib/firebase';
+import { onForegroundMessage, isPushSupported } from './lib/firebase';
 import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
@@ -959,15 +959,17 @@ useEffect(() => {
     const socket = socketRef.current;
     
     const handleConnect = () => {
-      const roomId = currentOutletId || currentUser.storeId || currentUser._id || 'default';
-      socket.emit('join_shop', String(roomId));
-      
-      // Join user-specific room for notifications (backup, already joined on connection)
-      if (currentUser._id) {
-        socket.emit('join_user', String(currentUser._id));
+      const userId = currentUser._id ?? currentUser.id;
+      // Store room must be the Store document id (same as emitAlert storeId). Never use staff user id or owner shopId token here.
+      const storeRoom = currentOutletId || currentUser.activeStoreId || null;
+      if (storeRoom) {
+        socket.emit('join_shop', String(storeRoom));
+      } else {
+        console.warn('[Socket] No store id for join_shop; user-targeted notifications still work if JWT auth succeeded.');
       }
-      
-      // Fetch notifications and chat unread count after connection
+      if (userId) {
+        socket.emit('join_user', String(userId));
+      }
       fetchNotificationHistory();
       updateChatUnreadCount();
     };
@@ -978,9 +980,13 @@ useEffect(() => {
     
     const handleNewMessage = (data) => {
       const me = currentUserRef.current;
-      const senderId = data?.message?.senderId && (data.message.senderId._id || data.message.senderId.id || data.message.senderId);
-      const myId = me?._id || me?.id;
-      const isFromOthers = senderId && senderId.toString() !== (myId?.toString?.() || String(myId));
+      const raw = data?.message?.senderId;
+      const senderId =
+        raw != null
+          ? String(raw._id ?? raw.id ?? raw)
+          : null;
+      const myId = me?._id ?? me?.id;
+      const isFromOthers = Boolean(senderId && myId != null && senderId !== String(myId));
       if (isFromOthers) playMessageSound();
       // Debounce unread refresh to avoid burst API calls during rapid incoming messages.
       if (chatUnreadRefreshTimeoutRef.current) {
@@ -994,7 +1000,17 @@ useEffect(() => {
     const handleNewSale = () => {
       if (billingRefreshRef.current) billingRefreshRef.current();
     };
+    const onConnectError = (err) => {
+      console.warn('[Socket] connect_error:', err?.message || err);
+    };
+    const onDisconnect = (reason) => {
+      if (reason === 'io server disconnect') {
+        socket.connect();
+      }
+    };
     socket.on('connect', handleConnect);
+    socket.on('connect_error', onConnectError);
+    socket.on('disconnect', onDisconnect);
     socket.on('new_notification', handleNewNotification);
     socket.on('new_message', handleNewMessage);
     socket.on('new_sale', handleNewSale);
@@ -1002,6 +1018,8 @@ useEffect(() => {
     return () => {
       if (socket) {
         socket.off('connect', handleConnect);
+        socket.off('connect_error', onConnectError);
+        socket.off('disconnect', onDisconnect);
         socket.off('new_notification', handleNewNotification);
         socket.off('new_message', handleNewMessage);
         socket.off('new_sale', handleNewSale);
@@ -1012,48 +1030,54 @@ useEffect(() => {
         chatUnreadRefreshTimeoutRef.current = null;
       }
     };
-  }, [currentUser, currentOutletId, fetchNotificationHistory, handleIncomingNotification, updateChatUnreadCount]);
+  }, [currentUser, currentUser?.activeStoreId, currentOutletId, fetchNotificationHistory, handleIncomingNotification, updateChatUnreadCount]);
 
   useEffect(() => {
     if (!currentUser) return;
 
+    let cancelled = false;
     let unsubscribe = () => {};
-    try {
-      unsubscribe = onForegroundMessage((payload) => {
-        const data = payload?.data || {};
-        const notification = payload?.notification || {};
-        const fallbackId = `fcm-${Date.now()}`;
-        const notifType = data.notificationType || data.type || '';
-        const inferredSound =
-          notifType === 'chat_message' || data.type === 'chat_message'
-            ? 'chat'
-            : String(notifType).startsWith('attendance_')
-              ? 'attendance'
-              : ['ledger_payment', 'ledger_credit', 'credit_sale', 'credit_limit_updated', 'customer_added'].includes(String(notifType))
-                ? 'ledger'
-                : ['inventory_low', 'credit_exceeded'].includes(String(notifType))
-                  ? 'alert'
-                  : 'default';
-        const soundCategory = data.soundCategory || inferredSound;
-        const synthesizedAlert = {
-          _id: data.notificationId || data.messageId || fallbackId,
-          id: data.notificationId || data.messageId || fallbackId,
-          type: data.notificationType || data.type || 'info',
-          category: data.category || 'Info',
-          title: notification.title || data.title || 'Pocket POS',
-          message: notification.body || data.body || data.message || 'New notification',
-          createdAt: new Date().toISOString(),
-          actorId: data.actorId || data.senderId || null,
-          soundCategory,
-          metadata: { ...data, soundCategory },
-        };
-        handleIncomingNotification(synthesizedAlert);
-      });
-    } catch {
-      void 0;
-    }
+
+    (async () => {
+      try {
+        if (!(await isPushSupported()) || cancelled) return;
+        unsubscribe = onForegroundMessage((payload) => {
+          const data = payload?.data || {};
+          const notification = payload?.notification || {};
+          const fallbackId = `fcm-${Date.now()}`;
+          const notifType = data.notificationType || data.type || '';
+          const inferredSound =
+            notifType === 'chat_message' || data.type === 'chat_message'
+              ? 'chat'
+              : String(notifType).startsWith('attendance_')
+                ? 'attendance'
+                : ['ledger_payment', 'ledger_credit', 'credit_sale', 'credit_limit_updated', 'customer_added'].includes(String(notifType))
+                  ? 'ledger'
+                  : ['inventory_low', 'credit_exceeded'].includes(String(notifType))
+                    ? 'alert'
+                    : 'default';
+          const soundCategory = data.soundCategory || inferredSound;
+          const synthesizedAlert = {
+            _id: data.notificationId || data.messageId || fallbackId,
+            id: data.notificationId || data.messageId || fallbackId,
+            type: data.notificationType || data.type || 'info',
+            category: data.category || 'Info',
+            title: notification.title || data.title || 'Pocket POS',
+            message: notification.body || data.body || data.message || 'New notification',
+            createdAt: new Date().toISOString(),
+            actorId: data.actorId || data.senderId || null,
+            soundCategory,
+            metadata: { ...data, soundCategory },
+          };
+          handleIncomingNotification(synthesizedAlert);
+        });
+      } catch (e) {
+        console.warn('[Push][App] Foreground FCM listener failed:', e?.message || e);
+      }
+    })();
 
     return () => {
+      cancelled = true;
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [currentUser, handleIncomingNotification]);
@@ -1074,7 +1098,14 @@ useEffect(() => {
   }, []); 
 
   const handleLoginSuccess = useCallback(async (user, token) => {
-    const normalizedUser = { ...user, role: user.role.toLowerCase(), permissions: user.permissions || {} };
+    const uid = user._id ?? user.id;
+    const normalizedUser = {
+      ...user,
+      _id: uid,
+      id: user.id ?? user._id ?? uid,
+      role: user.role.toLowerCase(),
+      permissions: user.permissions || {},
+    };
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
     setCurrentUser(normalizedUser);
@@ -1135,7 +1166,21 @@ useEffect(() => {
       localStorage.setItem('currentUser', JSON.stringify(mergedUser));
       return mergedUser;
     });
-  }, []);
+    // Keep active outlet label in sync after business-name edits from Profile.
+    if (updatedData.shopName) {
+      setCurrentOutlet((prevOutlet) => (
+        prevOutlet ? { ...prevOutlet, name: updatedData.shopName } : prevOutlet
+      ));
+      setOutlets((prevOutlets) => {
+        if (!Array.isArray(prevOutlets)) return prevOutlets;
+        return prevOutlets.map((outlet) => (
+          outlet?._id === currentOutletId || (!currentOutletId && prevOutlets.length === 1)
+            ? { ...outlet, name: updatedData.shopName }
+            : outlet
+        ));
+      });
+    }
+  }, [currentOutletId]);
 
   const handleRegistrationComplete = useCallback(() => {
     backStackRef.current = [];
@@ -1183,6 +1228,8 @@ useEffect(() => {
             shopName: serverUser.shopName ?? currentUser.shopName,
             id: serverUser.id ?? currentUser.id,
             _id: serverUser.id ?? currentUser._id,
+            activeStoreId: serverUser.activeStoreId ?? currentUser.activeStoreId,
+            shopId: serverUser.shopId ?? currentUser.shopId,
             permissions: serverUser.permissions || currentUser.permissions || {},
           };
           // For staff, effective plan comes from owner (current-plan API)
@@ -1196,7 +1243,16 @@ useEffect(() => {
           }
           const roleChanged = (currentUser.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
           const permissionsChanged = JSON.stringify(updatedUser.permissions || {}) !== JSON.stringify(currentUser.permissions || {});
-          if (roleChanged || updatedUser.plan !== currentUser.plan || updatedUser.shopName !== currentUser.shopName || permissionsChanged) {
+          const storeCtxChanged =
+            String(updatedUser.activeStoreId || '') !== String(currentUser.activeStoreId || '') ||
+            String(updatedUser.shopId || '') !== String(currentUser.shopId || '');
+          if (
+            roleChanged ||
+            updatedUser.plan !== currentUser.plan ||
+            updatedUser.shopName !== currentUser.shopName ||
+            permissionsChanged ||
+            storeCtxChanged
+          ) {
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));
             setCurrentUser(updatedUser);
           }

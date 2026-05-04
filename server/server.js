@@ -121,16 +121,22 @@ app.get('/api/uploads/files/:filename', (req, res) => {
 // --- SOCKET.IO LOGIC ---
 
 io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) return next();
-    
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+        console.warn('Socket: no auth token; connection allowed but user rooms must use join_user from client.');
+        return next();
+    }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.user = decoded;
+        socket.user = {
+            ...decoded,
+            id: decoded.id != null ? String(decoded.id) : decoded.id,
+            shopId: decoded.shopId != null ? String(decoded.shopId) : decoded.shopId,
+        };
         next();
     } catch (err) {
-        console.error("Socket Auth Error:", err.message);
-        next(); 
+        console.error('Socket Auth Error:', err.message);
+        next();
     }
 });
 
@@ -139,8 +145,9 @@ io.on('connection', (socket) => {
 
     // Join user-specific room for chat notifications
     if (socket.user && socket.user.id) {
-        socket.join(`user_${socket.user.id}`);
-        console.log(`👤 Socket ${socket.id} joined user room: user_${socket.user.id}`);
+        const uid = String(socket.user.id);
+        socket.join(`user_${uid}`);
+        console.log(`👤 Socket ${socket.id} auto-joined user room: user_${uid}`);
     }
 
     socket.on('join_shop', (shopId) => {

@@ -12,6 +12,7 @@ import ToggleSwitch from './ToggleSwitch';
 import API from '../config/api';
 import { isChatSoundEnabled, setChatSoundEnabled, playMessageSound, unlockAudio } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
+import { SettingsHomeSkeleton } from './skeletons/PageSkeletons';
 
 const PERMISSION_PAGE_LABELS = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -307,12 +308,23 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
 
     const [isCloudConnected, setIsCloudConnected] = useState(true); 
     const [connectedAccountEmail, setConnectedAccountEmail] = useState(currentUser?.email); 
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
 
     // Premium Store Data
     const [stores] = useState([
         { id: 1, name: "Main Outlet", location: "Downtown", isActive: true },
         { id: 2, name: "North Branch", location: "Suburbs", isActive: true },
     ]);
+
+    useEffect(() => {
+        const hasUser = currentUser && (currentUser._id != null || currentUser.id != null);
+        if (!hasUser) {
+            setIsInitialLoading(false);
+            return;
+        }
+        const id = setTimeout(() => setIsInitialLoading(false), 220);
+        return () => clearTimeout(id);
+    }, [currentUser]);
 
     const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
     const handleChangePasswordClick = () => {
@@ -393,23 +405,12 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                                     darkMode={darkMode}
                                 />
                             )}
-                            {/* Subscription & Plan Upgrade */}
+                            {/* Subscription & Billing */}
                             <SettingItem 
                                 icon={CreditCard} 
                                 title="Subscription & Billing" 
-                                description="Upgrade your plan or manage subscription and invoices." 
+                                description="Manage subscription and invoices." 
                                 onClick={handlePlanUpgradeClick} 
-                                actionComponent={
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handlePlanUpgradeClick();
-                                        }}
-                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-                                    >
-                                        Upgrade Now
-                                    </button>
-                                }
                                 accentColor="text-amber-600"
                                 darkMode={darkMode}
                             />
@@ -543,6 +544,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     };
 
     const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white/95 border-slate-300 shadow-sm';
+
+    if (isInitialLoading) {
+        return <SettingsHomeSkeleton darkMode={darkMode} />;
+    }
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>

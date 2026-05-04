@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
-    Package, Loader, Truck, AlertTriangle, ShoppingCart, Users,
+    Package, Truck, AlertTriangle, ShoppingCart, Users,
     Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download
 } from 'lucide-react';
 import SalesChart from './SalesChart';
 import { exportRowsToExcel } from '../utils/exportExcel';
+import { ReportsInitialSkeleton, skel } from './skeletons/PageSkeletons';
 
 // --- Constants ---
 const DATE_FILTERS = [
@@ -60,7 +61,9 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const [customEndDate, setCustomEndDate] = useState(getTodayDateString());
     const [summaryData, setSummaryData] = useState(null);
     const [chartData, setChartData] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    /** After first fetch, keep header/chrome and only skeleton heavy sections on refresh (same as Ledger / Dashboard). */
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [purchases, setPurchases] = useState([]);
     const [showAllBestSellers, setShowAllBestSellers] = useState(false);
@@ -89,6 +92,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const fetchReportData = useCallback(async () => {
         if (!apiClient || !API?.reportsSummary || !API?.reportsChartData) {
             setIsLoading(false);
+            setHasLoadedOnce(true);
             return;
         }
         setIsLoading(true);
@@ -145,6 +149,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             setChartData([]); // Set empty array on error
         } finally {
             setIsLoading(false);
+            setHasLoadedOnce(true);
         }
     }, [selectedFilter, customStartDate, customEndDate, viewType, apiClient, API, showToast]);
 
@@ -227,7 +232,11 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const plan = currentUser?.plan?.toUpperCase();
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
     const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
-    const showInitialSkeleton = isLoading && !summaryData;
+    const initialLoading = isLoading && !hasLoadedOnce;
+
+    if (initialLoading) {
+        return <ReportsInitialSkeleton darkMode={darkMode} />;
+    }
 
     return (
         <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
@@ -320,21 +329,16 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-20">
                 {/* KPI DASHBOARD */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {(showInitialSkeleton ? [
-                        { title: "Net Revenue", value: '...', icon: IndianRupee, color: "text-emerald-500" },
-                        { title: "Total Invoices", value: '...', icon: List, color: "text-indigo-500" },
-                        { title: "Avg Order Value", value: '...', icon: Activity, color: "text-amber-500" },
-                        { title: "Items Sold", value: '...', icon: Package, color: "text-sky-500" }
-                    ] : [
+                    {[
                         { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
                         { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500", onClick: handleOpenSalesHistory },
                         { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
                         { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
-                    ]).map((m, i) => (
+                    ].map((m, i) => (
                         <button
                             key={i}
                             onClick={m.onClick}
-                            disabled={!m.onClick}
+                            disabled={!m.onClick || isLoading}
                             className={`${cardBase} p-5 rounded-xl transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 text-left ${m.onClick ? 'cursor-pointer active:scale-[0.99]' : 'cursor-default'}`}
                         >
                             <div className="flex justify-between items-start mb-3">
@@ -342,7 +346,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                                 <m.icon className={`w-4 h-4 ${m.color}`} />
                             </div>
                             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                                {showInitialSkeleton ? <span className="animate-pulse opacity-60">...</span> : (isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value)}
+                                {isLoading ? <span className="animate-pulse opacity-50">...</span> : m.value}
                             </h2>
                         </button>
                     ))}
@@ -390,7 +394,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
 
                     <div className="p-6 h-[300px] md:h-[350px] w-full">
                         {isLoading ? (
-                            <div className="h-full w-full flex items-center justify-center"><Loader className="animate-spin text-indigo-500 w-6 h-6" /></div>
+                            <div className={`h-full w-full ${skel(darkMode, 'rounded-xl')}`} />
                         ) : (
                             <SalesChart data={chartData || []} viewType={viewType} yAxisKey={chartYAxis} darkMode={darkMode} />
                         )}

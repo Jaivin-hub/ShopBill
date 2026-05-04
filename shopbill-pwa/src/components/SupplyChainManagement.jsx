@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
@@ -7,6 +7,7 @@ import {
 import ScannerModal from './ScannerModal';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
 import { exportRowsToExcel } from '../utils/exportExcel';
+import { SupplyChainInitialSkeleton, SupplyChainContentSkeleton } from './skeletons/PageSkeletons';
 
 const DATE_FILTERS = [
   { id: '24h', label: ['24', 'Hrs'], days: 1 },
@@ -27,7 +28,9 @@ const EMPTY_PRODUCT_FORM = {
 
 const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [activeTab, setActiveTab] = useState('purchase');
-  const [isLoading, setIsLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -77,7 +80,12 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   }, [selectedFilter]);
 
   const fetchSCMData = useCallback(async () => {
-    setIsLoading(true);
+    if (!apiClient || !API) {
+      setDataLoading(false);
+      setHasLoadedOnce(true);
+      return;
+    }
+    setDataLoading(true);
     try {
       const [suppliersRes, historyRes, inventoryRes] = await Promise.all([
         apiClient.get(API.scmSuppliers).catch(() => ({ data: [] })),
@@ -90,18 +98,14 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     } catch (error) {
       showToast("Could not load supply chain data", "error");
     } finally {
-      setIsLoading(false);
+      setDataLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [apiClient, API, showToast]);
 
-  // Only fetch on mount, not when callback changes
-  const hasFetchedRef = useRef(false);
   useEffect(() => {
-    if (!hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchSCMData();
-    }
-  }, []);
+    fetchSCMData();
+  }, [fetchSCMData]);
 
   const sortedInventory = useMemo(() => {
     let result = inventory.filter(item =>
@@ -189,15 +193,15 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
     if (!purchaseForm.productId || !purchaseForm.supplierId) return showToast("Select product & supplier", "info");
-    setIsLoading(true);
+    setIsActionLoading(true);
     try {
       await apiClient.post(API.scmPurchases, { ...purchaseForm, quantity: Number(purchaseForm.quantity), purchasePrice: Number(purchaseForm.purchasePrice) });
       showToast(`Stock updated!`, 'success');
       setPurchaseForm({ productId: '', supplierId: '', quantity: '', purchasePrice: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0] });
-      fetchSCMData();
+      await fetchSCMData();
     } catch (error) {
       showToast("Error saving entry", 'error');
-    } finally { setIsLoading(false); }
+    } finally { setIsActionLoading(false); }
   };
 
   const handleAddSupplier = async (e) => {
@@ -237,7 +241,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       return;
     }
     
-    setIsLoading(true);
+    setIsActionLoading(true);
     try {
       if (editingSupplierId) {
         // Update existing supplier
@@ -262,11 +266,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       setIsSupplierModalOpen(false);
       setIsSupplierPickerOpen(false);
       setSearchTerm('');
-      fetchSCMData();
+      await fetchSCMData();
     } catch (error) { 
       showToast(editingSupplierId ? "Error updating supplier" : "Error adding supplier", "error");
     } finally { 
-      setIsLoading(false); 
+      setIsActionLoading(false); 
     }
   };
 
@@ -291,7 +295,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   const handleQuickAddProduct = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsActionLoading(true);
     try {
       const payload = { ...productForm };
       if (hasProductVariants && Array.isArray(payload.variants) && payload.variants.length > 0) {
@@ -321,8 +325,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       setIsProductModalOpen(false);
       setIsProductPickerOpen(false);
       setSearchTerm('');
-      fetchSCMData();
-    } catch (error) { showToast("Error adding product", "error"); } finally { setIsLoading(false); }
+      await fetchSCMData();
+    } catch (error) { showToast("Error adding product", "error"); } finally { setIsActionLoading(false); }
   };
 
   const addQuickVariant = () => {
@@ -409,6 +413,11 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     showToast('Supply Chain report downloaded as Excel.', 'success');
   }, [activeTab, filteredHistory, showToast, sortedInventory, suppliers]);
 
+  const initialDataLoading = dataLoading && !hasLoadedOnce;
+  if (initialDataLoading) {
+    return <SupplyChainInitialSkeleton darkMode={darkMode} />;
+  }
+
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
@@ -458,6 +467,9 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
+        {dataLoading && hasLoadedOnce ? (
+          <SupplyChainContentSkeleton darkMode={darkMode} />
+        ) : (
         <div className="max-w-7xl mx-auto space-y-8 pb-12">
         {activeTab === 'purchase' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -532,8 +544,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                     <span className="text-[11px] font-black text-indigo-500 tracking-widest ">ENTRY TOTAL</span>
                     <span className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>₹{(Number(purchaseForm.quantity || 0) * Number(purchaseForm.purchasePrice || 0)).toLocaleString()}</span>
                   </div>
-                  <button disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-black text-[10px] tracking-[0.22em] shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 ">
-                    {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <>Post stock entry <ArrowRight className="w-5 h-5" /></>}
+                  <button disabled={isActionLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-black text-[10px] tracking-[0.22em] shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 ">
+                    {isActionLoading ? <Loader className="w-5 h-5 animate-spin" /> : <>Post stock entry <ArrowRight className="w-5 h-5" /></>}
                   </button>
                 </div>
               </form>
@@ -547,7 +559,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                         <option value="low-stock">SORT: LOW STOCK</option>
                         <option value="a-z">SORT: A-Z</option>
                       </select>
-                      <button onClick={fetchSCMData} className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all"><RefreshCcw className="w-5 h-5 text-indigo-500" /></button>
+                      <button type="button" onClick={() => fetchSCMData()} className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all disabled:opacity-50" disabled={dataLoading} aria-busy={dataLoading}><RefreshCcw className={`w-5 h-5 text-indigo-500 ${dataLoading ? 'animate-spin' : ''}`} /></button>
                     </div>
                   </div>
                   <div className="relative">
@@ -883,6 +895,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
           </div>
         )}
         </div>
+        )}
       </div>
 
       {/* FAB: Add New Supplier Button - Floating Icon */}
@@ -1144,10 +1157,10 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </button>
               <button
                 type="submit"
-                disabled={isLoading || !String(productForm.name || '').trim() || (!hasProductVariants && !String(productForm.price || '').trim()) || (hasProductVariants && !(productForm.variants || []).some(v => String(v.label || '').trim() && String(v.price || '').trim()))}
+                disabled={isActionLoading || !String(productForm.name || '').trim() || (!hasProductVariants && !String(productForm.price || '').trim()) || (hasProductVariants && !(productForm.variants || []).some(v => String(v.label || '').trim() && String(v.price || '').trim()))}
                 className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading ? (
+                {isActionLoading ? (
                   <>
                     <Loader className="w-4 h-4 animate-spin" />
                     Adding...
@@ -1260,10 +1273,10 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </div>
               <button 
                 type="submit"
-                disabled={isLoading}
+                disabled={isActionLoading}
                 className={`w-full mt-2 py-3 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
               >
-                {isLoading ? (
+                {isActionLoading ? (
                   <>
                     <Loader className="w-4 h-4 animate-spin" />
                     {editingSupplierId ? 'Updating...' : 'Saving...'}

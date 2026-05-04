@@ -3,6 +3,7 @@ import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, Sca
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
+import { BillingTerminalInitialSkeleton } from './skeletons/PageSkeletons';
 
 const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser, requestAttendanceDecision }) => {
   const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
@@ -15,6 +16,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [customers, setCustomers] = useState([]);
   const [offers, setOffers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [lastAddedId, setLastAddedId] = useState(null);
   const [variantSelectorItem, setVariantSelectorItem] = useState(null);
   const [isRecentSalesOpen, setIsRecentSalesOpen] = useState(false);
@@ -46,6 +48,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       showToast('Error loading POS data.', 'error');
     } finally {
       setIsLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [apiClient, API.inventory, API.customers, API.offers, showToast]);
 
@@ -481,12 +484,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   const inputBase = darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
 
-  if (isLoading) return (
-    <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
-        <p className="text-xs font-black opacity-40 tracking-widest">Initializing Terminal...</p>
-    </div>
-  );
+  if (isLoading && !hasLoadedOnce) return <BillingTerminalInitialSkeleton darkMode={darkMode} />;
 
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>

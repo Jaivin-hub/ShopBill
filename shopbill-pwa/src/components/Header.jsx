@@ -37,9 +37,12 @@ const Header = ({
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
     const isPremium = currentUser?.plan === 'PREMIUM';
     const isOwner = userRole?.toLowerCase() === 'owner';
-    const displayedBusinessName = isPremium && isOwner
-        ? (currentOutlet?.name || businessName)
-        : businessName;
+    // Always prefer the latest profile business name (updated from Profile page),
+    // then fall back to outlet label if needed for premium owner context.
+    const profileBusinessName = (currentUser?.shopName || businessName || '').trim();
+    const displayedBusinessName = profileBusinessName || (
+        isPremium && isOwner ? (currentOutlet?.name || '') : ''
+    );
 
     // Sync local outlets with prop (always update when prop changes)
     useEffect(() => {

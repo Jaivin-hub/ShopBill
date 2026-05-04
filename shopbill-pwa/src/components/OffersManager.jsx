@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgePercent, Calendar, Plus, RefreshCw, Tag, Trash2 } from 'lucide-react';
+import { BadgePercent, Calendar, ChevronDown, Plus, RefreshCw, Tag, Trash2 } from 'lucide-react';
+import { OffersInitialSkeleton } from './skeletons/PageSkeletons';
 
 const OFFER_TYPES = [
   { id: 'product', label: 'Individual Product Offer' },
@@ -22,9 +23,11 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [offers, setOffers] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [offerBucket, setOfferBucket] = useState('active');
 
   const canManage = ['owner', 'manager'].includes(String(userRole || '').toLowerCase());
 
@@ -39,6 +42,7 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       showToast?.('Unable to load offers right now.', 'error');
     } finally {
       setIsLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [apiClient, API, showToast]);
 
@@ -141,34 +145,42 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     );
   }
 
-  const renderOfferList = (list, emptyLabel) => (
-    <div className="space-y-3">
-      {list.length === 0 ? (
-        <p className={`text-xs font-bold ${textMuted}`}>{emptyLabel}</p>
-      ) : list.map((offer) => (
-        <div key={offer._id || offer.id} className={`border rounded-xl p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{offer.title}</p>
-              <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
-                {offer.offerType === 'product' ? `Product: ${offer.productName || '-'}` : offer.offerType === 'all_products' ? 'All products' : 'Custom offer'}
-              </p>
-              <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
-                {offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `₹${offer.discountValue} off`} | {offer.startDate?.slice(0, 10)} to {offer.endDate?.slice(0, 10)}
-              </p>
-            </div>
-            <button
-              onClick={() => handleDeleteOffer(offer._id || offer.id)}
-              className="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10"
-              title="Delete offer"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+  if (isLoading && !hasLoadedOnce) {
+    return <OffersInitialSkeleton darkMode={darkMode} />;
+  }
+
+  const offerBuckets = useMemo(
+    () => [
+      {
+        id: 'active',
+        label: 'Active offers',
+        emptyLabel: 'No active offers.',
+        list: statusBuckets.active,
+        icon: BadgePercent,
+        iconClass: 'text-emerald-500',
+      },
+      {
+        id: 'scheduled',
+        label: 'Scheduled offers',
+        emptyLabel: 'No scheduled offers.',
+        list: statusBuckets.scheduled,
+        icon: Calendar,
+        iconClass: 'text-indigo-500',
+      },
+      {
+        id: 'expired',
+        label: 'Expired offers',
+        emptyLabel: 'No expired offers.',
+        list: statusBuckets.expired,
+        icon: Tag,
+        iconClass: 'text-amber-500',
+      },
+    ],
+    [statusBuckets]
   );
+
+  const currentBucket = offerBuckets.find((b) => b.id === offerBucket) || offerBuckets[0];
+  const BucketIcon = currentBucket?.icon || BadgePercent;
 
   return (
     <div className={`h-full min-h-0 overflow-y-auto px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
@@ -185,7 +197,7 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
                 className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black tracking-widest flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                {isFormOpen ? 'CLOSE FORM' : 'ADD NEW OFFER'}
+                <span className="hidden lg:inline">{isFormOpen ? 'CLOSE FORM' : 'ADD NEW OFFER'}</span>
               </button>
               <button onClick={fetchOffers} className={`p-2.5 rounded-xl border ${cardBase}`} title="Refresh offers">
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -227,19 +239,75 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
           </section>
         )}
 
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className={`${cardBase} border rounded-2xl p-4`}>
-            <h3 className="text-xs font-black tracking-widest mb-3 flex items-center gap-2"><BadgePercent className="w-4 h-4 text-emerald-500" /> ACTIVE OFFERS</h3>
-            {renderOfferList(statusBuckets.active, 'No active offers.')}
+        <section className={`${cardBase} border rounded-2xl p-4 md:p-5`}>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <h3 className="text-xs font-black tracking-widest flex items-center gap-2">
+              <BucketIcon className={`w-4 h-4 shrink-0 ${currentBucket?.iconClass || 'text-indigo-500'}`} />
+              OFFERS
+            </h3>
+            <div className="relative w-full sm:max-w-sm">
+              <label htmlFor="offers-bucket" className="sr-only">
+                Choose offer status
+              </label>
+              <select
+                id="offers-bucket"
+                value={offerBucket}
+                onChange={(e) => setOfferBucket(e.target.value)}
+                className={`w-full appearance-none cursor-pointer pl-4 pr-11 py-3 rounded-xl border text-xs font-black tracking-widest uppercase ${inputBase}`}
+              >
+                {offerBuckets.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.label} ({b.list.length})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${textMuted}`} aria-hidden />
+            </div>
           </div>
-          <div className={`${cardBase} border rounded-2xl p-4`}>
-            <h3 className="text-xs font-black tracking-widest mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-indigo-500" /> SCHEDULED OFFERS</h3>
-            {renderOfferList(statusBuckets.scheduled, 'No scheduled offers.')}
-          </div>
-          <div className={`${cardBase} border rounded-2xl p-4`}>
-            <h3 className="text-xs font-black tracking-widest mb-3 flex items-center gap-2"><Tag className="w-4 h-4 text-amber-500" /> EXPIRED OFFERS</h3>
-            {renderOfferList(statusBuckets.expired, 'No expired offers.')}
-          </div>
+
+          {currentBucket.list.length === 0 ? (
+            <p className={`text-xs font-bold py-10 text-center ${textMuted}`}>{currentBucket.emptyLabel}</p>
+          ) : (
+            <div
+              className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 scroll-smooth custom-scrollbar"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {currentBucket.list.map((offer) => (
+                <div
+                  key={offer._id || offer.id}
+                  className={`snap-center shrink-0 w-[min(100%,380px)] border rounded-xl p-4 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{offer.title}</p>
+                      <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
+                        {offer.offerType === 'product'
+                          ? `Product: ${offer.productName || '-'}`
+                          : offer.offerType === 'all_products'
+                            ? 'All products'
+                            : 'Custom offer'}
+                      </p>
+                      <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
+                        {offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `₹${offer.discountValue} off`} |{' '}
+                        {offer.startDate?.slice(0, 10)} to {offer.endDate?.slice(0, 10)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOffer(offer._id || offer.id)}
+                      className="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10 shrink-0"
+                      title="Delete offer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {currentBucket.list.length > 1 && (
+            <p className={`md:hidden text-[10px] font-bold text-center mt-2 ${textMuted}`}>Swipe sideways to view more offers</p>
+          )}
         </section>
       </div>
     </div>

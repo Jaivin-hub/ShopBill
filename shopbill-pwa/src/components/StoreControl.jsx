@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
+import { StoreControlInitialSkeleton } from './skeletons/PageSkeletons';
 
 const StoreControl = ({ 
     darkMode, 
@@ -200,12 +201,7 @@ const StoreControl = ({
     }
 
     if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center p-20 gap-4">
-                <Loader2 className="animate-spin text-indigo-500" size={40} />
-                <p className="text-[10px] font-black tracking-widest opacity-50 uppercase">Loading Store Network...</p>
-            </div>
-        );
+        return <StoreControlInitialSkeleton darkMode={darkMode} />;
     }
 
     return (
