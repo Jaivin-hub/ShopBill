@@ -8,6 +8,7 @@ import { FIREBASE_VAPID_KEY, isPushConfigured } from '../config/pushEnv';
 
 const STORAGE_KEY = 'push_token_registered';
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isAndroid = () => /Android/i.test(navigator.userAgent);
 
 export async function requestPushFromGesture() {
   if (!isPushConfigured() || !localStorage.getItem('userToken')) {
@@ -24,7 +25,7 @@ export async function requestPushFromGesture() {
     console.log('[Push][Gesture] User gesture detected, requesting token...');
     const token = await requestNotificationPermissionAndToken(FIREBASE_VAPID_KEY);
     if (token) {
-      await apiClient.post('/user/device-token', { token, platform: isMobile() ? 'ios-web' : 'web' }, {
+      await apiClient.post('/user/device-token', { token, platform: isAndroid() ? 'android-web' : (isMobile() ? 'ios-web' : 'web') }, {
         headers: { 'x-skip-attendance-prompt': '1' }
       });
       localStorage.setItem(STORAGE_KEY, '1');

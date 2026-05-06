@@ -9,6 +9,8 @@ import apiClient from '../lib/apiClient';
 import { FIREBASE_VAPID_KEY, isPushConfigured } from '../config/pushEnv';
 
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isAndroid = () => /Android/i.test(navigator.userAgent);
 
 /**
  * @param {boolean} enabled — e.g. !!currentUser
@@ -58,10 +60,9 @@ export function usePushNotifications(enabled, userKey) {
             console.warn('[Push][Hook] Could not read service worker registrations:', swErr?.message || swErr);
           }
         }
-        // iOS/Android web should still register token automatically after permission is granted.
-        // Do not trigger permission prompt without gesture on mobile.
-        if (isMobile() && Notification.permission !== 'granted') {
-          console.log(`[Push][Hook] Mobile permission not granted yet (${Notification.permission}), waiting for gesture`);
+        // iOS must request permission from user gesture; Android can request directly.
+        if (isIOS() && Notification.permission !== 'granted') {
+          console.log(`[Push][Hook] iOS permission not granted yet (${Notification.permission}), waiting for gesture`);
           return;
         }
         try {
@@ -88,7 +89,7 @@ export function usePushNotifications(enabled, userKey) {
         }
         await apiClient.post('/user/device-token', {
           token: fcmToken,
-          platform: isMobile() ? 'ios-web' : 'web'
+          platform: isAndroid() ? 'android-web' : (isMobile() ? 'ios-web' : 'web')
         }, {
           headers: { 'x-skip-attendance-prompt': '1' }
         });
