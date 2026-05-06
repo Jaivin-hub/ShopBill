@@ -10,7 +10,7 @@ import {
 import SettingItem from './SettingItem';
 import ToggleSwitch from './ToggleSwitch';
 import API from '../config/api';
-import { isChatSoundEnabled, setChatSoundEnabled, playMessageSound, unlockAudio } from '../utils/notificationSound';
+import { isChatSoundEnabled, setChatSoundEnabled } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
 import { SettingsHomeSkeleton } from './skeletons/PageSkeletons';
 
@@ -377,21 +377,20 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
         }
     };
 
-    const sectionClass = `${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-300 shadow-md'} border rounded-xl overflow-hidden transition-all`;
-    const sectionHeaderClass = `px-6 py-4 border-b flex justify-between items-center ${darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-slate-50 border-slate-200'}`;
-    const sectionLabelClass = `text-[10px] font-black  tracking-[0.2em] flex items-center ${darkMode ? 'text-gray-500' : 'text-black'}`;
+    const sectionClass = `${darkMode ? 'bg-slate-900/70 border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'} border rounded-2xl overflow-hidden transition-all`;
+    const sectionHeaderClass = `px-5 md:px-6 py-4 border-b flex justify-between items-center ${darkMode ? 'bg-slate-950/70 border-slate-800/80' : 'bg-slate-50/90 border-slate-200'}`;
+    const sectionLabelClass = `text-[10px] font-black tracking-[0.2em] flex items-center uppercase ${darkMode ? 'text-slate-400' : 'text-slate-700'}`;
 
     const renderSettingsList = () => (
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 max-w-7xl mx-auto">
             {/* 1. Account Management Section */}
             <section className={sectionClass}>
                 <div className={sectionHeaderClass}>
                     <h2 className={sectionLabelClass}>
                         <User className="w-4 h-4 mr-3 text-indigo-500" /> Account Security
                     </h2>
-                    <span className="text-[8px] font-black px-2 py-0.5 bg-indigo-600 text-white rounded border border-indigo-700  tracking-widest">Admin</span>
                 </div>
-                <div className="p-2">
+                <div className="p-1.5 md:p-2">
                     {currentUser?.role?.toLowerCase() === 'owner' && (
                         <>
                             {/* NEW: Outlet Management Item (Premium only) */}
@@ -453,7 +452,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             <Globe className="w-4 h-4 mr-3 text-emerald-600" /> System Preferences
                         </h2>
                     </div>
-                    <div className="p-2">
+                    <div className="p-1.5 md:p-2">
                         <SettingItem 
                             icon={Bell} 
                             title="Notifications" 
@@ -466,17 +465,9 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             <SettingItem 
                                 icon={MessageCircle} 
                                 title="Chat message sound" 
-                                description="Play sound when new message arrives. Tap Test to unlock audio on mobile." 
+                                description="Play sound when new message arrives." 
                                 actionComponent={
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => { unlockAudio(); setChatSoundEnabled(true); setChatSoundEnabledState(true); playMessageSound(); }}
-                                            className={`px-2 py-1.5 rounded-lg text-[10px] font-bold ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'} hover:opacity-90 active:scale-95 transition-all`}
-                                        >
-                                            Test
-                                        </button>
-                                        <ToggleSwitch checked={chatSoundEnabled} onChange={() => { const next = !chatSoundEnabled; setChatSoundEnabled(next); setChatSoundEnabledState(next); }} darkMode={darkMode} />
-                                    </div>
+                                    <ToggleSwitch checked={chatSoundEnabled} onChange={() => { const next = !chatSoundEnabled; setChatSoundEnabled(next); setChatSoundEnabledState(next); }} darkMode={darkMode} />
                                 } 
                                 accentColor="text-indigo-500" 
                                 darkMode={darkMode}
@@ -500,7 +491,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             <LifeBuoy className="w-4 h-4 mr-3 text-purple-600" /> Infrastructure
                         </h2>
                     </div>
-                    <div className="p-2">
+                    <div className="p-1.5 md:p-2">
                         <SettingItem 
                             icon={LifeBuoy} 
                             title="Help & Support" 
@@ -543,7 +534,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
         }
     };
 
-    const headerBase = darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white/95 border-slate-300 shadow-sm';
+    const headerBase = darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm';
 
     if (isInitialLoading) {
         return <SettingsHomeSkeleton darkMode={darkMode} />;
@@ -552,7 +543,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
             {/* STICKY HEADER */}
-            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-6 py-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-5 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         {currentView !== 'main' && (
@@ -564,10 +555,10 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                             </button>
                         )}
                         <div>
-                            <h1 className={`text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
+                            <h1 className={`text-xl md:text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-black'}`}>
                                 {currentView === 'storeControl' ? 'Store' : currentView === 'rolePermissions' ? 'Page' : 'Control'} <span className="text-indigo-600">{currentView === 'storeControl' ? 'Management' : currentView === 'rolePermissions' ? 'Permissions' : 'Center'}</span>
                             </h1>
-                            <p className={`text-[9px] font-bold  tracking-[0.25em] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-gray-500' : 'text-slate-800'}`}>
+                            <p className={`text-[9px] font-bold tracking-[0.22em] mt-1.5 flex items-center gap-1.5 uppercase ${darkMode ? 'text-slate-500' : 'text-slate-700'}`}>
                                 {currentView === 'storeControl' ? 'ACTIVE NODES: ' + stores.length : currentView === 'rolePermissions' ? 'Role Access Configuration' : 'System Governance Active'}
                             </p>
                         </div>
@@ -583,7 +574,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 md:p-10 pb-32">
+            <div className="max-w-7xl mx-auto p-4 md:p-8 pb-32">
                 {renderContent()}
             </div>
             </div>

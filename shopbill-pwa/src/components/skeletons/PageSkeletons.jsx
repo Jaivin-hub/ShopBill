@@ -50,7 +50,7 @@ export function ChatInitialSkeleton({ darkMode }) {
   const borderSide = darkMode ? 'border-slate-800' : 'border-slate-200';
   return (
     <div className={`flex flex-col md:flex-row ${themeBase} w-full h-full overflow-hidden`}>
-      <aside className={`w-full md:w-80 shrink-0 flex flex-col border-b md:border-b-0 md:border-r ${borderSide} h-[40vh] md:h-full min-h-0`}>
+      <aside className={`w-full md:w-80 shrink-0 flex flex-col border-b md:border-b-0 md:border-r ${borderSide} h-full min-h-0`}>
         <div className={`p-4 border-b ${borderSide} space-y-3`}>
           <div className={`h-10 w-full ${skel(darkMode, 'rounded-xl')}`} />
           <div className={`h-9 w-full ${skel(darkMode, 'rounded-xl')}`} />

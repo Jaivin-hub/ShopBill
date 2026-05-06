@@ -12,8 +12,14 @@ const apiClient = axios.create();
 
 // Helper function to extract the token from the URL path.
 const getTokenFromPath = () => {
+    const params = new URLSearchParams(window.location.search || '');
+    const queryToken = params.get('resetToken');
+    if (queryToken && /^[a-fA-F0-9]{64,}$/.test(queryToken)) {
+        return queryToken;
+    }
     // Expected path format: /reset-password/TOKEN_STRING
-    const path = window.location.pathname;
+    const hashPath = (window.location.hash || '').replace(/^#/, '');
+    const path = hashPath || window.location.pathname;
     const match = path.match(/\/reset-password\/([a-fA-F0-9]{64,})/); 
     return match ? match[1] : null;
 };

@@ -10,6 +10,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Use stable asset names to avoid stale HTML -> missing hashed chunk 404s
+        // on deep links like /staff-setup/:token during rolling deployments.
+        entryFileNames: 'assets/index.js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: (assetInfo) => {
+          const name = assetInfo?.name || '';
+          if (name.endsWith('.css')) return 'assets/index.css';
+          return 'assets/[name][extname]';
+        },
         manualChunks(id) {
           if (id.includes('node_modules/lucide-react')) return 'vendor-lucide';
         },

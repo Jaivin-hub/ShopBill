@@ -11,31 +11,32 @@ const SettingItem = ({
     darkMode 
 }) => {
     // Dynamic styles based on theme
-    const textColor = darkMode ? 'text-gray-100' : 'text-black';
-    const descColor = darkMode ? 'text-gray-400' : 'text-slate-600';
-    const borderColor = darkMode ? 'border-gray-800/60' : 'border-slate-100';
-    const hoverBg = darkMode ? 'hover:bg-indigo-500/5' : 'hover:bg-slate-50';
+    const textColor = darkMode ? 'text-slate-100' : 'text-slate-900';
+    const descColor = darkMode ? 'text-slate-400' : 'text-slate-600';
+    const borderColor = darkMode ? 'border-slate-800/70' : 'border-slate-200';
+    const hoverBg = darkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50/60';
     const iconColor = accentColor || 'text-indigo-500';
+    const iconWrap = darkMode ? 'bg-slate-900 group-hover:bg-indigo-500/20 border border-slate-800' : 'bg-white group-hover:bg-indigo-50 border border-slate-200';
 
     return (
         <article 
-            className={`flex items-center justify-between p-5 border-b last:border-0 transition-all duration-200 group ${borderColor} ${onClick ? `cursor-pointer ${hoverBg}` : ''}`}
+            className={`flex items-center justify-between p-4 md:p-5 border-b last:border-0 transition-all duration-200 group ${borderColor} ${onClick ? `cursor-pointer ${hoverBg}` : ''}`}
             onClick={onClick}
             itemScope
             itemType="https://schema.org/ListItem"
         >
-            <div className="flex items-center gap-5">
-                <div className={`p-2.5 rounded-xl transition-colors ${darkMode ? 'bg-gray-800/40 group-hover:bg-indigo-500/10' : 'bg-slate-100 group-hover:bg-white'}`}>
+            <div className="flex items-center gap-4 min-w-0">
+                <div className={`p-2.5 rounded-xl transition-colors shrink-0 ${iconWrap}`}>
                     <Icon className={`w-5 h-5 flex-shrink-0 ${iconColor}`} aria-hidden="true" />
                 </div>
                 
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                     <p className={`text-[13px] font-black tracking-tight ${textColor}`} itemProp="name">
                         {title}
                     </p>
                     {/* Description: Forced high visibility for light mode */}
                     <p 
-                        className={`text-[11px] font-bold mt-0.5 hidden sm:block leading-tight ${descColor}`} 
+                        className={`text-[11px] font-bold mt-0.5 hidden sm:block leading-tight truncate ${descColor}`} 
                         itemProp="description"
                     >
                         {description}

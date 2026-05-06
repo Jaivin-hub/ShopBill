@@ -10,8 +10,15 @@ const apiClient = axios.create();
 
 // Helper function to extract the token from the URL path for staff activation.
 const getTokenFromPath = () => {
+    const params = new URLSearchParams(window.location.search || '');
+    const queryToken = params.get('staffSetupToken');
+    if (queryToken && /^[a-fA-F0-9]+$/.test(queryToken)) {
+        return queryToken;
+    }
     // Expected path format: /staff-setup/TOKEN_STRING
-    const path = window.location.pathname;
+    // Support both normal path and hash route (#/staff-setup/TOKEN_STRING).
+    const hashPath = (window.location.hash || '').replace(/^#/, '');
+    const path = hashPath || window.location.pathname;
     // Regex specifically for the staff-setup path - token is 64 hex characters
     // Updated to be more flexible and handle any hex string after /staff-setup/
     const match = path.match(/\/staff-setup\/([a-fA-F0-9]+)/); 

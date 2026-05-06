@@ -18,6 +18,8 @@ import Login from './components/Login';
 import LandingPage from './components/LandingPage';
 import OutletManager from './components/OutletManager';
 import OutletSelector from './components/OutletSelector';
+import ResetPassword from './components/ResetPassword';
+import StaffSetPassword from './components/StaffSetPassword';
 
 // Lazy Load Heavy Components
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -28,8 +30,6 @@ const Reports = lazy(() => import('./components/Reports'));
 const SettingsPage = lazy(() => import('./components/Settings'));
 const Profile = lazy(() => import('./components/Profile'));
 const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
-const ResetPassword = lazy(() => import('./components/ResetPassword'));
-const StaffSetPassword = lazy(() => import('./components/StaffSetPassword'));
 const SalesActivityPage = lazy(() => import('./components/SalesActivityPage'));
 const OffersManager = lazy(() => import('./components/OffersManager'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
@@ -348,7 +348,11 @@ const DEFAULT_ROLE_PAGE_ACCESS = {
 };
 
 const checkDeepLinkPath = () => {
-    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get('staffSetupToken')) return 'staffSetPassword';
+    if (params.get('resetToken')) return 'resetPassword';
+    const hashPath = (window.location.hash || '').replace(/^#/, '');
+    const path = hashPath || window.location.pathname;
     if (path.startsWith('/staff-setup/')) {
         return 'staffSetPassword'; 
     }
@@ -377,9 +381,11 @@ const App = () => {
     
     // Listen for popstate events (browser back/forward)
     window.addEventListener('popstate', handlePathChange);
+    window.addEventListener('hashchange', handlePathChange);
     
     return () => {
       window.removeEventListener('popstate', handlePathChange);
+      window.removeEventListener('hashchange', handlePathChange);
     };
   }, [currentPage]);
   const [currentUser, setCurrentUser] = useState(() => {
@@ -1161,21 +1167,22 @@ useEffect(() => {
 
   const handleProfileUpdated = useCallback((updatedData) => {
     if (!updatedData) return;
+    const normalizedUpdate = updatedData?.user || updatedData?.data || updatedData;
     setCurrentUser((prevUser) => {
-      const mergedUser = { ...(prevUser || {}), ...updatedData };
+      const mergedUser = { ...(prevUser || {}), ...normalizedUpdate };
       localStorage.setItem('currentUser', JSON.stringify(mergedUser));
       return mergedUser;
     });
     // Keep active outlet label in sync after business-name edits from Profile.
-    if (updatedData.shopName) {
+    if (normalizedUpdate.shopName) {
       setCurrentOutlet((prevOutlet) => (
-        prevOutlet ? { ...prevOutlet, name: updatedData.shopName } : prevOutlet
+        prevOutlet ? { ...prevOutlet, name: normalizedUpdate.shopName } : prevOutlet
       ));
       setOutlets((prevOutlets) => {
         if (!Array.isArray(prevOutlets)) return prevOutlets;
         return prevOutlets.map((outlet) => (
           outlet?._id === currentOutletId || (!currentOutletId && prevOutlets.length === 1)
-            ? { ...outlet, name: updatedData.shopName }
+            ? { ...outlet, name: normalizedUpdate.shopName }
             : outlet
         ));
       });

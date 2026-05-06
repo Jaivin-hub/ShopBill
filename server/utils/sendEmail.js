@@ -294,6 +294,53 @@ const sendEmail = async (options) => {
 
         return info;
     } catch (err) {
+        // AWS/cloud migration resilience: if implicit TLS 465 fails, retry once on 587 STARTTLS.
+        // This is common when outbound 465 is blocked by host/network policy.
+        const shouldRetryOn587 =
+            port === 465 &&
+            secure === true &&
+            process.env.EMAIL_DISABLE_PORT_FALLBACK !== '1' &&
+            ['ETIMEDOUT', 'ESOCKET', 'ECONNREFUSED', 'ECONNECTION', 'EENVELOPE'].includes(String(err.code || ''));
+        if (shouldRetryOn587) {
+            console.warn('[sendEmail] 465 failed; retrying once with 587 + secure=false (STARTTLS).', {
+                errCode: err.code,
+                errMessage: err.message,
+            });
+            const retryTransporter = nodemailer.createTransport({
+                host,
+                port: 587,
+                secure: false,
+                auth: { user, pass },
+                connectionTimeout: connMs,
+                greetingTimeout: greetMs,
+                socketTimeout: sockMs,
+                debug: emailDebug,
+                ...(emailDebug ? { logger: console } : {}),
+                ...(process.env.EMAIL_REQUIRE_TLS === 'true' ? { requireTLS: true } : {}),
+                tls: {
+                    rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+                },
+            });
+            try {
+                const retryTimeout = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error(`SMTP fallback send timed out after ${overallMs}ms on 587.`)), overallMs);
+                });
+                const retryInfo = await Promise.race([retryTransporter.sendMail(mailOptions), retryTimeout]);
+                settled = true;
+                clearInterval(progressTimer);
+                try { retryTransporter.close(); } catch (_) { void 0; }
+                const elapsedMs = Date.now() - t0;
+                console.log('[sendEmail] ========== RESULT: SENT OK (FALLBACK 587) ==========', ts(), `elapsedMs=${elapsedMs}`);
+                console.log('[sendEmail] messageId:', retryInfo.messageId);
+                console.log('[sendEmail] accepted:', retryInfo.accepted, '| rejected:', retryInfo.rejected);
+                console.log('[sendEmail] smtp response:', retryInfo.response);
+                return retryInfo;
+            } catch (retryErr) {
+                try { retryTransporter.close(); } catch (_) { void 0; }
+                console.error('[sendEmail] Fallback 587 also failed:', retryErr.message, retryErr.code || '');
+            }
+        }
+
         settled = true;
         clearInterval(progressTimer);
         closeTransport();
@@ -403,7 +450,8 @@ sendEmail.getLastQueuedDispatchDebug = getLastQueuedDispatchDebug;
 
 function buildStaffActivationMail({ to, name, role, activationToken, shopName }) {
     const clientUrl = String(process.env.CLIENT_URL || '').trim();
-    const activationUrl = `${clientUrl}/staff-setup/${activationToken}`;
+    // Use query-token deep link so activation works even when hosting lacks SPA path rewrites.
+    const activationUrl = `${clientUrl}/?staffSetupToken=${activationToken}`;
     const shopLabel = shopName ? `<p>Shop: <strong>${shopName}</strong></p>` : '';
     return {
         context: 'activation-new-staff',
@@ -499,7 +547,7 @@ async function sendStaffActivationEmailAndGetDispatch(payload) {
     const mail = buildStaffActivationMail(payload);
     console.log('[sendEmail] staff activation mail build (token not logged):', {
         CLIENT_URL: process.env.CLIENT_URL || '(MISSING)',
-        pathSuffix: '/staff-setup/<token>',
+        pathSuffix: '/?staffSetupToken=<token>',
         tokenLengthChars: mail.activationTokenLengthChars,
         recipient: mail.to,
     });

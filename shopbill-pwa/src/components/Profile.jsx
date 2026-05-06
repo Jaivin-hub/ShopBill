@@ -143,12 +143,17 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
             showToast('Syncing changes...', 'info');
             const response = await apiClient.put(API.profile, profile);
             const updatedData = response.data.user || response.data.data || response.data;
-            setProfile(updatedData);
+            const normalizedUpdate = {
+                ...updatedData,
+                // Ensure header gets the just-saved business name even if API omits it in response payload.
+                shopName: updatedData?.shopName ?? profile.shopName,
+            };
+            setProfile((prev) => ({ ...prev, ...normalizedUpdate }));
             
             const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-            localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...updatedData }));
+            localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...normalizedUpdate }));
             if (typeof onProfileUpdated === 'function') {
-                onProfileUpdated(updatedData);
+                onProfileUpdated(normalizedUpdate);
             }
 
             setIsEditing(false);

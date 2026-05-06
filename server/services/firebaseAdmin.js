@@ -135,7 +135,6 @@ async function sendPushNotification(tokens, payload) {
         });
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
-            notification: { title, body },
             android: {
                 priority: 'high',
                 notification: {
