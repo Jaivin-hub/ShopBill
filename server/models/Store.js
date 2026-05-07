@@ -55,6 +55,14 @@ const StoreSchema = new mongoose.Schema({
                 settings: { type: Boolean, default: false },
                 staffPermissions: { type: Boolean, default: false }
             }
+        },
+        attendancePolicy: {
+            enabled: { type: Boolean, default: false },
+            defaultPunchInStart: { type: String, default: '' }, // HH:mm
+            defaultPunchInEnd: { type: String, default: '' }, // HH:mm
+            defaultAutoPunchOutTime: { type: String, default: '' }, // HH:mm
+            defaultAutoPunchOutEnabled: { type: Boolean, default: false },
+            allowShiftOverrides: { type: Boolean, default: true }
         }
     }
 }, { timestamps: true });

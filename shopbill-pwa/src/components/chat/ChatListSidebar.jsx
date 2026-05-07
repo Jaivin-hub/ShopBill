@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     Plus, Search, User, Store, Loader2, 
     ShieldCheck, ArrowRight, LayoutGrid, 
-    UserSquare2, Users
+    UserSquare2, Users, X
 } from 'lucide-react';
 
 const ChatListSidebar = ({
@@ -24,6 +24,7 @@ const ChatListSidebar = ({
     showOutletInfo = false
 }) => {
     const [viewMode, setViewMode] = useState('chats');
+    const [showSearch, setShowSearch] = useState(false);
 
     // --- Theme Vars ---
     const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
@@ -38,44 +39,58 @@ const ChatListSidebar = ({
                 {/* Sticky Header Area - Title, Description, Toggle, and Search */}
                 <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'border-slate-200 bg-white backdrop-blur-xl'} shadow-lg`}>
                     <div className="p-4 md:p-6 pb-3 md:pb-4">
-                        {/* Toggle */}
-                        <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className="flex items-center gap-2">
+                            {/* Toggle */}
+                            <div className={`flex p-1 rounded-xl gap-1 border flex-1 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                <button
+                                    onClick={() => setViewMode('chats')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                        viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                    }`}
+                                >
+                                    <LayoutGrid size={11} className="md:w-3 md:h-3" />
+                                    <span className="hidden sm:inline">GROUPS</span>
+                                    <span className="sm:hidden">Group</span>
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('users')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                        viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                    }`}
+                                >
+                                    <UserSquare2 size={11} className="md:w-3 md:h-3" />
+                                    <span className="hidden sm:inline">STAFF</span>
+                                    <span className="sm:hidden">Staff</span>
+                                </button>
+                            </div>
                             <button
-                                onClick={() => setViewMode('chats')}
-                                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
-                                    viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                                }`}
+                                type="button"
+                                onClick={() => setShowSearch((v) => !v)}
+                                className={`shrink-0 p-2.5 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                                aria-label={showSearch ? 'Hide search' : 'Show search'}
+                                title={showSearch ? 'Hide search' : 'Show search'}
                             >
-                                <LayoutGrid size={11} className="md:w-3 md:h-3" />
-                                <span className="hidden sm:inline">GROUPS</span>
-                                <span className="sm:hidden">Group</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('users')}
-                                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
-                                    viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                                }`}
-                            >
-                                <UserSquare2 size={11} className="md:w-3 md:h-3" />
-                                <span className="hidden sm:inline">STAFF</span>
-                                <span className="sm:hidden">Staff</span>
+                                {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
                             </button>
                         </div>
                     </div>
 
                     {/* Search - Inside Sticky Header */}
-                    <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950' : 'bg-white'}`}>
-                        <div className="relative group">
-                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
-                            <input
-                                type="text"
-                                placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
-                                value={searchTerm}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                className={`w-full pl-10 pr-4 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
-                            />
+                    {showSearch && (
+                        <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950' : 'bg-white'}`}>
+                            <div className="relative group">
+                                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
+                                    value={searchTerm}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    className={`w-full pl-10 pr-4 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Scrollable Content Area - Chat List */}
@@ -269,7 +284,6 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                     const isSelected = selectedChat?._id === chat._id;
                     const isVerified = chat.isDefault;
                     const lastMsg = chat.messages?.[chat.messages.length - 1];
-                    
                     return (
                         <button
                             key={chat._id}

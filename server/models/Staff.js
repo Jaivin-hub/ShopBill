@@ -44,6 +44,15 @@ const StaffSchema = new Schema({
     permissions: {
         reports: { type: Boolean, default: false }
     },
+    // Optional per-staff schedule override
+    workSchedule: {
+        enabled: { type: Boolean, default: false },
+        shiftName: { type: String, trim: true, default: '' },
+        punchInStart: { type: String, default: '' }, // HH:mm
+        punchInEnd: { type: String, default: '' },   // HH:mm
+        autoPunchOutTime: { type: String, default: '' }, // HH:mm
+        autoPunchOutEnabled: { type: Boolean, default: false }
+    },
     // Status to enable/disable access without deletion
     active: {
         type: Boolean,

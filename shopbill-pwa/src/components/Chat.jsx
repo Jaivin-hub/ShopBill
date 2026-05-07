@@ -1106,22 +1106,25 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             console.error('Missing userId or currentUser:', { userId, currentUser });
             return;
         }
+        const targetUserId = String(userId);
+        const currentUserId = String(currentUser._id || currentUser.id || '');
+        if (!currentUserId) {
+            showToast('Unable to open chat right now. Please try again.', 'error');
+            return;
+        }
         
         try {
+            const toId = (value) => {
+                if (value == null) return '';
+                if (typeof value === 'object') return String(value._id || value.id || value);
+                return String(value);
+            };
             // Check if a direct chat already exists with this user
             const existingChat = chats.find(chat => {
                 if (chat.type !== 'direct') return false;
-                const participantIds = chat.participants?.map(p => {
-                    // Handle both populated and non-populated participants
-                    if (typeof p === 'object' && p !== null) {
-                        return (p._id || p.id || p).toString();
-                    }
-                    return p.toString();
-                }) || [];
-                const currentUserId = (currentUser._id || currentUser.id).toString();
-                const targetUserId = userId.toString();
+                const participantIds = (chat.participants || []).map(toId).filter(Boolean);
                 return participantIds.includes(currentUserId) && 
-                       participantIds.includes(targetUserId) &&
+                       participantIds.includes(String(targetUserId)) &&
                        participantIds.length === 2;
             });
 
@@ -1136,33 +1139,18 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             showToast('Creating chat...', 'info');
             const response = await apiClient.post(API.createChat, {
                 type: 'direct',
-                participantIds: [userId]
+                participantIds: [targetUserId]
             });
 
             if (response.data?.success) {
                 const newChat = response.data.data;
-                // Refresh chats list to get the latest data
-                await fetchChats();
-                // Find the newly created chat in the refreshed list
-                const refreshedChats = await apiClient.get(API.chatList);
-                if (refreshedChats.data?.success) {
-                    const updatedChats = refreshedChats.data.data || [];
-                    setChats(updatedChats);
-                    // Find and select the new chat
-                    const createdChat = updatedChats.find(c => c._id === newChat._id) || newChat;
-                    setSelectedChat(createdChat);
-                    // Fetch messages for the new chat
-                    fetchMessages(createdChat._id);
-                } else {
-                    // Fallback: use the response data
-                    setChats(prev => {
-                        const exists = prev.some(c => c._id === newChat._id);
-                        if (exists) return prev;
-                        return [newChat, ...prev];
-                    });
+                // Select immediately to avoid intermittent "not opening" race.
+                if (newChat?._id) {
                     setSelectedChat(newChat);
                     fetchMessages(newChat._id);
                 }
+                // Refresh sidebar ordering/unread in background.
+                fetchChats();
                 showToast('Chat created', 'success');
             }
         } catch (error) {

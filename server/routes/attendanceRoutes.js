@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
+const Store = require('../models/Store');
 const { emitAlert } = require('./notificationRoutes');
 
 const router = express.Router();
@@ -13,6 +14,81 @@ const getActorNameWithRole = (staffRecord, reqUser) => {
     const name = staffRecord?.name || reqUser?.name || reqUser?.email || 'Staff';
     return `${name} (${displayRole})`;
 };
+
+const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const timeToMinutes = (value) => {
+    const t = String(value || '').trim();
+    if (!HHMM_PATTERN.test(t)) return null;
+    const [h, m] = t.split(':').map(Number);
+    return (h * 60) + m;
+};
+const minutesFromDateLocal = (date) => {
+    const d = new Date(date);
+    return (d.getHours() * 60) + d.getMinutes();
+};
+
+const isWithinWindow = (currentMins, startMins, endMins) => {
+    if (startMins == null || endMins == null) return true;
+    if (startMins === endMins) return true; // treat equal as full-day window
+    if (startMins < endMins) return currentMins >= startMins && currentMins <= endMins;
+    // Overnight window (e.g. 14:00 -> 02:00)
+    return currentMins >= startMins || currentMins <= endMins;
+};
+
+const resolveEffectiveSchedule = (storePolicy = {}, staffSchedule = {}) => {
+    const policyEnabled = storePolicy.enabled === true;
+    const shiftEnabled = staffSchedule.enabled === true;
+    const punchInStart = shiftEnabled ? (staffSchedule.punchInStart || '') : (storePolicy.defaultPunchInStart || '');
+    const punchInEnd = shiftEnabled ? (staffSchedule.punchInEnd || '') : (storePolicy.defaultPunchInEnd || '');
+    // Auto punch-out now follows configured shift/store end time.
+    return { policyEnabled, shiftEnabled, punchInStart, punchInEnd };
+};
+
+async function applyAutoPunchOutForStore(storeId) {
+    if (!storeId) return;
+    const store = await Store.findById(storeId).select('settings.attendancePolicy').lean();
+    const policy = store?.settings?.attendancePolicy || {};
+    if (policy.enabled !== true) return;
+    const now = new Date();
+    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const activeAttendance = await Attendance.find({
+        storeId,
+        status: 'active',
+        punchOut: null
+    });
+    if (!activeAttendance.length) return;
+    const staffIds = activeAttendance.map((a) => a.staffId).filter(Boolean);
+    const staffList = await Staff.find({ _id: { $in: staffIds } }).select('_id workSchedule').lean();
+    const staffById = new Map(staffList.map((s) => [String(s._id), s]));
+    for (const att of activeAttendance) {
+        const staff = staffById.get(String(att.staffId));
+        const effective = resolveEffectiveSchedule(policy, staff?.workSchedule || {});
+        if (!effective.policyEnabled) continue;
+        const cutoffMins = timeToMinutes(effective.punchInEnd);
+        if (cutoffMins == null) continue;
+        // Use attendance day as base, then move cutoff to next day when cutoff < punch-in clock
+        const baseDate = new Date(att.date || att.punchIn);
+        const cutoffAt = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), Math.floor(cutoffMins / 60), cutoffMins % 60, 0, 0);
+        const punchInMins = minutesFromDateLocal(att.punchIn || baseDate);
+        if (cutoffMins <= punchInMins) {
+            cutoffAt.setDate(cutoffAt.getDate() + 1);
+        }
+        if (now >= cutoffAt || (new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()) < todayDateOnly && now > cutoffAt)) {
+            if (att.onBreak) {
+                const activeBreak = att.breaks && att.breaks.find((b) => !b.breakEnd);
+                if (activeBreak) {
+                    activeBreak.breakEnd = now;
+                    const breakDiff = activeBreak.breakEnd - activeBreak.breakStart;
+                    activeBreak.breakDuration = Math.round(breakDiff / (1000 * 60));
+                }
+                att.onBreak = false;
+            }
+            att.punchOut = now;
+            att.status = 'completed';
+            await att.save();
+        }
+    }
+}
 
 /**
  * @route POST /api/attendance/punch-in
@@ -73,6 +149,23 @@ router.post('/punch-in', protect, async (req, res) => {
                 error: 'Staff record not found. Please contact your administrator.',
                 details: 'Your account is not linked to a staff record for this outlet.'
             });
+        }
+
+        await applyAutoPunchOutForStore(req.user.storeId);
+
+        // Enforce configured punch-in windows (supports overnight shifts).
+        const storeForPolicy = await Store.findById(req.user.storeId).select('settings.attendancePolicy').lean();
+        const storePolicy = storeForPolicy?.settings?.attendancePolicy || {};
+        const effectiveSchedule = resolveEffectiveSchedule(storePolicy, staff.workSchedule || {});
+        if (effectiveSchedule.policyEnabled) {
+            const nowMinutes = minutesFromDateLocal(new Date());
+            const startMins = timeToMinutes(effectiveSchedule.punchInStart);
+            const endMins = timeToMinutes(effectiveSchedule.punchInEnd);
+            if (startMins != null && endMins != null && !isWithinWindow(nowMinutes, startMins, endMins)) {
+                return res.status(400).json({
+                    error: `Punch-in allowed only between ${effectiveSchedule.punchInStart} and ${effectiveSchedule.punchInEnd} for this shift.`
+                });
+            }
         }
 
         // Get client's local date from request body to ensure correct date is saved
@@ -724,6 +817,8 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
+        await applyAutoPunchOutForStore(req.user.storeId);
+
         // Query for the most recent active attendance record for this staff member
         // Use a time-based approach (last 48 hours from punchIn) instead of date-based
         // This handles timezone differences where the saved date might differ from server UTC date
@@ -1034,6 +1129,8 @@ router.get('/active-status', protect, async (req, res) => {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected.' });
         }
+
+        await applyAutoPunchOutForStore(req.user.storeId);
 
         const now = new Date();
         // Only treat punch-in within last 24h as "currently working" – avoids showing staff who forgot to punch out days ago

@@ -45,8 +45,8 @@ export default defineConfig({
         type: 'module', 
       },
       manifest: {
-        name: 'Pocket POS - #1 Retail Management Tool | Point of Sale Software',
-        short_name: 'Pocket POS',
+        name: 'Pocket Pos',
+        short_name: 'Pocket Pos',
         description: 'Pocket POS - The #1 retail management software for Indian shops. Lightning-fast billing, real-time inventory management, digital Khata ledger, GST billing, and business reports. Works offline, syncs to cloud.',
         start_url: '/',
         display: 'standalone',

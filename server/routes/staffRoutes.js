@@ -82,6 +82,13 @@ const getStoreRolePermissions = (storeDoc) => {
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
 // to match the convention established in authRoutes.js and StaffSchema.
 const isowner = (userRole) => userRole === 'owner';
+const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const normalizeTimeOrEmpty = (value) => {
+    if (value == null) return '';
+    const t = String(value).trim();
+    if (!t) return '';
+    return HHMM_PATTERN.test(t) ? t : null;
+};
 
 /** Only explicit `true` counts as active — fixes legacy docs missing `active` and avoids UI showing the wrong state. */
 function enrichStaffMember(staff) {
@@ -96,7 +103,7 @@ function enrichStaffMember(staff) {
 
 async function enrichStaffById(staffId) {
     const staff = await Staff.findById(staffId)
-        .select('name email role phone active storeId userId permissions')
+        .select('name email role phone active storeId userId permissions workSchedule')
         .populate('userId', 'resetPasswordToken')
         .lean();
     return enrichStaffMember(staff);
@@ -184,7 +191,7 @@ router.get('/', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffList = await Staff.find({ storeId: req.user.storeId })
-            .select('name email role phone active storeId userId permissions')
+            .select('name email role phone active storeId userId permissions workSchedule')
             .populate('userId', 'resetPasswordToken')
             .lean()
             .sort({ role: -1, name: 1 });
@@ -785,6 +792,7 @@ router.put('/:id/role', protect, async (req, res) => {
 // ====================================================================
 router.put('/:id', protect, async (req, res, next) => {
     if (req.params.id === 'role-permissions') return next();
+    if (req.params.id === 'attendance-settings') return next();
     console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id', new Date().toISOString(), {
         staffId: req.params.id,
         body: req.body,
@@ -969,6 +977,122 @@ router.put('/:id/permissions', protect, async (req, res) => {
     } catch (error) {
         console.error('Staff permissions update error:', error.message);
         return res.status(500).json({ error: 'Failed to update staff permissions.' });
+    }
+});
+
+// ====================================================================
+// @route   GET /api/staff/attendance-settings
+// @desc    Get store-level attendance policy (owner/manager)
+// @access  Private (owner/manager)
+// ====================================================================
+router.get('/attendance-settings', protect, async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can view attendance settings.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const store = await Store.findById(req.user.storeId).select('settings.attendancePolicy').lean();
+        if (!store) return res.status(404).json({ error: 'Active outlet not found.' });
+        const policy = store.settings?.attendancePolicy || {};
+        return res.json({
+            success: true,
+            policy: {
+                enabled: policy.enabled === true,
+                defaultPunchInStart: policy.defaultPunchInStart || '',
+                defaultPunchInEnd: policy.defaultPunchInEnd || '',
+                defaultAutoPunchOutTime: policy.defaultAutoPunchOutTime || '',
+                defaultAutoPunchOutEnabled: true,
+                allowShiftOverrides: true
+            }
+        });
+    } catch (error) {
+        console.error('Attendance settings fetch error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch attendance settings.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/attendance-settings
+// @desc    Update store-level attendance policy (owner/manager)
+// @access  Private (owner/manager)
+// ====================================================================
+router.put('/attendance-settings', protect, async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update attendance settings.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const body = req.body || {};
+        const defaultPunchInStart = normalizeTimeOrEmpty(body.defaultPunchInStart);
+        const defaultPunchInEnd = normalizeTimeOrEmpty(body.defaultPunchInEnd);
+        const defaultAutoPunchOutTime = normalizeTimeOrEmpty(body.defaultAutoPunchOutTime);
+        if (defaultPunchInStart === null || defaultPunchInEnd === null || defaultAutoPunchOutTime === null) {
+            return res.status(400).json({ error: 'Invalid time format. Use HH:mm (24h).' });
+        }
+        const nextPolicy = {
+            enabled: body.enabled === true,
+            defaultPunchInStart: defaultPunchInStart || '',
+            defaultPunchInEnd: defaultPunchInEnd || '',
+            defaultAutoPunchOutTime: defaultPunchInEnd || '',
+            defaultAutoPunchOutEnabled: true,
+            allowShiftOverrides: true
+        };
+        const updated = await Store.findByIdAndUpdate(
+            req.user.storeId,
+            { $set: { 'settings.attendancePolicy': nextPolicy } },
+            { new: true, runValidators: true }
+        ).select('settings.attendancePolicy').lean();
+        if (!updated) return res.status(404).json({ error: 'Active outlet not found.' });
+        return res.json({ success: true, message: 'Attendance settings updated.', policy: updated.settings?.attendancePolicy || nextPolicy });
+    } catch (error) {
+        console.error('Attendance settings update error:', error.message);
+        return res.status(500).json({ error: 'Failed to update attendance settings.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/:id/work-schedule
+// @desc    Update per-staff shift schedule override (owner/manager)
+// @access  Private (owner/manager)
+// ====================================================================
+router.put('/:id/work-schedule', protect, async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update work schedules.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: req.params.id, storeId: req.user.storeId });
+        if (!staffMember) return res.status(404).json({ error: 'Staff member not found.' });
+        if (isowner(staffMember.role)) {
+            return res.status(400).json({ error: 'Owner schedule cannot be changed here.' });
+        }
+        const body = req.body || {};
+        const punchInStart = normalizeTimeOrEmpty(body.punchInStart);
+        const punchInEnd = normalizeTimeOrEmpty(body.punchInEnd);
+        const autoPunchOutTime = normalizeTimeOrEmpty(body.autoPunchOutTime);
+        if (punchInStart === null || punchInEnd === null || autoPunchOutTime === null) {
+            return res.status(400).json({ error: 'Invalid time format. Use HH:mm (24h).' });
+        }
+        staffMember.workSchedule = {
+            enabled: body.enabled === true,
+            shiftName: String(body.shiftName || '').trim(),
+            punchInStart: punchInStart || '',
+            punchInEnd: punchInEnd || '',
+            autoPunchOutTime: punchInEnd || '',
+            autoPunchOutEnabled: true
+        };
+        await staffMember.save();
+        const refreshed = await enrichStaffById(staffMember._id);
+        return res.json({ success: true, message: 'Work schedule updated.', staff: refreshed });
+    } catch (error) {
+        console.error('Work schedule update error:', error.message);
+        return res.status(500).json({ error: 'Failed to update work schedule.' });
     }
 });
 

@@ -178,11 +178,39 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, existingShifts = [] }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
+    const [scheduleForm, setScheduleForm] = useState({
+        enabled: false,
+        shiftName: '',
+        punchInStart: '',
+        punchInEnd: '',
+        autoPunchOutTime: ''
+    });
     const pendingInfoRef = useRef(null);
+    const existingShiftMap = useMemo(() => {
+        const map = new Map();
+        (existingShifts || []).forEach((shift) => {
+            const key = String(shift?.name || '').trim().toLowerCase();
+            if (!key) return;
+            map.set(key, shift);
+        });
+        return map;
+    }, [existingShifts]);
+
+    useEffect(() => {
+        const ws = staff?.workSchedule || {};
+        const normalizedShiftName = String(ws.shiftName || '').trim();
+        setScheduleForm({
+            enabled: ws.enabled === true,
+            shiftName: normalizedShiftName,
+            punchInStart: ws.punchInStart || '',
+            punchInEnd: ws.punchInEnd || '',
+            autoPunchOutTime: ws.autoPunchOutTime || ws.punchInEnd || ''
+        });
+    }, [staff, existingShiftMap]);
 
     useEffect(() => {
         if (!showPendingInfo) return;
@@ -418,20 +446,85 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                         </button>
                                     </div>
                                 )}
-                                {Array.isArray(currentPagePermissions) && currentPagePermissions.length > 0 && (
-                                    <div>
+                                {canManageWorkHours && staff.role !== 'owner' && (
+                                    <div className={`rounded-lg border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
                                         <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            Role Page Access
+                                            Work Hours / Shift
                                         </p>
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                            {currentPagePermissions.map((label) => (
-                                                <span
-                                                    key={label}
-                                                    className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
-                                                >
-                                                    {label}
-                                                </span>
-                                            ))}
+                                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            <label className={`text-[10px] font-bold flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={scheduleForm.enabled}
+                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, enabled: e.target.checked }))}
+                                                    className="h-4 w-4 accent-indigo-600"
+                                                />
+                                                Shift enabled
+                                            </label>
+                                            <input
+                                                list={`shift-name-options-${staff?._id || 'staff'}`}
+                                                value={scheduleForm.shiftName}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    const selectedShift = existingShiftMap.get(String(value || '').trim().toLowerCase());
+                                                    if (selectedShift) {
+                                                        setScheduleForm((p) => ({
+                                                            ...p,
+                                                            shiftName: selectedShift.name,
+                                                            punchInStart: selectedShift.punchInStart || '',
+                                                            punchInEnd: selectedShift.punchInEnd || '',
+                                                            autoPunchOutTime: selectedShift.punchInEnd || ''
+                                                        }));
+                                                        return;
+                                                    }
+                                                    setScheduleForm((p) => ({ ...p, shiftName: value }));
+                                                }}
+                                                placeholder="Shift name (choose or type)"
+                                                className={`w-full px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                            />
+                                            <datalist id={`shift-name-options-${staff?._id || 'staff'}`}>
+                                                {existingShifts.map((shift) => (
+                                                    <option key={shift.key} value={shift.name} />
+                                                ))}
+                                            </datalist>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input
+                                                    type="time"
+                                                    value={scheduleForm.punchInStart}
+                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, punchInStart: e.target.value }))}
+                                                    className={`w-full px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                                    title="Punch-in start"
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={scheduleForm.punchInEnd}
+                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, punchInEnd: e.target.value, autoPunchOutTime: e.target.value }))}
+                                                    className={`w-full px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                                    title="Punch-in end (auto punch-out)"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const normalizedName = String(scheduleForm.shiftName || '').trim();
+                                                    const key = normalizedName.toLowerCase();
+                                                    const matchedShift = key ? existingShiftMap.get(key) : null;
+                                                    const normalizedForm = {
+                                                        ...scheduleForm,
+                                                        shiftName: matchedShift?.name || normalizedName
+                                                    };
+                                                    const saved = await onSaveWorkSchedule?.(staff, normalizedForm);
+                                                    if (saved) {
+                                                        setShowDetails(false);
+                                                    }
+                                                }}
+                                                disabled={isSavingWorkSchedule}
+                                                className="px-3 py-2 rounded-lg text-[10px] font-black tracking-widest bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
+                                            >
+                                                {isSavingWorkSchedule ? 'Saving...' : 'Save Shift'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}
@@ -679,6 +772,17 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [isSavingRolePermissions, setIsSavingRolePermissions] = useState(false);
     const [showGrantPermissions, setShowGrantPermissions] = useState(false);
     const [permissionUpdatingId, setPermissionUpdatingId] = useState(null);
+    const [attendancePolicy, setAttendancePolicy] = useState({
+        enabled: false,
+        defaultPunchInStart: '',
+        defaultPunchInEnd: '',
+        defaultAutoPunchOutEnabled: true,
+        defaultAutoPunchOutTime: '',
+        allowShiftOverrides: true
+    });
+    const [isSavingAttendancePolicy, setIsSavingAttendancePolicy] = useState(false);
+    const [showWorkHoursSetup, setShowWorkHoursSetup] = useState(false);
+    const [scheduleUpdatingId, setScheduleUpdatingId] = useState(null);
     void onOpenRolePermissions;
 
     // Ensure we have write/read access
@@ -759,10 +863,31 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         }
     }, [apiClient, hasReadAccess]);
 
+    const fetchAttendancePolicy = useCallback(async () => {
+        if (!hasWriteAccess || !apiClient) return;
+        try {
+            const response = await apiClient.get(API.staffAttendanceSettings);
+            if (response.data?.policy) {
+                setAttendancePolicy({
+                    enabled: response.data.policy.enabled === true,
+                    defaultPunchInStart: response.data.policy.defaultPunchInStart || '',
+                    defaultPunchInEnd: response.data.policy.defaultPunchInEnd || '',
+                    defaultAutoPunchOutEnabled: true,
+                    defaultAutoPunchOutTime: response.data.policy.defaultAutoPunchOutTime || '',
+                    allowShiftOverrides: true
+                });
+            }
+        } catch (error) {
+            if (error?.cancelled) return;
+            console.error('Failed to fetch attendance policy:', error);
+        }
+    }, [apiClient, hasWriteAccess]);
+
     useEffect(() => {
         fetchStaff();
         fetchActiveStatus();
         fetchRolePermissions();
+        fetchAttendancePolicy();
         
         // Refresh active status every 60 seconds
         const interval = setInterval(() => {
@@ -770,7 +895,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         }, 60000);
         
         return () => clearInterval(interval);
-    }, [fetchStaff, fetchActiveStatus, fetchRolePermissions]);
+    }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchAttendancePolicy]);
 
     const [addStaffError, setAddStaffError] = useState(null);
 
@@ -859,6 +984,39 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             if (showToast) showToast(error.response?.data?.error || 'Failed to update individual permission.', 'error');
         } finally {
             setPermissionUpdatingId(null);
+        }
+    };
+    const handleSaveAttendancePolicy = async () => {
+        if (!hasWriteAccess) return;
+        setIsSavingAttendancePolicy(true);
+        try {
+            await apiClient.put(API.staffAttendanceSettings, attendancePolicy);
+            if (showToast) showToast('Working hours settings updated.', 'success');
+            await fetchAttendancePolicy();
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to save working hours settings.', 'error');
+        } finally {
+            setIsSavingAttendancePolicy(false);
+        }
+    };
+    const handleSaveStaffWorkSchedule = async (staffMember, scheduleForm) => {
+        if (!hasWriteAccess || !staffMember?._id) return;
+        setScheduleUpdatingId(String(staffMember._id));
+        try {
+            const res = await apiClient.put(API.staffWorkScheduleUpdate(staffMember._id), scheduleForm);
+            const updated = res?.data?.staff;
+            if (updated) {
+                setStaff((prev) => prev.map((s) => (String(s._id) === String(staffMember._id) ? { ...s, ...updated } : s)));
+            } else {
+                await fetchStaff();
+            }
+            if (showToast) showToast('Staff shift updated.', 'success');
+            return true;
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to update staff shift.', 'error');
+            return false;
+        } finally {
+            setScheduleUpdatingId(null);
         }
     };
 
@@ -994,6 +1152,25 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     }, [staff, activeStaffIds]);
     const workingStaff = orderedStaff.filter((s) => s.role !== 'owner' && activeStaffIds.has(String(s._id || '')));
     const nonWorkingStaff = orderedStaff.filter((s) => !(s.role !== 'owner' && activeStaffIds.has(String(s._id || ''))));
+    const existingShifts = useMemo(() => {
+        const shiftByKey = new Map();
+        (staff || []).forEach((s) => {
+            const shiftName = String(s?.workSchedule?.shiftName || '').trim();
+            const punchInStart = String(s?.workSchedule?.punchInStart || '').trim();
+            const punchInEnd = String(s?.workSchedule?.punchInEnd || '').trim();
+            if (!shiftName) return;
+            const key = shiftName.toLowerCase();
+            if (!shiftByKey.has(key)) {
+                shiftByKey.set(key, {
+                    key,
+                    name: shiftName,
+                    punchInStart,
+                    punchInEnd
+                });
+            }
+        });
+        return Array.from(shiftByKey.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [staff]);
 
     if (isLoading && !hasLoadedOnce) {
         return <TeamManagementInitialSkeleton darkMode={darkMode} />;
@@ -1117,6 +1294,72 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         )}
                     </div>
                 )}
+                {hasWriteAccess && (
+                    <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                        <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
+                            <div>
+                                <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Shop Opens &amp; Close Time</p>
+                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configure shop opening and closing time.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowWorkHoursSetup((v) => !v)}
+                                className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                            >
+                                {showWorkHoursSetup ? 'Hide' : 'Open'}
+                            </button>
+                        </div>
+                        {showWorkHoursSetup && (
+                            <div className="p-3 md:p-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <label className={`text-[11px] font-bold flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={attendancePolicy.enabled}
+                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, enabled: e.target.checked }))}
+                                            className="h-4 w-4 accent-indigo-600"
+                                        />
+                                        Enable working hours policy
+                                    </label>
+                                </div>
+                                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <div>
+                                        <label className={`text-[10px] font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Shop Opens At</label>
+                                        <input
+                                            type="time"
+                                            value={attendancePolicy.defaultPunchInStart}
+                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, defaultPunchInStart: e.target.value }))}
+                                            className={`w-full mt-1 px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                            title="Shop opening time"
+                                            placeholder="Open time"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={`text-[10px] font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Shop Closes At</label>
+                                        <input
+                                            type="time"
+                                            value={attendancePolicy.defaultPunchInEnd}
+                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, defaultPunchInEnd: e.target.value }))}
+                                            className={`w-full mt-1 px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                            title="Shop closing time (auto punch-out)"
+                                            placeholder="Close time"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveAttendancePolicy}
+                                        disabled={isSavingAttendancePolicy}
+                                        className="px-4 py-2 rounded-lg text-[10px] font-black tracking-widest bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
+                                    >
+                                        {isSavingAttendancePolicy ? 'Saving...' : 'Save Shop Timings'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {!hasOwnerAccess && hasWriteAccess && (
                     <div className={`rounded-xl border px-4 py-3 ${darkMode ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
                         <p className="text-[10px] font-black tracking-[0.2em] uppercase">Permissions</p>
@@ -1195,6 +1438,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         onToggleReportsPermission={handleToggleReportsPermission}
                                         reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
                                         canManageIndividualPermissions={hasOwnerAccess}
+                                        canManageWorkHours={hasWriteAccess}
+                                        onSaveWorkSchedule={handleSaveStaffWorkSchedule}
+                                        isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
+                                        existingShifts={existingShifts}
                                     />
                                 );
                                 })}
@@ -1248,6 +1495,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         onToggleReportsPermission={handleToggleReportsPermission}
                                         reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
                                         canManageIndividualPermissions={hasOwnerAccess}
+                                        canManageWorkHours={hasWriteAccess}
+                                        onSaveWorkSchedule={handleSaveStaffWorkSchedule}
+                                        isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
+                                        existingShifts={existingShifts}
                                     />
                                 );
                                 })}

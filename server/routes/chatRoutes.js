@@ -149,9 +149,7 @@ router.get('/chats', protect, async (req, res) => {
                 }
                 const storeGroupName = `${store.name} Group`;
                 let storeGroup = await Chat.findOne({ 
-                    name: storeGroupName, 
                     type: 'group',
-                    createdBy: user._id,
                     isDefault: true,
                     outletId: store._id
                 });
@@ -177,6 +175,11 @@ router.get('/chats', protect, async (req, res) => {
                         outletId: store._id, // Specific outlet group
                         requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
                     });
+                } else if (storeGroup.name !== storeGroupName) {
+                    // Business/outlet name changed: keep same chat, just rename it.
+                    storeGroup.name = storeGroupName;
+                    if (!storeGroup.createdBy) storeGroup.createdBy = user._id;
+                    await storeGroup.save();
                 }
             }
         }
@@ -255,9 +258,7 @@ router.get('/chats', protect, async (req, res) => {
                     if (userStore) {
                         const storeGroupName = `${userStore.name} Group`;
                         let storeGroup = await Chat.findOne({ 
-                            name: storeGroupName, 
                             type: 'group',
-                            createdBy: owner._id,
                             isDefault: true,
                             outletId: userStore._id
                         });
@@ -284,11 +285,18 @@ router.get('/chats', protect, async (req, res) => {
                                 requiredPlan: requiredPlan
                             });
                         } else {
+                            if (storeGroup.name !== storeGroupName) {
+                                // Business/outlet name changed: keep same chat, just rename it.
+                                storeGroup.name = storeGroupName;
+                            }
+                            if (!storeGroup.createdBy) {
+                                storeGroup.createdBy = owner._id;
+                            }
                             // Ensure current user is a participant
                             if (!storeGroup.participants.includes(user._id)) {
                                 storeGroup.participants.push(user._id);
-                                await storeGroup.save();
                             }
+                            await storeGroup.save();
                         }
                     }
                 }
@@ -1091,10 +1099,12 @@ router.delete('/:chatId', protect, async (req, res) => {
             });
         }
 
-        // Only allow the creator to delete the group
-        if (chat.createdBy && chat.createdBy.toString() !== req.user.id.toString()) {
+        // Allow creator OR owner to delete custom groups
+        const isCreator = chat.createdBy && chat.createdBy.toString() === req.user.id.toString();
+        const isOwner = String(user.role || '').toLowerCase() === 'owner';
+        if (!isCreator && !isOwner) {
             return res.status(403).json({ 
-                error: 'Only the group creator can delete this group' 
+                error: 'Only the group creator or owner can delete this group' 
             });
         }
 

@@ -53,7 +53,7 @@ const ChatHeader = ({
     const isCreator = currentUserId && chatCreatorId && String(currentUserId) === String(chatCreatorId);
     
     // Can delete if it's a custom group and user is the creator
-    const canDelete = isCustomGroup && isCreator;
+    const canDelete = isCustomGroup && (isCreator || isOwner);
     
     // Get outlet ID from selected chat
     const chatOutletId = selectedChat?.outletId?._id || selectedChat?.outletId;

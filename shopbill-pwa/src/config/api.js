@@ -44,6 +44,8 @@ const API = {
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,
     staffRolePermissions: API_BASE_URL + '/staff/role-permissions',
+    staffAttendanceSettings: API_BASE_URL + '/staff/attendance-settings', // GET, PUT
+    staffWorkScheduleUpdate: (id) => `${API_BASE_URL}/staff/${id}/work-schedule`, // PUT
     
     // Attendance/Punch In-Out Endpoints
     attendancePunchIn: API_BASE_URL + '/attendance/punch-in', // POST

@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 dotenv.config();
 const connectDB = require('./db');
 const { getAdmin } = require('./services/firebaseAdmin');
+const { runAttendanceAutomation } = require('./services/attendanceAutomation');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -209,6 +210,12 @@ const startServer = async () => {
             console.log(`📡 Listening on 0.0.0.0 (All Interfaces)`);
             console.log(`[Push] Push notification logs active.`);
         });
+
+        // Shift reminders + auto punch-out scheduler (runs every minute).
+        runAttendanceAutomation(io).catch(() => {});
+        setInterval(() => {
+            runAttendanceAutomation(io).catch(() => {});
+        }, 60 * 1000);
     } catch (error) {
         console.error('Startup Error:', error);
         process.exit(1);

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { exportRowsToExcel } from '../utils/exportExcel';
 import CustomerList from './CustomerList';
+import { LedgerInitialSkeleton } from './skeletons/PageSkeletons';
 import { 
   PaymentModal, 
   AddCustomerModal, 
@@ -269,67 +270,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
   );
 
   if (loading && !hasLoadedOnce) {
-    return (
-      <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
-        <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${dashboardStyleHeaderBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <div className="space-y-2.5">
-              <div className={`h-8 w-52 md:w-64 ${skelBlock()}`} />
-              <div className={`h-2.5 w-40 ${skelBlock()}`} />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 ${skelBlock('rounded-xl')}`} />
-              <div className={`hidden md:block h-9 w-36 ${skelBlock('rounded-xl')}`} />
-            </div>
-          </div>
-        </header>
-        <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-          <div className="max-w-7xl mx-auto space-y-8 pb-12">
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className={`p-5 rounded-2xl border ${cardBase}`}>
-                  <div className={`h-2.5 w-24 mb-4 ${skelBlock()}`} />
-                  <div className="flex justify-between items-start gap-3">
-                    <div className={`h-9 w-32 ${skelBlock()}`} />
-                    <div className={`h-12 w-12 shrink-0 ${skelBlock('rounded-xl')}`} />
-                  </div>
-                </div>
-              ))}
-            </section>
-            <div className={`flex p-1 rounded-xl gap-1 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-              <div className={`flex-1 h-9 ${skelBlock('rounded-lg')}`} />
-              <div className={`flex-1 h-9 ${skelBlock('rounded-lg')}`} />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {Array.from({ length: 8 }, (_, i) => (
-                <div key={i} className={`p-3 rounded-2xl border flex items-center gap-3 ${cardBase}`}>
-                  <div className={`h-10 w-10 shrink-0 ${skelBlock('rounded-xl')}`} />
-                  <div className={`h-3 flex-1 max-w-[100px] ${skelBlock()}`} />
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className={`rounded-3xl border flex flex-col overflow-hidden min-h-[220px] ${cardBase}`}>
-                  <div className={`px-6 py-5 border-b border-inherit flex items-center gap-2 ${darkMode ? 'bg-slate-800/30' : 'bg-slate-100/80'}`}>
-                    <div className={`h-4 w-4 ${skelBlock('rounded')}`} />
-                    <div className={`h-3 w-28 ${skelBlock()}`} />
-                  </div>
-                  <div className="p-5 space-y-3 flex-1">
-                    {[1, 2, 3].map((row) => (
-                      <div key={row} className="flex justify-between gap-2">
-                        <div className={`h-4 flex-1 ${skelBlock()}`} />
-                        <div className={`h-4 w-16 ${skelBlock()}`} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LedgerInitialSkeleton darkMode={darkMode} />;
   }
 
   return (
