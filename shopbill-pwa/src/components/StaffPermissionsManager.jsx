@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
@@ -7,7 +7,7 @@ import {
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
 import ConfirmationModal from './ConfirmationModal';
-import { TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
+import { TeamDirectorySkeleton, TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -49,6 +49,21 @@ const PAGE_ACCESS_LABELS = {
     settings: 'Settings',
     staffPermissions: 'Team Management'
 };
+const PERMISSION_PAGE_LABELS = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'billing', label: 'Billing' },
+    { id: 'khata', label: 'Ledger' },
+    { id: 'salesActivity', label: 'Sales History' },
+    { id: 'inventory', label: 'Stock' },
+    { id: 'scm', label: 'Supply Chain' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'chat', label: 'Messages' },
+    { id: 'notifications', label: 'Notifications' },
+    { id: 'profile', label: 'Profile' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'staffPermissions', label: 'Team Management' },
+    { id: 'offers', label: 'Offers' },
+];
 
 // Temporarily disabled: Team Management shortcut to role permissions page.
 const ENABLE_ROLE_PERMISSIONS_SHORTCUT = false;
@@ -62,12 +77,16 @@ const getRoleStyles = (role, darkMode) => {
     }
 };
 
-// --- EditRoleModal ---
+// --- EditStaffModal ---
 const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmitting, darkMode }) => {
     const [selectedRole, setSelectedRole] = useState('');
+    const [staffName, setStaffName] = useState('');
 
     useEffect(() => {
-        if (staffMember) setSelectedRole(staffMember.role);
+        if (staffMember) {
+            setSelectedRole(staffMember.role);
+            setStaffName(staffMember.name || '');
+        }
     }, [staffMember]);
 
     if (!isOpen || !staffMember) return null;
@@ -78,21 +97,21 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
-            <div className={`${modalBg} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[550px] rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+            <div className={`${modalBg} w-full max-w-md max-h-[85vh] sm:max-h-[80vh] rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
                 <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} flex-shrink-0`}>
                     <div>
                         <h2 className={`text-lg md:text-xl font-black tracking-tight flex items-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             <Edit3 className="w-5 h-5 mr-3 text-indigo-500 shrink-0" />
-                            Update Tier
+                            Update Staff
                         </h2>
-                        <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Role Modification</p>
+                        <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Profile & Role</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-rose-500 transition p-2 shrink-0" disabled={isSubmitting}>
                         <X className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
                 </div>
                 
-                <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto custom-scrollbar">
                     <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-500 shrink-0`}>
                             <User className="w-5 h-5" />
@@ -101,6 +120,17 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                             <p className={`text-sm font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staffMember.name}</p>
                             <p className={`text-[10px] font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staffMember.email}</p>
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Staff Name</label>
+                        <input
+                            value={staffName}
+                            onChange={(e) => setStaffName(e.target.value)}
+                            className={`w-full px-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none transition-all ${inputBg}`}
+                            disabled={isSubmitting}
+                            placeholder="Enter staff name"
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -128,9 +158,9 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                     </div>
 
                     <button 
-                        onClick={() => onUpdateRole(staffMember._id, selectedRole)}
+                        onClick={() => onUpdateRole(staffMember._id, { name: staffName.trim(), role: selectedRole })}
                         className="w-full py-3 sm:py-4 bg-indigo-600 text-white font-black text-xs tracking-widest rounded-xl sm:rounded-2xl hover:bg-indigo-500 transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                        disabled={isSubmitting || selectedRole === staffMember.role}
+                        disabled={isSubmitting || (!staffName.trim() || (selectedRole === staffMember.role && staffName.trim() === (staffMember.name || '').trim()))}
                     >
                         {isSubmitting ? (
                             <>
@@ -138,7 +168,7 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                                 <span>Updating...</span>
                             </>
                         ) : (
-                            <span>Confirm Role Update</span>
+                            <span>Save Changes</span>
                         )}
                     </button>
                 </div>
@@ -148,8 +178,9 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions }) => {
     const [showAttendance, setShowAttendance] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
     const pendingInfoRef = useRef(null);
 
@@ -214,7 +245,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     return (
         <div className="space-y-3">
             <div 
-                className={`group flex flex-col p-4 md:p-6 border rounded-xl md:rounded-2xl transition-all ${cardBase} ${darkMode ? 'hover:border-slate-700' : 'hover:border-indigo-200'}`}
+                className={`group flex flex-col p-3 md:p-4 border rounded-xl md:rounded-2xl transition-all ${cardBase} ${darkMode ? 'hover:border-slate-700' : 'hover:border-indigo-200'}`}
             >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
                     <div className="flex items-center gap-4 md:gap-5 flex-1 min-w-0">
@@ -222,7 +253,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             {staff.role === 'owner' ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <User className="w-5 h-5 md:w-6 md:h-6" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className={`text-base md:text-lg font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
+                            <h3 className={`text-sm md:text-base font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
                             <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
                             {staff.role !== 'owner' && !isPendingActivation && (
                                 <div className="flex items-center gap-2 mt-2">
@@ -306,7 +337,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         </div>
                     </div>
                     
-                    <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
+                    <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
                         <div className="flex-1 sm:flex-none">
                     <button
                         onClick={() => onToggleActive(staff)}
@@ -350,30 +381,62 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                     </div>
                 </div>
                 {staff.role !== 'owner' && !isPendingActivation && (
-                    <div className="mt-4 space-y-2">
-                        {Array.isArray(currentPagePermissions) && currentPagePermissions.length > 0 && (
-                            <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
-                                <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Current Page Access
-                                </p>
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {currentPagePermissions.map((label) => (
-                                        <span
-                                            key={label}
-                                            className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
+                    <div className="mt-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setShowDetails((v) => !v)}
+                                className={`w-full py-2 px-3 rounded-lg text-[11px] font-black tracking-wider transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+                            >
+                                {showDetails ? 'Hide' : 'Show'} Details
+                            </button>
+                            <button
+                                onClick={() => setShowAttendance(!showAttendance)}
+                                className={`w-full py-2 px-3 rounded-lg text-[11px] font-black tracking-wider transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+                            >
+                                {showAttendance ? 'Hide' : 'View'} Attendance
+                            </button>
+                        </div>
+                        {showDetails && (
+                            <div className={`rounded-xl border p-3 space-y-3 ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
+                                {canManageIndividualPermissions && staff.role === 'Manager' && (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                Individual Permission
+                                            </p>
+                                            <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                Reports Access
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onToggleReportsPermission?.(staff)}
+                                            disabled={reportsPermissionUpdating}
+                                            className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${staff?.permissions?.reports === true ? (darkMode ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border border-emerald-300') : (darkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-white text-slate-700 border border-slate-200')} disabled:opacity-60`}
                                         >
-                                            {label}
-                                        </span>
-                                    ))}
-                                </div>
+                                            {reportsPermissionUpdating ? 'Updating...' : (staff?.permissions?.reports === true ? 'Enabled' : 'Disabled')}
+                                        </button>
+                                    </div>
+                                )}
+                                {Array.isArray(currentPagePermissions) && currentPagePermissions.length > 0 && (
+                                    <div>
+                                        <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            Role Page Access
+                                        </p>
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {currentPagePermissions.map((label) => (
+                                                <span
+                                                    key={label}
+                                                    className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
+                                                >
+                                                    {label}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
-                        <button
-                            onClick={() => setShowAttendance(!showAttendance)}
-                            className={`w-full py-2 px-4 rounded-lg text-xs font-black transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
-                        >
-                            {showAttendance ? 'Hide' : 'View'} Attendance
-                        </button>
                     </div>
                 )}
             </div>
@@ -613,11 +676,15 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [activeStaffMap, setActiveStaffMap] = useState({}); // Map of staffId -> { punchIn: Date }
     const [confirmModal, setConfirmModal] = useState(null); // Internal confirmation modal state
     const [rolePagePermissions, setRolePagePermissions] = useState({ manager: {}, cashier: {} });
+    const [isSavingRolePermissions, setIsSavingRolePermissions] = useState(false);
+    const [showGrantPermissions, setShowGrantPermissions] = useState(false);
+    const [permissionUpdatingId, setPermissionUpdatingId] = useState(null);
     void onOpenRolePermissions;
 
     // Ensure we have write/read access
     const effectiveRole = (currentUserRole || currentUser?.role || 'owner').toLowerCase();
     const hasWriteAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
+    const hasOwnerAccess = effectiveRole === 'owner';
     const hasReadAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
 
     const fetchStaff = useCallback(async () => {
@@ -646,7 +713,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     }, [apiClient, hasReadAccess, showToast]);
 
     const fetchRolePermissions = useCallback(async () => {
-        if (!hasWriteAccess || !apiClient) return;
+        if (!hasOwnerAccess || !apiClient) return;
         try {
             const response = await apiClient.get(API.staffRolePermissions);
             if (response.data?.permissions) {
@@ -659,7 +726,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             if (error?.cancelled) return;
             console.error('Failed to fetch role permissions:', error);
         }
-    }, [apiClient, hasWriteAccess]);
+    }, [apiClient, hasOwnerAccess]);
 
     const fetchActiveStatus = useCallback(async () => {
         if (!hasReadAccess || !apiClient) return;
@@ -708,7 +775,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [addStaffError, setAddStaffError] = useState(null);
 
     const handleAddStaff = async (formData, resetForm) => {
-        if (!hasWriteAccess) return;
+        if (!hasOwnerAccess) return;
         setAddStaffError(null); // Clear previous error
         setIsProcessing(true);
         try {
@@ -737,19 +804,61 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         }
     };
 
-    const handleUpdateRole = async (id, newRole) => {
+    const handleUpdateRole = async (id, updates) => {
         setIsProcessing(true);
         try {
-            // Using the newly defined staffRoleUpdate endpoint
-            await apiClient.put(API.staffRoleUpdate(id), { role: newRole });
-            if (showToast) showToast('Permissions updated.', 'success');
+            const payload = {
+                name: updates?.name,
+                role: updates?.role,
+            };
+            await apiClient.put(API.staffUpdate ? API.staffUpdate(id) : API.staffRoleUpdate(id), payload);
+            if (showToast) showToast('Staff details updated.', 'success');
             await fetchStaff();
             setIsEditModalOpen(false);
             setSelectedStaff(null);
         } catch (error) {
-            if (showToast) showToast(error.response?.data?.error || 'Update failed.', 'error');
+            if (showToast) showToast(error.response?.data?.error || 'Staff update failed.', 'error');
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    const toggleRolePermission = (roleKey, pageId) => {
+        setRolePagePermissions((prev) => ({
+            ...prev,
+            [roleKey]: {
+                ...(prev?.[roleKey] || {}),
+                [pageId]: !(prev?.[roleKey]?.[pageId] === true),
+            },
+        }));
+    };
+
+    const handleSaveRolePermissions = async () => {
+        if (!hasWriteAccess) return;
+        setIsSavingRolePermissions(true);
+        try {
+            await apiClient.put(API.staffRolePermissions, rolePagePermissions);
+            if (showToast) showToast('Team page permissions updated.', 'success');
+            await fetchRolePermissions();
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to save page permissions.', 'error');
+        } finally {
+            setIsSavingRolePermissions(false);
+        }
+    };
+    const handleToggleReportsPermission = async (staffMember) => {
+        if (!hasOwnerAccess || !staffMember?._id || staffMember.role !== 'Manager') return;
+        const nextReports = !(staffMember?.permissions?.reports === true);
+        setPermissionUpdatingId(String(staffMember._id));
+        try {
+            const res = await apiClient.put(API.staffPermissionUpdate(staffMember._id), { reports: nextReports });
+            const updated = res?.data?.staff;
+            setStaff((prev) => prev.map((s) => (String(s._id) === String(staffMember._id) ? { ...s, ...(updated || {}), permissions: { ...(s.permissions || {}), reports: nextReports } } : s)));
+            if (showToast) showToast(`Reports access ${nextReports ? 'enabled' : 'disabled'} for ${staffMember.name}.`, 'success');
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to update individual permission.', 'error');
+        } finally {
+            setPermissionUpdatingId(null);
         }
     };
 
@@ -872,6 +981,19 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
     const borderStyle = darkMode ? 'border-slate-800/60' : 'border-slate-200';
+    const orderedStaff = useMemo(() => {
+        const getId = (s) => (s?._id != null ? String(s._id) : '');
+        return [...staff].sort((a, b) => {
+            if (a.role === 'owner' && b.role !== 'owner') return -1;
+            if (b.role === 'owner' && a.role !== 'owner') return 1;
+            const aWorking = activeStaffIds.has(getId(a));
+            const bWorking = activeStaffIds.has(getId(b));
+            if (aWorking !== bWorking) return aWorking ? -1 : 1;
+            return String(a?.name || '').localeCompare(String(b?.name || ''));
+        });
+    }, [staff, activeStaffIds]);
+    const workingStaff = orderedStaff.filter((s) => s.role !== 'owner' && activeStaffIds.has(String(s._id || '')));
+    const nonWorkingStaff = orderedStaff.filter((s) => !(s.role !== 'owner' && activeStaffIds.has(String(s._id || ''))));
 
     if (isLoading && !hasLoadedOnce) {
         return <TeamManagementInitialSkeleton darkMode={darkMode} />;
@@ -903,7 +1025,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                     >
                         <Plus className="w-4 h-4 mr-2" /> Add Member
                     </button>
-                    {hasWriteAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
+                    {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                         <button
                             onClick={onOpenRolePermissions}
                             className={`hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2.5 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest transition-all active:scale-95 border ${
@@ -920,7 +1042,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
-                {hasWriteAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
+                {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                     <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
                         <div>
                             <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Role Page Access</p>
@@ -935,11 +1057,78 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         </button>
                     </div>
                 )}
+                {hasOwnerAccess && (
+                    <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                        <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
+                            <div>
+                                <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Grant Permissions</p>
+                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control page access for Manager and Cashier roles.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowGrantPermissions((v) => !v)}
+                                className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                            >
+                                {showGrantPermissions ? 'Hide' : 'Open'}
+                            </button>
+                        </div>
+                        {showGrantPermissions && (
+                            <div className="p-3 md:p-4">
+                                <div className={`grid grid-cols-12 px-3 py-2.5 rounded-lg text-[9px] font-black tracking-widest uppercase ${darkMode ? 'bg-slate-950 border border-slate-800 text-slate-500' : 'bg-slate-50 border border-slate-200 text-slate-500'}`}>
+                                    <div className="col-span-6">Page</div>
+                                    <div className="col-span-3 text-center">Manager</div>
+                                    <div className="col-span-3 text-center">Cashier</div>
+                                </div>
+                                <div className="mt-2 rounded-lg border overflow-hidden">
+                                    {PERMISSION_PAGE_LABELS.map((page) => (
+                                        <div key={page.id} className={`grid grid-cols-12 items-center px-3 py-2.5 border-b last:border-b-0 ${darkMode ? 'border-slate-800 bg-slate-900/30' : 'border-slate-100 bg-white'}`}>
+                                            <div className={`col-span-6 text-[12px] font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{page.label}</div>
+                                            <div className="col-span-3 flex justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={rolePagePermissions?.manager?.[page.id] === true}
+                                                    onChange={() => toggleRolePermission('manager', page.id)}
+                                                    className="h-4 w-4 accent-indigo-600"
+                                                />
+                                            </div>
+                                            <div className="col-span-3 flex justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={rolePagePermissions?.cashier?.[page.id] === true}
+                                                    onChange={() => toggleRolePermission('cashier', page.id)}
+                                                    className="h-4 w-4 accent-indigo-600"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveRolePermissions}
+                                        disabled={isSavingRolePermissions || isLoading}
+                                        className="px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-[10px] font-black tracking-widest hover:bg-indigo-500 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isSavingRolePermissions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                        {isSavingRolePermissions ? 'Saving...' : 'Save Permissions'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                {!hasOwnerAccess && hasWriteAccess && (
+                    <div className={`rounded-xl border px-4 py-3 ${darkMode ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                        <p className="text-[10px] font-black tracking-[0.2em] uppercase">Permissions</p>
+                        <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Only owner can manage role and individual permissions.
+                        </p>
+                    </div>
+                )}
                 {/* Staff List */}
                 {isLoading ? (
-                    <div className={`flex flex-col items-center justify-center p-8 md:p-12 rounded-xl md:rounded-2xl border ${cardBase}`}>
-                        <Loader2 className="w-8 h-8 md:w-10 md:h-10 text-indigo-500 animate-spin mb-3" />
-                        <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Refreshing directory...</p>
+                    <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl border ${cardBase}`}>
+                        <TeamDirectorySkeleton darkMode={darkMode} />
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-3 md:gap-4">
@@ -955,7 +1144,15 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 <p className={`text-sm md:text-base font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No active staff found in directory.</p>
                             </div>
                         ) : (
-                            staff.map((s) => {
+                            <>
+                                {workingStaff.length > 0 && (
+                                    <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                                            Currently Working ({workingStaff.length})
+                                        </p>
+                                    </div>
+                                )}
+                                {workingStaff.map((s) => {
                                 const isActionDisabled = !hasWriteAccess || s.role === 'owner';
                                 const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
                                 const staffIdKey = s._id != null ? String(s._id) : '';
@@ -995,9 +1192,66 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         breakStart={breakStart}
                                         breakDurationMinutes={breakDurationMinutes}
                                         currentPagePermissions={effectiveRolePages}
+                                        onToggleReportsPermission={handleToggleReportsPermission}
+                                        reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
+                                        canManageIndividualPermissions={hasOwnerAccess}
                                     />
                                 );
-                            })
+                                })}
+                                {nonWorkingStaff.length > 0 && (
+                                    <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            Offline / Inactive ({nonWorkingStaff.length})
+                                        </p>
+                                    </div>
+                                )}
+                                {nonWorkingStaff.map((s) => {
+                                const isActionDisabled = !hasWriteAccess || s.role === 'owner';
+                                const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
+                                const staffIdKey = s._id != null ? String(s._id) : '';
+                                const isCurrentlyActive = staffIdKey ? activeStaffIds.has(staffIdKey) : false;
+                                const att = staffIdKey ? activeStaffMap[staffIdKey] : null;
+                                const punchInTime = att?.punchIn;
+                                const isOnBreak = att?.onBreak || false;
+                                const breakStart = att?.breakStart || null;
+                                const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
+                                const roleKey = s.role === 'Manager' ? 'manager' : s.role === 'Cashier' ? 'cashier' : null;
+                                const effectiveRolePages = roleKey
+                                    ? Object.entries(rolePagePermissions[roleKey] || {})
+                                        .filter(([, isAllowed]) => isAllowed === true)
+                                        .map(([pageKey]) => PAGE_ACCESS_LABELS[pageKey] || pageKey)
+                                    : [];
+                                return (
+                                    <StaffStatusButton
+                                        key={s._id}
+                                        staff={s}
+                                        isActionDisabled={isActionDisabled}
+                                        isPendingActivation={isPendingActivation}
+                                        onToggleActive={handleToggleActive}
+                                        onEdit={(staff) => {
+                                            setSelectedStaff(staff);
+                                            setIsEditModalOpen(true);
+                                        }}
+                                        onRemove={handleRemoveStaff}
+                                        darkMode={darkMode}
+                                        borderStyle={borderStyle}
+                                        cardBase={cardBase}
+                                        apiClient={apiClient}
+                                        API={API}
+                                        showToast={showToast}
+                                        isCurrentlyActive={isCurrentlyActive}
+                                        punchInTime={punchInTime}
+                                        isOnBreak={isOnBreak}
+                                        breakStart={breakStart}
+                                        breakDurationMinutes={breakDurationMinutes}
+                                        currentPagePermissions={effectiveRolePages}
+                                        onToggleReportsPermission={handleToggleReportsPermission}
+                                        reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
+                                        canManageIndividualPermissions={hasOwnerAccess}
+                                    />
+                                );
+                                })}
+                            </>
                         )}
                     </div>
                 )}

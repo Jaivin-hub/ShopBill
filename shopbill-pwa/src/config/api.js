@@ -39,6 +39,8 @@ const API = {
     staffToggle: (id) => `${API_BASE_URL}/staff/${id}/toggle`, // PUT legacy toggle
     staffSetActive: (id) => `${API_BASE_URL}/staff/${id}/active`, // PUT body: { active: boolean }
     staffDelete: (id) => `${API_BASE_URL}/staff/${id}`, // DELETE
+    staffUpdate: (id) => `${API_BASE_URL}/staff/${id}`, // PUT body: { name?: string, role?: 'Manager'|'Cashier' }
+    staffPermissionUpdate: (id) => `${API_BASE_URL}/staff/${id}/permissions`, // PUT body: { reports: boolean }
     activateStaff: API_BASE_URL + '/auth/activate',
     staffRoleUpdate: (id) => `${API_BASE_URL}/staff/${id}/role`,
     staffRolePermissions: API_BASE_URL + '/staff/role-permissions',

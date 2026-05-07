@@ -65,147 +65,126 @@ const CustomerList = ({
         return (
             <div
                 key={customer._id}
-                className={`w-full px-5 py-4 flex items-center gap-4 transition-all duration-200 border-l-2 relative group ${
-                    darkMode 
-                        ? 'border-transparent hover:bg-white/[0.02] hover:border-slate-700'
-                        : 'border-transparent hover:bg-slate-100 hover:border-slate-300'
+                className={`group rounded-2xl border p-3 sm:p-4 transition-all duration-200 ${
+                    darkMode
+                        ? 'bg-slate-900/45 border-slate-800 hover:border-slate-700'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
                 }`}
             >
-                <button
-                    onClick={() => openPaymentModal(customer)}
-                    className="flex-1 flex items-center gap-4 min-w-0"
-                >
-                {/* Avatar Section */}
-                <div className="relative shrink-0">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-300 ${
-                        darkMode
-                            ? 'bg-slate-900 border-slate-800 text-slate-500 group-hover:border-slate-600 group-hover:-rotate-3'
-                            : 'bg-slate-100 border-slate-200 text-slate-600 group-hover:border-indigo-300 group-hover:-rotate-3'
-                    }`}>
-                        <UserCircle2 size={18} strokeWidth={isOverLimit ? 2.5 : 2} className={statusConfig.color} />
-                    </div>
-                    {/* Status Badge Overlay */}
-                    {isOverLimit && (
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${darkMode ? 'bg-gray-950' : 'bg-white'} rounded-full flex items-center justify-center border ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <ShieldAlert size={10} className="text-rose-500" />
+                <div className="flex items-start gap-3">
+                    <button
+                        onClick={() => openPaymentModal(customer)}
+                        className="flex-1 min-w-0 flex items-start gap-3 text-left"
+                    >
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 transition-all ${
+                            darkMode ? 'bg-slate-900 border-slate-800 group-hover:border-slate-700' : 'bg-slate-50 border-slate-200 group-hover:border-indigo-300'
+                        }`}>
+                            <UserCircle2 size={18} strokeWidth={2} className={statusConfig.color} />
                         </div>
-                    )}
-                </div>
-
-                {/* Info Section */}
-                <div className="flex-1 min-w-0 text-left">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <h3 className={`text-[13px] font-black truncate tracking-wide uppercase transition-colors flex-1 min-w-0 leading-tight ${
-                            darkMode 
-                                ? 'text-slate-300 group-hover:text-white'
-                                : 'text-slate-700 group-hover:text-indigo-600'
-                        }`}>
-                            {customer.name}
-                        </h3>
-                    </div>
-
-                    <div className="flex items-center gap-2 min-w-0">
-                        <p className={`text-[11px] truncate font-medium leading-tight flex-1 min-w-0 ${
-                            darkMode 
-                                ? 'text-slate-500 group-hover:text-slate-400'
-                                : 'text-slate-600 group-hover:text-slate-700'
-                        }`}>
-                            {customer.phone ? (
-                                <>
-                                    <span className="font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 uppercase">
-                                        PHONE:
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className={`text-[13px] sm:text-sm font-black tracking-tight truncate ${
+                                    darkMode ? 'text-slate-100' : 'text-slate-900'
+                                }`}>
+                                    {customer.name}
+                                </h3>
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[9px] font-black tracking-widest uppercase ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
+                                    <statusConfig.icon size={11} />
+                                    {statusConfig.label}
+                                </span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                <p className={`text-[11px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    {customer.phone || 'No contact number'}
+                                </p>
+                                {creditLimit > 0 && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                        Limit: ₹{creditLimit.toLocaleString('en-IN')}
                                     </span>
-                                    {customer.phone}
-                                </>
-                            ) : (
-                                <span className="text-[9px] uppercase tracking-widest opacity-20 italic">No Contact</span>
-                            )}
-                        </p>
-                    </div>
-                </div>
-                
-                </button>
-                
-                {/* Amount and action icons: amount, then Collect / Edit / History / Remind */}
-                <div className="flex items-center gap-2 shrink-0">
-                    {outstandingAmount > 0 && (
-                        <p className={`text-sm font-black tracking-tight tabular-nums min-w-[4.5rem] text-right ${isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500'}`}>
+                                )}
+                            </div>
+                        </div>
+                    </button>
+                    <div className="text-right shrink-0 pl-2">
+                        <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Outstanding</p>
+                        <p className={`text-sm sm:text-base font-black tabular-nums ${outstandingAmount > 0 ? (isOverLimit ? 'text-rose-500' : 'text-amber-600 dark:text-amber-500') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
                             ₹{outstandingAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </p>
-                    )}
-                    <div className="flex items-center gap-1">
-                        {outstandingAmount > 0 && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    openPaymentModal(customer);
-                                }}
-                                className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-emerald-400 hover:bg-slate-800' : 'text-slate-600 hover:text-emerald-600 hover:bg-slate-100'}`}
-                                title="Collect payment"
-                                aria-label="Collect payment"
-                            >
-                                <Banknote size={18} strokeWidth={2} />
-                            </button>
-                        )}
-                        {openEditModal && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditModal(customer);
-                                }}
-                                className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'}`}
-                                title="Edit customer"
-                                aria-label="Edit name, phone, or limit"
-                            >
-                                <Pencil size={16} strokeWidth={2} />
-                            </button>
-                        )}
-                        {openDeleteModal && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDeleteModal(customer);
-                                }}
-                                className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-rose-400 hover:bg-slate-800' : 'text-slate-600 hover:text-rose-600 hover:bg-slate-100'}`}
-                                title="Delete customer"
-                                aria-label="Delete customer"
-                            >
-                                <Trash2 size={16} strokeWidth={2} />
-                            </button>
-                        )}
+                    </div>
+                </div>
+
+                <div className={`mt-3 pt-3 border-t flex items-center justify-end gap-1.5 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                    {outstandingAmount > 0 && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                openHistoryModal(customer);
+                                openPaymentModal(customer);
                             }}
-                            className={`p-2 rounded-lg transition-colors shrink-0 ${darkMode ? 'text-slate-500 hover:text-indigo-400 hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}
-                            title="View History"
-                            aria-label="View transaction history"
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800' : 'text-slate-600 hover:text-emerald-600 hover:bg-slate-100'}`}
+                            title="Collect payment"
+                            aria-label="Collect payment"
                         >
-                            <History size={16} strokeWidth={2} />
+                            <Banknote size={17} strokeWidth={2} />
                         </button>
-                        {showRemindOption && outstandingAmount > 0 && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    openRemindModal(customer);
-                                }}
-                                disabled={isRecentlySent}
-                                className={`p-2 rounded-lg transition-colors shrink-0 ${
-                                    isRecentlySent
-                                        ? 'text-emerald-500 cursor-not-allowed'
-                                        : darkMode ? 'text-slate-500 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'
-                                }`}
-                                title={isRecentlySent ? "Reminder sent recently" : "Send Reminder"}
-                            >
-                                {isRecentlySent ? (
-                                    <CheckCircle2 size={16} strokeWidth={2} />
-                                ) : (
-                                    <BellRing size={16} strokeWidth={2} />
-                                )}
-                            </button>
-                        )}
-                    </div>
+                    )}
+                    {openEditModal && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(customer);
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'}`}
+                            title="Edit customer"
+                            aria-label="Edit name, phone, or limit"
+                        >
+                            <Pencil size={16} strokeWidth={2} />
+                        </button>
+                    )}
+                    {openDeleteModal && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteModal(customer);
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800' : 'text-slate-600 hover:text-rose-600 hover:bg-slate-100'}`}
+                            title="Delete customer"
+                            aria-label="Delete customer"
+                        >
+                            <Trash2 size={16} strokeWidth={2} />
+                        </button>
+                    )}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openHistoryModal(customer);
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}
+                        title="View history"
+                        aria-label="View transaction history"
+                    >
+                        <History size={16} strokeWidth={2} />
+                    </button>
+                    {showRemindOption && outstandingAmount > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openRemindModal(customer);
+                            }}
+                            disabled={isRecentlySent}
+                            className={`p-2 rounded-lg transition-colors ${
+                                isRecentlySent
+                                    ? 'text-emerald-500 cursor-not-allowed'
+                                    : darkMode ? 'text-slate-400 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'
+                            }`}
+                            title={isRecentlySent ? "Reminder sent recently" : "Send reminder"}
+                        >
+                            {isRecentlySent ? (
+                                <CheckCircle2 size={16} strokeWidth={2} />
+                            ) : (
+                                <BellRing size={16} strokeWidth={2} />
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -223,7 +202,7 @@ const CustomerList = ({
     }
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-2 p-2 sm:p-3">
             {processedCustomers.map(renderCustomerCard)}
             
             {/* End of List Decorator */}

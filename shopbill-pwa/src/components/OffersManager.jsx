@@ -137,18 +137,6 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900';
   const textMuted = darkMode ? 'text-slate-400' : 'text-slate-500';
 
-  if (!canManage) {
-    return (
-      <div className={`h-full flex items-center justify-center ${darkMode ? 'bg-gray-950 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
-        Access restricted.
-      </div>
-    );
-  }
-
-  if (isLoading && !hasLoadedOnce) {
-    return <OffersInitialSkeleton darkMode={darkMode} />;
-  }
-
   const offerBuckets = useMemo(
     () => [
       {
@@ -178,6 +166,18 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     ],
     [statusBuckets]
   );
+
+  if (!canManage) {
+    return (
+      <div className={`h-full flex items-center justify-center ${darkMode ? 'bg-gray-950 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
+        Access restricted.
+      </div>
+    );
+  }
+
+  if (isLoading && !hasLoadedOnce) {
+    return <OffersInitialSkeleton darkMode={darkMode} />;
+  }
 
   const currentBucket = offerBuckets.find((b) => b.id === offerBucket) || offerBuckets[0];
   const BucketIcon = currentBucket?.icon || BadgePercent;

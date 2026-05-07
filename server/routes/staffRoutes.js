@@ -779,13 +779,88 @@ router.put('/:id/role', protect, async (req, res) => {
 });
 
 // ====================================================================
+// @route   PUT /api/staff/:id
+// @desc    Update staff profile fields (name / role)
+// @access  Private (owner/manager)
+// ====================================================================
+router.put('/:id', protect, async (req, res, next) => {
+    if (req.params.id === 'role-permissions') return next();
+    console.log('[staffRoutes] ROUTE HIT PUT /api/staff/:id', new Date().toISOString(), {
+        staffId: req.params.id,
+        body: req.body,
+        userId: req.user?.id?.toString?.(),
+    });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff.' });
+    }
+
+    const staffId = req.params.id;
+    const nextName = String(req.body?.name || '').trim();
+    const nextRole = req.body?.role;
+    const updateFields = {};
+
+    if (nextName) {
+        if (nextName.length < 2) {
+            return res.status(400).json({ error: 'Name must be at least 2 characters.' });
+        }
+        updateFields.name = nextName;
+    }
+    if (nextRole != null) {
+        if (nextRole !== 'Manager' && nextRole !== 'Cashier') {
+            return res.status(400).json({ error: 'Invalid role. Must be Manager or Cashier.' });
+        }
+        updateFields.role = nextRole;
+    }
+    if (Object.keys(updateFields).length === 0) {
+        return res.status(400).json({ error: 'No valid fields provided for update.' });
+    }
+
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: staffId, storeId: req.user.storeId });
+        if (!staffMember) {
+            return res.status(404).json({ error: 'Staff member not found.' });
+        }
+        if (isowner(staffMember.role)) {
+            return res.status(400).json({ error: 'Owner account cannot be edited from team management.' });
+        }
+
+        const updatedStaff = await Staff.findByIdAndUpdate(
+            staffId,
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        );
+
+        if (updatedStaff?.userId) {
+            const userUpdates = {};
+            if (updateFields.name) userUpdates.name = updateFields.name;
+            if (updateFields.role) userUpdates.role = updateFields.role;
+            if (Object.keys(userUpdates).length > 0) {
+                await User.findByIdAndUpdate(updatedStaff.userId, { $set: userUpdates });
+            }
+        }
+
+        console.log('[staffRoutes] ROUTE DONE PUT /api/staff/:id → 200', { staffId, fields: Object.keys(updateFields) });
+        return res.json({
+            message: `${updatedStaff.name} updated successfully.`,
+            staff: updatedStaff,
+        });
+    } catch (error) {
+        console.error('[staffRoutes] PUT /api/staff/:id → 500', error.message);
+        return res.status(500).json({ error: 'Failed to update staff.' });
+    }
+});
+
+// ====================================================================
 // @route   GET /api/staff/role-permissions
 // @desc    Get outlet-level page permissions for Manager and Cashier
-// @access  Private (owner-only)
+// @access  Private (owner/manager)
 // ====================================================================
 router.get('/role-permissions', protect, async (req, res) => {
-    if (!isowner(req.user.role)) {
-        return res.status(403).json({ error: 'Access denied. Only the owner can view role permissions.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can view role permissions.' });
     }
 
     try {
@@ -793,7 +868,10 @@ router.get('/role-permissions', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        const store = await Store.findOne({ _id: req.user.storeId, ownerId: req.user.id }).select('settings').lean();
+        const storeFilter = isowner(req.user.role)
+            ? { _id: req.user.storeId, ownerId: req.user.id }
+            : { _id: req.user.storeId };
+        const store = await Store.findOne(storeFilter).select('settings').lean();
         if (!store) {
             return res.status(404).json({ error: 'Active outlet not found.' });
         }
@@ -811,11 +889,11 @@ router.get('/role-permissions', protect, async (req, res) => {
 // ====================================================================
 // @route   PUT /api/staff/role-permissions
 // @desc    Update outlet-level page permissions for Manager and Cashier
-// @access  Private (owner-only)
+// @access  Private (owner/manager)
 // ====================================================================
 router.put('/role-permissions', protect, async (req, res) => {
-    if (!isowner(req.user.role)) {
-        return res.status(403).json({ error: 'Access denied. Only the owner can update role permissions.' });
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update role permissions.' });
     }
 
     try {
@@ -824,8 +902,11 @@ router.put('/role-permissions', protect, async (req, res) => {
         }
 
         const nextPermissions = normalizeRolePermissionPayload(req.body || {});
+        const storeFilter = isowner(req.user.role)
+            ? { _id: req.user.storeId, ownerId: req.user.id }
+            : { _id: req.user.storeId };
         const updatedStore = await Store.findOneAndUpdate(
-            { _id: req.user.storeId, ownerId: req.user.id },
+            storeFilter,
             { $set: { 'settings.rolePagePermissions': nextPermissions } },
             { new: true, runValidators: true }
         ).select('settings').lean();

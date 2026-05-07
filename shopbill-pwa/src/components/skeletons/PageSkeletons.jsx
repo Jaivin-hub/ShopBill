@@ -344,22 +344,42 @@ export function OffersInitialSkeleton({ darkMode }) {
     <div className={`h-full min-h-0 overflow-y-auto px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <div className="max-w-7xl mx-auto space-y-6">
         <section className={`${cardBase} border rounded-2xl p-5`}>
-          <div className="flex justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div className="space-y-2 flex-1">
               <div className={`h-8 w-52 ${skel(darkMode)}`} />
               <div className={`h-2.5 w-40 ${skel(darkMode)}`} />
             </div>
             <div className="flex gap-2">
-              <div className={`h-10 w-32 ${skel(darkMode, 'rounded-xl')}`} />
+              <div className={`h-10 w-12 sm:w-36 ${skel(darkMode, 'rounded-xl')}`} />
               <div className={`h-10 w-10 ${skel(darkMode, 'rounded-xl')}`} />
             </div>
           </div>
         </section>
-        <section className={`${cardBase} border rounded-2xl p-4`}>
-          <div className={`h-10 w-full max-w-sm mb-4 ${skel(darkMode, 'rounded-xl')}`} />
-          <div className="flex gap-3 overflow-hidden pb-1">
+
+        <section className={`${cardBase} border rounded-2xl p-4 md:p-5`}>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className={`h-4 w-4 rounded ${skel(darkMode)}`} />
+              <div className={`h-3.5 w-24 ${skel(darkMode)}`} />
+            </div>
+            <div className={`h-11 w-full sm:max-w-sm ${skel(darkMode, 'rounded-xl')}`} />
+          </div>
+
+          <div className="flex gap-3 overflow-hidden pb-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className={`min-w-[85%] sm:min-w-[320px] h-28 rounded-xl shrink-0 ${skel(darkMode)}`} />
+              <div
+                key={i}
+                className={`shrink-0 w-[min(100%,380px)] border rounded-xl p-4 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className={`h-4 w-40 max-w-[90%] ${skel(darkMode)}`} />
+                    <div className={`h-3 w-32 ${skel(darkMode)}`} />
+                    <div className={`h-3 w-52 max-w-full ${skel(darkMode)}`} />
+                  </div>
+                  <div className={`h-8 w-8 rounded-lg ${skel(darkMode)}`} />
+                </div>
+              </div>
             ))}
           </div>
         </section>

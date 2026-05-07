@@ -743,6 +743,9 @@ const App = () => {
 
   const handleIncomingNotification = useCallback((incomingAlert) => {
     if (!incomingAlert) return;
+    const incomingType = String(incomingAlert?.notificationType || incomingAlert?.type || '').toLowerCase();
+    // Chat events should update chat UI/unread only, not header notification feed.
+    if (incomingType === 'chat_message') return;
 
     // Filter out notifications where current user is the actor.
     const actorIdStr = incomingAlert?.actorId != null ? String(incomingAlert.actorId) : null;
