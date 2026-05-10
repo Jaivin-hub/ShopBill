@@ -9,6 +9,7 @@ const User = require('../models/User');
 const Store = require('../models/Store');
 const Staff = require('../models/Staff');
 const { sendPushNotification } = require('../services/firebaseAdmin');
+const { collectPushTokens } = require('../utils/pushTokens');
 const router = express.Router();
 
 // Configure multer for audio file uploads
@@ -850,16 +851,16 @@ router.post('/:chatId/message', (req, res, next) => {
         console.log('[Push] Recipient IDs for push:', recipientIds?.map(id => id.toString()) || []);
         if (recipientIds.length > 0) {
             const recipients = await User.find({ _id: { $in: recipientIds } })
-                .select('deviceTokens name email')
+                .select('deviceTokens name email pushNotificationsEnabled')
                 .lean();
-            const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
+            const dedupedTokens = collectPushTokens(recipients);
             recipients.forEach(r => {
                 const tk = (r.deviceTokens || []).map(t => t.token);
-                console.log('[Push] Recipient:', r._id, r.name || r.email, '| tokens:', tk.length, tk.length ? '(...)' : '(none)');
+                const pushOff = r.pushNotificationsEnabled === false;
+                console.log('[Push] Recipient:', r._id, r.name || r.email, '| tokens:', tk.length, pushOff ? '(push disabled in settings)' : tk.length ? '(...)' : '(none)');
             });
-            console.log('[Push] Chat message: total', recipientIds.length, 'recipient(s),', allTokens.length, 'device token(s). Will send push:', allTokens.length > 0);
-            if (allTokens.length > 0) {
-                const dedupedTokens = [...new Set(allTokens.filter(Boolean))];
+            console.log('[Push] Chat message: total', recipientIds.length, 'recipient(s),', dedupedTokens.length, 'push token(s). Will send push:', dedupedTokens.length > 0);
+            if (dedupedTokens.length > 0) {
                 const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
                 console.log('[Push] Calling sendPushNotification now...');
                 const pushResult = await sendPushNotification(dedupedTokens, {

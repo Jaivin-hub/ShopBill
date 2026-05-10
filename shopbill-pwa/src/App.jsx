@@ -11,6 +11,7 @@ import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { onForegroundMessage, isPushSupported } from './lib/firebase';
 import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
+import { requestPushFromGesture } from './utils/pushOnGesture';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -46,6 +47,10 @@ const PlanUpgrade = lazy(() => import('./components/PlanUpgrade'));
 const StaffPermissionsManager = lazy(() => import('./components/StaffPermissionsManager'));
 const ChangePasswordForm = lazy(() => import('./components/ChangePasswordForm'));
 const Chat = lazy(() => import('./components/Chat'));
+
+/** Used to avoid reloading on first SW install: controllerchange also fires when the page gets its first controlling worker. */
+const SW_CONTROLLER_URL_KEY = 'pocketpos_sw_controller_url';
+const normalizeSwScriptUrl = (url) => (url || '').split('?')[0];
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -154,10 +159,33 @@ const UpdatePrompt = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Listen for service worker controller change (new SW activated)
+    // Align stored URL with whoever is already controlling (e.g. after a reload or fast activation).
+    try {
+      const c = navigator.serviceWorker?.controller;
+      if (c?.scriptURL) {
+        sessionStorage.setItem(SW_CONTROLLER_URL_KEY, normalizeSwScriptUrl(c.scriptURL));
+      }
+    } catch {
+      /* private mode */
+    }
+
+    // Reload only when the controlling worker *replaces* a previous one (real update), not on first claim.
     const handleControllerChange = () => {
-      // Reload if a new service worker took control
-      if (navigator.serviceWorker.controller) {
+      const c = navigator.serviceWorker.controller;
+      if (!c?.scriptURL) return;
+      const url = normalizeSwScriptUrl(c.scriptURL);
+      let prev = null;
+      try {
+        prev = sessionStorage.getItem(SW_CONTROLLER_URL_KEY);
+      } catch {
+        /* private mode */
+      }
+      try {
+        sessionStorage.setItem(SW_CONTROLLER_URL_KEY, url);
+      } catch {
+        /* private mode */
+      }
+      if (prev && prev !== url) {
         window.location.reload();
       }
     };
@@ -352,12 +380,16 @@ const checkDeepLinkPath = () => {
     if (params.get('staffSetupToken')) return 'staffSetPassword';
     if (params.get('resetToken')) return 'resetPassword';
     const hashPath = (window.location.hash || '').replace(/^#/, '');
-    const path = hashPath || window.location.pathname;
+    let path = hashPath || window.location.pathname || '';
+    if (path && !path.startsWith('/')) path = `/${path}`;
     if (path.startsWith('/staff-setup/')) {
         return 'staffSetPassword'; 
     }
     if (path.startsWith('/reset-password/')) {
         return 'resetPassword'; 
+    }
+    if (path === '/notifications' || path.startsWith('/notifications/')) {
+        return 'notifications';
     }
     return null; 
 };
@@ -365,29 +397,9 @@ const checkDeepLinkPath = () => {
 const App = () => {
   const [currentPage, setCurrentPage] = useState(checkDeepLinkPath() || 'dashboard');
   const [pageOrigin, setPageOrigin] = useState('dashboard');
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
 
-  // Watch for URL changes to handle deep links (e.g., staff-setup, reset-password)
-  useEffect(() => {
-    const handlePathChange = () => {
-      const deepLinkPage = checkDeepLinkPath();
-      if (deepLinkPage && deepLinkPage !== currentPage) {
-        backStackRef.current = [];
-        setCurrentPage(deepLinkPage);
-      }
-    };
-    
-    // Check immediately on mount
-    handlePathChange();
-    
-    // Listen for popstate events (browser back/forward)
-    window.addEventListener('popstate', handlePathChange);
-    window.addEventListener('hashchange', handlePathChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePathChange);
-      window.removeEventListener('hashchange', handlePathChange);
-    };
-  }, [currentPage]);
   const [currentUser, setCurrentUser] = useState(() => {
     const userJson = localStorage.getItem('currentUser');
     return userJson ? JSON.parse(userJson) : null;
@@ -428,6 +440,24 @@ const App = () => {
   const touchStartRef = useRef({ x: 0, y: 0 });
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
+  // Deep links (staff-setup, reset-password): stable listeners; compare via ref to avoid effect churn on every page change.
+  useEffect(() => {
+    const handlePathChange = () => {
+      const deepLinkPage = checkDeepLinkPath();
+      if (deepLinkPage && deepLinkPage !== currentPageRef.current) {
+        backStackRef.current = [];
+        setCurrentPage(deepLinkPage);
+      }
+    };
+    handlePathChange();
+    window.addEventListener('popstate', handlePathChange);
+    window.addEventListener('hashchange', handlePathChange);
+    return () => {
+      window.removeEventListener('popstate', handlePathChange);
+      window.removeEventListener('hashchange', handlePathChange);
+    };
+  }, []);
+
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('themePreference');
     return saved !== null ? JSON.parse(saved) : true;
@@ -463,7 +493,20 @@ const App = () => {
     if (userRole === USER_ROLES.MANAGER && pageId === 'staffPermissions') return true;
     return rolePagePermissions?.[pageId] === true;
   }, [userRole, rolePagePermissions]);
-  usePushNotifications(!!currentUser, currentUser?._id || currentUser?.id);
+  const mergeCurrentUserFields = useCallback((partial) => {
+    if (!partial || typeof partial !== 'object') return;
+    setCurrentUser((prev) => {
+      const next = { ...(prev || {}), ...partial };
+      localStorage.setItem('currentUser', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  usePushNotifications(
+    !!currentUser,
+    currentUser?._id || currentUser?.id,
+    currentUser?.pushNotificationsEnabled
+  );
 
   /** FCM SW plays OS notification; open clients get distinct synthetic sounds via postMessage. */
   useEffect(() => {
@@ -728,7 +771,16 @@ const App = () => {
       
       if (response.data) {
         // API returns { count: number, alerts: array }
-        const alerts = response.data.alerts || [];
+        const alerts = (response.data.alerts || []).filter((alert) => {
+          const type = String(alert?.type || '').toLowerCase();
+          const notificationType = String(alert?.notificationType || alert?.metadata?.notificationType || '').toLowerCase();
+          const link = String(alert?.link || alert?.metadata?.link || '').toLowerCase();
+          const hasChatMarker = Boolean(alert?.chatId || alert?.metadata?.chatId);
+          if (type === 'chat_message' || notificationType === 'chat_message') return false;
+          if (hasChatMarker) return false;
+          if (link.includes('/chat')) return false;
+          return true;
+        });
         setNotifications(alerts.map(formatNotificationForRole));
       } else {
         setNotifications([]);
@@ -743,9 +795,17 @@ const App = () => {
 
   const handleIncomingNotification = useCallback((incomingAlert) => {
     if (!incomingAlert) return;
-    const incomingType = String(incomingAlert?.notificationType || incomingAlert?.type || '').toLowerCase();
+    const incomingType = String(
+      incomingAlert?.notificationType ||
+      incomingAlert?.type ||
+      incomingAlert?.metadata?.notificationType ||
+      ''
+    ).toLowerCase();
+    const incomingLink = String(incomingAlert?.link || incomingAlert?.metadata?.link || '').toLowerCase();
+    const hasChatMarker = Boolean(incomingAlert?.chatId || incomingAlert?.metadata?.chatId);
     // Chat events should update chat UI/unread only, not header notification feed.
     if (incomingType === 'chat_message') return;
+    if (hasChatMarker || incomingLink.includes('/chat')) return;
 
     // Filter out notifications where current user is the actor.
     const actorIdStr = incomingAlert?.actorId != null ? String(incomingAlert.actorId) : null;
@@ -859,11 +919,16 @@ const App = () => {
               localStorage.setItem('lastSelectedOutletId', targetOutletId);
             }
           }
-        } else {
-          // After initial restore, just sync currentOutlet from list if missing
-          if (!currentOutlet && currentOutletId) {
-            const activeOutlet = outletsList.find(o => o._id === currentOutletId);
-            if (activeOutlet) {
+        } else if (currentOutletId) {
+          // Keep object in sync with active id (needs fresh currentOutletId/currentOutlet from closure)
+          const activeOutlet = outletsList.find(
+            (o) => String(o._id) === String(currentOutletId)
+          );
+          if (activeOutlet) {
+            const idMismatch =
+              !currentOutlet ||
+              String(currentOutlet._id) !== String(currentOutletId);
+            if (idMismatch) {
               setCurrentOutlet(activeOutlet);
             }
           }
@@ -883,7 +948,7 @@ const App = () => {
       // Only log unexpected errors
       console.error('Error fetching outlets:', error);
     }
-  }, [currentUser, apiClient, API]);
+  }, [currentUser, currentOutlet, currentOutletId, apiClient, API]);
 
   // Initial fetch outlets - only when user or premium status changes
   const hasFetchedOutletsRef = useRef(false);
@@ -1054,7 +1119,7 @@ useEffect(() => {
           const data = payload?.data || {};
           const notification = payload?.notification || {};
           const fallbackId = `fcm-${Date.now()}`;
-          const notifType = data.notificationType || data.type || '';
+          const notifType = data.notificationType || data.type || (data.chatId ? 'chat_message' : '');
           const inferredSound =
             notifType === 'chat_message' || data.type === 'chat_message'
               ? 'chat'
@@ -1139,6 +1204,8 @@ useEffect(() => {
     setCurrentPage('dashboard'); // All roles start at dashboard now
     setIsViewingLogin(true); // Keep auth flow pinned; prevent fallback to landing after browser-back gestures.
     unlockAudio(); // Unlock audio for message sounds (user gesture from login)
+    // iOS Safari / installed PWA: notification permission must run in the same user-gesture chain as login tap.
+    requestPushFromGesture().catch(() => {});
   }, [apiClient, API]);
 
   // iOS edge-swipe/browser-back can navigate to pre-login history entry (landing).
@@ -1223,26 +1290,26 @@ useEffect(() => {
     setIsLoadingAuth(false);
   }, [logout, currentPage, currentUser]);
 
-  // Sync current user from server (role, plan, etc.) so staff see updated role after owner changes it in Team Management
+  // Sync current user from server (role, plan, page permissions) so staff pick up Team Management changes
   useEffect(() => {
     const syncUserFromProfile = async () => {
-      if (!currentUser || !apiClient || !API?.profile) return;
+      const cu = currentUserRef.current;
+      if (!cu || !apiClient || !API?.profile) return;
       try {
         const response = await apiClient.get(API.profile);
         if (response.data?.success && response.data?.user) {
           const serverUser = response.data.user;
           let updatedUser = {
-            ...currentUser,
-            role: serverUser.role ?? currentUser.role,
-            plan: serverUser.plan ?? currentUser.plan,
-            shopName: serverUser.shopName ?? currentUser.shopName,
-            id: serverUser.id ?? currentUser.id,
-            _id: serverUser.id ?? currentUser._id,
-            activeStoreId: serverUser.activeStoreId ?? currentUser.activeStoreId,
-            shopId: serverUser.shopId ?? currentUser.shopId,
-            permissions: serverUser.permissions || currentUser.permissions || {},
+            ...cu,
+            role: serverUser.role ?? cu.role,
+            plan: serverUser.plan ?? cu.plan,
+            shopName: serverUser.shopName ?? cu.shopName,
+            id: serverUser.id ?? cu.id,
+            _id: serverUser.id ?? cu._id,
+            activeStoreId: serverUser.activeStoreId ?? cu.activeStoreId,
+            shopId: serverUser.shopId ?? cu.shopId,
+            permissions: serverUser.permissions || cu.permissions || {},
           };
-          // For staff, effective plan comes from owner (current-plan API)
           if (updatedUser.role !== 'owner' && updatedUser.role !== 'superadmin') {
             try {
               const planRes = await apiClient.get(API.currentPlan);
@@ -1251,15 +1318,15 @@ useEffect(() => {
               }
             } catch { /* ignore */ }
           }
-          const roleChanged = (currentUser.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
-          const permissionsChanged = JSON.stringify(updatedUser.permissions || {}) !== JSON.stringify(currentUser.permissions || {});
+          const roleChanged = (cu.role || '').toLowerCase() !== (updatedUser.role || '').toLowerCase();
+          const permissionsChanged = JSON.stringify(updatedUser.permissions || {}) !== JSON.stringify(cu.permissions || {});
           const storeCtxChanged =
-            String(updatedUser.activeStoreId || '') !== String(currentUser.activeStoreId || '') ||
-            String(updatedUser.shopId || '') !== String(currentUser.shopId || '');
+            String(updatedUser.activeStoreId || '') !== String(cu.activeStoreId || '') ||
+            String(updatedUser.shopId || '') !== String(cu.shopId || '');
           if (
             roleChanged ||
-            updatedUser.plan !== currentUser.plan ||
-            updatedUser.shopName !== currentUser.shopName ||
+            updatedUser.plan !== cu.plan ||
+            updatedUser.shopName !== cu.shopName ||
             permissionsChanged ||
             storeCtxChanged
           ) {
@@ -1275,8 +1342,25 @@ useEffect(() => {
     if (currentUser?.id && apiClient) {
       syncUserFromProfile();
     }
+
+    const syncStaffOnResume = () => {
+      const cu = currentUserRef.current;
+      const role = (cu?.role || '').toLowerCase();
+      if (cu?.id && apiClient && (role === 'manager' || role === 'cashier')) {
+        syncUserFromProfile();
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') syncStaffOnResume();
+    };
+    window.addEventListener('focus', syncStaffOnResume);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', syncStaffOnResume);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]); // Run when user ID changes (after login) so staff get latest role/plan from server
+  }, [currentUser?.id]); // Login: full sync; staff also refresh on focus so outlet role permissions apply without re-login
 
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
@@ -1437,6 +1521,8 @@ useEffect(() => {
   }, [userRole, moreMenuUtilityItems, secondaryNavItems]);
 
   useEffect(() => {
+    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
+    if (publicPages.includes(currentPage)) return;
     if (!currentUser || userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return;
     if (!canAccessPage(currentPage)) {
       navigateTo('dashboard', { replace: true });
@@ -1529,7 +1615,8 @@ useEffect(() => {
       currentOutlet,
       currentOutletId,
       onOutletSwitch: handleOutletSwitch,
-      requestAttendanceDecision
+      requestAttendanceDecision,
+      onUserFieldsUpdated: mergeCurrentUserFields
     };
 
     const componentKey = `${currentPage}-${currentOutletId}`;
@@ -1579,6 +1666,45 @@ useEffect(() => {
     }
     return () => document.body.classList.remove(className);
   }, [currentPage]);
+
+  // Pin fixed mobile footer to the visual viewport when the keyboard is open. With
+  // interactive-widget=resizes-content, innerHeight/vv.height often match when the keyboard is closed;
+  // buggy large "gap" values were lifting the footer toward the top of the screen.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const isTextFieldFocused = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    };
+    const update = () => {
+      if (!isTextFieldFocused()) {
+        document.documentElement.style.setProperty('--keyboard-visual-offset', '0px');
+        return;
+      }
+      const ih = window.innerHeight;
+      const raw = Math.max(0, ih - vv.height - (Number(vv.offsetTop) || 0));
+      const cap = Math.floor(ih * 0.5);
+      const gap = raw > 0 && raw <= cap ? raw : 0;
+      document.documentElement.style.setProperty('--keyboard-visual-offset', `${gap}px`);
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
+      document.documentElement.style.removeProperty('--keyboard-visual-offset');
+    };
+  }, []);
   
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
@@ -1588,7 +1714,7 @@ useEffect(() => {
     <ApiProvider>
       {/* Scrollbar styles are now handled globally in index.css */}
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
-      <div className={`h-screen w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
+      <div className={`h-dvh max-h-dvh w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
         <UpdatePrompt />
         {showAppUI && showStaffPunchPrompt && isStaffUser && (
           <div className="fixed inset-0 z-[220] bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-4">
@@ -1652,11 +1778,27 @@ useEffect(() => {
                   <div className="font-black text-2xl tracking-tighter leading-tight">
                     <span className={darkMode ? 'text-white' : 'text-slate-900'}>POCKET</span> <span className="text-indigo-500">POS</span>
                   </div>
-                  {currentUser?.shopName && (
-                    <p className={`text-[9px] font-black uppercase tracking-widest truncate ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} title={currentUser.shopName}>
-                      {currentUser.shopName}
-                    </p>
-                  )}
+                  {(() => {
+                    const listName = outlets?.find((o) => String(o._id) === String(currentOutletId))?.name;
+                    const outletObjMatchesId =
+                      currentOutlet &&
+                      currentOutletId &&
+                      String(currentOutlet._id) === String(currentOutletId);
+                    const outletName = (
+                      (outletObjMatchesId ? currentOutlet?.name : null) ||
+                      listName ||
+                      ''
+                    ).trim();
+                    const sidebarLabel = (isPremium && userRole === USER_ROLES.OWNER && outletName)
+                      ? outletName
+                      : (currentUser?.shopName || '').trim();
+                    if (!sidebarLabel) return null;
+                    return (
+                      <p className={`text-[9px] font-black uppercase tracking-widest truncate ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} title={sidebarLabel}>
+                        {sidebarLabel}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1777,7 +1919,7 @@ useEffect(() => {
         </div>
         {showAppUI && !isChatSelected && (
           <>
-            <nav className={`fixed bottom-0 inset-x-0 h-18 border-t md:hidden flex items-center justify-around z-[50] px-2 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
+            <nav className={`fixed inset-x-0 bottom-0 max-md:bottom-[var(--keyboard-visual-offset,0px)] h-18 border-t md:hidden flex items-center justify-around z-[50] px-2 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
               {!showMoreMenu && primaryNavItems.map(item => (
                 <button key={item.id} onClick={() => navigateTo(item.id)} className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
                   {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
@@ -1825,7 +1967,7 @@ useEffect(() => {
               <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                 <div 
-                  className={`fixed bottom-0 left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100vh] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  className={`fixed left-0 right-0 bottom-0 max-md:bottom-[var(--keyboard-visual-offset,0px)] rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100dvh] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>

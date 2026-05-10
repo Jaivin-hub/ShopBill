@@ -85,12 +85,12 @@ define(['./workbox-3c4d4363'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.7ng7vj03qj8"
+    "revision": "0.3oq8jesvuug"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/],
-    denylist: [/^\/api/, /^\/_/, /^\/socket.io/]
+    denylist: [/^\/api/, /^\/_/, /^\/socket\.io/, /^\/firebase-messaging-sw\.js$/, /^\/sw\.js$/, /^\/dev-sw\.js$/, /^\/workbox.*\.js$/]
   }));
   workbox.registerRoute(({
     url

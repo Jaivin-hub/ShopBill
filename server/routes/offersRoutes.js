@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Offer = require('../models/Offer');
 const Inventory = require('../models/Inventory');
+const { emitAlert } = require('./notificationRoutes');
 
 const router = express.Router();
 
@@ -98,6 +99,17 @@ router.post('/', protect, async (req, res) => {
       endDate: end,
       isActive: true,
     });
+
+    // Notify owner instantly when a manager creates a new offer.
+    if (String(req.user.role || '').toLowerCase() === 'manager') {
+      try {
+        await emitAlert(req, req.user.storeId, 'system_update', {
+          message: `New offer created by manager: ${cleanTitle}`
+        });
+      } catch (notifError) {
+        console.error('Offer create notification error:', notifError);
+      }
+    }
 
     return res.status(201).json({ offer: created });
   } catch (error) {

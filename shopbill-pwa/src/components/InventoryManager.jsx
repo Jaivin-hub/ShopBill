@@ -52,6 +52,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isBulkUploading, setIsBulkUploading] = useState(false);
+    const [isReportDownloading, setIsReportDownloading] = useState(false);
     const [formData, setFormData] = useState(initialItemState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -345,7 +346,9 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             });
     }, [inventory, debouncedSearchTerm, sortOption, isTextileShop]);
 
-    const handleDownloadReport = useCallback(() => {
+    const handleDownloadReport = useCallback(async () => {
+        if (isReportDownloading) return;
+        setIsReportDownloading(true);
         const rows = [
             ['Name', 'HSN', 'Price', 'Quantity', 'Reorder Level', 'Has Variants']
         ];
@@ -371,9 +374,16 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
                 });
             }
         });
-        exportRowsToExcel(rows, `inventory-report-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Inventory');
-        showToast('Inventory report downloaded as Excel.', 'success');
-    }, [showToast, sortedAndFilteredInventory]);
+        try {
+            exportRowsToExcel(rows, `inventory-report-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Inventory');
+            const isAndroid = /android/i.test(window?.navigator?.userAgent || '');
+            showToast(isAndroid ? 'Inventory report downloaded as CSV.' : 'Inventory report downloaded as Excel.', 'success');
+        } catch (error) {
+            showToast('Inventory report download failed.', 'error');
+        } finally {
+            setTimeout(() => setIsReportDownloading(false), 600);
+        }
+    }, [isReportDownloading, showToast, sortedAndFilteredInventory]);
 
     // --- Render States ---
     if (!hasAccess) {
@@ -415,6 +425,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             openAddModal={openAddModal}
             openBulkUploadModal={openBulkUploadModal}
             handleDownloadReport={handleDownloadReport}
+            isReportDownloading={isReportDownloading}
             closeBulkUploadModal={closeBulkUploadModal}
             handleBulkUpload={handleBulkUpload}
             handleEditClick={handleEditClick}

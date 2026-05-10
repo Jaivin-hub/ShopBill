@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
     ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
-    ChevronRight, ChevronDown, Power, Info, ShieldAlert, Edit3, AlertCircle, Clock, CheckCircle2, XCircle
+    ChevronRight, ChevronDown, Power, Info, ShieldAlert, Edit3, AlertCircle, CheckCircle2, XCircle, Paperclip, Eye, Download,
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
 import ConfirmationModal from './ConfirmationModal';
+import WorkProfileModal from './WorkProfileModal';
 import { TeamDirectorySkeleton, TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
 
 // --- Feature Access Definitions for Display ---
@@ -78,7 +79,7 @@ const getRoleStyles = (role, darkMode) => {
 };
 
 // --- EditStaffModal ---
-const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmitting, darkMode }) => {
+const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmitting, darkMode, canEditRole }) => {
     const [selectedRole, setSelectedRole] = useState('');
     const [staffName, setStaffName] = useState('');
 
@@ -94,6 +95,12 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
     const modalBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-2xl';
     const inputBg = darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200';
+    const previewRole = canEditRole ? selectedRole : staffMember.role;
+    const nameUnchanged = staffName.trim() === (staffMember.name || '').trim();
+    const saveDisabled =
+        isSubmitting
+        || !staffName.trim()
+        || (canEditRole ? (selectedRole === staffMember.role && nameUnchanged) : nameUnchanged);
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
@@ -104,7 +111,9 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                             <Edit3 className="w-5 h-5 mr-3 text-indigo-500 shrink-0" />
                             Update Staff
                         </h2>
-                        <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Profile & Role</p>
+                        <p className={`text-[9px] font-black tracking-[0.2em] mt-0.5 uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {canEditRole ? 'Profile & Role' : 'Profile'}
+                        </p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-rose-500 transition p-2 shrink-0" disabled={isSubmitting}>
                         <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -133,23 +142,35 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Select New Role</label>
-                        <select
-                            value={selectedRole}
-                            onChange={(e) => setSelectedRole(e.target.value)}
-                            className={`w-full px-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none appearance-none cursor-pointer transition-all ${inputBg}`}
-                            disabled={isSubmitting}
-                        >
-                            <option value="Cashier">Cashier Tier</option>
-                            <option value="Manager">Management Tier</option>
-                        </select>
-                    </div>
+                    {canEditRole ? (
+                        <div className="space-y-2">
+                            <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Select New Role</label>
+                            <select
+                                value={selectedRole}
+                                onChange={(e) => setSelectedRole(e.target.value)}
+                                className={`w-full px-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none appearance-none cursor-pointer transition-all ${inputBg}`}
+                                disabled={isSubmitting}
+                            >
+                                <option value="Cashier">Cashier Tier</option>
+                                <option value="Manager">Management Tier</option>
+                            </select>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Role</label>
+                            <div className={`w-full px-4 py-3 sm:py-4 border text-sm font-bold rounded-xl sm:rounded-2xl ${inputBg} opacity-90`}>
+                                {staffMember.role === 'Manager' ? 'Management Tier' : 'Cashier Tier'}
+                            </div>
+                            <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                Only the store owner can change roles.
+                            </p>
+                        </div>
+                    )}
 
                     <div className={`p-4 rounded-xl md:rounded-2xl border ${cardBase}`}>
                         <p className={`text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-2 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>Tier Permissions:</p>
                         <div className="flex flex-wrap gap-1.5">
-                            {ROLE_PERMISSIONS[selectedRole]?.map((perm, idx) => (
+                            {ROLE_PERMISSIONS[previewRole]?.map((perm, idx) => (
                                 <span key={idx} className={`text-[8px] font-black px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-700'}`}>
                                     {perm}
                                 </span>
@@ -158,9 +179,16 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                     </div>
 
                     <button 
-                        onClick={() => onUpdateRole(staffMember._id, { name: staffName.trim(), role: selectedRole })}
+                        onClick={() =>
+                            onUpdateRole(
+                                staffMember._id,
+                                canEditRole
+                                    ? { name: staffName.trim(), role: selectedRole }
+                                    : { name: staffName.trim() }
+                            )
+                        }
                         className="w-full py-3 sm:py-4 bg-indigo-600 text-white font-black text-xs tracking-widest rounded-xl sm:rounded-2xl hover:bg-indigo-500 transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                        disabled={isSubmitting || (!staffName.trim() || (selectedRole === staffMember.role && staffName.trim() === (staffMember.name || '').trim()))}
+                        disabled={saveDisabled}
                     >
                         {isSubmitting ? (
                             <>
@@ -177,8 +205,138 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
     );
 };
 
+const PayrollSettlementModal = ({
+    isOpen,
+    darkMode,
+    staffMember,
+    month,
+    amount,
+    settlementAmount,
+    setSettlementAmount,
+    notes,
+    setNotes,
+    attachmentFile,
+    setAttachmentFile,
+    attachmentPreviewUrl,
+    onClose,
+    onConfirm,
+    isSubmitting
+}) => {
+    if (!isOpen || !staffMember) return null;
+    const modalBg = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-2xl';
+    const inputBg = darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+    const salaryMode = String(staffMember?.salaryMode || 'none');
+    const rate = Number(staffMember?.salaryRate || 0);
+    const totalDays = Number(staffMember?.totalDays || 0);
+    const totalMinutes = Number(staffMember?.totalMinutes || 0);
+    const overtimeMinutes = Number(staffMember?.overtimeMinutes || 0);
+    const workedHours = Math.floor(totalMinutes / 60);
+    const workedMins = totalMinutes % 60;
+    const overtimeHours = Math.floor(overtimeMinutes / 60);
+    const overtimeMins = overtimeMinutes % 60;
+    const payNow = Math.max(0, Number(settlementAmount || 0));
+    const remainingAmount = Math.max(0, Number(amount || 0) - payNow);
+    const monthLabel = month
+        ? new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+        : '-';
+    return (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-[220] p-3 sm:p-4">
+            <div className={`${modalBg} w-full max-w-lg rounded-xl sm:rounded-2xl border overflow-hidden`}>
+                <div className={`p-3 sm:p-4 border-b flex items-center justify-between ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'}`}>
+                    <div>
+                        <h3 className={`text-base sm:text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Mark Salary Settled</h3>
+                        <p className={`text-[9px] font-black tracking-[0.2em] uppercase mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staffMember.name}</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="p-2 text-slate-500 hover:text-rose-500" disabled={isSubmitting}>
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-4 space-y-4">
+                    <div className={`rounded-lg border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-slate-50'}`}>
+                        <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Month: {monthLabel}</p>
+                        <p className={`text-[10px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Worked period: {workedHours}h {workedMins}m
+                        </p>
+                        <p className={`text-[10px] font-bold mt-1 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                            Overtime: {overtimeHours}h {overtimeMins}m
+                        </p>
+                        <p className={`text-[10px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                            {salaryMode === 'hourly' ? 'Hourly' : salaryMode === 'daily' ? 'Daily' : 'Salary'} salary Rs {rate.toLocaleString('en-IN')}
+                        </p>
+                        <p className={`text-sm font-black mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Calculated Amount: Rs {Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <div>
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pay Amount</label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settlementAmount}
+                            onChange={(e) => setSettlementAmount(e.target.value)}
+                            className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${inputBg}`}
+                            placeholder="Enter paid amount"
+                            disabled={isSubmitting}
+                        />
+                        <p className={`text-[11px] font-bold mt-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            Remaining to next month: Rs {remainingAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Notes (optional)</label>
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={3}
+                            className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${inputBg}`}
+                            placeholder="Settlement note..."
+                            disabled={isSubmitting}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Attachment (optional)</label>
+                        <input
+                            type="file"
+                            onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                            className={`mt-2 block w-full text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}
+                            disabled={isSubmitting}
+                        />
+                        {attachmentFile && (
+                            <p className={`mt-2 text-[11px] font-bold flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <Paperclip className="w-3.5 h-3.5" />
+                                {attachmentFile.name}
+                            </p>
+                        )}
+                        {attachmentPreviewUrl && (
+                            <a
+                                href={attachmentPreviewUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`mt-2 inline-flex items-center gap-1 text-[11px] font-black ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}
+                            >
+                                <Eye className="w-3.5 h-3.5" />
+                                Preview selected attachment
+                            </a>
+                        )}
+                    </div>
+                </div>
+                <div className={`p-3 sm:p-4 border-t flex justify-end gap-2 ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <button type="button" onClick={onClose} disabled={isSubmitting} className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-wider ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                        Cancel
+                    </button>
+                    <button type="button" onClick={onConfirm} disabled={isSubmitting} className="px-3 py-2 rounded-lg text-[10px] font-black tracking-wider bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60 flex items-center gap-2">
+                        {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        {isSubmitting ? 'Saving...' : 'Confirm Settlement'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, existingShifts = [] }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [] }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
@@ -187,7 +345,9 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
         shiftName: '',
         punchInStart: '',
         punchInEnd: '',
-        autoPunchOutTime: ''
+        autoPunchOutTime: '',
+        salaryMode: 'none',
+        salaryAmount: ''
     });
     const pendingInfoRef = useRef(null);
     const existingShiftMap = useMemo(() => {
@@ -208,7 +368,9 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
             shiftName: normalizedShiftName,
             punchInStart: ws.punchInStart || '',
             punchInEnd: ws.punchInEnd || '',
-            autoPunchOutTime: ws.autoPunchOutTime || ws.punchInEnd || ''
+            autoPunchOutTime: ws.autoPunchOutTime || ws.punchInEnd || '',
+            salaryMode: staff?.compensation?.salaryMode || 'none',
+            salaryAmount: staff?.compensation?.amount != null ? String(staff.compensation.amount) : ''
         });
     }, [staff, existingShiftMap]);
 
@@ -269,7 +431,13 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
         if (punchInTime) return formatTimeAgo(punchInTime);
         return null;
     })();
-
+    const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    const formatWorkedTime = (minutes) => {
+        const totalMinutes = Math.max(0, Number(minutes || 0));
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}h ${m}m`;
+    };
     return (
         <div className="space-y-3">
             <div 
@@ -361,6 +529,16 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                         )}
                                     </div>
                                 )}
+                                {staff?.payrollSummary && staff?.compensation?.salaryMode && staff.compensation.salaryMode !== 'none' && (
+                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>
+                                        {formatCurrency(staff.payrollSummary.totalSalary)} this month
+                                    </span>
+                                )}
+                                {staff?.workSchedule?.enabled && staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
+                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
+                                        Shift Enabled
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -412,10 +590,11 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                     <div className="mt-3 space-y-2">
                         <div className="grid grid-cols-2 gap-2">
                             <button
+                                type="button"
                                 onClick={() => setShowDetails((v) => !v)}
                                 className={`w-full py-2 px-3 rounded-lg text-[11px] font-black tracking-wider transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
                             >
-                                {showDetails ? 'Hide' : 'Show'} Details
+                                {showDetails ? 'Close work profile' : 'Work profile'}
                             </button>
                             <button
                                 onClick={() => setShowAttendance(!showAttendance)}
@@ -424,112 +603,23 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                 {showAttendance ? 'Hide' : 'View'} Attendance
                             </button>
                         </div>
-                        {showDetails && (
-                            <div className={`rounded-xl border p-3 space-y-3 ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-slate-50'}`}>
-                                {canManageIndividualPermissions && staff.role === 'Manager' && (
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                Individual Permission
-                                            </p>
-                                            <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                Reports Access
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => onToggleReportsPermission?.(staff)}
-                                            disabled={reportsPermissionUpdating}
-                                            className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${staff?.permissions?.reports === true ? (darkMode ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border border-emerald-300') : (darkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-white text-slate-700 border border-slate-200')} disabled:opacity-60`}
-                                        >
-                                            {reportsPermissionUpdating ? 'Updating...' : (staff?.permissions?.reports === true ? 'Enabled' : 'Disabled')}
-                                        </button>
-                                    </div>
-                                )}
-                                {canManageWorkHours && staff.role !== 'owner' && (
-                                    <div className={`rounded-lg border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
-                                        <p className={`text-[9px] font-black tracking-[0.18em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            Work Hours / Shift
-                                        </p>
-                                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                            <label className={`text-[10px] font-bold flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={scheduleForm.enabled}
-                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, enabled: e.target.checked }))}
-                                                    className="h-4 w-4 accent-indigo-600"
-                                                />
-                                                Shift enabled
-                                            </label>
-                                            <input
-                                                list={`shift-name-options-${staff?._id || 'staff'}`}
-                                                value={scheduleForm.shiftName}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    const selectedShift = existingShiftMap.get(String(value || '').trim().toLowerCase());
-                                                    if (selectedShift) {
-                                                        setScheduleForm((p) => ({
-                                                            ...p,
-                                                            shiftName: selectedShift.name,
-                                                            punchInStart: selectedShift.punchInStart || '',
-                                                            punchInEnd: selectedShift.punchInEnd || '',
-                                                            autoPunchOutTime: selectedShift.punchInEnd || ''
-                                                        }));
-                                                        return;
-                                                    }
-                                                    setScheduleForm((p) => ({ ...p, shiftName: value }));
-                                                }}
-                                                placeholder="Shift name (choose or type)"
-                                                className={`w-full px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                                            />
-                                            <datalist id={`shift-name-options-${staff?._id || 'staff'}`}>
-                                                {existingShifts.map((shift) => (
-                                                    <option key={shift.key} value={shift.name} />
-                                                ))}
-                                            </datalist>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input
-                                                    type="time"
-                                                    value={scheduleForm.punchInStart}
-                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, punchInStart: e.target.value }))}
-                                                    className={`w-full px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                                                    title="Punch-in start"
-                                                />
-                                                <input
-                                                    type="time"
-                                                    value={scheduleForm.punchInEnd}
-                                                    onChange={(e) => setScheduleForm((p) => ({ ...p, punchInEnd: e.target.value, autoPunchOutTime: e.target.value }))}
-                                                    className={`w-full px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                                                    title="Punch-in end (auto punch-out)"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="mt-2 flex justify-end">
-                                            <button
-                                                type="button"
-                                                onClick={async () => {
-                                                    const normalizedName = String(scheduleForm.shiftName || '').trim();
-                                                    const key = normalizedName.toLowerCase();
-                                                    const matchedShift = key ? existingShiftMap.get(key) : null;
-                                                    const normalizedForm = {
-                                                        ...scheduleForm,
-                                                        shiftName: matchedShift?.name || normalizedName
-                                                    };
-                                                    const saved = await onSaveWorkSchedule?.(staff, normalizedForm);
-                                                    if (saved) {
-                                                        setShowDetails(false);
-                                                    }
-                                                }}
-                                                disabled={isSavingWorkSchedule}
-                                                className="px-3 py-2 rounded-lg text-[10px] font-black tracking-widest bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
-                                            >
-                                                {isSavingWorkSchedule ? 'Saving...' : 'Save Shift'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <WorkProfileModal
+                            isOpen={showDetails}
+                            onClose={() => setShowDetails(false)}
+                            staff={staff}
+                            darkMode={darkMode}
+                            scheduleForm={scheduleForm}
+                            setScheduleForm={setScheduleForm}
+                            existingShifts={existingShifts}
+                            existingShiftMap={existingShiftMap}
+                            canManageIndividualPermissions={canManageIndividualPermissions}
+                            canManageWorkHours={canManageWorkHours}
+                            onToggleReportsPermission={onToggleReportsPermission}
+                            reportsPermissionUpdating={reportsPermissionUpdating}
+                            onSaveWorkSchedule={onSaveWorkSchedule}
+                            isSavingWorkSchedule={isSavingWorkSchedule}
+                            showToast={showToast}
+                        />
                     </div>
                 )}
             </div>
@@ -562,7 +652,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
     };
 
     const handleSubmit = (e) => {
-        e.preventDefault();
+        if (e?.preventDefault) e.preventDefault();
         setFieldErrors({ name: '', email: '' });
 
         // Validate fields
@@ -734,7 +824,8 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </div>
                     
                     <button 
-                        type="submit"
+                        type="button"
+                        onClick={handleSubmit}
                         className="w-full py-3 sm:py-4 bg-indigo-600 text-white font-black text-xs tracking-widest rounded-xl sm:rounded-2xl hover:bg-indigo-500 transition shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                         disabled={isSubmitting}
                     >
@@ -772,17 +863,16 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [isSavingRolePermissions, setIsSavingRolePermissions] = useState(false);
     const [showGrantPermissions, setShowGrantPermissions] = useState(false);
     const [permissionUpdatingId, setPermissionUpdatingId] = useState(null);
-    const [attendancePolicy, setAttendancePolicy] = useState({
-        enabled: false,
-        defaultPunchInStart: '',
-        defaultPunchInEnd: '',
-        defaultAutoPunchOutEnabled: true,
-        defaultAutoPunchOutTime: '',
-        allowShiftOverrides: true
-    });
-    const [isSavingAttendancePolicy, setIsSavingAttendancePolicy] = useState(false);
-    const [showWorkHoursSetup, setShowWorkHoursSetup] = useState(false);
     const [scheduleUpdatingId, setScheduleUpdatingId] = useState(null);
+    const [payrollUpdatingId, setPayrollUpdatingId] = useState(null);
+    const [payrollConfirmingId, setPayrollConfirmingId] = useState(null);
+    const [payrollSettlementModal, setPayrollSettlementModal] = useState(null);
+    const [payrollSettlementAmount, setPayrollSettlementAmount] = useState('');
+    const [payrollSettlementNotes, setPayrollSettlementNotes] = useState('');
+    const [payrollSettlementAttachment, setPayrollSettlementAttachment] = useState(null);
+    const [managementTab, setManagementTab] = useState('team');
+    const [salaryTab, setSalaryTab] = useState('report');
+    const [payrollStatementRows, setPayrollStatementRows] = useState([]);
     void onOpenRolePermissions;
 
     // Ensure we have write/read access
@@ -862,32 +952,23 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             console.error('Failed to fetch active status:', error);
         }
     }, [apiClient, hasReadAccess]);
-
-    const fetchAttendancePolicy = useCallback(async () => {
+    const fetchPayrollStatement = useCallback(async () => {
         if (!hasWriteAccess || !apiClient) return;
         try {
-            const response = await apiClient.get(API.staffAttendanceSettings);
-            if (response.data?.policy) {
-                setAttendancePolicy({
-                    enabled: response.data.policy.enabled === true,
-                    defaultPunchInStart: response.data.policy.defaultPunchInStart || '',
-                    defaultPunchInEnd: response.data.policy.defaultPunchInEnd || '',
-                    defaultAutoPunchOutEnabled: true,
-                    defaultAutoPunchOutTime: response.data.policy.defaultAutoPunchOutTime || '',
-                    allowShiftOverrides: true
-                });
-            }
+            const res = await apiClient.get(API.staffPayrollStatement);
+            const rows = Array.isArray(res?.data?.rows) ? res.data.rows : [];
+            setPayrollStatementRows(rows);
         } catch (error) {
             if (error?.cancelled) return;
-            console.error('Failed to fetch attendance policy:', error);
+            setPayrollStatementRows([]);
         }
-    }, [apiClient, hasWriteAccess]);
+    }, [API.staffPayrollStatement, apiClient, hasWriteAccess]);
 
     useEffect(() => {
         fetchStaff();
         fetchActiveStatus();
         fetchRolePermissions();
-        fetchAttendancePolicy();
+        fetchPayrollStatement();
         
         // Refresh active status every 60 seconds
         const interval = setInterval(() => {
@@ -895,9 +976,19 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         }, 60000);
         
         return () => clearInterval(interval);
-    }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchAttendancePolicy]);
+    }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchPayrollStatement]);
 
     const [addStaffError, setAddStaffError] = useState(null);
+    const payrollAttachmentPreviewUrl = useMemo(() => {
+        if (!payrollSettlementAttachment) return '';
+        return URL.createObjectURL(payrollSettlementAttachment);
+    }, [payrollSettlementAttachment]);
+
+    useEffect(() => {
+        return () => {
+            if (payrollAttachmentPreviewUrl) URL.revokeObjectURL(payrollAttachmentPreviewUrl);
+        };
+    }, [payrollAttachmentPreviewUrl]);
 
     const handleAddStaff = async (formData, resetForm) => {
         if (!hasOwnerAccess) return;
@@ -932,10 +1023,10 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const handleUpdateRole = async (id, updates) => {
         setIsProcessing(true);
         try {
-            const payload = {
-                name: updates?.name,
-                role: updates?.role,
-            };
+            const payload = { name: updates?.name };
+            if (hasOwnerAccess && updates?.role != null) {
+                payload.role = updates.role;
+            }
             await apiClient.put(API.staffUpdate ? API.staffUpdate(id) : API.staffRoleUpdate(id), payload);
             if (showToast) showToast('Staff details updated.', 'success');
             await fetchStaff();
@@ -986,19 +1077,6 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             setPermissionUpdatingId(null);
         }
     };
-    const handleSaveAttendancePolicy = async () => {
-        if (!hasWriteAccess) return;
-        setIsSavingAttendancePolicy(true);
-        try {
-            await apiClient.put(API.staffAttendanceSettings, attendancePolicy);
-            if (showToast) showToast('Working hours settings updated.', 'success');
-            await fetchAttendancePolicy();
-        } catch (error) {
-            if (showToast) showToast(error.response?.data?.error || 'Failed to save working hours settings.', 'error');
-        } finally {
-            setIsSavingAttendancePolicy(false);
-        }
-    };
     const handleSaveStaffWorkSchedule = async (staffMember, scheduleForm) => {
         if (!hasWriteAccess || !staffMember?._id) return;
         setScheduleUpdatingId(String(staffMember._id));
@@ -1019,6 +1097,123 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             setScheduleUpdatingId(null);
         }
     };
+    const handleUpdatePayrollSettlement = useCallback(async (staffMember, payload) => {
+        if (!hasWriteAccess || !staffMember?._id) return;
+        setPayrollUpdatingId(String(staffMember._id));
+        try {
+            const res = await apiClient.put(API.staffPayrollSettlementUpdate(staffMember._id), payload);
+            const updated = res?.data?.staff;
+            if (updated) {
+                setStaff((prev) => prev.map((s) => (String(s._id) === String(staffMember._id) ? { ...s, ...updated } : s)));
+            } else {
+                await fetchStaff();
+            }
+            await fetchPayrollStatement();
+            if (showToast) showToast(payload.paid ? 'Payroll marked settled.' : 'Payroll marked pending.', 'success');
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to update payroll settlement.', 'error');
+        } finally {
+            setPayrollUpdatingId(null);
+        }
+    }, [apiClient, API.staffPayrollSettlementUpdate, fetchPayrollStatement, fetchStaff, hasWriteAccess, showToast]);
+
+    const openPayrollSettlementModal = useCallback((staffMember, month, amount) => {
+        setPayrollSettlementModal({
+            staffId: String(staffMember?._id || ''),
+            staffName: staffMember?.name || '',
+            month: String(month || ''),
+            amount: Number(amount || 0),
+            salaryMode: String(staffMember?.compensation?.salaryMode || 'none'),
+            salaryRate: Number(staffMember?.compensation?.amount || 0),
+            totalMinutes: Number(staffMember?.payrollSummary?.totalMinutes || 0),
+            overtimeMinutes: Number(staffMember?.payrollSummary?.overtimeMinutes || 0),
+            totalDays: Number(staffMember?.payrollSummary?.totalDays || 0),
+        });
+        setPayrollSettlementAmount(String(Number(amount || 0)));
+        setPayrollSettlementNotes('');
+        setPayrollSettlementAttachment(null);
+    }, []);
+
+    const closePayrollSettlementModal = useCallback(() => {
+        setPayrollSettlementModal(null);
+        setPayrollSettlementAmount('');
+        setPayrollSettlementNotes('');
+        setPayrollSettlementAttachment(null);
+        setPayrollConfirmingId(null);
+    }, []);
+
+    const confirmPayrollSettlement = useCallback(async () => {
+        if (!payrollSettlementModal?.staffId) return;
+        const staffMember = staff.find((s) => String(s._id) === payrollSettlementModal.staffId);
+        if (!staffMember) return;
+        const calculatedAmount = Math.max(0, Number(payrollSettlementModal.amount || 0));
+        const enteredAmount = Math.max(0, Number(payrollSettlementAmount || 0));
+        const settlementAmount = Math.min(calculatedAmount, enteredAmount);
+
+        let attachmentPayload = {};
+        try {
+            setPayrollConfirmingId(payrollSettlementModal.staffId);
+            if (payrollSettlementAttachment) {
+                const formData = new FormData();
+                formData.append('attachment', payrollSettlementAttachment);
+                const uploadRes = await apiClient.post(
+                    API.staffPayrollAttachmentUpload(payrollSettlementModal.staffId),
+                    formData,
+                    { headers: { 'Content-Type': 'multipart/form-data' } }
+                );
+                attachmentPayload = {
+                    attachmentUrl: uploadRes?.data?.attachmentUrl || uploadRes?.data?.attachmentPath || '',
+                    attachmentName: uploadRes?.data?.attachmentName || payrollSettlementAttachment.name || '',
+                    attachmentType: uploadRes?.data?.attachmentType || payrollSettlementAttachment.type || ''
+                };
+            }
+            await handleUpdatePayrollSettlement(staffMember, {
+                month: payrollSettlementModal.month,
+                paid: true,
+                amount: settlementAmount,
+                calculatedAmount,
+                notes: payrollSettlementNotes || '',
+                ...attachmentPayload
+            });
+            closePayrollSettlementModal();
+        } catch (error) {
+            if (showToast) showToast(error.response?.data?.error || 'Failed to mark payroll settled.', 'error');
+        } finally {
+            setPayrollConfirmingId(null);
+        }
+    }, [
+        API.staffPayrollAttachmentUpload,
+        apiClient,
+        closePayrollSettlementModal,
+        handleUpdatePayrollSettlement,
+        payrollSettlementAttachment,
+        payrollSettlementAmount,
+        payrollSettlementModal,
+        payrollSettlementNotes,
+        showToast,
+        staff
+    ]);
+    const downloadPayrollStatement = useCallback(async () => {
+        if (!hasWriteAccess || !apiClient) return;
+        try {
+            const res = await apiClient.get(`${API.staffPayrollStatement}?format=csv`, {
+                responseType: 'blob',
+            });
+            const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const monthStamp = new Date().toISOString().slice(0, 10);
+            link.href = url;
+            link.setAttribute('download', `payroll-statement-${monthStamp}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            if (showToast) showToast('Payroll statement downloaded.', 'success');
+        } catch (error) {
+            if (showToast) showToast('Failed to download payroll statement.', 'error');
+        }
+    }, [API.staffPayrollStatement, apiClient, hasWriteAccess, showToast]);
 
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
@@ -1171,6 +1366,12 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         });
         return Array.from(shiftByKey.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [staff]);
+    const formatWorkedTime = (minutes) => {
+        const totalMinutes = Math.max(0, Number(minutes || 0));
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}h ${m}m`;
+    };
 
     if (isLoading && !hasLoadedOnce) {
         return <TeamManagementInitialSkeleton darkMode={darkMode} />;
@@ -1219,6 +1420,31 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
+                <div className={`rounded-xl border p-1 flex gap-1 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <button
+                        type="button"
+                        onClick={() => setManagementTab('team')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'team' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                    >
+                        Team
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setManagementTab('salary')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'salary' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                    >
+                        Salary Reports
+                    </button>
+                    {hasOwnerAccess && (
+                        <button
+                            type="button"
+                            onClick={() => setManagementTab('permissions')}
+                            className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'permissions' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                        >
+                            Permissions
+                        </button>
+                    )}
+                </div>
                 {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                     <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
                         <div>
@@ -1234,7 +1460,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         </button>
                     </div>
                 )}
-                {hasOwnerAccess && (
+                {hasOwnerAccess && managementTab === 'permissions' && (
                     <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                         <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
                             <div>
@@ -1294,72 +1520,6 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         )}
                     </div>
                 )}
-                {hasWriteAccess && (
-                    <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                        <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
-                            <div>
-                                <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Shop Opens &amp; Close Time</p>
-                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configure shop opening and closing time.</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowWorkHoursSetup((v) => !v)}
-                                className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                            >
-                                {showWorkHoursSetup ? 'Hide' : 'Open'}
-                            </button>
-                        </div>
-                        {showWorkHoursSetup && (
-                            <div className="p-3 md:p-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <label className={`text-[11px] font-bold flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={attendancePolicy.enabled}
-                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, enabled: e.target.checked }))}
-                                            className="h-4 w-4 accent-indigo-600"
-                                        />
-                                        Enable working hours policy
-                                    </label>
-                                </div>
-                                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <div>
-                                        <label className={`text-[10px] font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Shop Opens At</label>
-                                        <input
-                                            type="time"
-                                            value={attendancePolicy.defaultPunchInStart}
-                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, defaultPunchInStart: e.target.value }))}
-                                            className={`w-full mt-1 px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                                            title="Shop opening time"
-                                            placeholder="Open time"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className={`text-[10px] font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Shop Closes At</label>
-                                        <input
-                                            type="time"
-                                            value={attendancePolicy.defaultPunchInEnd}
-                                            onChange={(e) => setAttendancePolicy((p) => ({ ...p, defaultPunchInEnd: e.target.value }))}
-                                            className={`w-full mt-1 px-3 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                                            title="Shop closing time (auto punch-out)"
-                                            placeholder="Close time"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveAttendancePolicy}
-                                        disabled={isSavingAttendancePolicy}
-                                        className="px-4 py-2 rounded-lg text-[10px] font-black tracking-widest bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
-                                    >
-                                        {isSavingAttendancePolicy ? 'Saving...' : 'Save Shop Timings'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
                 {!hasOwnerAccess && hasWriteAccess && (
                     <div className={`rounded-xl border px-4 py-3 ${darkMode ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
                         <p className="text-[10px] font-black tracking-[0.2em] uppercase">Permissions</p>
@@ -1368,8 +1528,152 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                         </p>
                     </div>
                 )}
+                {managementTab === 'salary' && (
+                    <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} p-3 md:p-4 space-y-3`}>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className={`inline-flex p-1 rounded-lg ${darkMode ? 'bg-slate-950 border border-slate-800' : 'bg-slate-100 border border-slate-200'}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => setSalaryTab('report')}
+                                    className={`px-3 py-1.5 rounded text-[10px] font-black tracking-wider ${salaryTab === 'report' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-200')}`}
+                                >
+                                    Individual Salary Report
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSalaryTab('history')}
+                                    className={`px-3 py-1.5 rounded text-[10px] font-black tracking-wider ${salaryTab === 'history' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-200')}`}
+                                >
+                                    Paid Salary History
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={downloadPayrollStatement}
+                                title="Download Statement"
+                                aria-label="Download Statement"
+                                className={`h-8 w-8 rounded-lg border flex items-center justify-center ${
+                                    darkMode
+                                        ? 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+                                        : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+                        </div>
+                        {salaryTab === 'report' && orderedStaff.filter((s) => s.role !== 'owner').map((member) => {
+                            const totalSalary = Number(member?.payrollSummary?.totalSalary || 0);
+                            const salaryMode = String(member?.compensation?.salaryMode || 'none');
+                            const rate = Number(member?.compensation?.amount || 0);
+                            return (
+                                <div key={`salary-${member._id}`} className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div>
+                                            <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{member.name}</p>
+                                            <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                {salaryMode === 'hourly' ? `Hourly: Rs ${rate}` : salaryMode === 'daily' ? `Daily: Rs ${rate}` : 'No salary mode'}
+                                            </p>
+                                        </div>
+                                        <span className={`text-xs font-black px-2 py-1 rounded ${darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>
+                                            Rs {totalSalary.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between gap-2">
+                                        <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            Worked: {member?.payrollSummary?.totalDays || 0} days, {formatWorkedTime(member?.payrollSummary?.totalMinutes || 0)}
+                                        </p>
+                                            {Number(member?.payrollSummary?.overtimeMinutes || 0) > 0 && (
+                                                <p className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                                                    OT: {formatWorkedTime(member?.payrollSummary?.overtimeMinutes || 0)}
+                                                </p>
+                                            )}
+                                            {Number(member?.payrollSummary?.carryForwardIn || 0) > 0 && (
+                                                <p className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                                                    Includes previous remaining: Rs {Number(member?.payrollSummary?.carryForwardIn || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                                </p>
+                                            )}
+                                        <div className="flex items-center gap-2">
+                                            {member?.payrollSummary?.attachmentUrl && (
+                                                <a
+                                                    href={member.payrollSummary.attachmentUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[9px] font-black tracking-wider border ${darkMode ? 'border-slate-700 text-slate-300 hover:text-indigo-300' : 'border-slate-300 text-slate-700 hover:text-indigo-700'}`}
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                    Preview
+                                                </a>
+                                            )}
+                                            {salaryMode !== 'none' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (member?.payrollSummary?.isSettled) {
+                                                            handleUpdatePayrollSettlement(member, {
+                                                                month: member?.payrollSummary?.month,
+                                                                paid: false,
+                                                                amount: totalSalary
+                                                            });
+                                                            return;
+                                                        }
+                                                        openPayrollSettlementModal(member, member?.payrollSummary?.month, totalSalary);
+                                                    }}
+                                                    disabled={payrollUpdatingId === String(member._id)}
+                                                    className="px-2 py-1 rounded text-[9px] font-black tracking-wider bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
+                                                >
+                                                    {payrollUpdatingId === String(member._id) ? 'Saving...' : (member?.payrollSummary?.isSettled ? 'Mark Unsettled' : 'Mark Settled')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {salaryTab === 'history' && (
+                        <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
+                            <p className={`text-[10px] font-black tracking-[0.2em] uppercase mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Paid Salary History</p>
+                            {payrollStatementRows.length === 0 ? (
+                                <p className={`text-[11px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>No settled salary records yet.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+                                    {payrollStatementRows.map((row, idx) => (
+                                        <div key={`${row.staffId}-${row.month}-${idx}`} className={`rounded-lg border px-3 py-2 ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className={`text-[11px] font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{row.staffName}</p>
+                                                <span className={`text-[10px] font-black ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>Rs {Number(row.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                {row.month} · {row.salaryMode} · Settled {row.paidAt ? new Date(row.paidAt).toLocaleDateString('en-IN') : ''}
+                                            </p>
+                                            <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                Marked by: {row.settledByName || 'Unknown'}{row.settledByRole ? ` (${row.settledByRole})` : ''}
+                                            </p>
+                                            {Number(row.carryForwardAmount || 0) > 0 && (
+                                                <p className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                                                    Remaining Rs {Number(row.carryForwardAmount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} moved to {row.carryForwardMonth || 'next month'}
+                                                </p>
+                                            )}
+                                            {row.attachmentUrl && (
+                                                <a
+                                                    href={row.attachmentUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className={`mt-1 inline-flex items-center gap-1 text-[10px] font-black ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}
+                                                >
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                    {row.attachmentName ? `Preview: ${row.attachmentName}` : 'Preview Attachment'}
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        )}
+                    </div>
+                )}
                 {/* Staff List */}
-                {isLoading ? (
+                {managementTab === 'team' && (isLoading ? (
                     <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl border ${cardBase}`}>
                         <TeamDirectorySkeleton darkMode={darkMode} />
                     </div>
@@ -1441,6 +1745,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         canManageWorkHours={hasWriteAccess}
                                         onSaveWorkSchedule={handleSaveStaffWorkSchedule}
                                         isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
+                                        onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
+                                        isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
                                         existingShifts={existingShifts}
                                     />
                                 );
@@ -1498,6 +1804,8 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         canManageWorkHours={hasWriteAccess}
                                         onSaveWorkSchedule={handleSaveStaffWorkSchedule}
                                         isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
+                                        onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
+                                        isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
                                         existingShifts={existingShifts}
                                     />
                                 );
@@ -1505,7 +1813,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                             </>
                         )}
                     </div>
-                )}
+                ))}
             </div>
             </div>
 
@@ -1541,6 +1849,35 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                 onUpdateRole={handleUpdateRole}
                 isSubmitting={isProcessing}
                 darkMode={darkMode}
+                canEditRole={hasOwnerAccess}
+            />
+
+            <PayrollSettlementModal
+                isOpen={Boolean(payrollSettlementModal)}
+                darkMode={darkMode}
+                staffMember={payrollSettlementModal ? {
+                    name: payrollSettlementModal.staffName,
+                    salaryMode: payrollSettlementModal.salaryMode,
+                    salaryRate: payrollSettlementModal.salaryRate,
+                    totalMinutes: payrollSettlementModal.totalMinutes,
+                    overtimeMinutes: payrollSettlementModal.overtimeMinutes,
+                    totalDays: payrollSettlementModal.totalDays
+                } : null}
+                month={payrollSettlementModal?.month || ''}
+                amount={payrollSettlementModal?.amount || 0}
+                settlementAmount={payrollSettlementAmount}
+                setSettlementAmount={setPayrollSettlementAmount}
+                notes={payrollSettlementNotes}
+                setNotes={setPayrollSettlementNotes}
+                attachmentFile={payrollSettlementAttachment}
+                setAttachmentFile={setPayrollSettlementAttachment}
+                attachmentPreviewUrl={payrollAttachmentPreviewUrl}
+                onClose={closePayrollSettlementModal}
+                onConfirm={confirmPayrollSettlement}
+                isSubmitting={Boolean(payrollSettlementModal?.staffId) && (
+                    payrollUpdatingId === String(payrollSettlementModal?.staffId)
+                    || payrollConfirmingId === String(payrollSettlementModal?.staffId)
+                )}
             />
 
             {/* Confirmation Modal for Deactivation and Deletion */}

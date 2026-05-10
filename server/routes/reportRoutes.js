@@ -7,6 +7,7 @@ const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Store = require('../models/Store');
+const Staff = require('../models/Staff');
 
 const router = express.Router();
 
@@ -18,7 +19,13 @@ const canAccessReports = async (req) => {
     const store = await Store.findById(req.user.storeId).select('settings.rolePagePermissions').lean();
     const pagePermissions = store?.settings?.rolePagePermissions || {};
     const roleKey = role === 'Manager' ? 'manager' : 'cashier';
-    return pagePermissions?.[roleKey]?.reports === true;
+    if (pagePermissions?.[roleKey]?.reports === true) return true;
+    if (role === 'Manager') {
+        const uid = req.user.id || req.user._id;
+        const staff = await Staff.findOne({ userId: uid, storeId: req.user.storeId }).select('permissions').lean();
+        return staff?.permissions?.reports === true;
+    }
+    return false;
 };
 
 // --- HELPER 1: Date Range Filter ---

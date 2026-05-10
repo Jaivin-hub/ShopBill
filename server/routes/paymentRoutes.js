@@ -9,6 +9,23 @@ const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+/** Mandate verification refunds ₹1; log clearly when Razorpay says it is already done or not allowed. */
+function logMandateRefundOutcome(razorpay_payment_id, refundError) {
+    const data = refundError.response?.data;
+    const desc = String(
+        data?.error?.description || data?.description || refundError.message || ''
+    );
+    const benign =
+        /already.*refunded|fully refunded|already been fully refunded|duplicate refund|refund.*already processed/i.test(
+            desc
+        );
+    if (benign) {
+        console.log(`[REFUND SKIP] ${razorpay_payment_id}: ${desc}`);
+        return;
+    }
+    console.error(`[REFUND FAILED] ${razorpay_payment_id}:`, data || refundError.message);
+}
+
 const PLAN_DETAILS = {
     BASIC: {
         plan_id: process.env.BASIC_PLAN,
@@ -136,8 +153,7 @@ router.post('/verify-subscription', async (req, res) => {
                 console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
 
             } catch (refundError) {
-                // Log the actual error message from Razorpay API for refund failures
-                console.error(`[REFUND FAILED]`, refundError.response ? refundError.response.data : refundError.message);
+                logMandateRefundOutcome(razorpay_payment_id, refundError);
             }
 
             return res.json({
@@ -460,7 +476,7 @@ router.post('/verify-plan-change', async (req, res) => {
             );
             console.log(`[REFUND SUCCESS] ₹1.00 refunded for Payment ID: ${razorpay_payment_id}`);
         } catch (refundError) {
-            console.error(`[REFUND FAILED] Failed to refund ₹1.00 for Payment ID: ${razorpay_payment_id}.`);
+            logMandateRefundOutcome(razorpay_payment_id, refundError);
         }
 
         // --- 3. FINAL USER MODEL UPDATE ---

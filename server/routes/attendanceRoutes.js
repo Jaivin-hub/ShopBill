@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
-const Store = require('../models/Store');
 const { emitAlert } = require('./notificationRoutes');
 
 const router = express.Router();
@@ -34,21 +33,65 @@ const isWithinWindow = (currentMins, startMins, endMins) => {
     // Overnight window (e.g. 14:00 -> 02:00)
     return currentMins >= startMins || currentMins <= endMins;
 };
-
-const resolveEffectiveSchedule = (storePolicy = {}, staffSchedule = {}) => {
-    const policyEnabled = storePolicy.enabled === true;
-    const shiftEnabled = staffSchedule.enabled === true;
-    const punchInStart = shiftEnabled ? (staffSchedule.punchInStart || '') : (storePolicy.defaultPunchInStart || '');
-    const punchInEnd = shiftEnabled ? (staffSchedule.punchInEnd || '') : (storePolicy.defaultPunchInEnd || '');
-    // Auto punch-out now follows configured shift/store end time.
-    return { policyEnabled, shiftEnabled, punchInStart, punchInEnd };
+const getShiftDurationMinutes = (startTime, endTime) => {
+    const startMins = timeToMinutes(startTime);
+    const endMins = timeToMinutes(endTime);
+    if (startMins == null || endMins == null) return 0;
+    if (startMins === endMins) return 24 * 60;
+    if (endMins > startMins) return endMins - startMins;
+    return (24 * 60) - startMins + endMins;
 };
+const getLiveWorkedMinutes = (attendance, now = new Date()) => {
+    const totalDiff = now - new Date(attendance?.punchIn || now);
+    const totalMinutes = Math.max(0, Math.round(totalDiff / (1000 * 60)));
+    let totalBreakMinutes = 0;
+    if (attendance?.breaks && attendance.breaks.length > 0) {
+        attendance.breaks.forEach((breakPeriod) => {
+            if (breakPeriod?.breakEnd && breakPeriod?.breakStart) {
+                totalBreakMinutes += Number(breakPeriod.breakDuration || 0);
+            } else if (breakPeriod?.breakStart && !breakPeriod?.breakEnd) {
+                const breakDiff = now - new Date(breakPeriod.breakStart);
+                totalBreakMinutes += Math.max(0, Math.round(breakDiff / (1000 * 60)));
+            }
+        });
+    }
+    return Math.max(0, totalMinutes - totalBreakMinutes);
+};
+
+const resolveEffectiveSchedule = (staffSchedule = {}) => {
+    const shiftEnabled = staffSchedule.enabled === true;
+    const punchInStart = shiftEnabled ? (staffSchedule.punchInStart || '') : '';
+    const punchInEnd = shiftEnabled ? (staffSchedule.punchInEnd || '') : '';
+    return { shiftEnabled, punchInStart, punchInEnd };
+};
+
+async function findStaffForRequest(req) {
+    const userId = req.user?._id;
+    const storeId = req.user?.storeId;
+    if (!userId) return null;
+
+    // 1) Preferred lookup: exact user + current store
+    if (storeId) {
+        let staff = await Staff.findOne({ userId, storeId });
+        if (!staff && mongoose.Types.ObjectId.isValid(userId) && mongoose.Types.ObjectId.isValid(storeId)) {
+            staff = await Staff.findOne({
+                userId: new mongoose.Types.ObjectId(userId),
+                storeId: new mongoose.Types.ObjectId(storeId)
+            });
+        }
+        if (staff) return staff;
+    }
+
+    // 2) Fallback: any active assignment for this user (latest)
+    const fallback = await Staff.findOne({ userId, active: true }).sort({ updatedAt: -1, createdAt: -1 });
+    if (fallback && !req.user.storeId) {
+        req.user.storeId = fallback.storeId;
+    }
+    return fallback;
+}
 
 async function applyAutoPunchOutForStore(storeId) {
     if (!storeId) return;
-    const store = await Store.findById(storeId).select('settings.attendancePolicy').lean();
-    const policy = store?.settings?.attendancePolicy || {};
-    if (policy.enabled !== true) return;
     const now = new Date();
     const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const activeAttendance = await Attendance.find({
@@ -62,8 +105,8 @@ async function applyAutoPunchOutForStore(storeId) {
     const staffById = new Map(staffList.map((s) => [String(s._id), s]));
     for (const att of activeAttendance) {
         const staff = staffById.get(String(att.staffId));
-        const effective = resolveEffectiveSchedule(policy, staff?.workSchedule || {});
-        if (!effective.policyEnabled) continue;
+        const effective = resolveEffectiveSchedule(staff?.workSchedule || {});
+        if (!effective.shiftEnabled) continue;
         const cutoffMins = timeToMinutes(effective.punchInEnd);
         if (cutoffMins == null) continue;
         // Use attendance day as base, then move cutoff to next day when cutoff < punch-in clock
@@ -108,24 +151,7 @@ router.post('/punch-in', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        // Find staff record
-        // Try with ObjectId conversion first, then fallback to direct values
-        let staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
-        });
-
-        // If not found, try with ObjectId conversion
-        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
-            try {
-                staff = await Staff.findOne({ 
-                    userId: new mongoose.Types.ObjectId(req.user._id), 
-                    storeId: new mongoose.Types.ObjectId(req.user.storeId)
-                });
-            } catch (lookupError) {
-                console.error('Staff lookup error with ObjectId:', lookupError);
-            }
-        }
+        const staff = await findStaffForRequest(req);
 
         if (!staff) {
             console.error('Staff not found:', {
@@ -153,18 +179,15 @@ router.post('/punch-in', protect, async (req, res) => {
 
         await applyAutoPunchOutForStore(req.user.storeId);
 
-        // Enforce configured punch-in windows (supports overnight shifts).
-        const storeForPolicy = await Store.findById(req.user.storeId).select('settings.attendancePolicy').lean();
-        const storePolicy = storeForPolicy?.settings?.attendancePolicy || {};
-        const effectiveSchedule = resolveEffectiveSchedule(storePolicy, staff.workSchedule || {});
-        if (effectiveSchedule.policyEnabled) {
+        // Allow punch-in outside configured window, mark it for OT tracking.
+        const effectiveSchedule = resolveEffectiveSchedule(staff.workSchedule || {});
+        let outsideShiftWindow = false;
+        if (effectiveSchedule.shiftEnabled) {
             const nowMinutes = minutesFromDateLocal(new Date());
             const startMins = timeToMinutes(effectiveSchedule.punchInStart);
             const endMins = timeToMinutes(effectiveSchedule.punchInEnd);
             if (startMins != null && endMins != null && !isWithinWindow(nowMinutes, startMins, endMins)) {
-                return res.status(400).json({
-                    error: `Punch-in allowed only between ${effectiveSchedule.punchInStart} and ${effectiveSchedule.punchInEnd} for this shift.`
-                });
+                outsideShiftWindow = true;
             }
         }
 
@@ -220,6 +243,10 @@ router.post('/punch-in', protect, async (req, res) => {
             const minutesWorked = Math.max(0, totalMinutes - totalBreakMinutes);
             const hours = Math.floor(minutesWorked / 60);
             const mins = minutesWorked % 60;
+            const configuredShiftMinutes = Number(existingAttendance.shiftDurationMinutes || 0);
+            const overtimeMinutes = configuredShiftMinutes > 0 ? Math.max(0, minutesWorked - configuredShiftMinutes) : 0;
+            const overtimeHours = Math.floor(overtimeMinutes / 60);
+            const overtimeMins = overtimeMinutes % 60;
 
             return res.status(400).json({ 
                 error: 'You are already punched in. Please punch out first before punching in again.',
@@ -231,7 +258,10 @@ router.post('/punch-in', protect, async (req, res) => {
                     breaks: existingAttendance.breaks || [],
                     totalBreakTime: totalBreakMinutes,
                     minutesWorked,
-                    hoursWorked: `${hours}h ${mins}m`
+                    hoursWorked: `${hours}h ${mins}m`,
+                    outsideShiftWindow: existingAttendance.outsideShiftWindow === true,
+                    overtimeMinutes,
+                    overtimeWorked: `${overtimeHours}h ${overtimeMins}m`
                 }
             });
         }
@@ -252,7 +282,11 @@ router.post('/punch-in', protect, async (req, res) => {
                 punchIn: punchInTime, // Use exact client time with milliseconds
                 status: 'active',
                 notes: body.notes || '',
-                workingHours: 0 // Initialize to 0 for active status
+                workingHours: 0, // Initialize to 0 for active status
+                shiftStart: effectiveSchedule.shiftEnabled ? String(effectiveSchedule.punchInStart || '') : '',
+                shiftEnd: effectiveSchedule.shiftEnabled ? String(effectiveSchedule.punchInEnd || '') : '',
+                shiftDurationMinutes: effectiveSchedule.shiftEnabled ? getShiftDurationMinutes(effectiveSchedule.punchInStart, effectiveSchedule.punchInEnd) : 0,
+                outsideShiftWindow
             };
 
             // Add location only if provided and valid
@@ -378,7 +412,9 @@ router.post('/punch-in', protect, async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Punched in successfully',
+            message: outsideShiftWindow
+                ? 'Punched in successfully. Outside shift window will be counted in overtime.'
+                : 'Punched in successfully',
             attendance: {
                 _id: attendance._id,
                 punchIn: attendance.punchIn,
@@ -387,7 +423,9 @@ router.post('/punch-in', protect, async (req, res) => {
                 breaks: attendance.breaks || [],
                 totalBreakTime: totalBreakMinutes,
                 minutesWorked,
-                hoursWorked: `${hours}h ${mins}m`
+                hoursWorked: `${hours}h ${mins}m`,
+                outsideShiftWindow: attendance.outsideShiftWindow === true,
+                overtimeMinutes: 0
             }
         });
     } catch (error) {
@@ -423,16 +461,7 @@ router.post('/punch-out', protect, async (req, res) => {
         }
 
         // Find staff record (same fallback as punch-in for ObjectId compatibility)
-        let staff = await Staff.findOne({
-            userId: req.user._id,
-            storeId: req.user.storeId
-        });
-        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
-            staff = await Staff.findOne({
-                userId: new mongoose.Types.ObjectId(req.user._id),
-                storeId: new mongoose.Types.ObjectId(req.user.storeId)
-            });
-        }
+        let staff = await findStaffForRequest(req);
 
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
@@ -540,6 +569,9 @@ router.post('/punch-out', protect, async (req, res) => {
         // Calculate hours and minutes for display
         const hours = Math.floor(attendance.workingHours / 60);
         const minutes = attendance.workingHours % 60;
+        const overtimeMinutes = Number(attendance.overtimeMinutes || 0);
+        const overtimeHours = Math.floor(overtimeMinutes / 60);
+        const overtimeMins = overtimeMinutes % 60;
 
         try {
             const actorNameWithRole = getActorNameWithRole(staff, req.user);
@@ -563,7 +595,9 @@ router.post('/punch-out', protect, async (req, res) => {
                 punchOut: attendance.punchOut,
                 workingHours: attendance.workingHours,
                 hoursWorked: `${hours}h ${minutes}m`,
-                status: attendance.status
+                status: attendance.status,
+                overtimeMinutes,
+                overtimeWorked: `${overtimeHours}h ${overtimeMins}m`
             }
         });
     } catch (error) {
@@ -590,13 +624,7 @@ router.post('/break-start', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        let staff = await Staff.findOne({ userId: req.user._id, storeId: req.user.storeId });
-        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
-            staff = await Staff.findOne({
-                userId: new mongoose.Types.ObjectId(req.user._id),
-                storeId: new mongoose.Types.ObjectId(req.user.storeId)
-            });
-        }
+        let staff = await findStaffForRequest(req);
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
         }
@@ -687,13 +715,7 @@ router.post('/break-end', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
 
-        let staff = await Staff.findOne({ userId: req.user._id, storeId: req.user.storeId });
-        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
-            staff = await Staff.findOne({
-                userId: new mongoose.Types.ObjectId(req.user._id),
-                storeId: new mongoose.Types.ObjectId(req.user.storeId)
-            });
-        }
+        let staff = await findStaffForRequest(req);
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found. Please contact your administrator.' });
         }
@@ -803,16 +825,7 @@ router.get('/current', protect, async (req, res) => {
             return res.json({ success: true, attendance: null });
         }
 
-        let staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
-        });
-        if (!staff && mongoose.Types.ObjectId.isValid(req.user._id) && mongoose.Types.ObjectId.isValid(req.user.storeId)) {
-            staff = await Staff.findOne({
-                userId: new mongoose.Types.ObjectId(req.user._id),
-                storeId: new mongoose.Types.ObjectId(req.user.storeId)
-            });
-        }
+        let staff = await findStaffForRequest(req);
         if (!staff) {
             return res.json({ success: true, attendance: null });
         }
@@ -877,6 +890,10 @@ router.get('/current', protect, async (req, res) => {
             const minutesWorked = Math.max(0, totalMinutes - totalBreakMinutes);
             const hours = Math.floor(minutesWorked / 60);
             const mins = minutesWorked % 60;
+            const configuredShiftMinutes = Number(attendance.shiftDurationMinutes || 0);
+            const overtimeMinutes = configuredShiftMinutes > 0 ? Math.max(0, minutesWorked - configuredShiftMinutes) : 0;
+            const overtimeHours = Math.floor(overtimeMinutes / 60);
+            const overtimeMins = overtimeMinutes % 60;
 
             return res.json({
                 success: true,
@@ -888,7 +905,10 @@ router.get('/current', protect, async (req, res) => {
                     breaks: attendance.breaks || [],
                     totalBreakTime: totalBreakMinutes,
                     minutesWorked,
-                    hoursWorked: `${hours}h ${mins}m`
+                    hoursWorked: `${hours}h ${mins}m`,
+                    outsideShiftWindow: attendance.outsideShiftWindow === true,
+                    overtimeMinutes,
+                    overtimeWorked: `${overtimeHours}h ${overtimeMins}m`
                 }
             });
         }
@@ -915,10 +935,7 @@ router.get('/my-records', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected.' });
         }
 
-        const staff = await Staff.findOne({ 
-            userId: req.user._id, 
-            storeId: req.user.storeId 
-        });
+        const staff = await findStaffForRequest(req);
 
         if (!staff) {
             return res.status(404).json({ error: 'Staff record not found.' });
@@ -947,9 +964,13 @@ router.get('/my-records', protect, async (req, res) => {
         const formattedRecords = records.map(record => {
             const hours = Math.floor(record.workingHours / 60);
             const minutes = record.workingHours % 60;
+            const overtimeMinutes = Number(record.overtimeMinutes || 0);
+            const overtimeHours = Math.floor(overtimeMinutes / 60);
+            const overtimeMins = overtimeMinutes % 60;
             return {
                 ...record,
                 hoursWorked: record.status === 'completed' ? `${hours}h ${minutes}m` : 'In Progress',
+                overtimeWorked: `${overtimeHours}h ${overtimeMins}m`,
                 dateString: new Date(record.date).toLocaleDateString()
             };
         });
@@ -1022,9 +1043,13 @@ router.get('/staff/:staffId', protect, async (req, res) => {
         const formattedRecords = records.map(record => {
             const hours = Math.floor(record.workingHours / 60);
             const minutes = record.workingHours % 60;
+            const overtimeMinutes = Number(record.overtimeMinutes || 0);
+            const overtimeHours = Math.floor(overtimeMinutes / 60);
+            const overtimeMins = overtimeMinutes % 60;
             return {
                 ...record,
                 hoursWorked: record.status === 'completed' ? `${hours}h ${minutes}m` : 'In Progress',
+                overtimeWorked: `${overtimeHours}h ${overtimeMins}m`,
                 dateString: new Date(record.date).toLocaleDateString()
             };
         });
@@ -1094,11 +1119,15 @@ router.get('/all', protect, async (req, res) => {
         const formattedRecords = records.map(record => {
             const hours = Math.floor(record.workingHours / 60);
             const minutes = record.workingHours % 60;
+            const overtimeMinutes = Number(record.overtimeMinutes || 0);
+            const overtimeHours = Math.floor(overtimeMinutes / 60);
+            const overtimeMins = overtimeMinutes % 60;
             return {
                 ...record,
                 staffName: record.staffId?.name || 'Unknown',
                 staffRole: record.staffId?.role || 'Unknown',
                 hoursWorked: record.status === 'completed' ? `${hours}h ${minutes}m` : 'In Progress',
+                overtimeWorked: `${overtimeHours}h ${overtimeMins}m`,
                 dateString: new Date(record.date).toLocaleDateString()
             };
         });

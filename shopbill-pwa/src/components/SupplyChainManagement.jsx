@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Truck, Plus, History, Users, PackageCheck, IndianRupee, AlertTriangle,
+  Truck, Plus, History, Users, PackageCheck, AlertTriangle,
   ArrowRight, Loader, X, Search, ChevronDown, Check, Phone, Mail, ScanLine, Package,
   Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download, Settings2, Trash2
 } from 'lucide-react';
@@ -49,13 +49,17 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [customEndDate, setCustomEndDate] = useState('');
   const [historyProductFilter, setHistoryProductFilter] = useState('all');
   const [historySupplierFilter, setHistorySupplierFilter] = useState('all');
+  const [showHistoryAdvancedFilters, setShowHistoryAdvancedFilters] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isSupplierPickerOpen, setIsSupplierPickerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [scannerContext, setScannerContext] = useState('arrival');
   const [editingSupplierId, setEditingSupplierId] = useState(null);
+  const [deletingSupplierId, setDeletingSupplierId] = useState(null);
+  const [showSupplyNavSection, setShowSupplyNavSection] = useState(true);
 
   const [purchaseForm, setPurchaseForm] = useState({
     productId: '', supplierId: '', quantity: '', purchasePrice: '',
@@ -293,6 +297,27 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     setEditingSupplierId(null);
   };
 
+  const handleDeleteSupplier = async (supplier) => {
+    const supplierId = supplier?._id;
+    if (!supplierId || !apiClient || !API?.scmSupplierDelete) return;
+    const approved = window.confirm(`Delete supplier "${supplier?.name || 'this supplier'}"?`);
+    if (!approved) return;
+    setDeletingSupplierId(supplierId);
+    try {
+      await apiClient.delete(API.scmSupplierDelete(supplierId));
+      setPurchaseForm((prev) => ({
+        ...prev,
+        supplierId: String(prev.supplierId || '') === String(supplierId) ? '' : prev.supplierId
+      }));
+      showToast('Supplier deleted', 'success');
+      await fetchSCMData();
+    } catch (error) {
+      showToast('Failed to delete supplier', 'error');
+    } finally {
+      setDeletingSupplierId(null);
+    }
+  };
+
   const handleQuickAddProduct = async (e) => {
     e.preventDefault();
     setIsActionLoading(true);
@@ -357,19 +382,66 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
     else if (editingProductVariantIndex !== null && index < editingProductVariantIndex) setEditingProductVariantIndex(editingProductVariantIndex - 1);
   };
 
-  const handleScanSuccess = (scannedItem) => {
-    const code = (scannedItem.hsn || scannedItem.barcode || "").toLowerCase().trim();
-    const existing = inventory.find(p => p.hsn && p.hsn.toLowerCase().trim() === code);
+  const applyExistingProductToQuickAdd = useCallback((item) => {
+    const variants = Array.isArray(item?.variants)
+      ? item.variants.map((variant) => ({
+          _id: variant?._id || `scm-var-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          label: String(variant?.label || '').trim(),
+          price: variant?.price ?? '',
+          quantity: Number(variant?.quantity || 0),
+          reorderLevel: variant?.reorderLevel == null ? '' : Number(variant.reorderLevel),
+          hsn: String(variant?.hsn || item?.hsn || '').trim()
+        }))
+      : [];
+    const hasVariants = variants.length > 0;
+    setHasProductVariants(hasVariants);
+    setEditingProductVariantIndex(hasVariants ? 0 : null);
+    setProductForm({
+      name: item?.name || '',
+      price: hasVariants ? '' : (item?.price ?? ''),
+      quantity: Number(item?.quantity || 0),
+      reorderLevel: item?.reorderLevel == null ? 5 : Number(item.reorderLevel),
+      hsn: String(item?.hsn || '').trim(),
+      variants
+    });
+    setIsProductModalOpen(true);
+  }, []);
+
+  const handleScanSuccess = useCallback((scannedItem) => {
+    const existingId = scannedItem?._id || scannedItem?.id;
     setIsScannerModalOpen(false);
-    if (existing) {
-      setPurchaseForm(prev => ({ ...prev, productId: existing._id || existing.id }));
-      showToast(`Found: ${existing.name}`, "success");
-    } else {
+    if (scannerContext === 'quick-add') {
+      applyExistingProductToQuickAdd(scannedItem);
+      showToast(`Loaded: ${scannedItem?.name || 'Product details'}`, "success");
+      return;
+    }
+    if (existingId) {
+      setPurchaseForm(prev => ({ ...prev, productId: existingId }));
+      showToast(`Found: ${scannedItem?.name || 'Product'}`, "success");
+      return;
+    }
+    const code = String(scannedItem?.hsn || scannedItem?.barcode || "").trim();
+    setProductForm(prev => ({ ...EMPTY_PRODUCT_FORM, ...prev, hsn: code }));
+    setIsProductModalOpen(true);
+    showToast("Scanned code added to product form.", "info");
+  }, [applyExistingProductToQuickAdd, scannerContext, showToast]);
+
+  const handleScanNotFound = useCallback((rawCode) => {
+    const code = String(rawCode || '').trim();
+    setIsScannerModalOpen(false);
+    if (!code) return;
+    if (scannerContext === 'quick-add') {
       setProductForm(prev => ({ ...prev, hsn: code }));
       setIsProductModalOpen(true);
-      showToast("Barcode detected.", "info");
+      showToast("New code detected. Fill product details to save.", "info");
+      return;
     }
-  };
+    setHasProductVariants(false);
+    setEditingProductVariantIndex(null);
+    setProductForm({ ...EMPTY_PRODUCT_FORM, hsn: code });
+    setIsProductModalOpen(true);
+    showToast("New product code detected. Add product details.", "info");
+  }, [scannerContext, showToast]);
 
   const filteredProducts = useMemo(() => inventory.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())), [inventory, searchTerm]);
   const filteredSuppliers = useMemo(() => suppliers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())), [suppliers, searchTerm]);
@@ -410,7 +482,8 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       });
     }
     exportRowsToExcel(rows, `supply-chain-${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`, 'SupplyChain');
-    showToast('Supply Chain report downloaded as Excel.', 'success');
+    const isAndroid = /android/i.test(window?.navigator?.userAgent || '');
+    showToast(isAndroid ? 'Report downloaded as CSV.' : 'Report downloaded as Excel.', 'success');
   }, [activeTab, filteredHistory, showToast, sortedInventory, suppliers]);
 
   const initialDataLoading = dataLoading && !hasLoadedOnce;
@@ -420,51 +493,136 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
-      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">
-              Supply <span className="text-indigo-500">Chain</span>
-            </h1>
-            <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">
-              Efficient Supply Management
-            </p>
-          </div>
+      <div className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl transition-colors ${headerBg} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
+        <header className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">
+                Supply <span className="text-indigo-500">Chain</span>
+              </h1>
+              <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]">
+                Fast Supply Ops
+              </p>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {activeTab === 'history' && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleDownloadReport}
-                className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
-                title="Download Supply Chain Report"
+                type="button"
+                onClick={() => setShowSupplyNavSection((prev) => !prev)}
+                className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                title={showSupplyNavSection ? 'Hide sections' : 'Show sections'}
+                aria-label={showSupplyNavSection ? 'Hide sections' : 'Show sections'}
               >
-                <span className="flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  <span className="hidden md:inline text-[10px] font-black tracking-[0.18em]">
-                    DOWNLOAD REPORT
-                  </span>
-                </span>
+                <Settings2 className="w-4 h-4" />
               </button>
-            )}
-            <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} flex p-1 rounded-xl border shadow-inner`}>
-            {[
-              { id: 'purchase', label: 'ADD STOCK', icon: PackageCheck },
-              { id: 'history', label: 'LOGS', icon: History },
-              { id: 'suppliers', label: 'SUPPLIERS', icon: Store }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-600')}`}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+        {showSupplyNavSection && (
+          <div className={`border-b px-4 md:px-8 py-3 ${darkMode ? 'bg-gray-950 border-slate-800/60' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="max-w-7xl mx-auto space-y-2">
+              <div className="flex items-center gap-2 min-w-0">
+              {activeTab === 'history' && (
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  className={`shrink-0 p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                  title="Download Supply Chain Report"
+                  aria-label="Download Supply Chain Report"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              )}
+              <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} min-w-0 flex-1 flex p-1 rounded-xl border shadow-inner`}>
+                {[
+                  { id: 'purchase', label: 'SUPPLYCHAIN', mobileLabel: 'SUPPLY', icon: PackageCheck },
+                  { id: 'history', label: 'HISTORY', mobileLabel: 'HISTORY', icon: History },
+                  { id: 'suppliers', label: 'VENDOR', mobileLabel: 'VENDOR', icon: Store }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 min-w-0 px-2 sm:px-4 py-2 rounded-lg text-[9px] sm:text-[10px] font-black tracking-wide sm:tracking-widest transition-all flex items-center justify-center gap-1 sm:gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-600')}`}
+                  >
+                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                    <span className="truncate hidden sm:inline">{tab.label}</span>
+                    <span className="truncate sm:hidden">{tab.mobileLabel}</span>
+                  </button>
+                ))}
+              </div>
+              {activeTab === 'history' && (
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryAdvancedFilters((prev) => !prev)}
+                  className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-[10px] font-black tracking-widest border transition-all inline-flex items-center gap-2 ${
+                    showHistoryAdvancedFilters
+                      ? 'bg-indigo-600 border-indigo-600 text-white'
+                      : (darkMode ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100')
+                  }`}
+                  aria-label={showHistoryAdvancedFilters ? 'Hide advanced filters' : 'Show advanced filters'}
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              </div>
+              {activeTab === 'history' && showHistoryAdvancedFilters && (
+                <div className={`rounded-xl border p-2 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={historyProductFilter}
+                      onChange={(e) => setHistoryProductFilter(e.target.value)}
+                      className={`w-full ${inputBase} ${dateTextColor} h-9 text-[9px] sm:text-[10px] font-bold tracking-wide px-2 rounded-lg outline-none border focus:border-indigo-500 transition-colors`}
+                    >
+                      <option value="all">Products</option>
+                      {historyProductOptions.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={historySupplierFilter}
+                      onChange={(e) => setHistorySupplierFilter(e.target.value)}
+                      className={`w-full ${inputBase} ${dateTextColor} h-9 text-[9px] sm:text-[10px] font-bold tracking-wide px-2 rounded-lg outline-none border focus:border-indigo-500 transition-colors`}
+                    >
+                      <option value="all">Vendors</option>
+                      {historySupplierOptions.map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedFilter === 'custom' && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="relative">
+                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10 pointer-events-none" />
+                        <input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className={`w-full ${inputBase} ${dateTextColor} h-9 text-[10px] font-black pl-8 pr-2 rounded-lg outline-none border focus:border-indigo-500 transition-colors`}
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
+                        />
+                      </div>
+                      <div className="relative">
+                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-500 z-10 pointer-events-none" />
+                        <input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className={`w-full ${inputBase} ${dateTextColor} h-9 text-[10px] font-black pl-8 pr-2 rounded-lg outline-none border focus:border-indigo-500 transition-colors`}
+                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
         {dataLoading && hasLoadedOnce ? (
@@ -477,7 +635,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               <form onSubmit={handlePurchaseSubmit}>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-[11px] font-black text-indigo-500 tracking-[0.2em] ">Arrival Entry</span>
-                  <button type="button" onClick={() => setIsScannerModalOpen(true)} className="flex items-center gap-2.5 px-3.5 py-2 bg-indigo-600/10 text-indigo-500 rounded-lg border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
+                  <button type="button" onClick={() => { setScannerContext('arrival'); setIsScannerModalOpen(true); }} className="flex items-center gap-2.5 px-3.5 py-2 bg-indigo-600/10 text-indigo-500 rounded-lg border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
                     <ScanLine className="w-4 h-4" />
                     <span className="text-[10px] font-black tracking-widest ">Scan Code</span>
                   </button>
@@ -597,17 +755,17 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
         )}
 
         {activeTab === 'history' && (
-          <div className="flex flex-col animate-in fade-in duration-500 space-y-6">
+          <div className="flex flex-col animate-in fade-in duration-500 space-y-4">
             {/* Filters first so KPIs below reflect selected range */}
             <section className={`${cardBase} rounded-2xl border p-4 md:p-6`}>
               <div className="space-y-3">
                 <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 xl:flex-1">
+                  <div className="grid grid-cols-5 gap-2 w-full xl:max-w-[640px]">
                     {DATE_FILTERS.map(f => (
                       <button
                         key={f.id}
                         onClick={() => setSelectedFilter(f.id)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
+                        className={`px-1 py-2 rounded-xl text-[10px] font-black tracking-wide transition-all border text-center leading-tight ${
                           selectedFilter === f.id
                             ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg'
                             : (darkMode
@@ -619,56 +777,6 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                       </button>
                     ))}
                   </div>
-                  {selectedFilter === 'custom' && (
-                    <div className="flex items-center gap-2 w-full xl:w-auto">
-                      <div className="relative flex-1 xl:w-40">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                        <input
-                          type="date"
-                          value={customStartDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
-                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                        />
-                      </div>
-                      <div className="relative flex-1 xl:w-40">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 pointer-events-none" />
-                        <input
-                          type="date"
-                          value={customEndDate}
-                          onChange={(e) => setCustomEndDate(e.target.value)}
-                          className={`w-full ${inputBase} ${dateTextColor} text-[16px] md:text-xs font-black p-2.5 pl-10 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
-                          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 md:ml-auto md:max-w-[430px]">
-                  <select
-                    value={historyProductFilter}
-                    onChange={(e) => setHistoryProductFilter(e.target.value)}
-                    className={`w-full ${inputBase} ${dateTextColor} text-[13px] md:text-xs font-black p-2.5 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
-                  >
-                    <option value="all">All Products</option>
-                    {historyProductOptions.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={historySupplierFilter}
-                    onChange={(e) => setHistorySupplierFilter(e.target.value)}
-                    className={`w-full ${inputBase} ${dateTextColor} text-[13px] md:text-xs font-black p-2.5 rounded-xl outline-none border focus:border-indigo-500 transition-colors`}
-                  >
-                    <option value="all">All Suppliers</option>
-                    {historySupplierOptions.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
             </section>
@@ -676,33 +784,26 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             {/* KPI Cards - Matching Dashboard Style */}
             <section className="grid grid-cols-2 gap-4">
               <div className={`p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
-                      Outlay Total
-                    </p>
-                    <h2 className="text-lg sm:text-2xl font-black text-emerald-400 leading-tight break-words">
-                      ₹{historyTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h2>
-                  </div>
-                  <div className="shrink-0 p-2.5 sm:p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
-                    <IndianRupee size={18} />
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                    Outlay Total
+                  </p>
+                  <h2
+                    className="text-base sm:text-xl font-black text-emerald-400 leading-tight break-all"
+                    title={`₹${historyTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  >
+                    ₹{historyTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h2>
                 </div>
               </div>
               <div className={`p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${cardBase}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
-                      Purchases
-                    </p>
-                    <h2 className="text-lg sm:text-2xl font-black text-indigo-400 leading-tight break-words">
-                      {filteredHistory.length}
-                    </h2>
-                  </div>
-                  <div className="shrink-0 p-2.5 sm:p-3 bg-indigo-500/10 rounded-xl text-indigo-500">
-                    <History size={18} />
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-slate-500 tracking-widest mb-1">
+                    Purchases
+                  </p>
+                  <h2 className="text-base sm:text-xl font-black text-indigo-400 leading-tight break-words">
+                    {filteredHistory.length}
+                  </h2>
                 </div>
               </div>
             </section>
@@ -852,16 +953,33 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-lg shadow-indigo-600/20">{s.name ? s.name[0] : 'V'}</div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditSupplier(s);
-                        }}
-                        className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all group/edit"
-                        aria-label="Edit supplier"
-                      >
-                        <Edit className="w-4 h-4 text-slate-400 group-hover/edit:text-indigo-500 transition-all" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditSupplier(s);
+                          }}
+                          className="p-2 hover:bg-indigo-500/10 rounded-xl transition-all group/edit"
+                          aria-label="Edit supplier"
+                        >
+                          <Edit className="w-4 h-4 text-slate-400 group-hover/edit:text-indigo-500 transition-all" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSupplier(s);
+                          }}
+                          disabled={deletingSupplierId === s._id}
+                          className="p-2 hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50"
+                          aria-label="Delete supplier"
+                        >
+                          {deletingSupplierId === s._id ? (
+                            <Loader className="w-4 h-4 animate-spin text-red-500" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500 transition-all" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <h4 className={`text-sm font-black truncate mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.name}</h4>
                     <div className={`flex items-center gap-3 pt-4 border-t ${darkMode ? 'border-slate-800/50' : 'border-slate-100'}`}>
@@ -1127,7 +1245,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   />
                   <button
                     type="button"
-                    onClick={() => setIsScannerModalOpen(true)}
+                    onClick={() => { setScannerContext('quick-add'); setIsScannerModalOpen(true); }}
                     className={`p-3 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} rounded-xl border hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500 transition-all`}
                     title="Scan Barcode"
                   >
@@ -1274,7 +1392,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               <button 
                 type="submit"
                 disabled={isActionLoading}
-                className={`w-full mt-2 py-3 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                className="w-full mt-2 py-3 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-500"
               >
                 {isActionLoading ? (
                   <>
@@ -1295,9 +1413,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             isOpen={isScannerModalOpen} 
             onClose={() => setIsScannerModalOpen(false)} 
             onScanSuccess={handleScanSuccess}
-            onScanNotFound={(code) => {
-                console.warn('Scanned item not found:', code);
-            }}
+            onScanNotFound={handleScanNotFound}
             onScanError={(error) => {
                 console.error('Scanner error:', error);
                 setIsScannerModalOpen(false);

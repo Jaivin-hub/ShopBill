@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Inventory = require('../models/Inventory');
 const Staff = require('../models/Staff');
@@ -119,6 +118,24 @@ router.put('/suppliers/:id', protect, async (req, res) => {
     }
 });
 
+router.delete('/suppliers/:id', protect, async (req, res) => {
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const deleted = await Supplier.findOneAndDelete({
+            _id: req.params.id,
+            storeId: req.user.storeId
+        });
+        if (!deleted) {
+            return res.status(404).json({ error: 'Supplier not found.' });
+        }
+        return res.json({ message: 'Supplier deleted successfully.' });
+    } catch (error) {
+        return res.status(500).json({ error: 'Failed to delete supplier.' });
+    }
+});
+
 // --- PURCHASE / PROCUREMENT ROUTES ---
 router.get('/purchases', protect, async (req, res) => {
     try {
@@ -143,68 +160,70 @@ router.get('/purchases', protect, async (req, res) => {
  * Updates stock AND triggers notifications.
  */
 router.post('/purchases', protect, async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
         if (!req.user.storeId) {
-            throw new Error('No active outlet selected. Please select an outlet first.');
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const { productId, supplierId, quantity, purchasePrice, invoiceNumber, date } = req.body;
         const storeId = req.user.storeId;
         const numQty = Number(quantity);
+        if (!Number.isFinite(numQty) || numQty < 1) {
+            return res.status(400).json({ error: 'Quantity must be at least 1.' });
+        }
 
-        // 1. Create Purchase Record
-        const purchase = await Purchase.create([{
-            storeId,
-            productId,
-            supplierId,
-            quantity: numQty,
-            purchasePrice: Number(purchasePrice),
-            invoiceNumber,
-            date: date || new Date()
-        }], { session });
-
-        // 2. Increment Inventory Stock
+        // No Mongo transaction: standalone MongoDB (no replica set) rejects transactions — that broke SCM purchases in production.
         const updatedItem = await Inventory.findOneAndUpdate(
             { _id: productId, storeId },
             { $inc: { quantity: numQty } },
-            { new: true, session }
+            { new: true }
         );
 
         if (!updatedItem) {
-            throw new Error('Product not found in inventory.');
+            return res.status(404).json({
+                error: 'Product not found in this outlet inventory. Refresh and pick a product from the current outlet.'
+            });
         }
 
-        await session.commitTransaction();
-        session.endSession();
+        let purchase;
+        try {
+            purchase = await Purchase.create({
+                storeId,
+                productId,
+                supplierId,
+                quantity: numQty,
+                purchasePrice: Number(purchasePrice),
+                invoiceNumber,
+                date: date || new Date()
+            });
+        } catch (createErr) {
+            await Inventory.findOneAndUpdate(
+                { _id: productId, storeId },
+                { $inc: { quantity: -numQty } }
+            );
+            throw createErr;
+        }
 
-        // 3. TRIGGER NOTIFICATIONS
-        // We pass 'numQty' to let the user know exactly how much was added in the alert.
         await handlePurchaseNotifications(req, updatedItem, numQty);
-        
-        // Send notification for purchase recording
+
         try {
             const actorNameWithRole = await getActorNameWithRole(req);
             await emitAlert(req, storeId, 'purchase_recorded', {
-                purchaseId: purchase[0]._id,
+                purchaseId: purchase._id,
                 itemId: updatedItem._id,
                 productName: updatedItem.name,
                 message: `Purchase of ${numQty} units of ${updatedItem.name} recorded by ${actorNameWithRole}`
             });
         } catch (err) {
-            console.error("❌ Error sending purchase notification:", err);
+            console.error('❌ Error sending purchase notification:', err);
         }
 
         res.status(201).json({
             message: 'Purchase recorded and stock updated.',
-            purchase: purchase[0],
+            purchase,
             newQuantity: updatedItem.quantity
         });
-
     } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
+        console.error('SCM purchase error:', error.message);
         res.status(500).json({ error: error.message || 'Failed to record purchase.' });
     }
 });

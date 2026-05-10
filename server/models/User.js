@@ -88,6 +88,9 @@ const UserSchema = new mongoose.Schema({
         updatedAt: { type: Date, default: Date.now }
     }],
 
+    /** When false, server must not send push and device-token registration is rejected. */
+    pushNotificationsEnabled: { type: Boolean, default: true },
+
     // Per-store last time user viewed "Recent Sales" in billing (for unseen count badge)
     salesLastReadAt: { type: mongoose.Schema.Types.Mixed, default: {} },
 

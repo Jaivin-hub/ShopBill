@@ -53,6 +53,34 @@ const StaffSchema = new Schema({
         autoPunchOutTime: { type: String, default: '' }, // HH:mm
         autoPunchOutEnabled: { type: Boolean, default: false }
     },
+    compensation: {
+        salaryMode: {
+            type: String,
+            enum: ['none', 'hourly', 'daily'],
+            default: 'none'
+        },
+        amount: {
+            type: Number,
+            default: 0,
+            min: 0
+        }
+    },
+    payrollSettlements: [{
+        month: { type: String, required: true }, // YYYY-MM
+        paid: { type: Boolean, default: false },
+        paidAt: { type: Date, default: null },
+        amount: { type: Number, default: 0 },
+        calculatedAmount: { type: Number, default: 0 },
+        carryForwardAmount: { type: Number, default: 0 },
+        carryForwardMonth: { type: String, default: '' },
+        notes: { type: String, default: '' },
+        attachmentUrl: { type: String, default: '' },
+        attachmentName: { type: String, default: '' },
+        attachmentType: { type: String, default: '' },
+        settledByUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        settledByName: { type: String, default: '' },
+        settledByRole: { type: String, default: '' }
+    }],
     // Status to enable/disable access without deletion
     active: {
         type: Boolean,

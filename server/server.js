@@ -26,6 +26,7 @@ const scmRoutes = require('./routes/scmRoutes');
 const outletRoutes = require('./routes/outletRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const offersRoutes = require('./routes/offersRoutes');
+const billDraftRoutes = require('./routes/billDraftRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -91,6 +92,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/bill-drafts', billDraftRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/attendance', require('./routes/attendanceRoutes'));

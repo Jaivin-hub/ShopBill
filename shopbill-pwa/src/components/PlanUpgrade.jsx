@@ -148,6 +148,23 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
     );
 };
 
+/** Optional plan patch for cached user, then hard-reload so UI (menus, premium, outlets) matches the server. */
+const reloadAppAfterSubscriptionChange = (planUpper = null) => {
+    if (planUpper) {
+        try {
+            const raw = localStorage.getItem('currentUser');
+            if (raw) {
+                const u = JSON.parse(raw);
+                u.plan = String(planUpper).toUpperCase();
+                localStorage.setItem('currentUser', JSON.stringify(u));
+            }
+        } catch (_) { /* ignore */ }
+    }
+    window.setTimeout(() => {
+        window.location.reload();
+    }, 450);
+};
+
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) => {
     const [currentPlan, setCurrentPlan] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
@@ -245,6 +262,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     const handleVerifyPlanChange = async (response, newPlanId) => {
         setIsUpgrading(true);
         setShowConfirmModal(false);
+        let reloadAfter = false;
         try {
             const verificationResponse = await apiClient.post(API.verifyPlanChange, {
                 razorpay_payment_id: response.razorpay_payment_id,
@@ -253,7 +271,8 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                 newPlan: newPlanId.toUpperCase(),
             });
             if (verificationResponse.data.success) {
-                showToast(`Provisioning ${newPlanId.toUpperCase()} Tier...`, 'success');
+                showToast(`Plan updated to ${newPlanId.toUpperCase()}. Refreshing app…`, 'success');
+                reloadAfter = true;
             } else {
                 showToast(verificationResponse.data.error || 'Verification failed.', 'error');
             }
@@ -261,7 +280,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
             showToast('Sync error. Contact support.', 'error');
         } finally {
             setIsUpgrading(false);
-            fetchPlanData();
+            if (!reloadAfter) fetchPlanData();
+        }
+        if (reloadAfter) {
+            reloadAppAfterSubscriptionChange(newPlanId);
         }
     };
 
@@ -313,17 +335,22 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
 
     const handleConfirmCancellation = async () => {
         setIsCancelling(true);
+        let reloadAfter = false;
         try {
             const response = await apiClient.post(API.cancelSubscription);
             if (response.data.success) {
-                showToast('Cancellation Logged.', 'success');
-                fetchPlanData();
+                showToast('Subscription updated. Refreshing app…', 'success');
+                reloadAfter = true;
             }
         } catch (error) {
             showToast('Cancellation failed.', 'error');
         } finally {
             setShowCancelModal(false);
             setIsCancelling(false);
+            if (!reloadAfter) fetchPlanData();
+        }
+        if (reloadAfter) {
+            reloadAppAfterSubscriptionChange();
         }
     };
 

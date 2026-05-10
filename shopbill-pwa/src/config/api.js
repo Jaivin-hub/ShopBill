@@ -33,6 +33,7 @@ const API = {
     uploadcloud: API_BASE_URL + '/auth/data/upload-to-cloud',
     currentPlan: API_BASE_URL + '/auth/current-plan',
     profile: API_BASE_URL + '/auth/profile',
+    pushPreferences: API_BASE_URL + '/user/push-preferences',
 
     // Staff Management Endpoints
     staff: API_BASE_URL + '/staff', // GET, POST
@@ -46,6 +47,9 @@ const API = {
     staffRolePermissions: API_BASE_URL + '/staff/role-permissions',
     staffAttendanceSettings: API_BASE_URL + '/staff/attendance-settings', // GET, PUT
     staffWorkScheduleUpdate: (id) => `${API_BASE_URL}/staff/${id}/work-schedule`, // PUT
+    staffPayrollSettlementUpdate: (id) => `${API_BASE_URL}/staff/${id}/payroll-settlement`, // PUT
+    staffPayrollAttachmentUpload: (id) => `${API_BASE_URL}/staff/${id}/payroll-attachment`, // POST multipart/form-data
+    staffPayrollStatement: API_BASE_URL + '/staff/payroll-statement', // GET, CSV download
     
     // Attendance/Punch In-Out Endpoints
     attendancePunchIn: API_BASE_URL + '/attendance/punch-in', // POST
@@ -62,6 +66,8 @@ const API = {
     inventory: API_BASE_URL + '/inventory',
     customers: API_BASE_URL + '/customers',
     sales: API_BASE_URL + '/sales',
+    billDrafts: API_BASE_URL + '/bill-drafts',
+    billDraftById: (id) => `${API_BASE_URL}/bill-drafts/${id}`,
     reportsSummary: API_BASE_URL + '/reports/summary',
     reportsChartData: API_BASE_URL + '/reports/chart-data',
     notificationalert: API_BASE_URL + '/notifications/alerts',
@@ -72,6 +78,7 @@ const API = {
     // 🚛 NEW: SUPPLY CHAIN MANAGEMENT (SCM) ENDPOINTS 🚛
     scmSuppliers: API_BASE_URL + '/scm/suppliers',    // GET (All Suppliers), POST (Add Supplier)
     scmSupplierUpdate: (id) => `${API_BASE_URL}/scm/suppliers/${id}`, // PUT (Update Supplier)
+    scmSupplierDelete: (id) => `${API_BASE_URL}/scm/suppliers/${id}`, // DELETE (Remove Supplier)
     scmPurchases: API_BASE_URL + '/scm/purchases',    // GET (Purchase History), POST (Record Purchase & Update Stock)
     // ------------------------------------------
 

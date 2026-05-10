@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgePercent, Calendar, ChevronDown, Plus, RefreshCw, Tag, Trash2 } from 'lucide-react';
+import { BadgePercent, Calendar, Plus, RefreshCw, Tag, Trash2, X } from 'lucide-react';
 import { OffersInitialSkeleton } from './skeletons/PageSkeletons';
+import ConfirmationModal from './ConfirmationModal';
 
 const OFFER_TYPES = [
   { id: 'product', label: 'Individual Product Offer' },
@@ -19,6 +20,12 @@ const emptyForm = {
   endDate: '',
 };
 
+const STATUS_TABS = [
+  { id: 'active', label: 'Active', icon: BadgePercent, accent: 'border-l-emerald-500', iconClass: 'text-emerald-500' },
+  { id: 'scheduled', label: 'Scheduled', icon: Calendar, accent: 'border-l-indigo-500', iconClass: 'text-indigo-500' },
+  { id: 'expired', label: 'Expired', icon: Tag, accent: 'border-l-amber-500', iconClass: 'text-amber-500' },
+];
+
 const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [offers, setOffers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -28,8 +35,16 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [offerBucket, setOfferBucket] = useState('active');
+  const [offerPendingDelete, setOfferPendingDelete] = useState(null);
 
   const canManage = ['owner', 'manager'].includes(String(userRole || '').toLowerCase());
+
+  const themeBase = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-slate-900';
+  const cardBase = darkMode ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
+  const subCardBase = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-100 border-slate-200';
+  const headerBase = darkMode ? 'bg-gray-950 border-gray-800/60' : 'bg-white border-slate-200 shadow-sm';
+  const inputBase = darkMode ? 'bg-gray-950 border-gray-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900';
+  const textMuted = darkMode ? 'text-slate-400' : 'text-slate-500';
 
   const fetchOffers = useCallback(async () => {
     setIsLoading(true);
@@ -82,6 +97,41 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     return { active, scheduled, expired };
   }, [offers]);
 
+  const tabCounts = useMemo(
+    () => ({
+      active: statusBuckets.active.length,
+      scheduled: statusBuckets.scheduled.length,
+      expired: statusBuckets.expired.length,
+    }),
+    [statusBuckets]
+  );
+
+  const emptyMessages = useMemo(
+    () => ({
+      active: 'No active offers. Create one or check Scheduled.',
+      scheduled: 'No upcoming offers scheduled.',
+      expired: 'No expired offers in history.',
+    }),
+    []
+  );
+
+  const currentList = statusBuckets[offerBucket] || [];
+  const currentTabMeta = STATUS_TABS.find((t) => t.id === offerBucket) || STATUS_TABS[0];
+  const TabIcon = currentTabMeta.icon;
+
+  const discountBadgeClass =
+    offerBucket === 'active'
+      ? darkMode
+        ? 'bg-emerald-500/15 text-emerald-400'
+        : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+      : offerBucket === 'scheduled'
+        ? darkMode
+          ? 'bg-indigo-500/15 text-indigo-300'
+          : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
+        : darkMode
+          ? 'bg-amber-500/12 text-amber-300'
+          : 'bg-amber-50 text-amber-900 border border-amber-200/80';
+
   const handleCreateOffer = async (e) => {
     e.preventDefault();
     if (!form.title.trim() || !form.startDate || !form.endDate || !form.discountValue) {
@@ -133,44 +183,10 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     }
   };
 
-  const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-  const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900';
-  const textMuted = darkMode ? 'text-slate-400' : 'text-slate-500';
-
-  const offerBuckets = useMemo(
-    () => [
-      {
-        id: 'active',
-        label: 'Active offers',
-        emptyLabel: 'No active offers.',
-        list: statusBuckets.active,
-        icon: BadgePercent,
-        iconClass: 'text-emerald-500',
-      },
-      {
-        id: 'scheduled',
-        label: 'Scheduled offers',
-        emptyLabel: 'No scheduled offers.',
-        list: statusBuckets.scheduled,
-        icon: Calendar,
-        iconClass: 'text-indigo-500',
-      },
-      {
-        id: 'expired',
-        label: 'Expired offers',
-        emptyLabel: 'No expired offers.',
-        list: statusBuckets.expired,
-        icon: Tag,
-        iconClass: 'text-amber-500',
-      },
-    ],
-    [statusBuckets]
-  );
-
   if (!canManage) {
     return (
-      <div className={`h-full flex items-center justify-center ${darkMode ? 'bg-gray-950 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
-        Access restricted.
+      <div className={`h-full flex items-center justify-center ${themeBase}`}>
+        <p className={`text-sm font-bold ${textMuted}`}>Access restricted.</p>
       </div>
     );
   }
@@ -179,137 +195,246 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     return <OffersInitialSkeleton darkMode={darkMode} />;
   }
 
-  const currentBucket = offerBuckets.find((b) => b.id === offerBucket) || offerBuckets[0];
-  const BucketIcon = currentBucket?.icon || BadgePercent;
-
   return (
-    <div className={`h-full min-h-0 overflow-y-auto px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        <section className={`${cardBase} border rounded-2xl p-5`}>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight">Offers <span className="text-indigo-500">Manager</span></h1>
-              <p className={`text-[10px] font-black tracking-[0.2em] mt-1 ${textMuted}`}>CREATE AND SCHEDULE STORE OFFERS</p>
+    <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
+      <header
+        className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-3 sm:px-4 md:px-8 pt-3 pb-3 md:py-4 border-b backdrop-blur-md ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}
+      >
+        <div className="max-w-7xl mx-auto space-y-3">
+          {/* Mobile: tight title row + full-width primary CTA; md+: inline actions */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 pr-2">
+              <h1 className={`text-lg sm:text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight leading-tight`}>
+                Store <span className="text-indigo-500">Offers</span>
+              </h1>
+              <p className="text-[9px] sm:text-[10px] text-gray-500 font-bold tracking-widest opacity-80 mt-0.5">Promotions &amp; pricing</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={() => setIsFormOpen((prev) => !prev)}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black tracking-widest flex items-center gap-2"
+                type="button"
+                onClick={fetchOffers}
+                disabled={isLoading}
+                className={`touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300' : 'bg-white border-slate-200 text-slate-600 shadow-sm'}`}
+                title="Refresh"
+                aria-label="Refresh offers"
               >
-                <Plus className="w-4 h-4" />
-                <span className="hidden lg:inline">{isFormOpen ? 'CLOSE FORM' : 'ADD NEW OFFER'}</span>
+                <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
-              <button onClick={fetchOffers} className={`p-2.5 rounded-xl border ${cardBase}`} title="Refresh offers">
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <button
+                type="button"
+                onClick={() => setIsFormOpen((prev) => !prev)}
+                className={`touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border transition-all active:scale-95 ${isFormOpen ? (darkMode ? 'bg-gray-900 border-gray-700 text-slate-200' : 'bg-slate-100 border-slate-300 text-slate-700') : 'bg-indigo-600 border-indigo-500 text-white shadow-sm hover:bg-indigo-500'}`}
+                title={isFormOpen ? 'Close form' : 'New offer'}
+                aria-label={isFormOpen ? 'Close offer form' : 'New offer'}
+              >
+                {isFormOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
               </button>
             </div>
           </div>
-        </section>
 
-        {isFormOpen && (
-          <section className={`${cardBase} border rounded-2xl p-5`}>
-            <h2 className="text-sm font-black tracking-widest mb-4 flex items-center gap-2"><Plus className="w-4 h-4 text-indigo-500" /> NEW OFFER</h2>
-            <form onSubmit={handleCreateOffer} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Offer title" className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`} />
-              <select value={form.offerType} onChange={(e) => setForm((p) => ({ ...p, offerType: e.target.value, productName: '' }))} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`}>
-                {OFFER_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
-              </select>
-              {form.offerType === 'product' && (
-                <select value={form.productName} onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`}>
-                  <option value="">Select product</option>
-                  {products.map((product) => (
-                    <option key={product._id || product.id} value={product._id || product.id}>
-                      {product.name}
+          {/* Mobile: 3-column tab grid (44px+ touch). Desktop: compact pill row */}
+          <div
+            role="tablist"
+            aria-label="Offer status"
+            className={`grid grid-cols-3 gap-1 p-1 rounded-xl border md:flex md:flex-nowrap md:overflow-x-auto md:no-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'}`}
+          >
+            {STATUS_TABS.map((tab) => {
+              const isActive = offerBucket === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setOfferBucket(tab.id)}
+                  className={`touch-manipulation flex items-center justify-center min-h-[44px] md:min-h-[40px] md:py-2 md:px-2 rounded-lg md:rounded-md transition-all font-bold text-[10px] md:text-[10px] md:tracking-tight md:whitespace-nowrap md:flex-1 ${isActive ? 'bg-indigo-600 text-white shadow-md' : darkMode ? 'text-gray-400 active:bg-gray-800' : 'text-slate-600 active:bg-white/80'}`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-20">
+          {isFormOpen && (
+            <section className={`${cardBase} rounded-2xl md:rounded-xl border p-4 md:p-5`}>
+              <h2 className="text-[10px] font-bold text-gray-500 tracking-widest mb-4 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-indigo-500" />
+                CREATE OFFER
+              </h2>
+              <form onSubmit={handleCreateOffer} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-3">
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="Offer title"
+                  className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                />
+                <select
+                  value={form.offerType}
+                  onChange={(e) => setForm((p) => ({ ...p, offerType: e.target.value, productName: '' }))}
+                  className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                >
+                  {OFFER_TYPES.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.label}
                     </option>
                   ))}
                 </select>
-              )}
-              <select value={form.discountType} onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value }))} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`}>
-                <option value="percentage">Percentage Discount</option>
-                <option value="flat">Flat Amount Discount</option>
-              </select>
-              <input type="number" step="0.01" min="0" value={form.discountValue} onChange={(e) => setForm((p) => ({ ...p, discountValue: e.target.value }))} placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount amount'} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`} />
-              <input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`} />
-              <input type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} className={`w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`} />
-              <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional description" rows={3} className={`md:col-span-2 w-full border rounded-xl p-3 text-sm font-bold ${inputBase}`} />
-              <button type="submit" disabled={isSaving} className="md:col-span-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black tracking-widest disabled:opacity-60">
-                {isSaving ? 'CREATING OFFER...' : 'CREATE OFFER'}
-              </button>
-            </form>
-          </section>
-        )}
-
-        <section className={`${cardBase} border rounded-2xl p-4 md:p-5`}>
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-            <h3 className="text-xs font-black tracking-widest flex items-center gap-2">
-              <BucketIcon className={`w-4 h-4 shrink-0 ${currentBucket?.iconClass || 'text-indigo-500'}`} />
-              OFFERS
-            </h3>
-            <div className="relative w-full sm:max-w-sm">
-              <label htmlFor="offers-bucket" className="sr-only">
-                Choose offer status
-              </label>
-              <select
-                id="offers-bucket"
-                value={offerBucket}
-                onChange={(e) => setOfferBucket(e.target.value)}
-                className={`w-full appearance-none cursor-pointer pl-4 pr-11 py-3 rounded-xl border text-xs font-black tracking-widest uppercase ${inputBase}`}
-              >
-                {offerBuckets.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label} ({b.list.length})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className={`pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${textMuted}`} aria-hidden />
-            </div>
-          </div>
-
-          {currentBucket.list.length === 0 ? (
-            <p className={`text-xs font-bold py-10 text-center ${textMuted}`}>{currentBucket.emptyLabel}</p>
-          ) : (
-            <div
-              className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 scroll-smooth custom-scrollbar"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              {currentBucket.list.map((offer) => (
-                <div
-                  key={offer._id || offer.id}
-                  className={`snap-center shrink-0 w-[min(100%,380px)] border rounded-xl p-4 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}
+                {form.offerType === 'product' && (
+                  <select
+                    value={form.productName}
+                    onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))}
+                    className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                  >
+                    <option value="">Select product</option>
+                    {products.map((product) => (
+                      <option key={product._id || product.id} value={product._id || product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  value={form.discountType}
+                  onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value }))}
+                  className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{offer.title}</p>
-                      <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
-                        {offer.offerType === 'product'
-                          ? `Product: ${offer.productName || '-'}`
-                          : offer.offerType === 'all_products'
-                            ? 'All products'
-                            : 'Custom offer'}
-                      </p>
-                      <p className={`text-[11px] font-bold mt-1 ${textMuted}`}>
-                        {offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `₹${offer.discountValue} off`} |{' '}
-                        {offer.startDate?.slice(0, 10)} to {offer.endDate?.slice(0, 10)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteOffer(offer._id || offer.id)}
-                      className="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10 shrink-0"
-                      title="Delete offer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <option value="percentage">Percentage discount</option>
+                  <option value="flat">Flat amount discount</option>
+                </select>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.discountValue}
+                  onChange={(e) => setForm((p) => ({ ...p, discountValue: e.target.value }))}
+                  placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount amount'}
+                  className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                />
+                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start date</label>
+                    <input
+                      type="date"
+                      value={form.startDate}
+                      onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
+                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End date</label>
+                    <input
+                      type="date"
+                      value={form.endDate}
+                      onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
+                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                    />
                   </div>
                 </div>
-              ))}
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                  placeholder="Optional description"
+                  rows={3}
+                  className={`md:col-span-2 w-full border rounded-xl p-3 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                />
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="touch-manipulation md:col-span-2 min-h-[48px] py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black tracking-widest disabled:opacity-60 transition-all active:scale-[0.99]"
+                >
+                  {isSaving ? 'Creating…' : 'Create offer'}
+                </button>
+              </form>
+            </section>
+          )}
+
+          <section className={`${cardBase} rounded-2xl md:rounded-xl border p-3 sm:p-4 md:p-5`}>
+            <div className="flex items-center gap-3 mb-3 md:mb-4">
+              <div className={`p-2.5 rounded-xl ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
+                <TabIcon className={`w-5 h-5 ${currentTabMeta.iconClass}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold text-gray-500 tracking-widest">{currentTabMeta.label.toUpperCase()}</p>
+                <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  {currentList.length} {currentList.length === 1 ? 'offer' : 'offers'}
+                </p>
+              </div>
             </div>
-          )}
-          {currentBucket.list.length > 1 && (
-            <p className={`md:hidden text-[10px] font-bold text-center mt-2 ${textMuted}`}>Swipe sideways to view more offers</p>
-          )}
-        </section>
+
+            {currentList.length === 0 ? (
+              <div className={`rounded-2xl border p-8 sm:p-10 text-center ${subCardBase}`}>
+                <TabIcon className={`w-12 h-12 mx-auto mb-4 opacity-35 ${currentTabMeta.iconClass}`} />
+                <p className={`text-sm font-bold leading-relaxed max-w-xs mx-auto ${textMuted}`}>{emptyMessages[offerBucket]}</p>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 list-none p-0 m-0">
+                {currentList.map((offer) => {
+                  const discountLabel =
+                    offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `₹${offer.discountValue} off`;
+                  const scopeLabel =
+                    offer.offerType === 'product'
+                      ? offer.productName || 'Product'
+                      : offer.offerType === 'all_products'
+                        ? 'All products'
+                        : 'Custom';
+                  return (
+                    <li key={offer._id || offer.id} className="min-w-0">
+                      <div
+                        className={`w-full border rounded-2xl p-4 border-l-[5px] transition-all ${currentTabMeta.accent} ${darkMode ? 'bg-gray-950/90 border-gray-800' : 'bg-white border-slate-200 shadow-sm'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black tracking-tight ${discountBadgeClass}`}>
+                                {discountLabel}
+                              </span>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider ${textMuted}`}>{scopeLabel}</span>
+                            </div>
+                            <p className={`text-base font-black leading-snug break-words ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {offer.title}
+                            </p>
+                            <p className={`text-[12px] font-semibold leading-relaxed ${textMuted}`}>
+                              {offer.startDate?.slice(0, 10)} → {offer.endDate?.slice(0, 10)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setOfferPendingDelete(offer)}
+                            className="touch-manipulation shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/15 transition-colors"
+                            title="Delete offer"
+                            aria-label={`Delete offer ${offer.title}`}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
+
+      {offerPendingDelete && (
+        <ConfirmationModal
+          darkMode={darkMode}
+          message={`Delete "${offerPendingDelete.title}" offer? This action cannot be undone.`}
+          confirmText="Delete offer"
+          cancelText="Cancel"
+          onCancel={() => setOfferPendingDelete(null)}
+          onConfirm={async () => {
+            const offerId = offerPendingDelete?._id || offerPendingDelete?.id;
+            await handleDeleteOffer(offerId);
+            setOfferPendingDelete(null);
+          }}
+        />
+      )}
     </div>
   );
 };

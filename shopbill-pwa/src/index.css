@@ -5,18 +5,31 @@
    ============================================ */
 html {
   height: 100%;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+@supports (min-height: 100dvh) {
+  html {
+    min-height: 100dvh;
+  }
+}
 body {
   height: 100%;
   min-height: 100%;
+  min-height: -webkit-fill-available;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   position: relative;
+}
+@supports (min-height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
 }
 #root {
   min-height: 100%;
@@ -26,6 +39,11 @@ body {
   flex-direction: column;
   isolation: isolate;
   min-width: 0;
+}
+@supports (min-height: 100dvh) {
+  #root {
+    min-height: 100dvh;
+  }
 }
 
 /* Single scroll container: only main content scrolls; prevents double scroll and layout jump */
@@ -40,11 +58,15 @@ body {
   min-width: 0;
 }
 
-/* Match body/html background to app theme - prevents white bar below content on checkout/login */
-html.dark, html.dark body, html.dark #root {
+/* Match html/body/#root to app theme — avoids exposed white when iOS resizes viewport / keyboard */
+html.dark,
+html.dark body,
+html.dark #root {
   background-color: #030712;
 }
-html:not(.dark) body, html:not(.dark) #root {
+html:not(.dark),
+html:not(.dark) body,
+html:not(.dark) #root {
   background-color: #f8fafc;
 }
 

@@ -24,11 +24,17 @@ const getActorNameWithRole = async (req) => {
     }
     
     // Format role for display
-    const roleDisplay = actorRole === 'owner' ? 'Owner' : 
-                       actorRole === 'Manager' ? 'Manager' : 
-                       actorRole === 'Cashier' ? 'Cashier' : 
+    const roleLower = String(actorRole || '').toLowerCase();
+    const roleDisplay = roleLower === 'owner' ? 'Owner' :
+                       actorRole === 'Manager' ? 'Manager' :
+                       actorRole === 'Cashier' ? 'Cashier' :
                        actorRole;
-    
+
+    // Owners: show role only (no email) e.g. "… stock updated by Owner (1 - Now: 7)"
+    if (roleLower === 'owner') {
+        return 'Owner';
+    }
+
     return `${actorName} (${roleDisplay})`;
 }; 
 
@@ -217,7 +223,6 @@ router.post('/', protect, async (req, res) => {
             ...cleanedData,
             storeId: req.user.storeId
         });
-        await checkAndNotifyLowStock(req, item);
 
         // Send notification for inventory addition
         try {
@@ -230,6 +235,7 @@ router.post('/', protect, async (req, res) => {
         } catch (err) {
             console.error("❌ Error sending inventory added notification:", err);
         }
+        await checkAndNotifyLowStock(req, item);
         
         res.json({ message: 'Item added successfully', item });
     } catch (error) {

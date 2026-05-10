@@ -17,7 +17,11 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
-        console.error('DEBUG: [401] Token missing in request headers');
+        if (process.env.LOG_MISSING_AUTH_TOKEN === '1') {
+            console.warn(
+                `[401] Missing Bearer token ${req.method} ${req.originalUrl || req.url || ''}`
+            );
+        }
         return res.status(401).json({ error: 'Not authorized, token missing or badly formatted.' });
     }
 

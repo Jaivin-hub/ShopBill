@@ -8,6 +8,24 @@ const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const sentReminderKeys = new Set();
 let isRunning = false;
 
+/** Wall-clock for shift times (HH:mm) — default India; override with ATTENDANCE_TZ (e.g. America/New_York). */
+const ATTENDANCE_TZ = process.env.ATTENDANCE_TZ || 'Asia/Kolkata';
+
+const formatDateKeyInTz = (date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: ATTENDANCE_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+
+const getClockMinutesInTz = (date) => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: ATTENDANCE_TZ,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(date);
+    const h = parseInt(parts.find((p) => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find((p) => p.type === 'minute').value, 10);
+    return h * 60 + m;
+};
+
 const timeToMinutes = (value) => {
     const t = String(value || '').trim();
     if (!HHMM_PATTERN.test(t)) return null;
@@ -15,19 +33,11 @@ const timeToMinutes = (value) => {
     return (h * 60) + m;
 };
 
-const resolveEffectiveSchedule = (storePolicy = {}, staffSchedule = {}) => {
-    const policyEnabled = storePolicy.enabled === true;
+const resolveEffectiveSchedule = (staffSchedule = {}) => {
     const shiftEnabled = staffSchedule.enabled === true;
-    const punchInStart = shiftEnabled ? (staffSchedule.punchInStart || '') : (storePolicy.defaultPunchInStart || '');
-    const punchInEnd = shiftEnabled ? (staffSchedule.punchInEnd || '') : (storePolicy.defaultPunchInEnd || '');
-    return { policyEnabled, shiftEnabled, punchInStart, punchInEnd };
-};
-
-const formatDateKey = (date) => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    const punchInStart = shiftEnabled ? (staffSchedule.punchInStart || '') : '';
+    const punchInEnd = shiftEnabled ? (staffSchedule.punchInEnd || '') : '';
+    return { shiftEnabled, punchInStart, punchInEnd };
 };
 
 const sendShiftReminderToStaff = async ({ io, userId, title, message, soundCategory = 'attendance' }) => {
@@ -48,7 +58,8 @@ const sendShiftReminderToStaff = async ({ io, userId, title, message, soundCateg
         io.to(`user_${userIdStr}`).emit('new_notification', payload);
     }
 
-    const user = await User.findById(userId).select('deviceTokens').lean();
+    const user = await User.findById(userId).select('deviceTokens pushNotificationsEnabled').lean();
+    if (user?.pushNotificationsEnabled === false) return;
     const tokens = (user?.deviceTokens || []).map((d) => d?.token).filter(Boolean);
     if (tokens.length > 0) {
         await sendPushNotification(tokens, {
@@ -66,13 +77,12 @@ const sendShiftReminderToStaff = async ({ io, userId, title, message, soundCateg
 };
 
 const processShiftNotifications = async ({ io, store, staffList, now }) => {
-    const storePolicy = store?.settings?.attendancePolicy || {};
-    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
-    const dateKey = formatDateKey(now);
+    const nowMinutes = getClockMinutesInTz(now);
+    const dateKey = formatDateKeyInTz(now);
 
     for (const staff of staffList) {
-        const effective = resolveEffectiveSchedule(storePolicy, staff?.workSchedule || {});
-        if (!effective.policyEnabled) continue;
+        const effective = resolveEffectiveSchedule(staff?.workSchedule || {});
+        if (!effective.shiftEnabled) continue;
         const startMins = timeToMinutes(effective.punchInStart);
         if (startMins == null) continue;
 
@@ -91,8 +101,8 @@ const processShiftNotifications = async ({ io, store, staffList, now }) => {
                 await sendShiftReminderToStaff({
                     io,
                     userId,
-                    title: 'Shift Reminder',
-                    message: `${staffName}${shiftLabel}: shift starts in 5 minutes.`
+                    title: 'Punch-in in 5 minutes',
+                    message: `${staffName}${shiftLabel}: punch-in starts in 5 minutes (at ${effective.punchInStart}).`
                 });
             }
         }
@@ -104,8 +114,8 @@ const processShiftNotifications = async ({ io, store, staffList, now }) => {
                 await sendShiftReminderToStaff({
                     io,
                     userId,
-                    title: 'Punch In Reminder',
-                    message: `${staffName}${shiftLabel}: your punch-in time has started. Please punch in now.`
+                    title: 'Punch-in time',
+                    message: `${staffName}${shiftLabel}: it is now your punch-in time (${effective.punchInStart}). Please punch in.`
                 });
             }
         }
@@ -113,7 +123,6 @@ const processShiftNotifications = async ({ io, store, staffList, now }) => {
 };
 
 const processAutoPunchOut = async ({ io, store, staffList, now }) => {
-    const storePolicy = store?.settings?.attendancePolicy || {};
     const staffById = new Map(staffList.map((s) => [String(s._id), s]));
     const activeAttendance = await Attendance.find({
         storeId: store._id,
@@ -124,8 +133,8 @@ const processAutoPunchOut = async ({ io, store, staffList, now }) => {
     for (const attendance of activeAttendance) {
         const staff = staffById.get(String(attendance.staffId));
         if (!staff) continue;
-        const effective = resolveEffectiveSchedule(storePolicy, staff?.workSchedule || {});
-        if (!effective.policyEnabled) continue;
+        const effective = resolveEffectiveSchedule(staff?.workSchedule || {});
+        if (!effective.shiftEnabled) continue;
         const endMins = timeToMinutes(effective.punchInEnd);
         if (endMins == null) continue;
 
@@ -174,9 +183,7 @@ const runAttendanceAutomation = async (io) => {
     isRunning = true;
     try {
         const now = new Date();
-        const stores = await Store.find({
-            'settings.attendancePolicy.enabled': true
-        }).select('settings.attendancePolicy ownerId');
+        const stores = await Store.find({ isActive: true }).select('_id');
 
         for (const store of stores) {
             const staffList = await Staff.find({

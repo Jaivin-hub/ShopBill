@@ -84,15 +84,6 @@ function normalizeSoundCategory(raw) {
     return ALLOWED_SOUND.has(s) ? s : 'default';
 }
 
-/** Android notification channel id (native/TWA; ignored on pure web). */
-function androidChannelForSound(soundCategory) {
-    if (soundCategory === 'chat') return 'pocketpos_chat';
-    if (soundCategory === 'alert') return 'pocketpos_alerts';
-    if (soundCategory === 'ledger') return 'pocketpos_ledger';
-    if (soundCategory === 'attendance') return 'pocketpos_attendance';
-    return 'pocketpos_default';
-}
-
 async function sendPushNotification(tokens, payload) {
     const fb = getAdmin();
     if (!fb) {
@@ -106,7 +97,6 @@ async function sendPushNotification(tokens, payload) {
     const deduped = [...new Set(tokens)];
     const { title, body, data = {}, soundCategory: rawSound = 'default' } = payload;
     const soundCategory = normalizeSoundCategory(rawSound);
-    const androidChannelId = androidChannelForSound(soundCategory);
     const ts = new Date().toISOString();
     const traceId = `push-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[Push][${traceId}] ${ts} firebaseAdmin.sendPushNotification: ${deduped.length} tokens | sound=${soundCategory} | title="${title}" | body="${(body || '').slice(0, 50)}..." | data=${JSON.stringify(data)}`);
@@ -133,57 +123,22 @@ async function sendPushNotification(tokens, payload) {
             soundCategory,
             link: normalizedData.link || linkPath,
         });
+        // Web Push: data + webpush.data only (no webpush.notification). If we set webpush.notification,
+        // Chrome Android often shows a system notification AND still delivers data to the SW — which then
+        // calls showNotification → duplicate. iOS Safari: one tray banner from the SW via showLocalPush only.
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
-            android: {
-                priority: 'high',
-                notification: {
-                    title,
-                    body,
-                    sound: 'default',
-                    channelId: androidChannelId,
-                    defaultSound: true,
-                    defaultVibrateTimings: true,
-                },
-                ttl: 60 * 60 * 1000
-            },
+            data: normalizedData,
             webpush: {
                 headers: {
                     Urgency: 'high',
-                    TTL: String(60 * 60 * 24), // 24h
+                    TTL: String(60 * 60 * 24),
                 },
                 data: webpushData,
-                notification: {
-                    title,
-                    body,
-                    icon: '/pwa-192x192.png',
-                    badge: '/pwa-192x192.png',
-                    requireInteraction: false,
-                    silent: false,
-                    tag: normalizedData.notificationId
-                        ? `pp-${soundCategory}-${normalizedData.notificationId}`
-                        : normalizedData.chatId
-                            ? `pp-chat-${normalizedData.chatId}`
-                            : `pp-${soundCategory}-${traceId.slice(-6)}`,
-                },
                 fcmOptions: {
                     link,
                 },
             },
-            apns: {
-                headers: {
-                    'apns-priority': '10',
-                    'apns-push-type': 'alert'
-                },
-                payload: {
-                    aps: {
-                        sound: 'default',
-                        badge: 1,
-                        contentAvailable: false
-                    }
-                },
-            },
-            data: normalizedData,
         });
         console.log(`[Push][${traceId}] ${new Date().toISOString()} firebaseAdmin RESULT: success=${result.successCount} failure=${result.failureCount} total=${deduped.length}`);
         const invalidTokens = [];

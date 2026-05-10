@@ -26,7 +26,7 @@ const DEFAULT_ROLE_PAGE_PERMISSIONS = {
         notifications: true,
         profile: true,
         settings: true,
-        staffPermissions: false
+        staffPermissions: true
     },
     cashier: {
         dashboard: true,
@@ -204,7 +204,8 @@ router.post('/login', async (req, res) => {
                     plan: effectivePlan, // Return effective plan (owner's plan for staff)
                     shopName: shopName, // Include registered business name
                     businessType: ownerAccount?.businessType || user.businessType || 'grocery',
-                    activeStoreId: activeStoreId || undefined
+                    activeStoreId: activeStoreId || undefined,
+                    pushNotificationsEnabled: user.pushNotificationsEnabled !== false
                 }
             });
         } else {
@@ -376,6 +377,7 @@ router.get('/profile', protect, async (req, res) => {
         let currency = user.currency || 'INR';
         let profileImageUrl = user.profileImageUrl;
         let businessType = user.businessType || 'grocery';
+        let profileName = user.name || '';
         let effectivePermissions = {
             reports: user.role === 'owner' || user.role === 'superadmin',
             pages: resolveRolePagePermissions({}, user.role)
@@ -396,7 +398,14 @@ router.get('/profile', protect, async (req, res) => {
                 address = store.address || user.address || '';
             }
         } else if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
-            // For staff members, get business details from owner (and from store so GST/address show)
+            const staffStoreId = req.user.storeId || req.user.activeStoreId;
+            const staffQuery = staffStoreId
+                ? { userId: user._id, storeId: staffStoreId }
+                : { userId: user._id };
+            const staffRecord = await Staff.findOne(staffQuery).select('name permissions role').lean();
+            if (staffRecord?.name) {
+                profileName = staffRecord.name;
+            }
             const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl businessType');
             if (businessDetails) {
                 shopName = businessDetails.shopName || shopName;
@@ -406,8 +415,6 @@ router.get('/profile', protect, async (req, res) => {
                 profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
                 businessType = businessDetails.businessType || businessType;
             }
-            // Staff work in a store: use store-specific business info for active outlet context
-            const staffStoreId = req.user.storeId || req.user.activeStoreId;
             if (staffStoreId) {
                 const store = await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).lean();
                 if (store) {
@@ -421,9 +428,13 @@ router.get('/profile', protect, async (req, res) => {
                 : null;
             const storeRolePermissions = staffStore?.settings?.rolePagePermissions || {};
             const rolePages = resolveRolePagePermissions(storeRolePermissions, user.role);
+            const mergedPages = { ...rolePages };
+            if (String(user.role).toLowerCase() === 'manager' && staffRecord?.permissions?.reports === true) {
+                mergedPages.reports = true;
+            }
             effectivePermissions = {
-                reports: rolePages.reports === true,
-                pages: rolePages
+                reports: mergedPages.reports === true,
+                pages: mergedPages
             };
         }
 
@@ -431,6 +442,7 @@ router.get('/profile', protect, async (req, res) => {
             success: true,
             user: {
                 id: user._id,
+                name: profileName,
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
@@ -446,7 +458,8 @@ router.get('/profile', protect, async (req, res) => {
                 plan: user.plan,
                 planEndDate: user.planEndDate,
                 businessType: businessType,
-                permissions: effectivePermissions
+                permissions: effectivePermissions,
+                pushNotificationsEnabled: user.pushNotificationsEnabled !== false
             }
         });
     } catch (error) {

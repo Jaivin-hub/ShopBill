@@ -10,7 +10,7 @@ import API from '../config/api';
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new';
 
-const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, darkMode, onAddNewCustomer, apiClient }) => {
+const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, darkMode, onAddNewCustomer, apiClient, customerPreset = null }) => {
     const dropdownRef = useRef(null);
     const [localSelectedCustomer, setLocalSelectedCustomer] = useState(WALK_IN_CUSTOMER);
     const [amountPaidInput, setAmountPaidInput] = useState('');
@@ -44,6 +44,22 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             setFormErrors({});
         }
     }, [isOpen, totalAmount]);
+
+    // Apply draft / parent-selected customer when opening settlement (does not reset on every totalAmount tick).
+    useEffect(() => {
+        if (!isOpen || !customerPreset || String(customerPreset.id) === 'walk_in') return;
+        const found = (allCustomers || []).find((c) => String(c._id || c.id) === String(customerPreset.id));
+        if (found) {
+            setLocalSelectedCustomer({ ...found, id: found._id || found.id });
+        } else {
+            setLocalSelectedCustomer({
+                id: customerPreset.id,
+                name: customerPreset.name || 'Customer',
+                outstandingCredit: customerPreset.outstandingCredit ?? 0,
+                creditLimit: customerPreset.creditLimit ?? 0,
+            });
+        }
+    }, [isOpen, customerPreset, allCustomers]);
 
     // Clear API credit error when user changes customer or payment (they may have fixed it)
     useEffect(() => {

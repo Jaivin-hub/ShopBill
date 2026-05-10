@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Truck, AlertTriangle, ShoppingCart, Users,
-    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download
+    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download, Settings2
 } from 'lucide-react';
 import SalesChart from './SalesChart';
 import { exportRowsToExcel } from '../utils/exportExcel';
@@ -68,6 +68,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const [purchases, setPurchases] = useState([]);
     const [showAllBestSellers, setShowAllBestSellers] = useState(false);
     const [allBestSellers, setAllBestSellers] = useState([]);
+    const [showAnalyticsHeaderControls, setShowAnalyticsHeaderControls] = useState(true);
     const handleOpenSalesHistory = useCallback(() => {
         try {
             if (typeof onOpenSalesHistory === 'function') {
@@ -244,13 +245,25 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
                 <div className="max-w-7xl mx-auto space-y-3">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                        <div>
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
                             <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight flex items-center gap-2 `}>
                                 Business <span className="text-indigo-500">Analytics</span>
                             </h1>
                             <p className="text-[10px] text-gray-500 font-bold tracking-widest  opacity-70">Store Intelligence Unit</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAnalyticsHeaderControls((prev) => !prev)}
+                                className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                                title={showAnalyticsHeaderControls ? 'Hide controls' : 'Show controls'}
+                                aria-label={showAnalyticsHeaderControls ? 'Hide controls' : 'Show controls'}
+                            >
+                                <Settings2 className="w-4 h-4" />
+                            </button>
                         </div>
 
+                        {showAnalyticsHeaderControls && (
                         <div className="flex items-center gap-2">
                             <div className={`flex overflow-x-auto no-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border flex-1 md:flex-none`}>
                                 {DATE_FILTERS.map(filter => (
@@ -287,10 +300,11 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                                 <Printer className="w-4 h-4" />
                             </button>
                         </div>
+                        )}
                     </div>
 
                     {/* ULTRA COMPACT SINGLE ROW CUSTOM RANGE */}
-                    {selectedFilter === 'custom' && (
+                    {showAnalyticsHeaderControls && selectedFilter === 'custom' && (
                         <div className={`flex items-center gap-1.5 p-1.5 rounded-xl border animate-in fade-in slide-in-from-top-1 duration-300 ${darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                             <div className="pl-1 hidden sm:block">
                                 <Calendar className="w-3.5 h-3.5 text-indigo-500" />

@@ -1,16 +1,35 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const crypto = require('crypto'); // REQUIRED: For secure token generation
+const multer = require('multer');
+const path = require('path');
 const Staff = require('../models/Staff');
 const User = require('../models/User'); // REQUIRED: To create a login account
 const Store = require('../models/Store');
 const Attendance = require('../models/Attendance');
 const Chat = require('../models/Chat');
+const { emitAlert } = require('./notificationRoutes');
 const { protect } = require('../middleware/authMiddleware');
 /** Staff mail: templates + queue only in utils/sendEmail.js */
 const sendEmail = require('../utils/sendEmail');
 
 const router = express.Router();
+
+const payrollAttachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, '../uploads/files'));
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const safeExt = ext || '.bin';
+        cb(null, `payroll-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
+    }
+});
+
+const payrollAttachmentUpload = multer({
+    storage: payrollAttachmentStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 const ROLE_PAGE_PERMISSION_KEYS = [
     'dashboard',
@@ -90,6 +109,37 @@ const normalizeTimeOrEmpty = (value) => {
     return HHMM_PATTERN.test(t) ? t : null;
 };
 
+const getNextMonthKey = (monthKey) => {
+    if (!/^\d{4}-\d{2}$/.test(String(monthKey || ''))) return '';
+    const [yearStr, monthStr] = String(monthKey).split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    if (!Number.isFinite(year) || !Number.isFinite(month)) return '';
+    const dt = new Date(year, month, 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+};
+
+async function resolveSettlementActorInfo(req) {
+    let actorName = req.user?.name || req.user?.email || 'User';
+    let actorRole = req.user?.role || 'User';
+    if (actorRole === 'Manager' || actorRole === 'Cashier') {
+        const staffRecord = await Staff.findOne({ userId: req.user._id }).select('name role').lean();
+        if (staffRecord) {
+            actorName = staffRecord.name || actorName;
+            actorRole = staffRecord.role || actorRole;
+        }
+    }
+    if (actorRole === 'owner') {
+        actorName = actorName || 'Owner';
+        actorRole = 'Owner';
+    }
+    return {
+        settledByUserId: req.user?._id || null,
+        settledByName: String(actorName || ''),
+        settledByRole: String(actorRole || '')
+    };
+}
+
 /** Only explicit `true` counts as active — fixes legacy docs missing `active` and avoids UI showing the wrong state. */
 function enrichStaffMember(staff) {
     if (!staff) return null;
@@ -103,7 +153,7 @@ function enrichStaffMember(staff) {
 
 async function enrichStaffById(staffId) {
     const staff = await Staff.findById(staffId)
-        .select('name email role phone active storeId userId permissions workSchedule')
+        .select('name email role phone active storeId userId permissions workSchedule compensation payrollSettlements')
         .populate('userId', 'resetPasswordToken')
         .lean();
     return enrichStaffMember(staff);
@@ -191,12 +241,145 @@ router.get('/', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const staffList = await Staff.find({ storeId: req.user.storeId })
-            .select('name email role phone active storeId userId permissions workSchedule')
+            .select('name email role phone active storeId userId permissions workSchedule compensation payrollSettlements')
             .populate('userId', 'resetPasswordToken')
             .lean()
             .sort({ role: -1, name: 1 });
-        
-        const enrichedStaffList = staffList.map((staff) => enrichStaffMember(staff));
+
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const staffIds = staffList.map((s) => s._id);
+        const monthlyAttendance = await Attendance.find({
+            storeId: new mongoose.Types.ObjectId(req.user.storeId),
+            staffId: { $in: staffIds },
+            date: { $gte: monthStart, $lt: nextMonthStart }
+        }).select('staffId status date punchIn punchOut workingHours overtimeMinutes shiftDurationMinutes totalBreakTime breaks').lean();
+        const attendanceByStaffId = new Map();
+        const getDateKey = (d) => {
+            const date = new Date(d);
+            return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+        };
+        const ensureBucket = (staffId) => {
+            const key = String(staffId);
+            if (!attendanceByStaffId.has(key)) {
+                attendanceByStaffId.set(key, { totalMinutes: 0, overtimeMinutes: 0, totalDays: 0, dayKeys: new Set() });
+            }
+            return attendanceByStaffId.get(key);
+        };
+        monthlyAttendance.forEach((record) => {
+            const bucket = ensureBucket(record.staffId);
+            if (record?.date) bucket.dayKeys.add(getDateKey(record.date));
+            if (record.status === 'completed') {
+                bucket.totalMinutes += Number(record.workingHours || 0);
+                bucket.overtimeMinutes += Number(record.overtimeMinutes || 0);
+                return;
+            }
+            if (record.status === 'active' && record.punchIn && !record.punchOut) {
+                const nowMs = Date.now();
+                const totalMins = Math.max(0, Math.round((nowMs - new Date(record.punchIn).getTime()) / 60000));
+                let breakMins = 0;
+                (record.breaks || []).forEach((breakItem) => {
+                    if (breakItem?.breakStart && breakItem?.breakEnd) {
+                        breakMins += Number(breakItem.breakDuration || 0);
+                    } else if (breakItem?.breakStart && !breakItem?.breakEnd) {
+                        breakMins += Math.max(0, Math.round((nowMs - new Date(breakItem.breakStart).getTime()) / 60000));
+                    }
+                });
+                const workedMinutes = Math.max(0, totalMins - breakMins);
+                bucket.totalMinutes += workedMinutes;
+                const shiftDuration = Number(record.shiftDurationMinutes || 0);
+                if (shiftDuration > 0) {
+                    bucket.overtimeMinutes += Math.max(0, workedMinutes - shiftDuration);
+                }
+            }
+        });
+        attendanceByStaffId.forEach((bucket) => {
+            bucket.totalDays = bucket.dayKeys.size;
+        });
+
+        const enrichedStaffList = staffList.map((staff) => {
+            const enriched = enrichStaffMember(staff);
+            const attendance = attendanceByStaffId.get(String(staff._id)) || { totalMinutes: 0, overtimeMinutes: 0, totalDays: 0 };
+            const salaryMode = String(staff?.compensation?.salaryMode || 'none');
+            const amount = Number(staff?.compensation?.amount || 0);
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const settlements = Array.isArray(staff?.payrollSettlements) ? staff.payrollSettlements : [];
+            const currentSettlement = settlements.find((s) => String(s?.month || '') === monthKey) || null;
+            const carryForwardIn = settlements.reduce((sum, s) => {
+                if (s?.paid !== true) return sum;
+                if (String(s?.carryForwardMonth || '') !== monthKey) return sum;
+                return sum + Number(s?.carryForwardAmount || 0);
+            }, 0);
+            let payableMinutes = Number(attendance.totalMinutes || 0);
+            let payableOvertimeMinutes = Number(attendance.overtimeMinutes || 0);
+            let payableDays = Number(attendance.totalDays || 0);
+            if (currentSettlement?.paid === true && currentSettlement?.paidAt) {
+                const paidAtMs = new Date(currentSettlement.paidAt).getTime();
+                let minutesAfterSettlement = 0;
+                let overtimeAfterSettlement = 0;
+                const dayKeysAfterSettlement = new Set();
+                monthlyAttendance.forEach((record) => {
+                    if (String(record?.staffId || '') !== String(staff?._id || '')) return;
+                    const recordTime = record?.punchOut || record?.punchIn || record?.date;
+                    if (!recordTime) return;
+                    const recordMs = new Date(recordTime).getTime();
+                    if (!Number.isFinite(recordMs) || recordMs <= paidAtMs) return;
+                    if (record?.date) dayKeysAfterSettlement.add(getDateKey(record.date));
+                    if (record.status === 'completed') {
+                        minutesAfterSettlement += Number(record.workingHours || 0);
+                        overtimeAfterSettlement += Number(record.overtimeMinutes || 0);
+                        return;
+                    }
+                    if (record.status === 'active' && record.punchIn && !record.punchOut) {
+                        const nowMs = Date.now();
+                        const totalMins = Math.max(0, Math.round((nowMs - new Date(record.punchIn).getTime()) / 60000));
+                        let breakMins = 0;
+                        (record.breaks || []).forEach((breakItem) => {
+                            if (breakItem?.breakStart && breakItem?.breakEnd) {
+                                breakMins += Number(breakItem.breakDuration || 0);
+                            } else if (breakItem?.breakStart && !breakItem?.breakEnd) {
+                                breakMins += Math.max(0, Math.round((nowMs - new Date(breakItem.breakStart).getTime()) / 60000));
+                            }
+                        });
+                        const workedMinutes = Math.max(0, totalMins - breakMins);
+                        minutesAfterSettlement += workedMinutes;
+                        const shiftDuration = Number(record.shiftDurationMinutes || 0);
+                        if (shiftDuration > 0) {
+                            overtimeAfterSettlement += Math.max(0, workedMinutes - shiftDuration);
+                        }
+                    }
+                });
+                payableMinutes = minutesAfterSettlement;
+                payableOvertimeMinutes = overtimeAfterSettlement;
+                payableDays = dayKeysAfterSettlement.size;
+            }
+            let totalSalary = 0;
+            if (salaryMode === 'hourly') {
+                totalSalary = (payableMinutes / 60) * amount;
+            } else if (salaryMode === 'daily') {
+                totalSalary = payableDays * amount;
+            }
+            totalSalary += Number(carryForwardIn || 0);
+            return {
+                ...enriched,
+                payrollSummary: {
+                    month: monthKey,
+                    totalMinutes: payableMinutes,
+                    overtimeMinutes: payableOvertimeMinutes,
+                    totalDays: payableDays,
+                    totalSalary: Math.round(totalSalary * 100) / 100,
+                    isSettled: currentSettlement?.paid === true && Math.round(totalSalary * 100) / 100 <= 0,
+                    settledAt: currentSettlement?.paidAt || null,
+                    attachmentUrl: currentSettlement?.attachmentUrl || '',
+                    attachmentName: currentSettlement?.attachmentName || '',
+                    attachmentType: currentSettlement?.attachmentType || '',
+                    settledByName: currentSettlement?.settledByName || '',
+                    settledByRole: currentSettlement?.settledByRole || '',
+                    carryForwardIn: Math.round(Number(carryForwardIn || 0) * 100) / 100
+                }
+            };
+        });
         
         console.log('[staffRoutes] ROUTE DONE GET /api/staff → 200', { count: enrichedStaffList.length });
         res.json(enrichedStaffList);
@@ -727,9 +910,9 @@ router.put('/:id/role', protect, async (req, res) => {
         body: req.body,
         userId: req.user?.id?.toString?.(),
     });
-    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
-        console.log('[staffRoutes] PUT /:id/role → 403 not owner/manager');
-        return res.status(403).json({ error: 'Access denied. Only owner or manager can change roles.' });
+    if (!isowner(req.user.role)) {
+        console.log('[staffRoutes] PUT /:id/role → 403 not owner');
+        return res.status(403).json({ error: 'Access denied. Only the store owner can change staff roles.' });
     }
 
     const { role: newRole } = req.body;
@@ -813,15 +996,6 @@ router.put('/:id', protect, async (req, res, next) => {
         }
         updateFields.name = nextName;
     }
-    if (nextRole != null) {
-        if (nextRole !== 'Manager' && nextRole !== 'Cashier') {
-            return res.status(400).json({ error: 'Invalid role. Must be Manager or Cashier.' });
-        }
-        updateFields.role = nextRole;
-    }
-    if (Object.keys(updateFields).length === 0) {
-        return res.status(400).json({ error: 'No valid fields provided for update.' });
-    }
 
     try {
         if (!req.user.storeId) {
@@ -833,6 +1007,23 @@ router.put('/:id', protect, async (req, res, next) => {
         }
         if (isowner(staffMember.role)) {
             return res.status(400).json({ error: 'Owner account cannot be edited from team management.' });
+        }
+
+        if (nextRole != null) {
+            if (!isowner(req.user.role)) {
+                if (nextRole !== staffMember.role) {
+                    return res.status(403).json({ error: 'Only the store owner can change staff roles.' });
+                }
+            } else {
+                if (nextRole !== 'Manager' && nextRole !== 'Cashier') {
+                    return res.status(400).json({ error: 'Invalid role. Must be Manager or Cashier.' });
+                }
+                updateFields.role = nextRole;
+            }
+        }
+
+        if (Object.keys(updateFields).length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update.' });
         }
 
         const updatedStaff = await Staff.findByIdAndUpdate(
@@ -1055,6 +1246,99 @@ router.put('/attendance-settings', protect, async (req, res) => {
 });
 
 // ====================================================================
+// @route   GET /api/staff/payroll-statement
+// @desc    Get or download settled payroll statement for outlet
+// @access  Private (owner/manager)
+// ====================================================================
+router.get('/payroll-statement', protect, async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can view payroll statement.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const monthFilter = String(req.query?.month || '').trim();
+        const wantsCsv = String(req.query?.format || '').toLowerCase() === 'csv';
+        const staffList = await Staff.find({ storeId: req.user.storeId })
+            .select('name role compensation payrollSettlements')
+            .lean();
+        const rows = [];
+        staffList.forEach((member) => {
+            const settlements = Array.isArray(member?.payrollSettlements) ? member.payrollSettlements : [];
+            settlements.forEach((entry) => {
+                if (entry?.paid !== true) return;
+                const month = String(entry?.month || '');
+                if (monthFilter && month !== monthFilter) return;
+                rows.push({
+                    staffId: String(member?._id || ''),
+                    staffName: member?.name || 'Unknown',
+                    role: member?.role || 'Unknown',
+                    salaryMode: member?.compensation?.salaryMode || 'none',
+                    amount: Number(entry?.amount || 0),
+                    month,
+                    paidAt: entry?.paidAt ? new Date(entry.paidAt).toISOString() : '',
+                    notes: String(entry?.notes || ''),
+                    calculatedAmount: Number(entry?.calculatedAmount || 0),
+                    carryForwardAmount: Number(entry?.carryForwardAmount || 0),
+                    carryForwardMonth: String(entry?.carryForwardMonth || ''),
+                    attachmentUrl: String(entry?.attachmentUrl || ''),
+                    attachmentName: String(entry?.attachmentName || ''),
+                    attachmentType: String(entry?.attachmentType || ''),
+                    settledByName: String(entry?.settledByName || ''),
+                    settledByRole: String(entry?.settledByRole || '')
+                });
+            });
+        });
+        rows.sort((a, b) => new Date(b.paidAt || 0) - new Date(a.paidAt || 0));
+
+        if (wantsCsv) {
+            const headers = ['Staff Name', 'Role', 'Salary Mode', 'Month', 'Calculated Amount', 'Paid Amount', 'Carry Forward', 'Carry Forward Month', 'Paid At', 'Settled By Name', 'Settled By Role', 'Notes'];
+            const escapeCsv = (value) => {
+                const v = String(value ?? '');
+                if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+                return v;
+            };
+            const csvLines = [
+                headers.join(','),
+                ...rows.map((row) => [
+                    escapeCsv(row.staffName),
+                    escapeCsv(row.role),
+                    escapeCsv(row.salaryMode),
+                    escapeCsv(row.month),
+                    escapeCsv(row.calculatedAmount.toFixed(2)),
+                    escapeCsv(row.amount.toFixed(2)),
+                    escapeCsv(row.carryForwardAmount.toFixed(2)),
+                    escapeCsv(row.carryForwardMonth),
+                    escapeCsv(row.paidAt),
+                    escapeCsv(row.settledByName),
+                    escapeCsv(row.settledByRole),
+                    escapeCsv(row.notes)
+                ].join(','))
+            ];
+            const csv = csvLines.join('\n');
+            const fileSuffix = monthFilter || 'all-months';
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="payroll-statement-${fileSuffix}.csv"`);
+            return res.status(200).send(csv);
+        }
+
+        const totalPaid = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        return res.json({
+            success: true,
+            rows,
+            summary: {
+                totalEntries: rows.length,
+                totalPaid: Math.round(totalPaid * 100) / 100
+            }
+        });
+    } catch (error) {
+        console.error('Payroll statement fetch error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch payroll statement.' });
+    }
+});
+
+// ====================================================================
 // @route   PUT /api/staff/:id/work-schedule
 // @desc    Update per-staff shift schedule override (owner/manager)
 // @access  Private (owner/manager)
@@ -1076,8 +1360,17 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
         const punchInStart = normalizeTimeOrEmpty(body.punchInStart);
         const punchInEnd = normalizeTimeOrEmpty(body.punchInEnd);
         const autoPunchOutTime = normalizeTimeOrEmpty(body.autoPunchOutTime);
+        const salaryModeRaw = String(body.salaryMode || 'none').toLowerCase();
+        const salaryMode = ['none', 'hourly', 'daily'].includes(salaryModeRaw) ? salaryModeRaw : null;
+        const salaryAmount = Number(body.salaryAmount || 0);
         if (punchInStart === null || punchInEnd === null || autoPunchOutTime === null) {
             return res.status(400).json({ error: 'Invalid time format. Use HH:mm (24h).' });
+        }
+        if (!salaryMode) {
+            return res.status(400).json({ error: 'Invalid salary mode.' });
+        }
+        if (!Number.isFinite(salaryAmount) || salaryAmount < 0) {
+            return res.status(400).json({ error: 'Salary amount must be 0 or more.' });
         }
         staffMember.workSchedule = {
             enabled: body.enabled === true,
@@ -1087,12 +1380,164 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
             autoPunchOutTime: punchInEnd || '',
             autoPunchOutEnabled: true
         };
+        staffMember.compensation = {
+            salaryMode,
+            amount: salaryAmount
+        };
         await staffMember.save();
+
+        const ws = staffMember.workSchedule;
+        let shiftMessage;
+        if (!ws.enabled) {
+            shiftMessage = 'Shift schedule was turned off for your account. Punch-in reminders will not be sent until a shift is enabled again.';
+        } else {
+            const namePart = ws.shiftName ? `${ws.shiftName}: ` : '';
+            const endDisp = (ws.autoPunchOutTime || ws.punchInEnd || '').trim();
+            shiftMessage =
+                `${namePart}Punch-in window ${ws.punchInStart}–${ws.punchInEnd}. ` +
+                (endDisp ? `Shift end / auto punch-out ${endDisp}. ` : '') +
+                `You will get app reminders 5 minutes before punch-in (${ws.punchInStart}) and when punch-in time begins.`;
+        }
+        if (staffMember.userId) {
+            try {
+                await emitAlert(req, req.user.storeId, 'staff_shift_assigned', {
+                    message: shiftMessage,
+                    staffId: staffMember._id,
+                    targetUserId: staffMember.userId
+                });
+            } catch (notifyErr) {
+                console.error('Staff shift notification error:', notifyErr.message);
+            }
+        }
+
         const refreshed = await enrichStaffById(staffMember._id);
         return res.json({ success: true, message: 'Work schedule updated.', staff: refreshed });
     } catch (error) {
         console.error('Work schedule update error:', error.message);
         return res.status(500).json({ error: 'Failed to update work schedule.' });
+    }
+});
+
+// ====================================================================
+// @route   PUT /api/staff/:id/payroll-settlement
+// @desc    Mark payroll settled/unsettled for a month (owner/manager)
+// @access  Private (owner/manager)
+// ====================================================================
+router.put('/:id/payroll-settlement', protect, async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can update payroll settlement.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: req.params.id, storeId: req.user.storeId });
+        if (!staffMember) return res.status(404).json({ error: 'Staff member not found.' });
+        if (isowner(staffMember.role)) {
+            return res.status(400).json({ error: 'Owner payroll settlement cannot be changed here.' });
+        }
+
+        const body = req.body || {};
+        const month = String(body.month || '').trim();
+        const paid = body.paid === true;
+        const amount = Number(body.amount || 0);
+        const calculatedAmountRaw = Number(body.calculatedAmount ?? body.amount ?? 0);
+        if (!/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({ error: 'Invalid month format. Use YYYY-MM.' });
+        }
+        if (!Number.isFinite(amount) || amount < 0) {
+            return res.status(400).json({ error: 'Invalid settlement amount.' });
+        }
+        if (!Number.isFinite(calculatedAmountRaw) || calculatedAmountRaw < 0) {
+            return res.status(400).json({ error: 'Invalid calculated salary amount.' });
+        }
+
+        const settlements = Array.isArray(staffMember.payrollSettlements) ? [...staffMember.payrollSettlements] : [];
+        const idx = settlements.findIndex((s) => String(s.month) === month);
+        const actorInfo = await resolveSettlementActorInfo(req);
+        const calculatedAmount = Math.round(calculatedAmountRaw * 100) / 100;
+        const paidAmount = Math.round(amount * 100) / 100;
+        const carryForwardAmount = paid
+            ? Math.max(0, Math.round((calculatedAmount - paidAmount) * 100) / 100)
+            : 0;
+        const carryForwardMonth = carryForwardAmount > 0 ? getNextMonthKey(month) : '';
+        const nextEntry = {
+            month,
+            paid,
+            amount: paidAmount,
+            calculatedAmount: paid ? calculatedAmount : 0,
+            carryForwardAmount,
+            carryForwardMonth,
+            paidAt: paid ? new Date() : null,
+            notes: String(body.notes || ''),
+            attachmentUrl: paid ? String(body.attachmentUrl || '') : '',
+            attachmentName: paid ? String(body.attachmentName || '') : '',
+            attachmentType: paid ? String(body.attachmentType || '') : '',
+            settledByUserId: paid ? actorInfo.settledByUserId : null,
+            settledByName: paid ? actorInfo.settledByName : '',
+            settledByRole: paid ? actorInfo.settledByRole : ''
+        };
+        if (idx >= 0) settlements[idx] = nextEntry;
+        else settlements.push(nextEntry);
+
+        staffMember.payrollSettlements = settlements;
+        await staffMember.save();
+        if (paid === true) {
+            try {
+                const actorName = actorInfo?.settledByName || req.user?.name || req.user?.email || 'User';
+                const actorRole = actorInfo?.settledByRole || req.user?.role || 'User';
+                await emitAlert(req, req.user.storeId, 'payroll_settlement_marked', {
+                    staffId: String(staffMember._id || ''),
+                    staffName: staffMember.name || 'Staff',
+                    month,
+                    amount: paidAmount,
+                    actorName,
+                    actorRole,
+                    message: carryForwardAmount > 0
+                        ? `${actorName} (${actorRole}) settled Rs ${paidAmount.toLocaleString('en-IN')} for ${staffMember.name || 'staff'} (${month}). Remaining Rs ${carryForwardAmount.toLocaleString('en-IN')} moved to ${carryForwardMonth}.`
+                        : `${actorName} (${actorRole}) marked payroll settlement for ${staffMember.name || 'staff'} for ${month}.`
+                });
+            } catch (notifError) {
+                console.error('Payroll settlement notification error:', notifError.message);
+            }
+        }
+        const refreshed = await enrichStaffById(staffMember._id);
+        return res.json({ success: true, message: 'Payroll settlement updated.', staff: refreshed });
+    } catch (error) {
+        console.error('Payroll settlement update error:', error.message);
+        return res.status(500).json({ error: 'Failed to update payroll settlement.' });
+    }
+});
+
+// ====================================================================
+// @route   POST /api/staff/:id/payroll-attachment
+// @desc    Upload optional payroll settlement attachment (owner/manager)
+// @access  Private (owner/manager)
+// ====================================================================
+router.post('/:id/payroll-attachment', protect, payrollAttachmentUpload.single('attachment'), async (req, res) => {
+    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
+        return res.status(403).json({ error: 'Access denied. Only owner or manager can upload payroll attachments.' });
+    }
+    try {
+        if (!req.user.storeId) {
+            return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        }
+        const staffMember = await Staff.findOne({ _id: req.params.id, storeId: req.user.storeId }).select('_id').lean();
+        if (!staffMember) return res.status(404).json({ error: 'Staff member not found.' });
+        if (!req.file) return res.status(400).json({ error: 'Attachment file is required.' });
+
+        const filePath = `/uploads/files/${req.file.filename}`;
+        const fileUrl = `${req.protocol}://${req.get('host')}${filePath}`;
+        return res.json({
+            success: true,
+            attachmentUrl: fileUrl,
+            attachmentPath: filePath,
+            attachmentName: String(req.file.originalname || ''),
+            attachmentType: String(req.file.mimetype || '')
+        });
+    } catch (error) {
+        console.error('Payroll attachment upload error:', error.message);
+        return res.status(500).json({ error: 'Failed to upload payroll attachment.' });
     }
 });
 

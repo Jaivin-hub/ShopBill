@@ -7,6 +7,33 @@ const { getAdmin, sendPushNotification } = require('../services/firebaseAdmin');
 const router = express.Router();
 
 /**
+ * @route PUT /api/user/push-preferences
+ * @desc Enable or disable push notifications for this account (clears tokens when disabled).
+ * @access Private
+ */
+router.put('/push-preferences', protect, async (req, res) => {
+    try {
+        const enabled = Boolean(req.body?.enabled);
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found.' });
+        }
+        user.pushNotificationsEnabled = enabled;
+        if (!enabled) {
+            user.deviceTokens = [];
+        }
+        await user.save();
+        res.json({
+            success: true,
+            pushNotificationsEnabled: user.pushNotificationsEnabled,
+        });
+    } catch (error) {
+        console.error('Push preferences error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update push preferences.' });
+    }
+});
+
+/**
  * @route PUT /api/user/plan
  * @desc Update user's subscription plan (Owner only)
  * @access Private (Owner only)
@@ -80,22 +107,52 @@ router.post('/device-token', protect, async (req, res) => {
             return res.status(400).json({ error: 'Device token is required.' });
         }
         console.log(`[Push] ${ts()} device-token incoming platform=${platform} tokenLength=${token.length} tokenTail=...${token.slice(-12)}`);
-        const user = await User.findById(req.user.id);
+        const userId = req.user.id;
+        const user = await User.findById(userId).select('_id pushNotificationsEnabled');
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
-        const deviceTokens = user.deviceTokens || [];
-        const existing = deviceTokens.findIndex(d => d.token === token);
-        const now = new Date();
-        if (existing >= 0) {
-            deviceTokens[existing].platform = platform;
-            deviceTokens[existing].updatedAt = now;
-        } else {
-            deviceTokens.push({ token, platform, updatedAt: now });
+        if (user.pushNotificationsEnabled === false) {
+            return res.status(403).json({
+                success: false,
+                error: 'Push notifications are turned off in Settings. Enable them to register this device.',
+            });
         }
-        user.deviceTokens = deviceTokens;
-        await user.save();
-        console.log(`[Push] ${ts()} Device token REGISTERED user=${req.user.id} platform=${platform} total=${deviceTokens.length} tokenTail=...${token.slice(-12)}`);
+        const now = new Date();
+        // Atomic update avoids VersionError when push registration races with profile/sync saves.
+        const MAX_TOKENS = 25;
+        const result = await User.collection.updateOne(
+            { _id: user._id },
+            [
+                {
+                    $set: {
+                        deviceTokens: {
+                            $slice: [
+                                {
+                                    $concatArrays: [
+                                        {
+                                            $filter: {
+                                                input: { $ifNull: ['$deviceTokens', []] },
+                                                as: 't',
+                                                cond: { $ne: ['$$t.token', token] }
+                                            }
+                                        },
+                                        [{ token, platform, updatedAt: now }]
+                                    ]
+                                },
+                                -MAX_TOKENS
+                            ]
+                        }
+                    }
+                }
+            ]
+        );
+        if (!result.matchedCount) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        const after = await User.findById(userId).select('deviceTokens').lean();
+        const total = Array.isArray(after?.deviceTokens) ? after.deviceTokens.length : 0;
+        console.log(`[Push] ${ts()} Device token REGISTERED user=${userId} platform=${platform} total=${total} tokenTail=...${token.slice(-12)}`);
         res.json({ success: true });
     } catch (error) {
         console.error('Device Token Error:', error);
@@ -182,8 +239,11 @@ router.post('/device-token/test', async (req, res) => {
         if (!userId) {
             return res.status(400).json({ error: 'userId is required in body, query (?userId=...), or x-user-id header.' });
         }
-        const user = await User.findById(userId).select('deviceTokens email role').lean();
+        const user = await User.findById(userId).select('deviceTokens email role pushNotificationsEnabled').lean();
         if (!user) return res.status(404).json({ error: 'User not found.' });
+        if (user.pushNotificationsEnabled === false) {
+            return res.status(403).json({ error: 'Push notifications are disabled for this user in Settings.' });
+        }
 
         const tokens = [...new Set((user.deviceTokens || []).map(d => d.token).filter(Boolean))];
         if (tokens.length === 0) {

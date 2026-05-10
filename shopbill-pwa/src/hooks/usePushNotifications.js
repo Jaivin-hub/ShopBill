@@ -2,6 +2,7 @@
  * Hook to request push notification permission and register FCM token.
  * On desktop: auto-request after short delay.
  * On mobile (iOS): requires user gesture - handled by pushOnGesture on first tap.
+ * Respects Settings: when pushNotificationsEnabled is false, does not register.
  */
 import { useEffect, useRef } from 'react';
 import { requestNotificationPermissionAndToken, isPushSupported, ensureFcmServiceWorkerReady } from '../lib/firebase';
@@ -15,14 +16,30 @@ const isAndroid = () => /Android/i.test(navigator.userAgent);
 /**
  * @param {boolean} enabled — e.g. !!currentUser
  * @param {string|undefined} userKey — user id; when it changes, token is re-posted for the new account
+ * @param {boolean|undefined} pushNotificationsEnabled — from server / Settings; false disables registration
  */
-export function usePushNotifications(enabled, userKey) {
+export function usePushNotifications(enabled, userKey, pushNotificationsEnabled) {
   /** Last FCM token POSTed to API this session (token refresh must re-register). */
   const lastPostedTokenRef = useRef('');
   const lastUserKeyRef = useRef('');
+  const prevPreferenceRef = useRef(null);
+
+  const preferenceAllowsPush = pushNotificationsEnabled !== false;
+
+  useEffect(() => {
+    const wasOff = prevPreferenceRef.current === false;
+    prevPreferenceRef.current = preferenceAllowsPush;
+    if (preferenceAllowsPush && wasOff) {
+      lastPostedTokenRef.current = '';
+    }
+  }, [preferenceAllowsPush]);
 
   useEffect(() => {
     if (!enabled) {
+      return;
+    }
+    if (!preferenceAllowsPush) {
+      console.log('[Push][Hook] Skipping: push disabled in Settings');
       return;
     }
     if (!isPushConfigured()) {
@@ -42,8 +59,7 @@ export function usePushNotifications(enabled, userKey) {
     let cancelled = false;
     const attempt = async () => {
       try {
-        if (!(await isPushSupported()) || cancelled) {
-          console.log('[Push][Hook] Attempt skipped: unsupported or cancelled');
+        if (!preferenceAllowsPush || !(await isPushSupported()) || cancelled) {
           return;
         }
         console.log(`[Push][Hook] Notification.permission=${Notification.permission}`);
@@ -60,7 +76,6 @@ export function usePushNotifications(enabled, userKey) {
             console.warn('[Push][Hook] Could not read service worker registrations:', swErr?.message || swErr);
           }
         }
-        // iOS must request permission from user gesture; Android can request directly.
         if (isIOS() && Notification.permission !== 'granted') {
           console.log(`[Push][Hook] iOS permission not granted yet (${Notification.permission}), waiting for gesture`);
           return;
@@ -108,9 +123,8 @@ export function usePushNotifications(enabled, userKey) {
     ];
     let interval = null;
     let retryCount = 0;
-    // Keep retrying in background for delayed iOS SW/token readiness.
     interval = setInterval(() => {
-      if (cancelled || lastPostedTokenRef.current || retryCount >= 5) {
+      if (cancelled || lastPostedTokenRef.current || retryCount >= 5 || !preferenceAllowsPush) {
         if (interval) clearInterval(interval);
         return;
       }
@@ -119,7 +133,7 @@ export function usePushNotifications(enabled, userKey) {
     }, 30000);
 
     const onVisibleOrFocus = () => {
-      if (cancelled || lastPostedTokenRef.current) return;
+      if (cancelled || lastPostedTokenRef.current || !preferenceAllowsPush) return;
       if (document.visibilityState === 'visible') attempt();
     };
     window.addEventListener('focus', onVisibleOrFocus);
@@ -132,5 +146,5 @@ export function usePushNotifications(enabled, userKey) {
       window.removeEventListener('focus', onVisibleOrFocus);
       document.removeEventListener('visibilitychange', onVisibleOrFocus);
     };
-  }, [enabled, userKey]);
+  }, [enabled, userKey, preferenceAllowsPush]);
 }

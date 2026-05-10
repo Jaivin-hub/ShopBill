@@ -40,6 +40,7 @@ const NotificationSchema = new mongoose.Schema({
             'attendance_break_start',
             'attendance_break_end',
             'attendance_punch_out',
+            'staff_shift_assigned',
             'system', 
             'success', 
             'system_update',
@@ -49,6 +50,13 @@ const NotificationSchema = new mongoose.Schema({
             'new_shop_registered'
         ], 
         required: true 
+    },
+    // When set, only this user (and matching public queries) should see the alert — used for per-staff messages.
+    recipientUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+        index: true
     },
     // When true, this notification is for superadmins (e.g. new shop registered)
     forSuperAdmin: { type: Boolean, default: false },
@@ -76,7 +84,8 @@ const NotificationSchema = new mongoose.Schema({
     metadata: { 
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', index: true },
         customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true },
-        variantId: { type: mongoose.Schema.Types.ObjectId, default: null }
+        variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null }
     },
     createdAt: { 
         type: Date, 

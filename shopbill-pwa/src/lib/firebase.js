@@ -36,6 +36,21 @@ function getMessagingInstance() {
 }
 
 export async function isPushSupported() {
+  try {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const ios = /iPhone|iPad|iPod/i.test(ua);
+    const standalone =
+      (typeof window !== 'undefined' &&
+        window.matchMedia &&
+        window.matchMedia('(display-mode: standalone)').matches) ||
+      (typeof navigator !== 'undefined' && /** @type {any} */ (navigator).standalone === true);
+    if (ios && standalone && typeof window !== 'undefined' && 'PushManager' in window && 'serviceWorker' in navigator) {
+      console.log('[Push][Firebase] iOS home-screen PWA: push treated as supported (Safari sometimes misreports isSupported)');
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
   const supported = await isSupported();
   console.log(`[Push][Firebase] isSupported=${supported}`);
   return supported;
@@ -103,7 +118,7 @@ export async function requestNotificationPermissionAndToken(vapidKey) {
     return null;
   }
   try {
-    if (!(await isSupported())) {
+    if (!(await isPushSupported())) {
       console.warn('[Push][Firebase] Firebase messaging unsupported in this browser');
       return null;
     }

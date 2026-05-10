@@ -214,16 +214,29 @@ router.post('/', protect, async (req, res) => {
         }
         
         // --- 3. Create Sale Record ---
-        const normalizedItems = (items || []).map((item) => ({
-            itemId: item.itemId,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            variantId: item.variantId || null,
-            variantLabel: item.variantLabel || '',
-            variantSize: item.variantSize || '',
-            variantColor: item.variantColor || '',
-        }));
+        const normalizedItems = (items || []).map((item) => {
+            const price = Number(item.price) || 0;
+            const originalRaw = item.originalPrice != null ? Number(item.originalPrice) : null;
+            const originalPrice = originalRaw != null && Number.isFinite(originalRaw) ? originalRaw : price;
+            const discountAmount = Math.max(0, Number(item.discountAmount) || 0);
+            const offerId = item.appliedOfferId && isValidObjectId(String(item.appliedOfferId))
+                ? item.appliedOfferId
+                : null;
+            return {
+                itemId: item.itemId,
+                name: item.name,
+                quantity: item.quantity,
+                price,
+                originalPrice: originalPrice > price ? originalPrice : price,
+                discountAmount,
+                appliedOfferId: offerId,
+                appliedOfferTitle: String(item.appliedOfferTitle || '').slice(0, 200),
+                variantId: item.variantId || null,
+                variantLabel: item.variantLabel || '',
+                variantSize: item.variantSize || '',
+                variantColor: item.variantColor || '',
+            };
+        });
 
         const newSale = await Sale.create({
             totalAmount,

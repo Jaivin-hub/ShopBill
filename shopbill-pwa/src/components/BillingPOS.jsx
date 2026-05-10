@@ -1,9 +1,84 @@
 import React, { useState, useMemo, useCallback, useEffect, memo, useRef } from 'react';
-import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ChevronDown, Receipt, Clock, ArrowRight } from 'lucide-react';
+import { IndianRupee, Trash2, ShoppingCart, Minus, Plus, Search, X, Loader2, ScanLine, ChevronRight, Calculator, Printer, Package, User, CreditCard, XCircle, Sparkles, Box, ChevronDown, Receipt, Clock, ArrowRight, Save, ClipboardList, Trash } from 'lucide-react';
 import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
 import { BillingTerminalInitialSkeleton } from './skeletons/PageSkeletons';
+
+/** Restore cart lines from a saved draft; clamp qty to current stock; drop missing products. */
+function restoreCartFromDraftLines(lines, inventory, showToast) {
+  if (!Array.isArray(lines) || lines.length === 0) return [];
+  const out = [];
+  for (const line of lines) {
+    const itemId = line.itemId || line._id || line.productId || line.id;
+    if (!itemId) continue;
+    const inv = inventory.find((i) => String(i._id) === String(itemId) || String(i.id) === String(itemId));
+    if (!inv) {
+      showToast(`Skipped: ${line.name || 'item'} (not in catalog)`, 'warning');
+      continue;
+    }
+    let qty = Math.max(1, parseInt(line.quantity, 10) || 1);
+    if (line.variantId) {
+      const v = inv.variants?.find((x) => String(x._id) === String(line.variantId));
+      if (!v) {
+        showToast(`Skipped: ${line.name || inv.name} (variant unavailable)`, 'warning');
+        continue;
+      }
+      qty = Math.min(qty, v.quantity || 0);
+      if (qty < 1) {
+        showToast(`Skipped: ${line.name || inv.name} (out of stock)`, 'warning');
+        continue;
+      }
+    } else {
+      if (inv.variants && inv.variants.length > 0) {
+        showToast(`Skipped: ${inv.name} (needs variant)`, 'warning');
+        continue;
+      }
+      qty = Math.min(qty, inv.quantity || 0);
+      if (qty < 1) {
+        showToast(`Skipped: ${inv.name} (out of stock)`, 'warning');
+        continue;
+      }
+    }
+    out.push({
+      _id: inv._id,
+      name: line.name || inv.name,
+      price: Number(line.price) || 0,
+      originalPrice: line.originalPrice != null ? Number(line.originalPrice) : Number(line.price) || 0,
+      discountAmount: Number(line.discountAmount) || 0,
+      appliedOfferId: line.appliedOfferId || null,
+      appliedOfferTitle: line.appliedOfferTitle || '',
+      quantity: qty,
+      variantId: line.variantId || undefined,
+      variantLabel: line.variantLabel || '',
+      variantSize: line.variantSize || '',
+      variantColor: line.variantColor || '',
+    });
+  }
+  return out;
+}
+
+/** Text for invoice line when an offer was applied (persisted on Sale.items). */
+function getSaleLineOfferCaption(item) {
+  const qty = Number(item.quantity) || 1;
+  const unitDisc = Number(item.discountAmount) || 0;
+  const lineSave = unitDisc * qty;
+  const orig = item.originalPrice != null ? Number(item.originalPrice) : null;
+  const price = Number(item.price) || 0;
+  const title = (item.appliedOfferTitle && String(item.appliedOfferTitle).trim()) || '';
+  const hasOffer = lineSave > 0 || (orig != null && orig > price + 0.001) || Boolean(title);
+  if (!hasOffer) return null;
+  const bits = [];
+  if (title) bits.push(`Offer: ${title}`);
+  if (orig != null && orig > price + 0.001) bits.push(`Was ₹${orig.toLocaleString('en-IN')}/unit`);
+  if (lineSave > 0) bits.push(`You save ₹${lineSave.toLocaleString('en-IN')}`);
+  return bits.join(' · ');
+}
+
+function sumSaleOfferSavings(items) {
+  if (!Array.isArray(items)) return 0;
+  return items.reduce((acc, it) => acc + (Number(it.discountAmount) || 0) * (Number(it.quantity) || 1), 0);
+}
 
 const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser, requestAttendanceDecision }) => {
   const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
@@ -28,6 +103,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [shopInfo, setShopInfo] = useState(null);
   const justClosedBillRef = useRef({ id: null, at: 0 });
   const closedBillIdRef = useRef(null);
+  const [billDrafts, setBillDrafts] = useState([]);
+  const [isBillDraftsModalOpen, setIsBillDraftsModalOpen] = useState(false);
+  const [loadingBillDrafts, setLoadingBillDrafts] = useState(false);
+  const [savingBillDraft, setSavingBillDraft] = useState(false);
+  const [activeBillDraftId, setActiveBillDraftId] = useState(null);
+  const [paymentCustomerPreset, setPaymentCustomerPreset] = useState(null);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -113,6 +194,30 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       if (refreshRecentSalesRef) refreshRecentSalesRef.current = null;
     };
   }, [refreshRecentSalesRef, fetchRecentSales]);
+
+  const fetchBillDrafts = useCallback(async () => {
+    if (!API?.billDrafts) return;
+    try {
+      const res = await apiClient.get(API.billDrafts);
+      setBillDrafts(res.data?.drafts || []);
+    } catch (e) {
+      if (e?.cancelled || e?.message?.includes?.('cancelled')) return;
+      console.error('Bill drafts fetch:', e);
+      const msg = e.response?.data?.error;
+      if (msg) showToast?.(msg, 'error');
+    }
+  }, [apiClient, API.billDrafts, showToast]);
+
+  useEffect(() => {
+    fetchBillDrafts();
+  }, [fetchBillDrafts]);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setActiveBillDraftId(null);
+      setPaymentCustomerPreset(null);
+    }
+  }, [cart.length]);
 
   // Fetch shop info for bill display
   useEffect(() => {
@@ -400,8 +505,143 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     if (cart.length === 0) return;
     setCart([]);
     setSearchTerm('');
+    setActiveBillDraftId(null);
+    setPaymentCustomerPreset(null);
     showToast("Transaction Discarded", "info");
   };
+
+  const scrollToCart = useCallback(() => {
+    const cartSection = document.getElementById('billing-list-section');
+    if (cartSection) cartSection.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  const openBillDraftsModal = useCallback(async () => {
+    setIsBillDraftsModalOpen(true);
+    setLoadingBillDrafts(true);
+    try {
+      await fetchBillDrafts();
+    } finally {
+      setLoadingBillDrafts(false);
+    }
+  }, [fetchBillDrafts]);
+
+  const saveBillDraft = useCallback(async () => {
+    if (!API?.billDrafts) {
+      showToast('Drafts are not available. Update the app or try again.', 'error');
+      return;
+    }
+    if (cart.length === 0) {
+      showToast('Add items before saving a draft.', 'error');
+      return;
+    }
+    const items = cart.map((item) => {
+      const id = item._id ?? item.id;
+      return {
+      itemId: id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      originalPrice: item.originalPrice ?? item.price,
+      discountAmount: item.discountAmount || 0,
+      appliedOfferId: item.appliedOfferId || null,
+      appliedOfferTitle: item.appliedOfferTitle || null,
+      variantId: item.variantId || null,
+      variantLabel: item.variantLabel || null,
+      variantSize: item.variantSize || null,
+      variantColor: item.variantColor || null,
+    };
+    }).filter((row) => row.itemId != null && String(row.itemId).trim() !== '');
+    if (items.length === 0) {
+      showToast('Cart lines are missing product ids. Clear the cart and add items again.', 'error');
+      return;
+    }
+    const body = {
+      items,
+      totalAmount,
+      customerId: paymentCustomerPreset && String(paymentCustomerPreset.id) !== 'walk_in' ? paymentCustomerPreset.id : null,
+      customerName: paymentCustomerPreset && String(paymentCustomerPreset.id) !== 'walk_in' ? (paymentCustomerPreset.name || '') : '',
+    };
+    setSavingBillDraft(true);
+    try {
+      if (activeBillDraftId) {
+        await apiClient.put(API.billDraftById(activeBillDraftId), body);
+        showToast('Draft updated', 'success');
+      } else {
+        const res = await apiClient.post(API.billDrafts, body);
+        const id = res.data?.draft?._id;
+        if (id) setActiveBillDraftId(id);
+        showToast('Draft saved', 'success');
+      }
+      await fetchBillDrafts();
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || 'Failed to save draft';
+      showToast(msg, 'error');
+    } finally {
+      setSavingBillDraft(false);
+    }
+  }, [API, cart, totalAmount, activeBillDraftId, paymentCustomerPreset, apiClient, showToast, fetchBillDrafts]);
+
+  const resumeBillDraft = useCallback(async (draft) => {
+    if (cart.length > 0) {
+      const ok = typeof window !== 'undefined' && window.confirm('Replace the current cart with this draft?');
+      if (!ok) return;
+    }
+    let d = draft;
+    try {
+      if (!d.items || d.items.length === 0) {
+        const res = await apiClient.get(API.billDraftById(d._id));
+        d = res.data?.draft;
+      }
+    } catch (e) {
+      showToast(e.response?.data?.error || 'Failed to load draft', 'error');
+      return;
+    }
+    if (!d?.items?.length) {
+      showToast('Draft is empty.', 'error');
+      return;
+    }
+    const restored = restoreCartFromDraftLines(d.items, inventory, showToast);
+    if (restored.length === 0) {
+      showToast('Could not restore draft (no lines in stock).', 'error');
+      return;
+    }
+    setCart(restored);
+    setActiveBillDraftId(d._id);
+    if (d.customerId) {
+      const cid = String(d.customerId);
+      const c = customers.find((x) => String(x._id || x.id) === cid);
+      if (c) {
+        setPaymentCustomerPreset({ ...c, id: c._id || c.id });
+      } else {
+        setPaymentCustomerPreset({
+          id: d.customerId,
+          name: d.customerName || 'Customer',
+          outstandingCredit: 0,
+          creditLimit: 0,
+        });
+      }
+    } else {
+      setPaymentCustomerPreset(null);
+    }
+    setIsBillDraftsModalOpen(false);
+    showToast('Draft loaded into cart', 'success');
+    scrollToCart();
+  }, [cart.length, apiClient, API, inventory, customers, showToast, scrollToCart]);
+
+  const deleteBillDraft = useCallback(async (id, e) => {
+    e?.stopPropagation?.();
+    if (!API?.billDraftById) return;
+    const ok = typeof window !== 'undefined' && window.confirm('Delete this draft?');
+    if (!ok) return;
+    try {
+      await apiClient.delete(API.billDraftById(id));
+      if (String(activeBillDraftId) === String(id)) setActiveBillDraftId(null);
+      showToast('Draft deleted', 'success');
+      await fetchBillDrafts();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to delete', 'error');
+    }
+  }, [API, activeBillDraftId, apiClient, showToast, fetchBillDrafts]);
 
   const handleOpenPaymentModal = useCallback(async () => {
     try {
@@ -413,13 +653,6 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // ignore: prompt flow already handles UX
     }
   }, [requestAttendanceDecision]);
-
-  const scrollToCart = () => {
-    const cartSection = document.getElementById('billing-list-section');
-    if (cartSection) {
-      cartSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   // UPDATED: Process Payment now handles mixed/split data correctly
   const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, paidVia = null) => {
@@ -454,10 +687,19 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     };
 
     try {
+      const draftIdToRemove = activeBillDraftId;
       const response = await apiClient.post(API.sales, saleData, { headers: { 'x-skip-attendance-prompt': '1' } });
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
+      setPaymentCustomerPreset(null);
+      if (draftIdToRemove && API.billDraftById) {
+        try {
+          await apiClient.delete(API.billDraftById(draftIdToRemove));
+        } catch (_) { /* ignore */ }
+      }
+      setActiveBillDraftId(null);
+      fetchBillDrafts();
       fetchData(); // Refresh inventory and customer balances
       // Optimistic update: prepend new sale so badge count shows instantly
       const newSale = response?.data?.newSale;
@@ -469,7 +711,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
       throw error; 
     }
-  }, [totalAmount, cart, apiClient, API.sales, fetchData, fetchRecentSales, showToast])
+  }, [totalAmount, cart, apiClient, API.sales, API.billDraftById, fetchData, fetchRecentSales, fetchBillDrafts, showToast, activeBillDraftId])
 
   const handlePhysicalScannerInput = (e) => {
     if (e.key === 'Enter' && searchTerm) {
@@ -535,6 +777,19 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                       </span>
                     ) : null;
                   })()}
+                </button>
+                <button
+                  type="button"
+                  onClick={openBillDraftsModal}
+                  title="Saved drafts"
+                  className={`p-2.5 border rounded-xl transition-all active:scale-90 relative ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-white border-slate-200 text-amber-600 shadow-sm'}`}
+                >
+                  <ClipboardList className="w-5 h-5" />
+                  {billDrafts.length > 0 ? (
+                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black min-w-[16px] h-4 px-0.5 flex items-center justify-center rounded-full">
+                      {billDrafts.length > 9 ? '9+' : billDrafts.length}
+                    </span>
+                  ) : null}
                 </button>
                 <button onClick={() => setIsCameraScannerOpen(true)} className={`p-2.5 border rounded-xl transition-all active:scale-90 ${darkMode ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600 shadow-sm'}`}>
                   <ScanLine className="w-5 h-5" />
@@ -670,7 +925,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </div>
 
       {cart.length > 0 && (
-        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[72px]`}>
+        <footer className={`fixed left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 max-md:bottom-[calc(72px+var(--keyboard-visual-offset,0px))]`}>
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-safe md:pb-5">
             {/* Mobile: single compact row */}
             <div className="w-full md:flex-1 flex flex-row md:flex-row items-center gap-2 md:gap-4">
@@ -716,6 +971,19 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
               </button>
 
               <button
+                type="button"
+                onClick={saveBillDraft}
+                disabled={savingBillDraft}
+                title={activeBillDraftId ? 'Update saved draft' : 'Save cart as draft'}
+                className={`group h-full px-3 md:px-5 border rounded-xl md:rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 transition-all active:scale-95 shrink-0 disabled:opacity-50 ${darkMode ? 'bg-slate-900 border-amber-500/30 text-amber-400 hover:border-amber-500/50' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}
+              >
+                {savingBillDraft ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <Save className="w-4 h-4 md:w-5 md:h-5" />}
+                <span className="text-[9px] md:text-[10px] font-black tracking-widest hidden sm:inline">
+                  {activeBillDraftId ? 'Update draft' : 'Save draft'}
+                </span>
+              </button>
+
+              <button
                 onClick={handleOpenPaymentModal}
                 className="flex-1 md:min-w-[260px] h-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-[11px] tracking-[0.15em] md:tracking-[0.2em] flex items-center justify-center gap-2 md:gap-3 shadow-lg shadow-indigo-500/40 transition-all active:scale-95 min-w-0"
               >
@@ -735,7 +1003,127 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         showToast={showToast}
         apiClient={apiClient}
         darkMode={darkMode}
+        customerPreset={paymentCustomerPreset}
       />
+      {/* Bill drafts: pause billing and resume later */}
+      {isBillDraftsModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setIsBillDraftsModalOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className={`relative w-full max-w-xl md:max-w-2xl h-[85vh] sm:h-[80vh] max-h-[600px] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl overflow-hidden flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
+              <div className="flex items-center gap-3">
+                <ClipboardList className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                <div>
+                  <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Draft bills
+                  </h3>
+                  <p className={`text-xs font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Resume a saved cart or delete old drafts
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBillDraftsModalOpen(false)}
+                className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 md:p-6 overflow-y-auto custom-scroll flex-1 min-h-0">
+              {loadingBillDrafts ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                </div>
+              ) : billDrafts.length > 0 ? (
+                <div className="space-y-2">
+                  {billDrafts.map((d) => {
+                    const updated = d.updatedAt ? new Date(d.updatedAt) : null;
+                    const timeLabel = updated && !Number.isNaN(updated.getTime())
+                      ? updated.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+                      : '';
+                    const isActive = activeBillDraftId && String(activeBillDraftId) === String(d._id);
+                    return (
+                      <div
+                        key={d._id}
+                        className={`group flex flex-col sm:flex-row sm:items-center gap-3 p-4 border rounded-xl transition-all ${
+                          isActive
+                            ? darkMode
+                              ? 'bg-amber-500/10 border-amber-500/40'
+                              : 'bg-amber-50 border-amber-200'
+                            : darkMode
+                              ? 'bg-gray-950 border-slate-800 hover:bg-slate-900'
+                              : 'bg-slate-50 border-slate-200 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            {d.label || 'Draft'}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[10px] font-bold text-slate-500">
+                            {timeLabel && <span>{timeLabel}</span>}
+                            {d.items?.length != null && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-400" />
+                                <span>{d.items.length} lines</span>
+                              </>
+                            )}
+                            <span className="w-1 h-1 rounded-full bg-slate-400" />
+                            <span className="text-emerald-600 dark:text-emerald-400">₹{Number(d.totalAmount || 0).toLocaleString()}</span>
+                            {(d.customerName || d.customerId) && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-400" />
+                                <span className="truncate max-w-[140px]">{d.customerName || 'Customer'}</span>
+                              </>
+                            )}
+                          </div>
+                          {isActive && (
+                            <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 mt-1 uppercase tracking-wider">
+                              In cart — Save draft updates this row
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => resumeBillDraft(d)}
+                            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
+                          >
+                            Resume
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => deleteBillDraft(d._id, e)}
+                            className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/40' : 'border-slate-200 text-slate-500 hover:text-rose-600'}`}
+                            aria-label="Delete draft"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-16 px-4">
+                  <ClipboardList className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
+                  <p className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    No drafts yet. Add items to the cart and tap &quot;Save draft&quot; in the bar below.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <ScannerModal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
@@ -748,7 +1136,6 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         onScanError={(error) => {
           console.error('Scanner error:', error);
           showToast(error || 'Camera access failed.', 'error');
-          setIsCameraScannerOpen(false);
         }}
         darkMode={darkMode}
       />
@@ -1051,27 +1438,41 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                           <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading items...</span>
                         </div>
                       ) : (
-                        selectedSale.items?.map((item, i) => (
-                          <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 ${darkMode ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-white'}`}>
-                            <div className="flex flex-col">
+                        selectedSale.items?.map((item, i) => {
+                          const offerCaption = getSaleLineOfferCaption(item);
+                          return (
+                          <div key={i} className={`flex justify-between items-start gap-2 p-3 text-xs border-b last:border-0 ${darkMode ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-white'}`}>
+                            <div className="flex flex-col min-w-0">
                               <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {item.name || 'General Item'}
                               </span>
                               <span className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Qty: {item.quantity} × ₹{item.price?.toLocaleString()}
+                                Qty: {item.quantity} × ₹{Number(item.price || 0).toLocaleString('en-IN')}
                               </span>
+                              {offerCaption && (
+                                <span className={`text-[9px] font-bold mt-1 leading-snug ${darkMode ? 'text-emerald-400/90' : 'text-emerald-700'}`}>
+                                  {offerCaption}
+                                </span>
+                              )}
                             </div>
-                            <span className={`font-bold tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                              ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                            <span className={`font-bold tabular-nums shrink-0 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
                             </span>
                           </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className={`p-6 border-t space-y-4 ${darkMode ? 'bg-gray-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  {sumSaleOfferSavings(selectedSale.items) > 0 && (
+                    <div className={`flex justify-between items-center px-1 ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                      <span className="text-[10px] font-black tracking-widest">Total offer savings</span>
+                      <span className="text-sm font-black tabular-nums">₹{sumSaleOfferSavings(selectedSale.items).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <div className="space-y-0.5">
                       <p className={`text-[10px] font-bold tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Grand Total</p>

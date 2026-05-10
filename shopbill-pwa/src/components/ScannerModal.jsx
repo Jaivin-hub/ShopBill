@@ -200,7 +200,7 @@ const ScannerModal = ({
     if (!isOpen) return null;
 
     const isBusy = lookupStatus === 'lookingUp' || lookupStatus === 'initializing' || lookupStatus === 'loadingLib';
-    const isAutoClosing = lookupStatus === 'found' || (lookupStatus === 'notFound' && lastScannedCodeRef.current); 
+    const isAutoClosing = lookupStatus === 'found'; 
 
     return (
         <div 

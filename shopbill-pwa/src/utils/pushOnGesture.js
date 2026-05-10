@@ -10,12 +10,38 @@ const STORAGE_KEY = 'push_token_registered';
 const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const isAndroid = () => /Android/i.test(navigator.userAgent);
 
+/**
+ * Call from submit/tap before any await (e.g. login). iOS Safari only allows Notification.requestPermission
+ * inside a user gesture; waiting for the login API finishes breaks that chain.
+ */
+export async function primeNotificationPermissionFromGesture() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'default') return;
+  try {
+    await Notification.requestPermission();
+  } catch {
+    void 0;
+  }
+}
+
 export async function requestPushFromGesture() {
   if (!isPushConfigured() || !localStorage.getItem('userToken')) {
     if (!isPushConfigured()) {
       console.warn('[Push][Gesture] Skipping: VITE_FIREBASE_VAPID_KEY not set in build');
     }
     return;
+  }
+  try {
+    const raw = localStorage.getItem('currentUser');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u.pushNotificationsEnabled === false) {
+        console.log('[Push][Gesture] Skipping: push disabled in Settings');
+        return;
+      }
+    }
+  } catch (_) {
+    /* ignore */
   }
   try {
     if (!(await isPushSupported())) {

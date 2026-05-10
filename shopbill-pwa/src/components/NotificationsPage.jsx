@@ -121,7 +121,7 @@ const getNotificationTypeDetails = (type) => {
     }
 };
 
-const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurrentPage }) => {
+const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurrentPage, userRole }) => {
     const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
     useEffect(() => {
@@ -186,7 +186,12 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
 
     const getNotificationTargetPage = (notification) => {
         const type = String(notification?.type || '').toLowerCase();
-        if (type.startsWith('inventory_') || type === 'credit_exceeded') return 'inventory';
+        const roleLower = String(userRole || '').toLowerCase();
+        if (type.startsWith('inventory_')) {
+            if (roleLower === 'cashier') return 'billing';
+            return 'inventory';
+        }
+        if (type === 'credit_exceeded') return 'inventory';
         if (type === 'purchase_recorded') return 'scm';
         if (type === 'ledger_payment' || type === 'ledger_credit' || type === 'credit_sale' || type === 'customer_added' || type === 'credit_limit_updated') return 'khata';
         if (type === 'new_shop_registered') return 'superadmin_users';

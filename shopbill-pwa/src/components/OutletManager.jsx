@@ -10,6 +10,7 @@ import {
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import ConfirmationModal from './ConfirmationModal';
+import { isPremiumPlan } from '../utils/subscription';
 
 const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage, onOutletsChange }) => {
     const [outlets, setOutlets] = useState([]);
@@ -41,7 +42,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [loadingStaff, setLoadingStaff] = useState({}); // { outletId: true/false }
     const fetchingStaffRef = useRef(new Set()); // Track which outlets are currently being fetched
 
-    const isPremium = currentUser?.plan === 'PREMIUM';
+    const isPremium = isPremiumPlan(currentUser);
 
     // Styling logic
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import API from '../config/api';
+import { primeNotificationPermissionFromGesture } from '../utils/pushOnGesture';
 
 // --- AXIOS INSTANCE WITH AUTH INTERCEPTOR ---
 const apiClient = axios.create();
@@ -100,7 +101,7 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                             type={showPassword ? 'text' : 'password'}
                             placeholder="••••••••"
                             /* Changed text-sm to text-base (16px) to prevent iOS zoom */
-                            className={`w-full pl-11 pr-11 py-3 ${inputBg} border ${inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
+                            className={`w-full pl-11 pr-14 py-3 ${inputBg} border ${inputBorder} ${inputText} text-base md:text-sm font-bold rounded-xl focus:border-indigo-500 outline-none transition-all ${placeholderColor}`}
                             onChange={(e) => setPassword(e.target.value)}
                             value={password}
                             required
@@ -108,9 +109,10 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className={`absolute right-4 top-1/2 -translate-y-1/2 ${iconColor} hover:text-indigo-400 transition-colors`}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg ${iconColor} hover:text-indigo-400 transition-colors`}
                         >
-                            {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {showPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
                         </button>
                     </div>
                 </div>
@@ -261,6 +263,7 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
         e.preventDefault();
         setLoading(true);
         try {
+            await primeNotificationPermissionFromGesture();
             const response = await apiClient.post(API.login, { identifier, password });
             if (response.data?.token) {
                 localStorage.setItem('userToken', response.data.token);

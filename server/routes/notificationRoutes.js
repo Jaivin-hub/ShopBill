@@ -5,14 +5,15 @@ const Staff = require('../models/Staff');
 const Store = require('../models/Store');
 const User = require('../models/User');
 const { sendPushNotification } = require('../services/firebaseAdmin');
+const { collectPushTokens } = require('../utils/pushTokens');
 
 const router = express.Router();
 
 /**
  * UTILITY: emitAlert
  * Saves the alert to the DB first for persistence, then pushes via Socket for real-time.
- * UPDATED: Smart notification targeting - excludes the actor from their own action notifications.
- * Only sends notifications to managers and cashiers (excluding the person who performed the action).
+ * Smart targeting: most types exclude the actor from real-time/push. Inventory stock/price updates
+ * notify owner + staff but never the user who made the change.
  */
 const emitAlert = async (req, storeId, type, data) => {
     const io = req.app.get('socketio');
@@ -177,6 +178,26 @@ const emitAlert = async (req, storeId, type, data) => {
                 workingMinutes: data.workingMinutes ?? null
             };
             break;
+        case 'payroll_settlement_marked':
+            title = 'Payroll Settlement';
+            category = 'Info';
+            message = data.message || `${data.actorName || 'User'} marked salary settlement for ${data.staffName || 'staff'}.`;
+            metadata = {
+                staffId: data.staffId || null,
+                month: data.month || null,
+                amount: data.amount ?? null,
+                actorName: data.actorName || null,
+                actorRole: data.actorRole || null
+            };
+            break;
+        case 'staff_shift_assigned':
+            title = 'Your shift was updated';
+            category = 'Info';
+            message = data.message || 'Your work schedule was updated. Open the app for details.';
+            metadata = {
+                staffId: data.staffId || null
+            };
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -212,7 +233,8 @@ const emitAlert = async (req, storeId, type, data) => {
             message: finalMessage, // Include store name in message
             metadata,
             readBy: [], // Ensure this is initialized as empty
-            createdAt: new Date()
+            createdAt: new Date(),
+            recipientUserId: type === 'staff_shift_assigned' && data.targetUserId ? data.targetUserId : null
         });
 
         if (io) {
@@ -235,6 +257,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     'attendance_break_end',
                     'attendance_punch_out'
                 ].includes(type);
+                const isStaffShiftAssigned = type === 'staff_shift_assigned';
                 const actorRoleLower = (actorRole || '').toLowerCase();
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
@@ -255,7 +278,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     });
                 }
 
-                // Price update: notify owner + all managers, including actor (owner/manager).
+                // Price update: notify owner + all managers (actor excluded below).
                 if (!isLowStockAlert && isInventoryPriceUpdated && store && store.ownerId) {
                     targetUserIds.add(store.ownerId.toString());
                     staffMembers.forEach(staff => {
@@ -265,7 +288,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     });
                 }
 
-                // Inventory field updates (price/reorder/stock): always notify owner + all staff.
+                // Stock/price field updates: notify owner + all staff; actor gets no push (see below).
                 if (!isLowStockAlert && isInventoryFieldUpdate && store && store.ownerId) {
                     targetUserIds.add(store.ownerId.toString());
                     staffMembers.forEach(staff => {
@@ -309,9 +332,11 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Owner default targeting (ledger payments handled separately).
+                // Important: for manager/cashier actions, owner must ALWAYS be notified.
                 if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
-                    if (isLedgerPayment || ownerIdStr !== actorIdStr) {
+                    const actorIsOwner = actorRoleLower === 'owner' || ownerIdStr === actorIdStr;
+                    if (isLedgerPayment || !actorIsOwner) {
                         targetUserIds.add(ownerIdStr);
                         if (isCreditSale) {
                             console.log(`📢 Credit sale: Owner ${ownerIdStr} will receive notification.`);
@@ -321,9 +346,8 @@ const emitAlert = async (req, storeId, type, data) => {
                     } else {
                         console.log(`📢 Owner ${ownerIdStr} is the actor, skipping self-notification`);
                     }
-                } else {
-                    console.warn(`⚠️ Store ${storeIdStr} has no ownerId, owner will not receive notification`);
                 }
+                // Low stock / bulk / credit-limit / price-update paths add the owner above; do not log a false "no ownerId" here.
 
                 // Staff targeting:
                 // - ledger_payment: notify all staff (manager + cashier)
@@ -365,9 +389,19 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
+                if (type === 'inventory_updated' || type === 'inventory_price_updated') {
+                    targetUserIds.delete(actorIdStr);
+                }
+
+                if (isStaffShiftAssigned && data.targetUserId) {
+                    targetUserIds.clear();
+                    targetUserIds.add(String(data.targetUserId));
+                }
+
                 const pushSoundCategory = (() => {
                     if (type === 'inventory_low' || type === 'credit_exceeded') return 'alert';
                     if (
+                        type === 'staff_shift_assigned' ||
                         type === 'attendance_punch_in' ||
                         type === 'attendance_break_start' ||
                         type === 'attendance_break_end' ||
@@ -403,10 +437,9 @@ const emitAlert = async (req, storeId, type, data) => {
                 // Push notifications to target users
                 if (targetUserIds.size > 0) {
                     const recipients = await User.find({ _id: { $in: [...targetUserIds] } })
-                        .select('deviceTokens email role')
+                        .select('deviceTokens email role pushNotificationsEnabled')
                         .lean();
-                    const allTokens = recipients.flatMap(u => (u.deviceTokens || []).map(d => d.token));
-                    const dedupedTokens = [...new Set(allTokens.filter(Boolean))];
+                    const dedupedTokens = collectPushTokens(recipients);
                     const recipientSummary = recipients.map((u) => ({
                         user: u._id?.toString?.() || '',
                         role: u.role || '',
@@ -414,9 +447,9 @@ const emitAlert = async (req, storeId, type, data) => {
                         tokenCount: Array.isArray(u.deviceTokens) ? u.deviceTokens.length : 0,
                         tokenTails: (u.deviceTokens || []).map(dt => `...${String(dt.token || '').slice(-10)}`)
                     }));
-                    console.log(`[Push][${pushTraceId}] Notification targets=${targetUserIds.size} recipientDocs=${recipients.length} rawTokens=${allTokens.length} uniqueTokens=${dedupedTokens.length}`);
+                    console.log(`[Push][${pushTraceId}] Notification targets=${targetUserIds.size} recipientDocs=${recipients.length} uniqueTokens=${dedupedTokens.length}`);
                     console.log(`[Push][${pushTraceId}] Recipient token map:`, recipientSummary);
-                    if (allTokens.length > 0) {
+                    if (dedupedTokens.length > 0) {
                         const pushResult = await sendPushNotification(dedupedTokens, {
                             title: title || 'Pocket POS',
                             body: finalMessage?.slice(0, 120) || message?.slice(0, 120) || 'New notification',
@@ -449,8 +482,10 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Also emit to store room for backward compatibility (but filter on client side)
-                // This ensures users who haven't refreshed still get notifications
-                io.to(storeIdStr).emit('new_notification', notificationData);
+                // Skip store-wide broadcast for personal shift notices (only targeted user rooms above).
+                if (type !== 'staff_shift_assigned') {
+                    io.to(storeIdStr).emit('new_notification', notificationData);
+                }
 
                 console.log(`📢 Notification sent to ${targetUserIds.size} users${isLowStockAlert ? ' (including actor)' : ` (excluding actor ${actorId})`} from store: ${storeName}`);
             } catch (targetingError) {
@@ -514,7 +549,7 @@ const resolveLowStockAlert = async (req, storeId, itemId, variantId = null) => {
 const notifySuperadminsNewShop = async (req, newOwner) => {
     const io = req.app && req.app.get ? req.app.get('socketio') : null;
     try {
-        const superadmins = await User.find({ role: 'superadmin' }).select('_id deviceTokens').lean();
+        const superadmins = await User.find({ role: 'superadmin' }).select('_id deviceTokens pushNotificationsEnabled').lean();
         if (superadmins.length === 0) return;
 
         const shopName = newOwner.shopName || 'Unknown';
@@ -539,9 +574,8 @@ const notifySuperadminsNewShop = async (req, newOwner) => {
             if (io && sa._id) io.to(`user_${sa._id}`).emit('new_notification', notificationData);
         });
 
-        if (superadmins.some(sa => (sa.deviceTokens || []).length > 0)) {
-            const allTokens = superadmins.flatMap(u => (u.deviceTokens || []).map(d => d.token));
-            if (allTokens.length > 0) {
+        const allTokens = collectPushTokens(superadmins);
+        if (allTokens.length > 0) {
                 const { sendPushNotification } = require('../services/firebaseAdmin');
                 sendPushNotification(allTokens, {
                     title: title,
@@ -549,7 +583,6 @@ const notifySuperadminsNewShop = async (req, newOwner) => {
                     soundCategory: 'alert',
                     data: { type: 'notification', link: '/notifications', notificationType: 'new_shop_registered' }
                 }).catch(err => console.error('[Push] Superadmin new-shop notification error:', err));
-            }
         }
         console.log(`📢 Superadmin notification: new shop "${shopName}" registered; sent to ${superadmins.length} superadmin(s).`);
     } catch (err) {
@@ -571,9 +604,27 @@ router.get('/alerts', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             filter = { forSuperAdmin: true, dismissedBy: { $nin: [req.user._id] } };
         } else if (req.user.role === 'owner') {
-            filter = { ownerId: req.user._id, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
+            filter = {
+                ownerId: req.user._id,
+                forSuperAdmin: { $ne: true },
+                dismissedBy: { $nin: [req.user._id] },
+                $or: [
+                    { recipientUserId: null },
+                    { recipientUserId: { $exists: false } },
+                    { recipientUserId: req.user._id }
+                ]
+            };
         } else if (req.user.storeId) {
-            filter = { storeId: req.user.storeId, forSuperAdmin: { $ne: true }, dismissedBy: { $nin: [req.user._id] } };
+            filter = {
+                storeId: req.user.storeId,
+                forSuperAdmin: { $ne: true },
+                dismissedBy: { $nin: [req.user._id] },
+                $or: [
+                    { recipientUserId: null },
+                    { recipientUserId: { $exists: false } },
+                    { recipientUserId: req.user._id }
+                ]
+            };
         } else {
             return res.json({ count: 0, alerts: [] });
         }
@@ -589,7 +640,9 @@ router.get('/alerts', protect, async (req, res) => {
         // Users don't need to see notifications about their own actions
         const filteredNotifications = notifications.filter(n => {
             // If actorId exists and matches current user, exclude this notification
-            if (n.actorId && n.actorId.toString() === req.user._id.toString() && n.type !== 'inventory_price_updated') {
+            // Keep critical stock/credit alerts visible even if generated by the same user.
+            const selfVisibleTypes = new Set(['inventory_low', 'credit_exceeded', 'inventory_price_updated']);
+            if (n.actorId && n.actorId.toString() === req.user._id.toString() && !selfVisibleTypes.has(n.type)) {
                 return false;
             }
             return true;

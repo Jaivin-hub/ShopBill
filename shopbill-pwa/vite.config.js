@@ -80,7 +80,16 @@ export default defineConfig({
         
         // Use network-first strategy for HTML to ensure fresh content
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /^\/_/, /^\/socket.io/],
+        // Keep Firebase messaging + main SW URLs out of SPA fallback (avoids wrong document for SW navigations in edge cases).
+        navigateFallbackDenylist: [
+          /^\/api/,
+          /^\/_/,
+          /^\/socket\.io/,
+          /^\/firebase-messaging-sw\.js$/,
+          /^\/sw\.js$/,
+          /^\/dev-sw\.js$/,
+          /^\/workbox.*\.js$/,
+        ],
         
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],
         

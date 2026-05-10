@@ -8,6 +8,7 @@ import {
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import { StoreControlInitialSkeleton } from './skeletons/PageSkeletons';
+import { isPremiumPlan } from '../utils/subscription';
 
 const StoreControl = ({ 
     darkMode, 
@@ -32,8 +33,7 @@ const StoreControl = ({
         settings: { receiptFooter: 'Thank you for shopping!' }
     });
 
-    // Check if user has PREMIUM plan
-    const isPremium = currentUser?.plan === 'PREMIUM';
+    const isPremium = isPremiumPlan(currentUser);
 
     // Styling logic
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';

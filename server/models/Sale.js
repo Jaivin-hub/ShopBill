@@ -30,7 +30,11 @@ const SaleSchema = new mongoose.Schema({
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', required: true },
         name: { type: String, required: true },
         quantity: { type: Number, required: true, min: 1 },
-        price: { type: Number, required: true, min: 0 }, // Price at time of sale
+        price: { type: Number, required: true, min: 0 }, // Final unit price at time of sale
+        originalPrice: { type: Number, default: null }, // Pre-offer unit price (null = same as price for legacy rows)
+        discountAmount: { type: Number, default: 0 }, // Per-unit discount in ₹ (from offer)
+        appliedOfferId: { type: mongoose.Schema.Types.ObjectId, ref: 'Offer', default: null },
+        appliedOfferTitle: { type: String, default: '' },
         variantId: { type: mongoose.Schema.Types.ObjectId, default: null }, // Variant ID if this is a variant sale
         variantLabel: { type: String, default: '' }, // Variant label (e.g., "500ml", "1L") for display
         // Optional textile metadata at line-item level

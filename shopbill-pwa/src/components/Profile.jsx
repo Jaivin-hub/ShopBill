@@ -55,7 +55,11 @@ const ProfileInputField = ({ label, name, value, icon: Icon, readOnly = false, p
 );
 
 function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, onProfileUpdated }) {
+    const roleLower = userRole?.toLowerCase() || '';
+    const showStaffDisplayName = roleLower === 'manager' || roleLower === 'cashier';
+
     const [profile, setProfile] = useState({
+        name: '',
         email: '',
         phone: '',
         shopName: '',
@@ -81,6 +85,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
                 ? phoneDigits.slice(-10)
                 : phoneDigits.slice(0, 10);
             setProfile({
+                name: data.name || '',
                 email: data.email || '',
                 phone,
                 shopName: data.shopName || '',
@@ -247,6 +252,20 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
                     </div>
 
                     <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {showStaffDisplayName && (
+                            <ProfileInputField 
+                                label="Staff Name" 
+                                name="name" 
+                                value={profile.name} 
+                                icon={User}
+                                readOnly={true}
+                                onChange={handleChange}
+                                isEditing={isEditing}
+                                darkMode={darkMode}
+                                validationErrors={validationErrors}
+                                setValidationErrors={setValidationErrors}
+                            />
+                        )}
                         <ProfileInputField 
                             label="Email Address" 
                             name="email" 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Store, ChevronDown, Check, Loader, AlertCircle } from 'lucide-react';
 import API from '../config/api';
+import { isPremiumPlan } from '../utils/subscription';
 
 const OutletSelector = ({
     apiClient,
@@ -16,7 +17,7 @@ const OutletSelector = ({
     const [currentOutlet, setCurrentOutlet] = useState(null);
     const fetchingRef = useRef(false);
 
-    const isPremium = currentUser?.plan === 'PREMIUM';
+    const isPremium = isPremiumPlan(currentUser);
 
     useEffect(() => {
         if (isPremium && currentUser) {
@@ -25,7 +26,16 @@ const OutletSelector = ({
             setIsLoading(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPremium, currentUser]); // Removed currentOutletId to prevent duplicate fetches
+    }, [isPremium, currentUser]); // Outlet list fetch only when user/plan changes
+
+    // Keep trigger label in sync when parent switches outlet (e.g. mobile Store Hub)
+    useEffect(() => {
+        if (!currentOutletId || outlets.length === 0) return;
+        const active = outlets.find((o) => String(o._id) === String(currentOutletId));
+        if (active) {
+            setCurrentOutlet(active);
+        }
+    }, [currentOutletId, outlets]);
 
     const fetchOutlets = async () => {
         // Prevent duplicate requests using ref
@@ -40,7 +50,9 @@ const OutletSelector = ({
                 setOutlets(outletsList);
                 
                 // Find current outlet
-                const active = outletsList.find(o => o._id === currentOutletId) || outletsList[0];
+                const active =
+                    outletsList.find((o) => String(o._id) === String(currentOutletId)) ||
+                    outletsList[0];
                 setCurrentOutlet(active);
             }
         } catch (error) {

@@ -4,6 +4,7 @@ import {
     CreditCard, LayoutGrid, Store, Plus, ChevronRight,
     Loader2, Settings
 } from 'lucide-react';
+import { isPremiumPlan } from '../utils/subscription';
 
 const Header = ({
     companyName,
@@ -35,14 +36,27 @@ const Header = ({
     const lastUserIdRef = useRef(null);
 
     const unreadCount = (notifications || []).filter(n => n && n.isRead === false).length;
-    const isPremium = currentUser?.plan === 'PREMIUM';
+    const isPremium = isPremiumPlan(currentUser);
     const isOwner = userRole?.toLowerCase() === 'owner';
-    // Always prefer the latest profile business name (updated from Profile page),
-    // then fall back to outlet label if needed for premium owner context.
     const profileBusinessName = (currentUser?.shopName || businessName || '').trim();
-    const displayedBusinessName = profileBusinessName || (
-        isPremium && isOwner ? (currentOutlet?.name || '') : ''
-    );
+    const outletNameFromList = outlets?.find((o) => String(o._id) === String(currentOutletId))?.name;
+    const outletObjMatchesId =
+        currentOutlet &&
+        currentOutletId &&
+        String(currentOutlet._id) === String(currentOutletId);
+    const resolvedOutletName = (
+        (outletObjMatchesId ? currentOutlet?.name : null) ||
+        outletNameFromList ||
+        ''
+    ).trim();
+    // Premium owners: show active outlet name in the header (updates when switching branches).
+    const displayedBusinessName = (() => {
+        if (isPremium && isOwner) {
+            if (resolvedOutletName) return resolvedOutletName;
+            return profileBusinessName;
+        }
+        return profileBusinessName || resolvedOutletName;
+    })();
 
     // Sync local outlets with prop (always update when prop changes)
     useEffect(() => {

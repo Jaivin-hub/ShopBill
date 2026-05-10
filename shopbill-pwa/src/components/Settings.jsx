@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { 
     User, Lock, Globe, Check, Bell, RefreshCw, Users, LogOut, MessageCircle, 
     UploadCloud, CheckCircle, Link, Mail, Crown, LifeBuoy, 
@@ -13,6 +13,8 @@ import API from '../config/api';
 import { isChatSoundEnabled, setChatSoundEnabled } from '../utils/notificationSound';
 import StoreControl from './StoreControl';
 import { SettingsHomeSkeleton } from './skeletons/PageSkeletons';
+import { isPremiumPlan, isProOrPremium } from '../utils/subscription';
+import { requestPushFromGesture } from '../utils/pushOnGesture';
 
 const PERMISSION_PAGE_LABELS = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -291,7 +293,7 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
     );
 };
 
-function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, setDarkMode, currentUser, currentOutletId, onOutletSwitch }) { 
+function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigin, darkMode, setDarkMode, currentUser, currentOutletId, onOutletSwitch, onUserFieldsUpdated }) { 
     const [currentView, setCurrentView] = useState(() => {
         const target = localStorage.getItem('settings_target_view');
         if (target) {
@@ -300,8 +302,9 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
         }
         return 'main';
     }); 
-    const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
     const [chatSoundEnabled, setChatSoundEnabledState] = useState(() => isChatSoundEnabled());
+    /** Bumped on focus/visibility so Notification.permission re-reads after user changes site settings. */
+    const [permissionRefreshKey, setPermissionRefreshKey] = useState(0);
     const [confirmModal, setConfirmModal] = useState(null); 
     const [cloudUploadStatus, setCloudUploadStatus] = useState('idle');
     const [cloudSelectionModal, setCloudSelectionModal] = useState(null); 
@@ -326,7 +329,101 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
         return () => clearTimeout(id);
     }, [currentUser]);
 
-    const handleToggleNotifications = () => setIsNotificationEnabled(prev => !prev);
+    const browserNotificationPermission = useMemo(() => {
+        if (typeof Notification === 'undefined') return 'denied';
+        return Notification.permission;
+    }, [permissionRefreshKey]);
+    const notificationBrowserGranted = browserNotificationPermission === 'granted';
+    const notificationBrowserDenied = browserNotificationPermission === 'denied';
+    const appWantsPush = currentUser?.pushNotificationsEnabled !== false;
+    const pushToggleOn = notificationBrowserGranted && appWantsPush;
+
+    useEffect(() => {
+        const bump = () => setPermissionRefreshKey((k) => k + 1);
+        document.addEventListener('visibilitychange', bump);
+        window.addEventListener('focus', bump);
+        window.addEventListener('pageshow', bump);
+        return () => {
+            document.removeEventListener('visibilitychange', bump);
+            window.removeEventListener('focus', bump);
+            window.removeEventListener('pageshow', bump);
+        };
+    }, []);
+
+    // If the user blocks the site in OS/browser settings, keep server preference in sync (no push tokens).
+    useEffect(() => {
+        if (!apiClient || !onUserFieldsUpdated) return;
+        const syncDenied = async () => {
+            if (document.visibilityState !== 'visible') return;
+            if (typeof Notification === 'undefined') return;
+            if (Notification.permission !== 'denied') return;
+            if (currentUser?.pushNotificationsEnabled === false) return;
+            try {
+                await apiClient.put(API.pushPreferences, { enabled: false });
+                onUserFieldsUpdated({ pushNotificationsEnabled: false });
+            } catch (_) {
+                /* ignore */
+            }
+        };
+        document.addEventListener('visibilitychange', syncDenied);
+        syncDenied();
+        return () => document.removeEventListener('visibilitychange', syncDenied);
+    }, [apiClient, onUserFieldsUpdated, currentUser?.pushNotificationsEnabled]);
+
+    const handlePushNotificationsToggle = useCallback(async () => {
+        if (!apiClient) {
+            if (showToast) showToast('Unable to save preference right now.', 'error');
+            return;
+        }
+        setPermissionRefreshKey((k) => k + 1);
+        if (pushToggleOn) {
+            try {
+                await apiClient.put(API.pushPreferences, { enabled: false });
+                if (onUserFieldsUpdated) onUserFieldsUpdated({ pushNotificationsEnabled: false });
+                if (showToast) showToast('Push notifications off. This device will not receive alerts.', 'info');
+            } catch (err) {
+                if (showToast) showToast(err.response?.data?.error || 'Could not update notification preference.', 'error');
+            }
+            return;
+        }
+        if (typeof Notification === 'undefined') {
+            if (showToast) showToast('Notifications are not supported in this browser.', 'error');
+            return;
+        }
+        const permLive = Notification.permission;
+        if (permLive === 'denied') {
+            if (showToast) {
+                showToast(
+                    'Notifications are blocked for this site. Use your browser menu → Site settings (or padlock) → Allow notifications, then tap this switch again.',
+                    'error'
+                );
+            }
+            return;
+        }
+        let perm = permLive;
+        if (perm === 'default') {
+            perm = await Notification.requestPermission();
+            setPermissionRefreshKey((k) => k + 1);
+        }
+        if (perm !== 'granted') {
+            try {
+                await apiClient.put(API.pushPreferences, { enabled: false });
+                if (onUserFieldsUpdated) onUserFieldsUpdated({ pushNotificationsEnabled: false });
+            } catch (_) {
+                /* ignore */
+            }
+            if (showToast) showToast('Notification permission was not granted.', 'info');
+            return;
+        }
+        try {
+            await apiClient.put(API.pushPreferences, { enabled: true });
+            if (onUserFieldsUpdated) onUserFieldsUpdated({ pushNotificationsEnabled: true });
+            await requestPushFromGesture();
+            if (showToast) showToast('Push notifications on.', 'success');
+        } catch (err) {
+            if (showToast) showToast(err.response?.data?.error || 'Could not enable push notifications.', 'error');
+        }
+    }, [apiClient, pushToggleOn, onUserFieldsUpdated, showToast]);
     const handleChangePasswordClick = () => {
         setPageOrigin('settings');
         setCurrentPage('passwordChange');
@@ -394,7 +491,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     {currentUser?.role?.toLowerCase() === 'owner' && (
                         <>
                             {/* NEW: Outlet Management Item (Premium only) */}
-                            {currentUser?.plan === 'PREMIUM' && (
+                            {isPremiumPlan(currentUser) && (
                                 <SettingItem 
                                     icon={Store} 
                                     title="Outlet Management" 
@@ -455,13 +552,23 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     <div className="p-1.5 md:p-2">
                         <SettingItem 
                             icon={Bell} 
-                            title="Notifications" 
-                            description="Real-time toast notifications." 
-                            actionComponent={<ToggleSwitch checked={isNotificationEnabled} onChange={handleToggleNotifications} darkMode={darkMode} />} 
+                            title="Push notifications" 
+                            description={
+                                notificationBrowserDenied
+                                    ? 'Blocked in browser settings. Allow this site, return here, then turn this on.'
+                                    : 'Alerts on this device when the app is in the background. Uses the same permission as your browser or PWA.'
+                            }
+                            actionComponent={
+                                <ToggleSwitch
+                                    checked={pushToggleOn}
+                                    onChange={handlePushNotificationsToggle}
+                                    aria-label="Push notifications"
+                                />
+                            } 
                             accentColor="text-sky-600" 
                             darkMode={darkMode}
                         />
-                        {(currentUser?.plan === 'PRO' || currentUser?.plan === 'PREMIUM') && (
+                        {isProOrPremium(currentUser) && (
                             <SettingItem 
                                 icon={MessageCircle} 
                                 title="Chat message sound" 

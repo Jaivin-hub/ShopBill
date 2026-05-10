@@ -12,14 +12,45 @@ const firebaseConfig = {
   appId: '1:918619248030:web:05b66603fe70426211728f',
 };
 
+/** No regex literals here — avoids corrupt merges into public/. Trailing-slash strip only. */
+function stripTrailingSlash(pathname) {
+  if (!pathname || pathname === '/') return '/';
+  let p = pathname;
+  while (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  return p || '/';
+}
+
+/** Same-origin app links use hash so cold opens always load index.html and App deep-linking works. */
 function resolveOpenUrl(raw) {
   try {
-    if (!raw || typeof raw !== 'string') return new URL('/notifications', self.location.origin).href;
+    const fallback = new URL('/#/notifications', self.location.origin).href;
+    if (!raw || typeof raw !== 'string') return fallback;
     const t = raw.trim();
-    if (t.startsWith('http://') || t.startsWith('https://')) return t;
-    return new URL(t.startsWith('/') ? t : '/' + t, self.location.origin).href;
+    const toHashNotifications = (search = '') =>
+      new URL('/#/notifications' + (search || ''), self.location.origin).href;
+    const toHashChat = (suffix, search = '') =>
+      new URL('/#/chat' + (suffix || '') + (search || ''), self.location.origin).href;
+    if (t.startsWith('http://') || t.startsWith('https://')) {
+      const u = new URL(t);
+      if (u.origin !== self.location.origin) return t;
+      const p = stripTrailingSlash(u.pathname || '/') || '/';
+      const search = u.search || '';
+      if (p === '/notifications' || p.startsWith('/notifications/')) return toHashNotifications(search);
+      if (p === '/chat' || p.startsWith('/chat/')) return toHashChat(p.slice('/chat'.length), search);
+      return t;
+    }
+    let path = t.startsWith('/') ? t : '/' + t;
+    const qIdx = path.indexOf('?');
+    const search = qIdx >= 0 ? path.slice(qIdx) : '';
+    const pathnameOnly = qIdx >= 0 ? path.slice(0, qIdx) : path;
+    const pathname = stripTrailingSlash(pathnameOnly) || '/';
+    if (pathname === '/notifications' || pathname.startsWith('/notifications/')) return toHashNotifications(search);
+    if (pathname === '/chat' || pathname.startsWith('/chat/')) {
+      return toHashChat(pathname.slice('/chat'.length), search);
+    }
+    return new URL(pathname + search, self.location.origin).href;
   } catch (e) {
-    return self.location.origin + '/notifications';
+    return self.location.origin + '/#/notifications';
   }
 }
 
@@ -91,8 +122,16 @@ function showLocalPush(title, body, data) {
     data: Object.assign({}, d, { url: targetUrl, soundCategory: soundCategory }),
     requireInteraction: false,
   };
-  const shown = self.registration.showNotification(title || 'Pocket POS', options);
-  return Promise.resolve(shown).then(() => broadcastSoundToClients(soundCategory));
+  const t = title || 'Pocket POS';
+  const runShow = (opts) => self.registration.showNotification(t, opts);
+  return Promise.resolve()
+    .then(() => runShow(options))
+    .catch(() => {
+      const fallback = Object.assign({}, options);
+      delete fallback.vibrate;
+      return runShow(fallback);
+    })
+    .then(() => broadcastSoundToClients(soundCategory));
 }
 
 const hasValidConfig = firebaseConfig.projectId && !firebaseConfig.projectId.includes('PLACEHOLDER');
@@ -104,10 +143,10 @@ try {
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((payload) => {
       console.log('[Push][SW] Background message received:', payload);
-      const n = payload.notification || {};
+      const n = payload.notification && typeof payload.notification === 'object' ? payload.notification : {};
       const data = Object.assign({}, payload.data || {});
-      const title = n.title || data.title || 'Pocket POS';
-      const body = n.body || data.body || data.message || 'New update';
+      const title = String(n.title || data.title || 'Pocket POS');
+      const body = String(n.body || data.body || data.message || 'New update');
       return showLocalPush(title, body, data);
     });
     firebaseBackgroundHandlerActive = true;

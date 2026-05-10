@@ -7,8 +7,11 @@ import {
     Store, MapPin, BarChart3, Settings2, Truck, ChevronDown, ChevronUp, AlertCircle, X
 } from 'lucide-react';
 import AttendancePunch from './AttendancePunch';
+import { isProOrPremium } from '../utils/subscription';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
+
+const canEditBusinessAddress = (role) => role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
 
 const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
@@ -81,9 +84,9 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         setCurrentAttendance(attendance);
     }, []);
 
-    // Check if business address is missing
+    // Check if business address is missing (owners + managers can fix it in Profile)
     const checkAddressStatus = useCallback(async () => {
-        if (userRole === USER_ROLES.OWNER && apiClient && API) {
+        if (canEditBusinessAddress(userRole) && apiClient && API) {
             try {
                 const response = await apiClient.get(API.profile);
                 const address = response.data?.user?.address || response.data?.address || '';
@@ -123,7 +126,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     // Refresh address status when returning to dashboard (e.g., from profile page)
     useEffect(() => {
         const handleFocus = () => {
-            if (hasAccess && userRole === USER_ROLES.OWNER) {
+            if (hasAccess && canEditBusinessAddress(userRole)) {
                 checkAddressStatus();
             }
         };
@@ -225,7 +228,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
     // Role-based quick actions
     const quickActions = useMemo(() => {
-        const hasPremiumPlan = currentUser?.plan === 'PREMIUM' || currentUser?.plan === 'PRO';
+        const hasPremiumPlan = isProOrPremium(currentUser);
         
         // Calculate owner order based on plan
         // Basic: 1. Team Management, 2. Recent Sales, 3. Ledger, 4. Add Stock, 5. New Bill, 6. Reports
@@ -388,7 +391,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
             <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
             {/* Address Reminder Banner - opaque background so content behind does not show through */}
-            {isAddressMissing && showAddressReminder && userRole === USER_ROLES.OWNER && (
+            {isAddressMissing && showAddressReminder && canEditBusinessAddress(userRole) && (
                 <div className={`mx-0 mb-4 border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${darkMode ? 'bg-slate-900 border-amber-500/50' : 'bg-amber-50 border-amber-200'}`}>
                     <div className={`flex-shrink-0 p-2 rounded-lg ${darkMode ? 'bg-amber-900' : 'bg-amber-100'}`}>
                         <AlertCircle className={`w-5 h-5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />

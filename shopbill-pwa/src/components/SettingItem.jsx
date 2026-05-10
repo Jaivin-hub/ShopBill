@@ -44,9 +44,9 @@ const SettingItem = ({
                 </div>
             </div>
 
-            <div className="flex items-center">
+            <div className="relative z-20 flex shrink-0 items-center pointer-events-auto">
                 {actionComponent ? (
-                    <div className="scale-90 origin-right">
+                    <div className="flex min-h-[44px] min-w-[44px] items-center justify-center scale-90 origin-right">
                         {actionComponent}
                     </div>
                 ) : (

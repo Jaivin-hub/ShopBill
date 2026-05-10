@@ -32,9 +32,30 @@ const AttendanceSchema = new Schema({
         type: Date,
         default: null
     },
+    // Snapshot of configured shift window when punched in
+    shiftStart: {
+        type: String,
+        default: ''
+    },
+    shiftEnd: {
+        type: String,
+        default: ''
+    },
+    shiftDurationMinutes: {
+        type: Number,
+        default: 0
+    },
+    outsideShiftWindow: {
+        type: Boolean,
+        default: false
+    },
     // Total working hours (calculated in minutes, then converted)
     workingHours: {
         type: Number, // in minutes
+        default: 0
+    },
+    overtimeMinutes: {
+        type: Number,
         default: 0
     },
     // Status: 'active' (punched in), 'completed' (punched out)
@@ -118,6 +139,10 @@ AttendanceSchema.pre('save', function(next) {
         const totalDiff = this.punchOut - this.punchIn;
         const totalMinutes = Math.round(totalDiff / (1000 * 60));
         this.workingHours = Math.max(0, totalMinutes - totalBreakMinutes); // Ensure non-negative
+        const shiftDuration = Number(this.shiftDurationMinutes || 0);
+        this.overtimeMinutes = shiftDuration > 0
+            ? Math.max(0, this.workingHours - shiftDuration)
+            : 0;
     }
     next();
 });

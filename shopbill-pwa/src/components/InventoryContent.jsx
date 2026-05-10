@@ -541,11 +541,13 @@ const EMPTY_TEXTILE_META = { brand: '', fabric: '', season: '', collection: '' }
 
 const InventoryContent = ({
     inventory, loading, listSyncing = false, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
-    isTextileShop = false,
+    isTextileShop = false, isReportDownloading = false,
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isHsnScannerOpen, setIsHsnScannerOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [showControlSection, setShowControlSection] = useState(true);
     const sortDropdownRef = useRef(null);
     const [hasVariants, setHasVariants] = useState(false);
     const [editingVariantIndex, setEditingVariantIndex] = useState(null);
@@ -666,59 +668,97 @@ const InventoryContent = ({
                                 <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Stock <span className="text-indigo-500">Hub</span></h1>
                                 <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]  mt-1">Manage your products and stock levels</p>
                             </div>
-                            {!readOnly && (
-                            <div className="flex md:hidden items-center gap-2">
-                                <button onClick={openBulkUploadModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border text-emerald-500 rounded-xl active:scale-90`}><Upload className="w-5 h-5" /></button>
-                                <button onClick={handleDownloadReport} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border text-indigo-500 rounded-xl active:scale-90`} title="Download Inventory Report"><Download className="w-5 h-5" /></button>
-                                <button onClick={openScannerModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border text-indigo-500 rounded-xl active:scale-90`}><ScanLine className="w-5 h-5" /></button>
-                                <button onClick={openAddModal} className="p-3 bg-indigo-600 text-white rounded-xl active:scale-90 shadow-lg shadow-indigo-600/20"><Plus className="w-5 h-5" /></button>
-                            </div>
-                            )}
-                        </div>
-                        {!readOnly && (
-                        <div className="hidden md:flex items-center gap-3">
-                            <button onClick={openScannerModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all`}><ScanLine className="w-5 h-5" /></button>
-                            <button onClick={openBulkUploadModal} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-500'} border text-emerald-500 rounded-xl transition-all`}><Upload className="w-5 h-5" /></button>
-                            <button onClick={handleDownloadReport} className={`px-4 py-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all flex items-center gap-2`} title="Download Inventory Report"><Download className="w-5 h-5" /><span className="hidden lg:inline text-[10px] font-black tracking-[0.18em]">DOWNLOAD REPORT</span></button>
-                            <button onClick={openAddModal} className="px-6 py-3 bg-indigo-600 text-white text-[10px] font-black tracking-[0.2em]  rounded-xl hover:bg-indigo-500 transition-all flex items-center gap-2">
-                                <Plus className="w-4 h-4" /> Add product
+                            <button
+                                type="button"
+                                onClick={() => setShowControlSection((prev) => !prev)}
+                                className={`p-3 rounded-xl border transition-all ${
+                                    darkMode
+                                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-indigo-500'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-500'
+                                }`}
+                                title={showControlSection ? 'Hide controls' : 'Show controls'}
+                                aria-label={showControlSection ? 'Hide controls' : 'Show controls'}
+                            >
+                                <Settings2 className="w-5 h-5" />
                             </button>
                         </div>
-                        )}
                     </div>
                 </header>
 
                 {/* Search & Sort Bar */}
-                <div className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'bg-gray-950 border-slate-900/60' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="max-w-7xl mx-auto flex gap-3">
-                        <div className="relative flex-grow">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
-                            <input
-                                type="text"
-                                placeholder="search..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={`no-zoom-search w-full pl-11 pr-4 py-3 border rounded-xl text-[10px] font-black tracking-[0.2em] focus:outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'}`}
-                            />
-                            {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500"><X className="w-4 h-4" /></button>}
-                        </div>
-                        <div className="relative" ref={sortDropdownRef}>
-                            <button 
-                                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)} 
-                                className={`flex items-center gap-2 px-5 py-3 ${darkMode ? 'bg-slate-900 border' : 'bg-white border'} rounded-xl text-[10px] font-black tracking-widest  transition-all ${isSortDropdownOpen ? 'border-indigo-500 text-indigo-500' : (darkMode ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-500')}`}
-                            >
-                                <ListOrdered className="w-4 h-4" /> <span className="hidden sm:inline">{currentSortLabel}</span>
-                            </button>
-                            {isSortDropdownOpen && (
-                                <div className={`absolute right-0 mt-2 w-56 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl shadow-2xl z-[100] overflow-hidden`}>
-                                    {sortOptions.map(opt => (
-                                        <button key={opt.value} onClick={() => { setSortOption(opt.value); setIsSortDropdownOpen(false); }} className={`w-full px-5 py-4 text-left text-[10px] font-black  tracking-widest transition-colors ${sortOption === opt.value ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-50')}`}>{opt.label}</button>
-                                    ))}
+                {showControlSection && (
+                    <div className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'bg-gray-950 border-slate-900/60' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="max-w-7xl mx-auto space-y-3">
+                            {isSearchOpen ? (
+                                <div className="flex items-center gap-2 w-full">
+                                    <div className="relative min-w-0 flex-1">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search products..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className={`no-zoom-search w-full pl-11 pr-10 py-3 border rounded-xl text-[10px] font-black tracking-[0.2em] focus:outline-none focus:border-indigo-500 transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'}`}
+                                        />
+                                        <button onClick={() => { setSearchTerm(''); setIsSearchOpen(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-1 rounded-md hover:bg-slate-500/10"><X className="w-4 h-4" /></button>
+                                    </div>
+                                    <div className="relative flex-shrink-0" ref={sortDropdownRef}>
+                                        <button
+                                            onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                            className={`flex items-center justify-center gap-2 px-3 py-3 ${darkMode ? 'bg-slate-900 border' : 'bg-white border'} rounded-xl text-[10px] font-black tracking-widest transition-all ${isSortDropdownOpen ? 'border-indigo-500 text-indigo-500' : (darkMode ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-500')}`}
+                                        >
+                                            <ListOrdered className="w-4 h-4" /> <span className="hidden md:inline">{currentSortLabel}</span>
+                                        </button>
+                                        {isSortDropdownOpen && (
+                                            <div className={`absolute right-0 mt-2 w-56 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl shadow-2xl z-[100] overflow-hidden`}>
+                                                {sortOptions.map(opt => (
+                                                    <button key={opt.value} onClick={() => { setSortOption(opt.value); setIsSortDropdownOpen(false); }} className={`w-full px-5 py-4 text-left text-[10px] font-black  tracking-widest transition-colors ${sortOption === opt.value ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-50')}`}>{opt.label}</button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center w-full gap-2">
+                                    {!readOnly && (
+                                        <>
+                                            <button onClick={openBulkUploadModal} className={`flex-1 flex items-center justify-center p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-500'} border text-emerald-500 rounded-xl transition-all`} title="Bulk upload">
+                                                <Upload className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={handleDownloadReport} disabled={isReportDownloading} className={`flex-1 flex items-center justify-center p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all disabled:opacity-60`} title="Download report">
+                                                {isReportDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                            </button>
+                                            <button onClick={openScannerModal} className={`flex-1 flex items-center justify-center p-3 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500'} border text-indigo-500 rounded-xl transition-all`} title="Scan code">
+                                                <ScanLine className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={openAddModal} className="flex-1 flex items-center justify-center p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20" title="Add product">
+                                                <Plus className="w-5 h-5" />
+                                            </button>
+                                        </>
+                                    )}
+                                    <button onClick={() => setIsSearchOpen(true)} className={`flex-1 flex items-center justify-center p-3 border rounded-xl transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500 text-slate-400' : 'bg-white border-slate-200 hover:border-indigo-500 text-slate-500'}`} title="Search">
+                                        <Search className="w-5 h-5" />
+                                    </button>
+                                    <div className="relative flex-1" ref={sortDropdownRef}>
+                                        <button
+                                            onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                            className={`w-full flex items-center justify-center gap-2 px-3 py-3 ${darkMode ? 'bg-slate-900 border' : 'bg-white border'} rounded-xl text-[10px] font-black tracking-widest transition-all ${isSortDropdownOpen ? 'border-indigo-500 text-indigo-500' : (darkMode ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-500')}`}
+                                        >
+                                            <ListOrdered className="w-4 h-4" /> <span className="hidden md:inline">{currentSortLabel}</span>
+                                        </button>
+                                        {isSortDropdownOpen && (
+                                            <div className={`absolute right-0 mt-2 w-56 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl shadow-2xl z-[100] overflow-hidden`}>
+                                                {sortOptions.map(opt => (
+                                                    <button key={opt.value} onClick={() => { setSortOption(opt.value); setIsSortDropdownOpen(false); }} className={`w-full px-5 py-4 text-left text-[10px] font-black  tracking-widest transition-colors ${sortOption === opt.value ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-50')}`}>{opt.label}</button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* --- CONTENT --- */}

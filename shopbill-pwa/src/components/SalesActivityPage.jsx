@@ -12,6 +12,27 @@ const getLocalDateString = (date) => {
     return `${year}-${month}-${day}`;
 };
 
+function getSaleLineOfferCaption(item) {
+    const qty = Number(item.quantity) || 1;
+    const unitDisc = Number(item.discountAmount) || 0;
+    const lineSave = unitDisc * qty;
+    const orig = item.originalPrice != null ? Number(item.originalPrice) : null;
+    const price = Number(item.price) || 0;
+    const title = (item.appliedOfferTitle && String(item.appliedOfferTitle).trim()) || '';
+    const hasOffer = lineSave > 0 || (orig != null && orig > price + 0.001) || Boolean(title);
+    if (!hasOffer) return null;
+    const bits = [];
+    if (title) bits.push(`Offer: ${title}`);
+    if (orig != null && orig > price + 0.001) bits.push(`Was ₹${orig.toLocaleString('en-IN')}/unit`);
+    if (lineSave > 0) bits.push(`You save ₹${lineSave.toLocaleString('en-IN')}`);
+    return bits.join(' · ');
+}
+
+function sumSaleOfferSavings(items) {
+    if (!Array.isArray(items)) return 0;
+    return items.reduce((acc, it) => acc + (Number(it.discountAmount) || 0) * (Number(it.quantity) || 1), 0);
+}
+
 // --- REFINED DATE FILTER ---
 const DateRangeFilter = ({ dateRange, onDateRangeChange, darkMode }) => {
     const bgClass = darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-300 shadow-sm';
@@ -240,17 +261,23 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                     <div className="space-y-3">
                         <span className={`text-[9px] font-bold tracking-widest px-1 print-text ${secondaryText}`}>Line Items</span>
                         <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
-                            {sale.items?.map((item, i) => (
-                                <div key={i} className={`flex justify-between items-center p-3 text-xs border-b last:border-0 print-bg ${darkMode ? 'border-gray-800 bg-gray-900/20' : 'border-slate-100 bg-white'}`}>
-                                    <div className="flex flex-col">
+                            {sale.items?.map((item, i) => {
+                                const offerCaption = getSaleLineOfferCaption(item);
+                                return (
+                                <div key={i} className={`flex justify-between items-start gap-2 p-3 text-xs border-b last:border-0 print-bg ${darkMode ? 'border-gray-800 bg-gray-900/20' : 'border-slate-100 bg-white'}`}>
+                                    <div className="flex flex-col min-w-0">
                                         <span className={`font-bold print-text ${textColor}`}>{item.name || 'General Item'}</span>
-                                        <span className={`text-[10px] font-medium print-text ${secondaryText}`}>Qty: {item.quantity} × ₹{item.price?.toLocaleString()}</span>
+                                        <span className={`text-[10px] font-medium print-text ${secondaryText}`}>Qty: {item.quantity} × ₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
+                                        {offerCaption && (
+                                            <span className={`text-[9px] font-bold mt-1 leading-snug print-text ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{offerCaption}</span>
+                                        )}
                                     </div>
-                                    <span className={`font-bold tabular-nums print-text ${textColor}`}>
-                                        ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                                    <span className={`font-bold tabular-nums shrink-0 print-text ${textColor}`}>
+                                        ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
                                     </span>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                     
@@ -262,6 +289,12 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                 </div>
 
                 <div className={`p-6 border-t space-y-4 print-bg ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-slate-50 border-slate-100'}`}>
+                    {sumSaleOfferSavings(sale.items) > 0 && (
+                        <div className={`flex justify-between items-center px-1 print-text ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                            <span className="text-[10px] font-black tracking-widest">Total offer savings</span>
+                            <span className="text-sm font-black tabular-nums">₹{sumSaleOfferSavings(sale.items).toLocaleString('en-IN')}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center">
                         <div className="space-y-0.5">
                             <p className={`text-[10px] font-bold tracking-widest print-text ${secondaryText}`}>Grand Total</p>
