@@ -18,8 +18,8 @@ export default function firebaseSwPlugin() {
       };
       const content = `/* eslint-disable no-restricted-globals */
 // Firebase Messaging Service Worker - auto-generated with env config
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
 const firebaseConfig = {
   apiKey: '${cfg.apiKey}',
@@ -161,10 +161,15 @@ try {
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((payload) => {
       console.log('[Push][SW] Background message received:', payload);
-      const n = payload.notification && typeof payload.notification === 'object' ? payload.notification : {};
       const data = Object.assign({}, payload.data || {});
+      const n = payload.notification && typeof payload.notification === 'object' ? payload.notification : {};
       const title = String(n.title || data.title || 'Pocket POS');
       const body = String(n.body || data.body || data.message || 'New update');
+      const hasSystemNotification =
+        (n.title != null && String(n.title).trim() !== '') || (n.body != null && String(n.body).trim() !== '');
+      if (hasSystemNotification) {
+        return broadcastSoundToClients(data.soundCategory || 'default');
+      }
       return showLocalPush(title, body, data);
     });
     firebaseBackgroundHandlerActive = true;

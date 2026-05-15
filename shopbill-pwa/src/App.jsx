@@ -9,7 +9,7 @@ import API, { SOCKET_URL, SOCKET_IO_CLIENT_BASE } from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
-import { onForegroundMessage, isPushSupported } from './lib/firebase';
+import { onForegroundMessage, isPushSupported, ensureFcmServiceWorkerReady } from './lib/firebase';
 import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
 import { requestPushFromGesture } from './utils/pushOnGesture';
 import { USER_ROLES } from './utils/constants';
@@ -51,6 +51,17 @@ const Chat = lazy(() => import('./components/Chat'));
 /** Used to avoid reloading on first SW install: controllerchange also fires when the page gets its first controlling worker. */
 const SW_CONTROLLER_URL_KEY = 'pocketpos_sw_controller_url';
 const normalizeSwScriptUrl = (url) => (url || '').split('?')[0];
+
+/** Single ~10ms pulse when a horizontal swipe changes tabs (mechanical “tick”); Android et al.; iOS has no Vibration API. */
+function pulseSwipeHaptic() {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(10);
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -427,6 +438,8 @@ const App = () => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [hasModalOpen, setHasModalOpen] = useState(false);
+  /** Bumped from Header “Add New” branch hub so OutletManager opens create modal after navigation */
+  const [openCreateBranchSignal, setOpenCreateBranchSignal] = useState(0);
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
   const [showStaffPunchPrompt, setShowStaffPunchPrompt] = useState(false);
   const [hasStaffPunchedIn, setHasStaffPunchedIn] = useState(false);
@@ -490,9 +503,13 @@ const App = () => {
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return true;
     // Always allow utility settings and sales history access for staff.
     if (pageId === 'settings' || pageId === 'salesActivity') return true;
+    // Messages must stay visible for staff so chat does not disappear from footer.
+    if (pageId === 'chat' && (userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER)) return true;
+    // Manager-specific reports grant should immediately unlock Reports page visibility.
+    if (pageId === 'reports' && userRole === USER_ROLES.MANAGER && currentUser?.permissions?.reports === true) return true;
     if (userRole === USER_ROLES.MANAGER && pageId === 'staffPermissions') return true;
     return rolePagePermissions?.[pageId] === true;
-  }, [userRole, rolePagePermissions]);
+  }, [userRole, rolePagePermissions, currentUser?.permissions?.reports]);
   const mergeCurrentUserFields = useCallback((partial) => {
     if (!partial || typeof partial !== 'object') return;
     setCurrentUser((prev) => {
@@ -721,6 +738,10 @@ const App = () => {
       }
       if (rawUrl.includes('/inventory')) {
         navigateTo('inventory');
+        return;
+      }
+      if (rawUrl.includes('/reports')) {
+        navigateTo('reports');
         return;
       }
       if (rawUrl.includes('/scm') || rawUrl.includes('/supply')) {
@@ -1115,6 +1136,8 @@ useEffect(() => {
     (async () => {
       try {
         if (!(await isPushSupported()) || cancelled) return;
+        await ensureFcmServiceWorkerReady();
+        if (cancelled) return;
         unsubscribe = onForegroundMessage((payload) => {
           const data = payload?.data || {};
           const notification = payload?.notification || {};
@@ -1202,27 +1225,41 @@ useEffect(() => {
     
     backStackRef.current = [];
     setCurrentPage('dashboard'); // All roles start at dashboard now
-    setIsViewingLogin(true); // Keep auth flow pinned; prevent fallback to landing after browser-back gestures.
+    setIsViewingLogin(false);
+    // Replace the current history slot so edge-swipe / system back does not restore a pre-login bfcache snapshot.
+    try {
+      window.history.replaceState(
+        { pocketposApp: true, pocketposAuthed: true, at: Date.now() },
+        '',
+        window.location.href
+      );
+    } catch {
+      /* ignore */
+    }
     unlockAudio(); // Unlock audio for message sounds (user gesture from login)
     // iOS Safari / installed PWA: notification permission must run in the same user-gesture chain as login tap.
     requestPushFromGesture().catch(() => {});
   }, [apiClient, API]);
 
-  // iOS edge-swipe/browser-back can navigate to pre-login history entry (landing).
-  // When authenticated, keep users inside app until explicit logout.
+  // bfcache can restore an older JS snapshot after system back; re-sync session from storage.
   useEffect(() => {
-    if (!currentUser) return;
-    const guardState = { pocketposAuthSession: true, at: Date.now() };
-    window.history.pushState(guardState, '', window.location.href);
-
-    const handleAuthenticatedPopState = () => {
-      if (!currentUserRef.current) return;
-      window.history.pushState(guardState, '', window.location.href);
+    const onPageShow = (e) => {
+      if (!e.persisted) return;
+      const token = localStorage.getItem('userToken');
+      const raw = localStorage.getItem('currentUser');
+      if (!token || token === 'undefined' || !raw) return;
+      try {
+        const stored = JSON.parse(raw);
+        if (!(stored && (stored.id || stored._id))) return;
+        setCurrentUser(stored);
+        setIsViewingLogin(false);
+      } catch {
+        /* ignore */
+      }
     };
-
-    window.addEventListener('popstate', handleAuthenticatedPopState);
-    return () => window.removeEventListener('popstate', handleAuthenticatedPopState);
-  }, [currentUser?._id]);
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   const handleOutletSwitch = useCallback((outlet) => {
     if (outlet) {
@@ -1355,9 +1392,17 @@ useEffect(() => {
     };
     window.addEventListener('focus', syncStaffOnResume);
     document.addEventListener('visibilitychange', onVisibility);
+    const periodicStaffSync = setInterval(() => {
+      const cu = currentUserRef.current;
+      const role = (cu?.role || '').toLowerCase();
+      if (document.visibilityState === 'visible' && cu?.id && apiClient && (role === 'manager' || role === 'cashier')) {
+        syncUserFromProfile();
+      }
+    }, 45000);
     return () => {
       window.removeEventListener('focus', syncStaffOnResume);
       document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(periodicStaffSync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]); // Login: full sync; staff also refresh on focus so outlet role permissions apply without re-login
@@ -1365,7 +1410,12 @@ useEffect(() => {
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const userPlan = currentUser?.plan?.toUpperCase();
-    const hasChatAccess = userPlan === 'PRO' || userPlan === 'PREMIUM';
+    // Managers/cashiers should always have chat access; owner chat remains plan-gated.
+    const hasChatAccess =
+      userRole === USER_ROLES.MANAGER ||
+      userRole === USER_ROLES.CASHIER ||
+      userPlan === 'PRO' ||
+      userPlan === 'PREMIUM';
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 1, manager: 1, cashier: 1 } },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
@@ -1393,7 +1443,7 @@ useEffect(() => {
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
       [USER_ROLES.MANAGER]: isBasicManager
-        ? ['dashboard', 'inventory', 'khata', 'billing']
+        ? ['dashboard', 'inventory', 'khata', 'chat', ...(canAccessPage('reports') ? ['reports'] : [])]
         : ['dashboard', 'inventory', 'scm', 'khata', 'chat'],
       [USER_ROLES.CASHIER]: ['dashboard', 'billing', 'khata', 'chat'], // Dashboard, Billing, Ledger, Messages
     };
@@ -1424,7 +1474,7 @@ useEffect(() => {
       .concat(secondary.filter(item => !secondaryOrder.includes(item.id)));
     
     return { primaryNavItems: primary, secondaryNavItems: sortedSecondary };
-  }, [navItems, userRole, currentUser?.plan]);
+  }, [navItems, userRole, currentUser?.plan, canAccessPage]);
 
   // Ordered page ids for swipe navigation (matches footer tabs; Settings added when it's a direct tab)
   const swipeablePageIds = useMemo(() => {
@@ -1440,6 +1490,7 @@ useEffect(() => {
       if (backStackRef.current.length > 0) {
         const backPage = backStackRef.current[backStackRef.current.length - 1];
         backStackRef.current = backStackRef.current.slice(0, -1);
+        pulseSwipeHaptic();
         setSlideDirection('right');
         setCurrentPage(backPage);
         setTimeout(() => setSlideDirection(null), 320);
@@ -1448,6 +1499,7 @@ useEffect(() => {
       const idx = swipeablePageIds.indexOf(currentPage);
       if (idx > 0) {
         const prevId = swipeablePageIds[idx - 1];
+        pulseSwipeHaptic();
         setSlideDirection('right');
         setCurrentPage(prevId);
         setTimeout(() => setSlideDirection(null), 320);
@@ -1459,6 +1511,7 @@ useEffect(() => {
     if (idx === -1) return;
     if (idx < swipeablePageIds.length - 1) {
       const nextId = swipeablePageIds[idx + 1];
+      pulseSwipeHaptic();
       setSlideDirection('left');
       setCurrentPage(nextId);
       setTimeout(() => setSlideDirection(null), 320);
@@ -1546,7 +1599,7 @@ useEffect(() => {
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
-    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }} />;
+    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }} />;
     if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} onLogout={logout} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {
@@ -1636,7 +1689,7 @@ useEffect(() => {
             case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} onProfileUpdated={handleProfileUpdated} />;
             case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
-            case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} />;
+            case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} openCreateBranchSignal={openCreateBranchSignal} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => navigateTo('dashboard', { replace: true })} />;
             case 'offers': return <OffersManager key={componentKey} {...commonProps} />;
             case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={() => setCurrentPage('staffPermissions')} />;
@@ -1667,45 +1720,6 @@ useEffect(() => {
     return () => document.body.classList.remove(className);
   }, [currentPage]);
 
-  // Pin fixed mobile footer to the visual viewport when the keyboard is open. With
-  // interactive-widget=resizes-content, innerHeight/vv.height often match when the keyboard is closed;
-  // buggy large "gap" values were lifting the footer toward the top of the screen.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const isTextFieldFocused = () => {
-      const el = document.activeElement;
-      if (!el) return false;
-      const tag = el.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
-      if (el.isContentEditable) return true;
-      return false;
-    };
-    const update = () => {
-      if (!isTextFieldFocused()) {
-        document.documentElement.style.setProperty('--keyboard-visual-offset', '0px');
-        return;
-      }
-      const ih = window.innerHeight;
-      const raw = Math.max(0, ih - vv.height - (Number(vv.offsetTop) || 0));
-      const cap = Math.floor(ih * 0.5);
-      const gap = raw > 0 && raw <= cap ? raw : 0;
-      document.documentElement.style.setProperty('--keyboard-visual-offset', `${gap}px`);
-    };
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    document.addEventListener('focusin', update);
-    document.addEventListener('focusout', update);
-    update();
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      document.removeEventListener('focusin', update);
-      document.removeEventListener('focusout', update);
-      document.documentElement.style.removeProperty('--keyboard-visual-offset');
-    };
-  }, []);
-  
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
   const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
@@ -1714,7 +1728,9 @@ useEffect(() => {
     <ApiProvider>
       {/* Scrollbar styles are now handled globally in index.css */}
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
-      <div className={`h-dvh max-h-dvh w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}>
+      <div
+        className={`h-dvh min-h-dvh max-h-dvh w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden overscroll-none transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}
+      >
         <UpdatePrompt />
         {showAppUI && showStaffPunchPrompt && isStaffUser && (
           <div className="fixed inset-0 z-[220] bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-4">
@@ -1765,6 +1781,10 @@ useEffect(() => {
             showToast={showToast}
             hasModalOpen={hasModalOpen}
             outlets={outlets}
+            onOpenAddBranchFromHub={() => {
+              setOpenCreateBranchSignal((n) => n + 1);
+              navigateTo('outlets');
+            }}
           />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -1794,7 +1814,7 @@ useEffect(() => {
                       : (currentUser?.shopName || '').trim();
                     if (!sidebarLabel) return null;
                     return (
-                      <p className={`text-[9px] font-black uppercase tracking-widest truncate ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} title={sidebarLabel}>
+                      <p className={`header-outlet-subline text-[9px] font-black truncate ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} title={sidebarLabel}>
                         {sidebarLabel}
                       </p>
                     );
@@ -1892,10 +1912,10 @@ useEffect(() => {
                 </div>
             </aside>
           )}
-          <main className={`${showAppUI ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-initial min-h-0'} transition-all duration-300 ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-hidden overflow-x-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-16 md:pt-0 overflow-hidden overflow-x-hidden pb-24 md:pb-6' : 'md:ml-64 pt-16 md:pt-6 pb-24 md:pb-6 overflow-hidden overflow-x-hidden')) : 'w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar'}`}>
+          <main className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 overscroll-none ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-x-hidden overflow-y-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] md:pt-0 overflow-x-hidden overflow-y-hidden md:pb-6' : 'md:ml-64 pt-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] md:pt-6 overflow-x-hidden overflow-y-auto md:pb-6')) : 'w-full overflow-y-auto overflow-x-hidden custom-scrollbar'}`}>
             <div
-              className={`${currentPage === 'chat' && isChatSelected ? 'h-full flex-1 min-h-0' : (currentPage === 'chat' ? 'h-full flex-1 min-h-0' : `max-w-7xl mx-auto w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'} ${showAppUI ? 'overflow-x-hidden' : ''}`}
-              {...(showAppUI ? { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } : {})}
+              className={`${currentPage === 'chat' && isChatSelected ? 'h-full min-h-0 flex-1 overflow-hidden' : (currentPage === 'chat' ? 'h-full min-h-0 flex-1 overflow-hidden' : `max-w-7xl mx-auto w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'} ${showAppUI ? 'overflow-x-hidden' : ''}`}
+              {...(showAppUI && currentPage !== 'chat' ? { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } : {})}
             >
               <div
                 className={`${
@@ -1908,7 +1928,7 @@ useEffect(() => {
                   showAppUI && currentPage === 'chat'
                     ? 'h-full flex-1 min-h-0 flex flex-col'
                     : showAppUI && currentPage !== 'chat' && !isChatSelected
-                      ? 'flex-1 min-h-0 flex flex-col'
+                      ? 'h-full flex-1 min-h-0 flex flex-col'
                       : ''
                 }`}
               >
@@ -1919,9 +1939,14 @@ useEffect(() => {
         </div>
         {showAppUI && !isChatSelected && (
           <>
-            <nav className={`fixed inset-x-0 bottom-0 max-md:bottom-[var(--keyboard-visual-offset,0px)] h-18 border-t md:hidden flex items-center justify-around z-[50] px-2 pb-safe shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl ${darkMode ? 'bg-gray-950/90 border-gray-900' : 'bg-white/90 border-slate-200'}`}>
+            <nav
+              aria-label="Main navigation"
+              className={`relative z-[50] flex w-full shrink-0 flex-col border-t md:hidden shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl overscroll-none pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] ${darkMode ? 'bg-gray-950/95 border-gray-900' : 'bg-white/95 border-slate-200'}`}
+              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
+            >
+              <div className="flex min-h-[3.5rem] flex-1 items-stretch justify-evenly gap-0.5 px-1 sm:px-2">
               {!showMoreMenu && primaryNavItems.map(item => (
-                <button key={item.id} onClick={() => navigateTo(item.id)} className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
+                <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
                   {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
                   <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
                     <item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
@@ -1936,8 +1961,9 @@ useEffect(() => {
               {/* Cashier or Basic plan Manager: direct Settings icon in footer. Owner / Premium-Pro Manager: More button when they have secondary/utility items */}
               {(userRole === USER_ROLES.CASHIER || (userRole === USER_ROLES.MANAGER && currentUser?.plan?.toUpperCase() !== 'PREMIUM' && currentUser?.plan?.toUpperCase() !== 'PRO')) ? (
                 <button
+                  type="button"
                   onClick={() => navigateTo('settings')}
-                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${currentPage === 'settings' ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${currentPage === 'settings' ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
                   {currentPage === 'settings' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
                   <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === 'settings' ? 'bg-indigo-500/10' : ''}`}>
@@ -1946,8 +1972,9 @@ useEffect(() => {
                 </button>
               ) : (secondaryNavItems.length > 0 || utilityNavItems.length > 0) && (
                 <button 
+                  type="button"
                   onClick={() => setShowMoreMenu(!showMoreMenu)} 
-                  className={`flex flex-col items-center justify-center py-2 px-2 transition-all relative flex-1 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
                   {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
                   <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
@@ -1960,6 +1987,7 @@ useEffect(() => {
                   </div>
                 </button>
               )}
+              </div>
             </nav>
 
             {/* More Menu Modal */}
@@ -1967,7 +1995,8 @@ useEffect(() => {
               <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                 <div 
-                  className={`fixed left-0 right-0 bottom-0 max-md:bottom-[var(--keyboard-visual-offset,0px)] rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100dvh] overflow-y-auto custom-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  className={`fixed bottom-0 left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100dvh] overflow-y-auto custom-scrollbar pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+                  style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
@@ -1978,7 +2007,7 @@ useEffect(() => {
                       </button>
                     </div>
                   </div>
-                  <div className="px-2 pt-2 pb-4 pb-safe">
+                  <div className="px-2 pt-2 pb-2">
                     {/* Owner: Team management, Inventory, Billing, [Supply Chain], Settings. Others: utility then secondary */}
                     {footerMoreMenuItems ? (
                       footerMoreMenuItems.map(item => (

@@ -198,6 +198,14 @@ const emitAlert = async (req, storeId, type, data) => {
                 staffId: data.staffId || null
             };
             break;
+        case 'reports_access_enabled':
+            title = 'Reports Access Enabled';
+            category = 'Info';
+            message = data.message || 'Reports access has been enabled for your account.';
+            metadata = {
+                ...(data.staffId ? { staffId: data.staffId } : {})
+            };
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -234,7 +242,7 @@ const emitAlert = async (req, storeId, type, data) => {
             metadata,
             readBy: [], // Ensure this is initialized as empty
             createdAt: new Date(),
-            recipientUserId: type === 'staff_shift_assigned' && data.targetUserId ? data.targetUserId : null
+            recipientUserId: data.targetUserId || null
         });
 
         if (io) {
@@ -258,6 +266,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     'attendance_punch_out'
                 ].includes(type);
                 const isStaffShiftAssigned = type === 'staff_shift_assigned';
+                const hasDirectTarget = Boolean(data?.targetUserId);
                 const actorRoleLower = (actorRole || '').toLowerCase();
 
                 // Get all managers and cashiers for this store (needed for default and cashier-reported)
@@ -397,6 +406,10 @@ const emitAlert = async (req, storeId, type, data) => {
                     targetUserIds.clear();
                     targetUserIds.add(String(data.targetUserId));
                 }
+                if (hasDirectTarget) {
+                    targetUserIds.clear();
+                    targetUserIds.add(String(data.targetUserId));
+                }
 
                 const pushSoundCategory = (() => {
                     if (type === 'inventory_low' || type === 'credit_exceeded') return 'alert';
@@ -456,10 +469,10 @@ const emitAlert = async (req, storeId, type, data) => {
                             soundCategory: pushSoundCategory,
                             data: {
                                 type: 'notification',
-                                link: '/notifications',
+                                link: data?.link || '/notifications',
                                 notificationId: newNotification._id?.toString() || '',
                                 storeId: storeIdStr,
-                                notificationType: type,
+                                notificationType: data?.notificationType || type,
                                 category,
                                 actorId: actorId?.toString?.() || '',
                                 soundCategory: pushSoundCategory,

@@ -109,8 +109,15 @@ const protect = async (req, res, next) => {
                 storeId = req.headers['x-store-id'];
                 const store = await Store.findOne({ _id: storeId, ownerId: user._id, isActive: true });
                 if (store) {
-                    user.activeStoreId = storeId;
-                    await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
+                    const contextOnlyRaw = req.headers['x-store-context-only'];
+                    const contextOnly =
+                        String(contextOnlyRaw || '').toLowerCase() === '1' ||
+                        String(contextOnlyRaw || '').toLowerCase() === 'true';
+                    // Read-only outlet context (e.g. Store Network loading every branch) must not persist activeStoreId.
+                    if (!contextOnly) {
+                        user.activeStoreId = storeId;
+                        await User.findByIdAndUpdate(user._id, { activeStoreId: storeId });
+                    }
                 } else {
                     console.error(`DEBUG: [403] Owner ${user._id} attempted access to invalid/unowned store: ${storeId}`);
                     return res.status(403).json({ error: 'Invalid outlet or outlet does not belong to you.' });

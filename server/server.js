@@ -186,6 +186,18 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Typing indicator — relay to others in the same chat room (sender excluded via socket.to)
+    socket.on('chat_typing', (payload) => {
+        if (!socket.user?.id || !payload?.chatId) return;
+        const chatId = String(payload.chatId);
+        const isTyping = !!payload.isTyping;
+        socket.to(`chat_${chatId}`).emit('chat_typing', {
+            chatId,
+            userId: String(socket.user.id),
+            isTyping,
+        });
+    });
+
     // Handle manual leave if needed
     socket.on('leave_shop', (shopId) => {
         if (shopId) {

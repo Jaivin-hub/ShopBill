@@ -4,7 +4,8 @@ import { MessageCircle, Plus } from 'lucide-react';
 const EmptyChatView = ({
     chats,
     onNewChat,
-    darkMode
+    darkMode,
+    showStartChatButton = true,
 }) => {
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
 
@@ -22,11 +23,14 @@ const EmptyChatView = ({
                     {chats.length === 0 ? 'No Conversations Yet' : 'Select a Chat'}
                 </h3>
                 <p className={`text-sm mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {chats.length === 0 
+                    {!showStartChatButton
+                        ? 'Choose someone under Staff in the sidebar to start a direct message.'
+                        : chats.length === 0 
                         ? 'Start communicating with your team members. Create your first chat to get started!'
                         : 'Choose a conversation from the sidebar to view messages or start a new one'
                     }
                 </p>
+                {showStartChatButton && (
                 <button
                     onClick={onNewChat}
                     className="w-full py-3.5 px-6 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
@@ -34,7 +38,8 @@ const EmptyChatView = ({
                     <Plus className="w-5 h-5" />
                     <span>Start New Chat</span>
                 </button>
-                {chats.length > 0 && (
+                )}
+                {showStartChatButton && chats.length > 0 && (
                     <p className={`text-xs mt-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         Or click on any chat from the sidebar
                     </p>

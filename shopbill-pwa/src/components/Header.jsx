@@ -23,7 +23,8 @@ const Header = ({
     onOutletSwitch,
     showToast,
     hasModalOpen = false,
-    outlets = [] // Receive outlets from parent to avoid duplicate fetching
+    outlets = [], // Receive outlets from parent to avoid duplicate fetching
+    onOpenAddBranchFromHub
 }) => {
     const [showStoreHub, setShowStoreHub] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
@@ -233,7 +234,7 @@ const Header = ({
     return (
         <>
             <header 
-                className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] p-4 flex justify-between items-center backdrop-blur-md ${headerBg} transition-all duration-300 ${hasModalOpen ? 'opacity-0 pointer-events-none invisible' : ''}`}
+                className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] flex justify-between items-center backdrop-blur-md overscroll-none [transform:translate3d(0,0,0)] ${headerBg} transition-all duration-300 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-4 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] ${hasModalOpen ? 'opacity-0 pointer-events-none invisible' : ''}`}
                 aria-hidden={hasModalOpen}
             >
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setCurrentPage('dashboard'); setShowStoreHub(false); }}>
@@ -245,7 +246,7 @@ const Header = ({
                             Pocket <span className="text-indigo-500">POS</span>
                         </h1>
                         {displayedBusinessName && (
-                            <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[120px]">
+                            <p className="header-outlet-subline text-[8px] font-black text-indigo-500 truncate max-w-[120px]">
                                 {displayedBusinessName}
                             </p>
                         )}
@@ -295,7 +296,7 @@ const Header = ({
 
             {/* Expansion Panel (Store Hub) - hidden when a modal is open so modal has focus */}
             {isPremium && isOwner && showStoreHub && !hasModalOpen && (
-                <div className={`fixed top-[73px] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
+                <div className={`fixed top-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-[10px] font-black tracking-widest opacity-50 uppercase">Select Active Branch</span>
                         <button 
@@ -342,7 +343,14 @@ const Header = ({
                                     );
                                 })}
                                 <button 
-                                    onClick={() => { setCurrentPage('outlets'); setShowStoreHub(false); }}
+                                    onClick={() => {
+                                        setShowStoreHub(false);
+                                        if (onOpenAddBranchFromHub) {
+                                            onOpenAddBranchFromHub();
+                                        } else {
+                                            setCurrentPage('outlets');
+                                        }
+                                    }}
                                     className={`flex-shrink-0 snap-start px-4 py-3 rounded-2xl border border-dashed flex items-center gap-3 ${
                                         darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'
                                     }`}

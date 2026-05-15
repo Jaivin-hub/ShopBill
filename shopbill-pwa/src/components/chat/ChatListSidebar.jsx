@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
-    Plus, Search, User, Store, Loader2, 
+    Search, User, 
     ShieldCheck, ArrowRight, LayoutGrid, 
     UserSquare2, Users, X
 } from 'lucide-react';
+import { participantLabelForViewer, participantEmailForViewer, participantRoleLabelForViewer, isStaffViewer, isParticipantOwner } from '../../utils/ownerDisplay';
+import {
+    ChatSidebarHeaderSkeleton,
+    ChatSidebarGroupsRowsSkeleton,
+    ChatSidebarStaffRowsSkeleton,
+} from '../skeletons/PageSkeletons';
 
 const ChatListSidebar = ({
     chats,
     selectedChat,
     onSelectChat,
     staffList,
-    onNewGroupClick,
     onQuickMessage,
     searchTerm,
     onSearchChange,
@@ -21,10 +26,32 @@ const ChatListSidebar = ({
     currentUser,
     darkMode,
     staffUnreadMap = {},
-    showOutletInfo = false
+    showOutletInfo = false,
+    viewMode = 'chats',
+    onViewModeChange,
 }) => {
-    const [viewMode, setViewMode] = useState('chats');
     const [showSearch, setShowSearch] = useState(false);
+    const safeChats = Array.isArray(chats) ? chats : [];
+    const groupUnreadCount = useMemo(
+        () =>
+            safeChats
+                .filter((chat) => chat?.type === 'group' || chat?.isDefault)
+                .reduce((total, chat) => total + (Number(chat?.unreadCount) || 0), 0),
+        [safeChats]
+    );
+    const staffUnreadCount = useMemo(
+        () =>
+            Object.values(staffUnreadMap || {}).reduce(
+                (total, unread) => total + (Number(unread) || 0),
+                0
+            ),
+        [staffUnreadMap]
+    );
+
+    const safeStaffList = Array.isArray(staffList) ? staffList : [];
+    const showSidebarHeaderSkeleton =
+        (viewMode === 'chats' && isLoading && safeChats.length === 0) ||
+        (viewMode === 'users' && isLoadingStaff && safeStaffList.length === 0);
 
     // --- Theme Vars ---
     const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
@@ -36,62 +63,109 @@ const ChatListSidebar = ({
         >
             {/* Scrollable Container - Required for sticky to work */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {/* Sticky Header Area - Title, Description, Toggle, and Search */}
-                <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'border-slate-200 bg-white backdrop-blur-xl'} shadow-lg`}>
-                    <div className="p-4 md:p-6 pb-3 md:pb-4">
-                        <div className="flex items-center gap-2">
-                            {/* Toggle */}
-                            <div className={`flex p-1 rounded-xl gap-1 border flex-1 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-                                <button
-                                    onClick={() => setViewMode('chats')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
-                                        viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                                    }`}
-                                >
-                                    <LayoutGrid size={11} className="md:w-3 md:h-3" />
-                                    <span className="hidden sm:inline">GROUPS</span>
-                                    <span className="sm:hidden">Group</span>
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('users')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
-                                        viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
-                                    }`}
-                                >
-                                    <UserSquare2 size={11} className="md:w-3 md:h-3" />
-                                    <span className="hidden sm:inline">STAFF</span>
-                                    <span className="sm:hidden">Staff</span>
-                                </button>
+                {showSidebarHeaderSkeleton ? (
+                    <ChatSidebarHeaderSkeleton darkMode={darkMode} />
+                ) : (
+                    <>
+                        {/* Sticky Header Area - Title, Description, Toggle, and Search */}
+                        <div className={`sticky top-0 z-[100] border-b ${darkMode ? 'border-slate-800/60 bg-gray-950 backdrop-blur-xl' : 'border-slate-200 bg-white backdrop-blur-xl'} shadow-lg`}>
+                            <div className="p-4 md:p-6 pb-3 md:pb-4">
+                                <div className="flex items-center gap-2">
+                                    {/* Toggle */}
+                                    <div className={`flex p-1 rounded-xl gap-1 border flex-1 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() => onViewModeChange?.('chats')}
+                                            className={`flex-1 flex items-center justify-between px-2 md:px-2.5 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                                viewMode === 'chats' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-1.5 md:gap-2">
+                                                <LayoutGrid size={11} className="md:w-3 md:h-3" />
+                                                <span className="hidden sm:inline">GROUPS</span>
+                                                <span className="sm:hidden">Group</span>
+                                            </span>
+                                            {groupUnreadCount > 0 && (
+                                                <span
+                                                    className={`h-4 min-w-[16px] px-1 rounded-full text-[8px] font-black leading-none flex items-center justify-center ${
+                                                        viewMode === 'chats'
+                                                            ? 'bg-white/25 text-white'
+                                                            : darkMode
+                                                                ? 'bg-rose-600 text-white'
+                                                                : 'bg-rose-500 text-white'
+                                                    }`}
+                                                >
+                                                    {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onViewModeChange?.('users')}
+                                            className={`flex-1 flex items-center justify-between px-2 md:px-2.5 py-2 rounded-lg text-[8px] md:text-[9px] font-black tracking-[0.2em] transition-all ${
+                                                viewMode === 'users' ? activeTab : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-1.5 md:gap-2">
+                                                <UserSquare2 size={11} className="md:w-3 md:h-3" />
+                                                <span className="hidden sm:inline">STAFF</span>
+                                                <span className="sm:hidden">Staff</span>
+                                            </span>
+                                            {staffUnreadCount > 0 && (
+                                                <span
+                                                    className={`h-4 min-w-[16px] px-1 rounded-full text-[8px] font-black leading-none flex items-center justify-center ${
+                                                        viewMode === 'users'
+                                                            ? 'bg-white/25 text-white'
+                                                            : darkMode
+                                                                ? 'bg-rose-600 text-white'
+                                                                : 'bg-rose-500 text-white'
+                                                    }`}
+                                                >
+                                                    {staffUnreadCount > 99 ? '99+' : staffUnreadCount}
+                                                </span>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSearch((v) => !v)}
+                                        className={`shrink-0 p-2.5 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                                        aria-label={showSearch ? 'Hide search' : 'Show search'}
+                                        title={showSearch ? 'Hide search' : 'Show search'}
+                                    >
+                                        {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+                                    </button>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowSearch((v) => !v)}
-                                className={`shrink-0 p-2.5 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                                aria-label={showSearch ? 'Hide search' : 'Show search'}
-                                title={showSearch ? 'Hide search' : 'Show search'}
-                            >
-                                {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-                            </button>
-                        </div>
-                    </div>
 
-                    {/* Search - Inside Sticky Header */}
-                    {showSearch && (
-                        <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950' : 'bg-white'}`}>
-                            <div className="relative group">
-                                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
-                                    value={searchTerm}
-                                    onChange={(e) => onSearchChange(e.target.value)}
-                                    className={`w-full pl-10 pr-4 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
-                                />
-                            </div>
+                            {/* Search - Inside Sticky Header */}
+                            {showSearch && (
+                                <div className={`px-4 md:px-6 pb-3 md:pb-4 ${darkMode ? 'bg-gray-950' : 'bg-white'}`}>
+                                    <div className="relative group">
+                                        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'} group-focus-within:text-indigo-500 transition-colors`} />
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            placeholder={viewMode === 'users' ? "Search workforce..." : "Search frequencies..."}
+                                            value={searchTerm}
+                                            onChange={(e) => onSearchChange(e.target.value)}
+                                            onFocus={(e) => {
+                                                requestAnimationFrame(() => {
+                                                    try {
+                                                        e.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+                                                    } catch {
+                                                        e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                                                    }
+                                                });
+                                            }}
+                                            className={`w-full pl-10 pr-4 py-2.5 md:py-3 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl text-[16px] md:text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
+                    </>
+                )}
 
                 {/* Scrollable Content Area - Chat List */}
                 <div className="min-h-0">
@@ -123,34 +197,20 @@ const ChatListSidebar = ({
                     )}
                 </div>
             </div>
-            
-            {/* Floating Add Button - Above Footer (Mobile Only) */}
-            <button
-                onClick={onNewGroupClick}
-                className="md:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
-                aria-label="Create new chat"
-            >
-                <Plus className="w-6 h-6" strokeWidth={2.5} />
-            </button>
         </div>
     );
 };
 
 const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, darkMode, currentUser, staffUnreadMap = {}, chats = [], showOutletInfo = false }) => {
-    if (isLoadingStaff) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-5 h-5 animate-spin text-indigo-500 mb-3" />
-                <p className="text-[9px] font-black text-slate-600 tracking-[0.3em] uppercase">Syncing Node...</p>
-            </div>
-        );
-    }
-
     // Get direct chats for each staff member to sort by last message time
     const currentUserId = currentUser?._id || currentUser?.id;
     const directChatsMap = {};
     const safeChats = Array.isArray(chats) ? chats : [];
     const safeStaffList = Array.isArray(staffList) ? staffList : [];
+
+    if (isLoadingStaff && safeStaffList.length === 0) {
+        return <ChatSidebarStaffRowsSkeleton darkMode={darkMode} />;
+    }
     safeChats.forEach(chat => {
         if (chat.type === 'direct' && Array.isArray(chat.participants)) {
             const other = chat.participants.find(p => {
@@ -182,8 +242,8 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
         if (timeA > 0) return -1;
         if (timeB > 0) return 1;
         // If neither has messages, sort alphabetically
-        const nameA = (a.name || a.email || '').toLowerCase();
-        const nameB = (b.name || b.email || '').toLowerCase();
+        const nameA = (participantLabelForViewer(a, currentUser) || '').toLowerCase();
+        const nameB = (participantLabelForViewer(b, currentUser) || '').toLowerCase();
         return nameA.localeCompare(nameB);
     });
 
@@ -191,8 +251,12 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
         if (staff._id === currentUser?._id) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
-        return (staff.name || staff.email || '').toLowerCase().includes(term) ||
-               (staff.outletName || '').toLowerCase().includes(term);
+        const label = participantLabelForViewer(staff, currentUser);
+        const emailLine = participantEmailForViewer(staff, currentUser);
+        return label.toLowerCase().includes(term) ||
+               (emailLine && emailLine.toLowerCase().includes(term)) ||
+               (staff.outletName || '').toLowerCase().includes(term) ||
+               participantRoleLabelForViewer(staff, currentUser).toLowerCase().includes(term);
     });
 
     return (
@@ -209,12 +273,12 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
                         <User className={`w-5 h-5 ${darkMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className={`text-[13px] font-black truncate uppercase tracking-tight transition-colors ${darkMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-indigo-600'}`}>
-                            {staff.name || staff.email}
+                        <p className={`text-[13px] font-black truncate tracking-tight transition-colors ${isStaffViewer(currentUser) && isParticipantOwner(staff) ? 'normal-case' : 'uppercase'} ${darkMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-indigo-600'}`}>
+                            {participantLabelForViewer(staff, currentUser)}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[8px] font-black tracking-widest text-indigo-500 uppercase">
-                                {staff.role}
+                            <span className={`text-[8px] font-black tracking-widest text-indigo-500 ${isStaffViewer(currentUser) && isParticipantOwner(staff) ? 'normal-case' : 'uppercase'}`}>
+                                {participantRoleLabelForViewer(staff, currentUser)}
                             </span>
                             {showOutletInfo && staff.outletName && (
                                 <span className={`text-[8px] font-bold truncate uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
@@ -239,13 +303,8 @@ const StaffListView = ({ staffList, searchTerm, isLoadingStaff, onQuickMessage, 
 
 const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading, getChatDisplayName, formatTime, currentUser, darkMode, showOutletInfo = false }) => {
     const safeChats = Array.isArray(chats) ? chats : [];
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-3" />
-                <p className={`text-[9px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Fetching Frequencies...</p>
-            </div>
-        );
+    if (isLoading && safeChats.length === 0) {
+        return <ChatSidebarGroupsRowsSkeleton darkMode={darkMode} />;
     }
 
     // Sort chats by lastMessageAt (from backend) - most recent first
@@ -360,6 +419,8 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                             }
                                             const currentUserId = currentUser?._id || currentUser?.id;
                                             const isOwn = Boolean(senderId && currentUserId && String(senderId) === String(currentUserId));
+                                            const staffViewer = isStaffViewer(currentUser);
+                                            const senderIsOwner = lastMsg.senderRole?.toLowerCase() === 'owner';
                                             
                                             // Determine message preview text
                                             let previewText = '';
@@ -377,10 +438,10 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
                                             
                                             return (
                                                 <>
-                                                    <span className="font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 uppercase">
+                                                    <span className={`font-black text-[8px] mr-1.5 opacity-40 text-indigo-500 ${staffViewer && senderIsOwner && !isOwn ? 'normal-case' : 'uppercase'}`}>
                                                         {isOwn ? 'YOU:' : (
-                                                            lastMsg.senderRole?.toLowerCase() === 'owner' 
-                                                                ? `${lastMsg.senderRole.toUpperCase()}:` 
+                                                            senderIsOwner
+                                                                ? (staffViewer ? 'Owner:' : `${lastMsg.senderRole.toUpperCase()}:`)
                                                                 : (lastMsg.senderName ? `${lastMsg.senderName.toUpperCase()}:` : 'INCOMING:')
                                                         )}
                                                     </span>

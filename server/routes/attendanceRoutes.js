@@ -1173,7 +1173,7 @@ router.get('/active-status', protect, async (req, res) => {
             punchIn: { $gte: twentyFourHoursAgo }
         })
         .select('staffId punchIn onBreak breaks')
-        .populate('staffId', 'name email')
+        .populate('staffId', 'name email userId')
         .sort({ punchIn: -1 })
         .lean();
 
@@ -1191,7 +1191,7 @@ router.get('/active-status', protect, async (req, res) => {
                 punchIn: { $gte: twentyFourHoursAgo }
             })
             .select('staffId punchIn onBreak breaks')
-            .populate('staffId', 'name email')
+            .populate('staffId', 'name email userId')
             .sort({ punchIn: -1 })
             .lean();
         }
@@ -1204,7 +1204,7 @@ router.get('/active-status', protect, async (req, res) => {
                 punchIn: { $gte: twentyFourHoursAgo }
             })
             .select('staffId punchIn onBreak breaks')
-            .populate('staffId', 'name email')
+            .populate('staffId', 'name email userId')
             .sort({ punchIn: -1 })
             .lean();
         }
@@ -1238,9 +1238,12 @@ router.get('/active-status', protect, async (req, res) => {
                         breakDurationMinutes = Math.floor((now - new Date(activeBreak.breakStart)) / (1000 * 60));
                     }
                 }
+                const uid = record.staffId?.userId;
+                const userIdStr = uid ? (uid._id || uid).toString() : null;
                 activeStaffMap[staffId] = {
                     punchIn: record.punchIn,
                     staffName: record.staffId?.name,
+                    userId: userIdStr || undefined,
                     onBreak,
                     breakStart: breakStart || undefined,
                     breakDurationMinutes: breakDurationMinutes || undefined
@@ -1248,11 +1251,17 @@ router.get('/active-status', protect, async (req, res) => {
             }
         });
 
+        const activePunchedInUserIds = [...new Set(
+            Object.values(activeStaffMap).map((d) => d.userId).filter(Boolean)
+        )];
+
         res.json({
             success: true,
             activeStaffIds: Object.keys(activeStaffMap),
+            activePunchedInUserIds,
             activeAttendance: Object.entries(activeStaffMap).map(([staffId, data]) => ({
                 staffId,
+                userId: data.userId,
                 staffName: data.staffName,
                 punchIn: data.punchIn,
                 onBreak: data.onBreak,

@@ -116,25 +116,26 @@ async function sendPushNotification(tokens, payload) {
             soundCategory,
             link: preData.link || linkPath,
         });
-        const webpushData = stringifyDataMap({
-            ...normalizedData,
-            title: String(title || normalizedData.title || ''),
-            body: String(body || normalizedData.body || ''),
-            soundCategory,
-            link: normalizedData.link || linkPath,
-        });
-        // Web Push: data + webpush.data only (no webpush.notification). If we set webpush.notification,
-        // Chrome Android often shows a system notification AND still delivers data to the SW — which then
-        // calls showNotification → duplicate. iOS Safari: one tray banner from the SW via showLocalPush only.
+        const iconUrl = baseClientUrl ? `${baseClientUrl}/pwa-192x192.png` : '';
+        const webBody = String(body || '').slice(0, 120) || 'New notification';
+        const webTitle = String(title || 'Pocket POS');
+        // Web/PWA: many Android Chrome + iOS 16.4+ builds only surface pushes reliably when `webpush`
+        // includes a notification + data. Top-level `data` alone often stops reaching `onBackgroundMessage`.
+        // The SW skips duplicate showLocalPush when `payload.notification` is present (avoids double alerts).
         const result = await fb.messaging().sendEachForMulticast({
             tokens: deduped,
             data: normalizedData,
             webpush: {
                 headers: {
                     Urgency: 'high',
-                    TTL: String(60 * 60 * 24),
+                    TTL: `${60 * 60 * 24}`,
                 },
-                data: webpushData,
+                data: normalizedData,
+                notification: {
+                    title: webTitle,
+                    body: webBody,
+                    ...(iconUrl ? { icon: iconUrl, badge: iconUrl } : {}),
+                },
                 fcmOptions: {
                     link,
                 },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgePercent, Calendar, Plus, RefreshCw, Tag, Trash2, X } from 'lucide-react';
+import { BadgePercent, Calendar, Plus, RefreshCw, RotateCcw, Tag, Trash2, X } from 'lucide-react';
 import { OffersInitialSkeleton } from './skeletons/PageSkeletons';
 import ConfirmationModal from './ConfirmationModal';
 
@@ -17,7 +17,9 @@ const emptyForm = {
   discountType: 'percentage',
   discountValue: '',
   startDate: '',
+  startTime: '00:00',
   endDate: '',
+  endTime: '23:59',
 };
 
 const STATUS_TABS = [
@@ -25,6 +27,18 @@ const STATUS_TABS = [
   { id: 'scheduled', label: 'Scheduled', icon: Calendar, accent: 'border-l-indigo-500', iconClass: 'text-indigo-500' },
   { id: 'expired', label: 'Expired', icon: Tag, accent: 'border-l-amber-500', iconClass: 'text-amber-500' },
 ];
+
+function defaultReactivateDateTimes() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const startDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const startTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const end = new Date(now);
+  end.setDate(end.getDate() + 7);
+  const endDate = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+  const endTime = startTime;
+  return { startDate, startTime, endDate, endTime };
+}
 
 const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [offers, setOffers] = useState([]);
@@ -36,6 +50,9 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [form, setForm] = useState(emptyForm);
   const [offerBucket, setOfferBucket] = useState('active');
   const [offerPendingDelete, setOfferPendingDelete] = useState(null);
+  const [reactivateTarget, setReactivateTarget] = useState(null);
+  const [reactivateFields, setReactivateFields] = useState(() => defaultReactivateDateTimes());
+  const [isReactivating, setIsReactivating] = useState(false);
 
   const canManage = ['owner', 'manager'].includes(String(userRole || '').toLowerCase());
 
@@ -97,15 +114,6 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
     return { active, scheduled, expired };
   }, [offers]);
 
-  const tabCounts = useMemo(
-    () => ({
-      active: statusBuckets.active.length,
-      scheduled: statusBuckets.scheduled.length,
-      expired: statusBuckets.expired.length,
-    }),
-    [statusBuckets]
-  );
-
   const emptyMessages = useMemo(
     () => ({
       active: 'No active offers. Create one or check Scheduled.',
@@ -134,16 +142,22 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
 
   const handleCreateOffer = async (e) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.startDate || !form.endDate || !form.discountValue) {
-      showToast?.('Please fill title, discount, start date and end date.', 'error');
+    if (!form.title.trim() || !form.startDate || !form.endDate || !form.startTime || !form.endTime || !form.discountValue) {
+      showToast?.('Please fill title, discount, start/end date and start/end time.', 'error');
       return;
     }
     if (form.offerType === 'product' && !form.productName) {
       showToast?.('Please select a product.', 'error');
       return;
     }
-    if (new Date(form.startDate) > new Date(form.endDate)) {
-      showToast?.('End date must be after start date.', 'error');
+    const startDateTime = new Date(`${form.startDate}T${form.startTime}`);
+    const endDateTime = new Date(`${form.endDate}T${form.endTime}`);
+    if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
+      showToast?.('Invalid start or end date/time.', 'error');
+      return;
+    }
+    if (startDateTime > endDateTime) {
+      showToast?.('End date/time must be after start date/time.', 'error');
       return;
     }
 
@@ -154,8 +168,8 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       productId: form.offerType === 'product' ? form.productName : null,
       discountType: form.discountType,
       discountValue: Number(form.discountValue),
-      startDate: form.startDate,
-      endDate: form.endDate,
+      startDate: startDateTime.toISOString(),
+      endDate: endDateTime.toISOString(),
     };
 
     setIsSaving(true);
@@ -180,6 +194,59 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       setOffers((prev) => prev.filter((o) => o._id !== offerId && o.id !== offerId));
     } catch (error) {
       showToast?.('Unable to delete offer now.', 'error');
+    }
+  };
+
+  const openReactivateModal = (offer) => {
+    setReactivateTarget(offer);
+    setReactivateFields(defaultReactivateDateTimes());
+  };
+
+  const handleReactivateOffer = async () => {
+    if (!reactivateTarget) return;
+    const { startDate, startTime, endDate, endTime } = reactivateFields;
+    if (!startDate || !startTime || !endDate || !endTime) {
+      showToast?.('Please set start and end date/time.', 'error');
+      return;
+    }
+    const startDateTime = new Date(`${startDate}T${startTime}`);
+    const endDateTime = new Date(`${endDate}T${endTime}`);
+    if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
+      showToast?.('Invalid start or end date/time.', 'error');
+      return;
+    }
+    if (startDateTime > endDateTime) {
+      showToast?.('End must be after start.', 'error');
+      return;
+    }
+    const offer = reactivateTarget;
+    const offerId = offer._id || offer.id;
+    const rawProductId = offer.productId;
+    const productId =
+      offer.offerType === 'product'
+        ? (typeof rawProductId === 'object' && rawProductId !== null ? rawProductId._id || rawProductId.id : rawProductId)
+        : null;
+
+    setIsReactivating(true);
+    try {
+      await apiClient.put(API.offerById(offerId), {
+        title: offer.title,
+        description: offer.description || '',
+        offerType: offer.offerType,
+        productId,
+        discountType: offer.discountType,
+        discountValue: offer.discountValue,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        isActive: true,
+      });
+      showToast?.('Offer reactivated.', 'success');
+      setReactivateTarget(null);
+      await fetchOffers();
+    } catch (error) {
+      showToast?.(error.response?.data?.error || 'Could not reactivate offer.', 'error');
+    } finally {
+      setIsReactivating(false);
     }
   };
 
@@ -325,11 +392,29 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
                     />
                   </div>
                   <div>
+                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start time</label>
+                    <input
+                      type="time"
+                      value={form.startTime}
+                      onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
+                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                    />
+                  </div>
+                  <div>
                     <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End date</label>
                     <input
                       type="date"
                       value={form.endDate}
                       onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
+                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End time</label>
+                    <input
+                      type="time"
+                      value={form.endTime}
+                      onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
                       className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
                     />
                   </div>
@@ -401,15 +486,28 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
                               {offer.startDate?.slice(0, 10)} → {offer.endDate?.slice(0, 10)}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setOfferPendingDelete(offer)}
-                            className="touch-manipulation shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/15 transition-colors"
-                            title="Delete offer"
-                            aria-label={`Delete offer ${offer.title}`}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            {offerBucket === 'expired' && (
+                              <button
+                                type="button"
+                                onClick={() => openReactivateModal(offer)}
+                                className="touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-emerald-500 hover:bg-emerald-500/10 active:bg-emerald-500/15 transition-colors"
+                                title="Reactivate offer"
+                                aria-label={`Reactivate offer ${offer.title}`}
+                              >
+                                <RotateCcw className="w-5 h-5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setOfferPendingDelete(offer)}
+                              className="touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/15 transition-colors"
+                              title="Delete offer"
+                              aria-label={`Delete offer ${offer.title}`}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </li>
@@ -434,6 +532,96 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
             setOfferPendingDelete(null);
           }}
         />
+      )}
+
+      {reactivateTarget && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => !isReactivating && setReactivateTarget(null)}
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
+            role="dialog"
+            aria-labelledby="reactivate-offer-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between px-4 py-3 border-b ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+              <h2 id="reactivate-offer-title" className={`text-sm font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Reactivate offer
+              </h2>
+              <button
+                type="button"
+                onClick={() => !isReactivating && setReactivateTarget(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
+                aria-label="Close"
+                disabled={isReactivating}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className={`text-xs font-bold ${textMuted}`}>
+                Set a new window for <span className={darkMode ? 'text-white' : 'text-slate-800'}>{reactivateTarget.title}</span>.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start date</label>
+                  <input
+                    type="date"
+                    value={reactivateFields.startDate}
+                    onChange={(e) => setReactivateFields((f) => ({ ...f, startDate: e.target.value }))}
+                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start time</label>
+                  <input
+                    type="time"
+                    value={reactivateFields.startTime}
+                    onChange={(e) => setReactivateFields((f) => ({ ...f, startTime: e.target.value }))}
+                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End date</label>
+                  <input
+                    type="date"
+                    value={reactivateFields.endDate}
+                    onChange={(e) => setReactivateFields((f) => ({ ...f, endDate: e.target.value }))}
+                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End time</label>
+                  <input
+                    type="time"
+                    value={reactivateFields.endTime}
+                    onChange={(e) => setReactivateFields((f) => ({ ...f, endTime: e.target.value }))}
+                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isReactivating}
+                  onClick={() => setReactivateTarget(null)}
+                  className={`flex-1 min-h-[44px] rounded-xl text-xs font-black tracking-widest border transition-colors ${darkMode ? 'border-gray-700 text-slate-300 hover:bg-gray-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isReactivating}
+                  onClick={handleReactivateOffer}
+                  className="flex-1 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-widest disabled:opacity-60 transition-colors"
+                >
+                  {isReactivating ? 'Saving…' : 'Reactivate'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -10,7 +10,63 @@ const Store = require('../models/Store');
 const Staff = require('../models/Staff');
 const { sendPushNotification } = require('../services/firebaseAdmin');
 const { collectPushTokens } = require('../utils/pushTokens');
+const { findDefaultOutletGroupChat } = require('../utils/defaultOutletChat');
 const router = express.Router();
+
+function parseMentionsFromBody(raw) {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+        const s = raw.trim();
+        if (!s) return [];
+        try {
+            const p = JSON.parse(s);
+            return Array.isArray(p) ? p : [];
+        } catch {
+            return [];
+        }
+    }
+    return [];
+}
+
+function normalizeMentionUserIds(rawIds, participantIds, senderId) {
+    const participantSet = new Set((participantIds || []).map(id => (id && id.toString ? id.toString() : String(id))));
+    const senderStr = senderId && senderId.toString ? senderId.toString() : String(senderId);
+    const out = [];
+    const seen = new Set();
+    for (const id of parseMentionsFromBody(rawIds)) {
+        if (id == null) continue;
+        const sid = id.toString ? id.toString() : String(id);
+        if (!sid || sid === senderStr || !participantSet.has(sid) || seen.has(sid)) continue;
+        seen.add(sid);
+        out.push(sid);
+    }
+    return out;
+}
+
+async function buildMentionsDetail(mentionIds) {
+    if (!mentionIds?.length) return [];
+    const ids = mentionIds.map(m => (m.toString ? m.toString() : String(m)));
+    const [users, staffRows] = await Promise.all([
+        User.find({ _id: { $in: ids } }).select('name email').lean(),
+        Staff.find({ userId: { $in: ids }, active: true }).select('userId name').lean(),
+    ]);
+    const firstStaffNameByUser = new Map();
+    for (const s of staffRows) {
+        const uid = s.userId.toString();
+        if (!firstStaffNameByUser.has(uid)) firstStaffNameByUser.set(uid, s.name);
+    }
+    const userById = new Map(users.map(u => [u._id.toString(), u]));
+    return ids.map(mid => {
+        const u = userById.get(mid);
+        const name = firstStaffNameByUser.get(mid) || u?.name || u?.email || 'User';
+        return { _id: mid, name };
+    });
+}
+
+function isGroupLikeChat(chat) {
+    return chat && (chat.type === 'group' || chat.isDefault || chat.isGroupChat);
+}
 
 // Configure multer for audio file uploads
 const audioStorage = multer.diskStorage({
@@ -143,25 +199,26 @@ router.get('/chats', protect, async (req, res) => {
             const stores = await Store.find({ ownerId: user._id, isActive: true });
             const plan = (user.plan || '').toUpperCase();
 
-            // Create individual store groups for each outlet (Pro: skip "Main Store" so only one group)
+            // Per-outlet default groups: always resolve existing chat first (avoid duplicates when
+            // business name changes). Pro: still skip *creating* a new chat only while name is "Main Store".
             for (const store of stores) {
-                if (plan === 'PRO' && store.name && store.name.trim().toLowerCase() === 'main store') {
-                    continue; // Pro plan: single store - do not create "Main Store Group"
-                }
                 const storeGroupName = `${store.name} Group`;
-                let storeGroup = await Chat.findOne({ 
-                    type: 'group',
-                    isDefault: true,
-                    outletId: store._id
-                });
+                const skipCreatingMainStorePro =
+                    plan === 'PRO' &&
+                    store.name &&
+                    store.name.trim().toLowerCase() === 'main store';
+
+                let storeGroup = await findDefaultOutletGroupChat(user._id, store._id);
 
                 if (!storeGroup) {
-                    // Get staff for this specific outlet
-                    const storeStaff = await Staff.find({ 
-                        storeId: store._id, 
-                        active: true 
+                    if (skipCreatingMainStorePro) {
+                        continue;
+                    }
+                    const storeStaff = await Staff.find({
+                        storeId: store._id,
+                        active: true
                     }).populate('userId', '_id');
-                    
+
                     const storeStaffUserIds = storeStaff
                         .map(s => s.userId?._id)
                         .filter(id => id && id.toString() !== user._id.toString());
@@ -173,14 +230,24 @@ router.get('/chats', protect, async (req, res) => {
                         participants: [user._id, ...storeStaffUserIds],
                         createdBy: user._id,
                         isDefault: true,
-                        outletId: store._id, // Specific outlet group
+                        outletId: store._id,
                         requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
                     });
-                } else if (storeGroup.name !== storeGroupName) {
-                    // Business/outlet name changed: keep same chat, just rename it.
-                    storeGroup.name = storeGroupName;
-                    if (!storeGroup.createdBy) storeGroup.createdBy = user._id;
-                    await storeGroup.save();
+                } else {
+                    let changed = false;
+                    if (!storeGroup.isDefault) {
+                        storeGroup.isDefault = true;
+                        changed = true;
+                    }
+                    if (!storeGroup.createdBy) {
+                        storeGroup.createdBy = user._id;
+                        changed = true;
+                    }
+                    if (storeGroup.name !== storeGroupName) {
+                        storeGroup.name = storeGroupName;
+                        changed = true;
+                    }
+                    if (changed) await storeGroup.save();
                 }
             }
         }
@@ -258,11 +325,7 @@ router.get('/chats', protect, async (req, res) => {
                     const userStore = ownerStores.find(s => s._id.toString() === user.activeStoreId.toString());
                     if (userStore) {
                         const storeGroupName = `${userStore.name} Group`;
-                        let storeGroup = await Chat.findOne({ 
-                            type: 'group',
-                            isDefault: true,
-                            outletId: userStore._id
-                        });
+                        let storeGroup = await findDefaultOutletGroupChat(owner._id, userStore._id);
 
                         if (!storeGroup) {
                             // Get staff for this specific outlet
@@ -287,13 +350,14 @@ router.get('/chats', protect, async (req, res) => {
                             });
                         } else {
                             if (storeGroup.name !== storeGroupName) {
-                                // Business/outlet name changed: keep same chat, just rename it.
                                 storeGroup.name = storeGroupName;
+                            }
+                            if (!storeGroup.isDefault) {
+                                storeGroup.isDefault = true;
                             }
                             if (!storeGroup.createdBy) {
                                 storeGroup.createdBy = owner._id;
                             }
-                            // Ensure current user is a participant
                             if (!storeGroup.participants.includes(user._id)) {
                                 storeGroup.participants.push(user._id);
                             }
@@ -438,12 +502,14 @@ router.get('/:chatId/messages', protect, async (req, res) => {
             });
         }
 
-        // Build participants list with names (for seen-by display)
+        // Build participants list with names, email, role (for seen-by + client-side owner masking)
         const participantsPopulated = await Promise.all((chat.participants || []).map(async (pid) => {
-            const user = await User.findById(pid).select('name email').lean();
+            const user = await User.findById(pid).select('name email role').lean();
             const staff = await Staff.findOne({ userId: pid, active: true }).populate('storeId', 'name').lean();
             const name = staff?.name || user?.name || user?.email || 'Unknown';
-            return { _id: pid.toString(), name };
+            const email = staff?.email || user?.email || null;
+            const role = staff?.role || user?.role || undefined;
+            return { _id: pid.toString(), name, email, role };
         }));
 
         const lastReadByPlain = {};
@@ -475,14 +541,29 @@ router.get('/:chatId/messages', protect, async (req, res) => {
                     fileUrl: msgObj.fileUrl || null,
                     fileName: msgObj.fileName || null,
                     fileType: msgObj.fileType || null,
-                    fileSize: msgObj.fileSize || null
+                    fileSize: msgObj.fileSize || null,
+                    mentions: (msgObj.mentions || []).map(m => (m.toString ? m.toString() : String(m))),
                 };
             });
+
+        const allMentionIds = [...new Set(messages.flatMap(m => m.mentions || []))];
+        let mentionNameMap = {};
+        if (allMentionIds.length) {
+            const detail = await buildMentionsDetail(allMentionIds);
+            mentionNameMap = Object.fromEntries(detail.map(d => [d._id, d.name]));
+        }
+        const messagesWithMentionDetails = messages.map(m => ({
+            ...m,
+            mentionsDetail: (m.mentions || []).map(id => ({
+                _id: id,
+                name: mentionNameMap[id] || 'User',
+            })),
+        }));
 
         res.json({ 
             success: true, 
             data: {
-                messages,
+                messages: messagesWithMentionDetails,
                 lastReadBy: lastReadByPlain,
                 participants: participantsPopulated
             },
@@ -639,7 +720,8 @@ router.post('/:chatId/message', (req, res, next) => {
                         'audio/mpeg', 'audio/mp3', 'audio/wav',
                         'audio/webm', 'video/webm',  // Chrome/Android (video/webm for audio-only)
                         'audio/ogg', 'audio/opus',
-                        'audio/aac', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'  // Safari/iOS
+                        'audio/aac', 'audio/m4a', 'audio/mp4', 'audio/x-m4a',  // Safari/iOS
+                        'video/mp4', // Safari MediaRecorder sometimes tags AAC-in-MP4 as video/mp4
                     ];
                     const ext = (path.extname(file.originalname || '').toLowerCase()) || '';
                     const validExt = ['.webm', '.m4a', '.mp4', '.ogg', '.aac', '.mp3', '.wav'];
@@ -699,7 +781,7 @@ router.post('/:chatId/message', (req, res, next) => {
         const { chatId } = req.params;
         console.log(`[Push] ${ts()} ===== MESSAGE API HANDLER START ===== chatId=${chatId} sender=${req.user?.id}`);
         // Parse body - multer should have parsed it by now
-        const { content, audioDuration, messageType, fileName, fileType, fileSize } = req.body || {};
+        const { content, audioDuration, messageType, fileName, fileType, fileSize, mentions: mentionsBody } = req.body || {};
 
         // Validate: must have either content, audio file, or file
         if (!content?.trim() && !req.file) {
@@ -789,6 +871,13 @@ router.post('/:chatId/message', (req, res, next) => {
             console.log('[Server] File message saved:', { fileUrl: message.fileUrl, fileName: message.fileName, fileType: message.fileType });
         }
 
+        if (detectedMessageType === 'text' && isGroupLikeChat(chat)) {
+            const mentionStrs = normalizeMentionUserIds(mentionsBody, chat.participants, req.user.id);
+            if (mentionStrs.length) {
+                message.mentions = mentionStrs;
+            }
+        }
+
         // Add message to chat
         chat.messages.push(message);
         chat.lastMessageAt = new Date();
@@ -801,6 +890,9 @@ router.post('/:chatId/message', (req, res, next) => {
         
         // Convert Mongoose subdocument to plain object
         const savedMessageObj = savedMessage.toObject ? savedMessage.toObject() : savedMessage;
+
+        const mentionIdsForDetail = savedMessageObj.mentions || [];
+        const mentionsDetail = await buildMentionsDetail(mentionIdsForDetail);
         
         // Populate sender info for response - ensure all fields are included
         const populatedMessage = {
@@ -824,7 +916,9 @@ router.post('/:chatId/message', (req, res, next) => {
             fileUrl: savedMessageObj.fileUrl || null,
             fileName: savedMessageObj.fileName || null,
             fileType: savedMessageObj.fileType || null,
-            fileSize: savedMessageObj.fileSize || null
+            fileSize: savedMessageObj.fileSize || null,
+            mentions: (savedMessageObj.mentions || []).map(m => m.toString()),
+            mentionsDetail
         };
 
         // Emit to Socket.IO for real-time updates
@@ -862,13 +956,17 @@ router.post('/:chatId/message', (req, res, next) => {
             console.log('[Push] Chat message: total', recipientIds.length, 'recipient(s),', dedupedTokens.length, 'push token(s). Will send push:', dedupedTokens.length > 0);
             if (dedupedTokens.length > 0) {
                 const contentPreview = populatedMessage.content?.slice(0, 80) || (populatedMessage.messageType === 'audio' ? 'Voice message' : populatedMessage.messageType === 'file' ? 'File' : 'New message');
+                const isGroupChat = chat.type === 'group' || chat.isDefault;
+                const groupName = (chat.name || '').trim() || 'Group';
+                const pushBody = isGroupChat ? `${groupName}: ${contentPreview}` : contentPreview;
                 console.log('[Push] Calling sendPushNotification now...');
                 const pushResult = await sendPushNotification(dedupedTokens, {
                     title: senderName,
-                    body: contentPreview,
+                    body: pushBody,
                     soundCategory: 'chat',
                     data: {
                         chatId: chat._id.toString(),
+                        chatName: isGroupChat ? groupName : '',
                         messageId: populatedMessage._id?.toString() || '',
                         senderId: req.user.id.toString(),
                         actorId: req.user.id.toString(),

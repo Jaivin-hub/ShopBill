@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MessageCircle, Loader2, ShieldCheck, Plus } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { SOCKET_URL, SOCKET_IO_CLIENT_BASE } from '../config/api';
@@ -9,6 +9,14 @@ import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
 import EmptyChatView from './chat/EmptyChatView';
 import { ChatInitialSkeleton } from './skeletons/PageSkeletons';
+import { participantLabelForViewer } from '../utils/ownerDisplay';
+
+/** iOS / iPadOS Safari needs different MediaRecorder behavior than Chrome/Android */
+function isAppleTouchDevice() {
+    if (typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
 
 const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange, onNavigateToStaffPermissions }) => {
     // Styling Vars matching Dashboard architecture
@@ -17,7 +25,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     // Safety check
     if (!currentUser) {
         return (
-            <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
+            <div className={`h-full min-h-0 w-full flex flex-col items-center justify-center ${themeBase}`}>
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
                 <p className="text-xs font-black opacity-40 tracking-widest uppercase">Initializing Secure Link...</p>
             </div>
@@ -27,15 +35,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     // State
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
+    const selectedChatRef = useRef(null);
+    selectedChatRef.current = selectedChat;
     const [messages, setMessages] = useState([]);
     const [staffUnreadMap, setStaffUnreadMap] = useState({});
     
-    // Notify parent when chat selection changes (to hide/show main header)
-    useEffect(() => {
-        if (onChatSelectionChange) {
-            onChatSelectionChange(!!selectedChat);
-        }
-    }, [selectedChat, onChatSelectionChange]);
     const [messageInput, setMessageInput] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -48,6 +52,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [staffList, setStaffList] = useState([]);
     const [isLoadingStaff, setIsLoadingStaff] = useState(false);
     const [isCreatingChat, setIsCreatingChat] = useState(false);
+    /** Sidebar list: Groups vs Staff — controls where “new group” FAB appears */
+    const [chatListViewMode, setChatListViewMode] = useState('chats');
     
     // Voice recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -67,21 +73,149 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     // Seen/read receipts
     const [chatLastReadBy, setChatLastReadBy] = useState({});
     const [chatParticipants, setChatParticipants] = useState([]);
+    const [mentionUserIds, setMentionUserIds] = useState([]);
+    const [remoteTypingUserIds, setRemoteTypingUserIds] = useState([]);
     
     // Refs
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
     const recordingTimerRef = useRef(null);
+    /** Mirrors recording UI seconds so sendVoiceMessage always reads the latest duration (avoids stale closure on iOS). */
+    const recordingTimeRef = useRef(0);
     const audioRefs = useRef({});
     const mediaStreamRef = useRef(null); // Track the media stream for cleanup
     const recordingChunksRef = useRef([]); // Track recording chunks
+    /** State updates for MediaRecorder lag on some devices — always stop via ref */
+    const mediaRecorderRef = useRef(null);
+    const recordingMimeTypeRef = useRef('');
+    /** When user cancels, ignore onstop blob (avoids race repopulating preview) */
+    const recordingDiscardRef = useRef(false);
+    const typingLocalActiveRef = useRef(false);
+    const typingIdleTimerRef = useRef(null);
+    const remoteTypingTimeoutsRef = useRef({});
+    /** Last chat id we registered in history (null = list layer) — push once, replace when switching threads */
+    const threadHistorySyncedIdRef = useRef(null);
+    /** Mobile: swipe from left edge to return to Groups & Staff list (same as header back / OS back). */
+    const threadSwipeBackRef = useRef({ active: false, x0: 0, y0: 0, edgeEligible: false });
 
     // Constants
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
     const isPremium = currentUser?.plan?.toUpperCase() === 'PREMIUM';
     const hasChatAccess = isPro || isPremium;
     const showOutletInfo = isPremium; // Multi-store (outlet labels) only for Premium; Pro has single store
+
+    const canFetchActivePunchedIn = useMemo(() => {
+        const r = String(currentUser?.role || '').toLowerCase();
+        return r === 'owner' || r === 'manager';
+    }, [currentUser?.role]);
+
+    const [activePunchedInUserIds, setActivePunchedInUserIds] = useState([]);
+
+    // Notify parent when chat selection changes (to hide/show main header)
+    useEffect(() => {
+        if (onChatSelectionChange) {
+            onChatSelectionChange(!!selectedChat);
+        }
+    }, [selectedChat, onChatSelectionChange]);
+
+    // Map "open thread" to a history entry so OS / edge back returns to Groups & Staff list (same chat page).
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.history) return;
+        const id = selectedChat?._id;
+        if (!id) {
+            threadHistorySyncedIdRef.current = null;
+            return;
+        }
+        try {
+            const prev = threadHistorySyncedIdRef.current;
+            if (prev === null) {
+                window.history.pushState({ pocketposChatThread: true }, '', window.location.href);
+            } else if (prev !== id) {
+                window.history.replaceState({ pocketposChatThread: true }, '', window.location.href);
+            }
+            threadHistorySyncedIdRef.current = id;
+        } catch {
+            /* ignore */
+        }
+    }, [selectedChat?._id]);
+
+    useEffect(() => {
+        const onPopState = () => {
+            if (!selectedChatRef.current) return;
+            setSelectedChat(null);
+            setShowInfo(false);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []);
+
+    const isGroupChatSelected = !!(selectedChat && (selectedChat.type === 'group' || selectedChat.isDefault || selectedChat.isGroupChat));
+    const mentionCandidates = useMemo(() => {
+        if (!isGroupChatSelected) return [];
+        const uid = (currentUser?._id || currentUser?.id)?.toString();
+        return chatParticipants
+            .filter((p) => {
+                const pid = p?._id != null ? String(p._id) : '';
+                return pid && pid !== uid;
+            })
+            .map((p) => ({
+                ...p,
+                name: participantLabelForViewer(p, currentUser),
+            }));
+    }, [isGroupChatSelected, chatParticipants, currentUser]);
+
+    const typingBannerText = useMemo(() => {
+        if (!remoteTypingUserIds.length) return null;
+        const names = remoteTypingUserIds.map((id) => {
+            const p = chatParticipants.find((x) => String(x._id) === id);
+            return p ? participantLabelForViewer(p, currentUser) : 'Someone';
+        });
+        const uniq = [...new Set(names)];
+        if (uniq.length === 1) return `${uniq[0]} is typing`;
+        if (uniq.length === 2) return `${uniq[0]} and ${uniq[1]} are typing`;
+        return `${uniq.slice(0, -1).join(', ')}, and ${uniq[uniq.length - 1]} are typing`;
+    }, [remoteTypingUserIds, chatParticipants, currentUser]);
+
+    const TYPING_IDLE_MS = 2800;
+
+    const flushLocalTypingStop = useCallback((chatId) => {
+        if (typingIdleTimerRef.current) {
+            clearTimeout(typingIdleTimerRef.current);
+            typingIdleTimerRef.current = null;
+        }
+        if (!chatId || !typingLocalActiveRef.current) return;
+        typingLocalActiveRef.current = false;
+        socketRef.current?.emit('chat_typing', { chatId, isTyping: false });
+    }, []);
+
+    const scheduleTypingFromText = useCallback((rawValue) => {
+        if (!selectedChat?._id || !socketRef.current?.connected) return;
+        const cid = selectedChat._id;
+        const trimmed = String(rawValue || '').trim();
+        if (!trimmed) {
+            flushLocalTypingStop(cid);
+            return;
+        }
+        if (!typingLocalActiveRef.current) {
+            typingLocalActiveRef.current = true;
+            socketRef.current.emit('chat_typing', { chatId: cid, isTyping: true });
+        }
+        if (typingIdleTimerRef.current) clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = setTimeout(() => {
+            typingIdleTimerRef.current = null;
+            flushLocalTypingStop(cid);
+        }, TYPING_IDLE_MS);
+    }, [selectedChat?._id, flushLocalTypingStop]);
+
+    const handleComposerTextChange = useCallback((value) => {
+        setMessageInput(value);
+        scheduleTypingFromText(value);
+    }, [scheduleTypingFromText]);
+
+    useEffect(() => {
+        setMentionUserIds([]);
+    }, [selectedChat?._id]);
 
     // Initialize Socket.IO connection
     useEffect(() => {
@@ -96,6 +230,30 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         socketRef.current.on('chat_read', (data) => {
             if (data.chatId === selectedChat?._id) {
                 setChatLastReadBy(prev => ({ ...prev, ...(data.lastReadBy || {}) }));
+            }
+        });
+
+        socketRef.current.on('chat_typing', (data) => {
+            if (!data || !selectedChat?._id) return;
+            if (data.chatId !== selectedChat._id) return;
+            const uid = String(data.userId);
+            const me = String(currentUser._id || currentUser.id || '');
+            if (!me || uid === me) return;
+            if (data.isTyping) {
+                setRemoteTypingUserIds((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+                if (remoteTypingTimeoutsRef.current[uid]) {
+                    clearTimeout(remoteTypingTimeoutsRef.current[uid]);
+                }
+                remoteTypingTimeoutsRef.current[uid] = setTimeout(() => {
+                    delete remoteTypingTimeoutsRef.current[uid];
+                    setRemoteTypingUserIds((prev) => prev.filter((id) => id !== uid));
+                }, 4500);
+            } else {
+                if (remoteTypingTimeoutsRef.current[uid]) {
+                    clearTimeout(remoteTypingTimeoutsRef.current[uid]);
+                    delete remoteTypingTimeoutsRef.current[uid];
+                }
+                setRemoteTypingUserIds((prev) => prev.filter((id) => id !== uid));
             }
         });
 
@@ -138,8 +296,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             fetchChats();
         });
 
-        return () => { if (socketRef.current) socketRef.current.disconnect(); };
-    }, [hasChatAccess, selectedChat]);
+        return () => {
+            Object.values(remoteTypingTimeoutsRef.current).forEach(clearTimeout);
+            remoteTypingTimeoutsRef.current = {};
+            setRemoteTypingUserIds([]);
+            if (socketRef.current) socketRef.current.disconnect();
+        };
+    }, [hasChatAccess, selectedChat, currentUser]);
 
     // Join/leave chat room for real-time read receipts
     useEffect(() => {
@@ -147,6 +310,19 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         socketRef.current.emit('join_chat', selectedChat._id);
         return () => { socketRef.current?.emit('leave_chat', selectedChat._id); };
     }, [selectedChat?._id]);
+
+    useEffect(() => {
+        setRemoteTypingUserIds([]);
+        Object.values(remoteTypingTimeoutsRef.current).forEach(clearTimeout);
+        remoteTypingTimeoutsRef.current = {};
+    }, [selectedChat?._id]);
+
+    useEffect(() => {
+        const cid = selectedChat?._id;
+        return () => {
+            if (cid) flushLocalTypingStop(cid);
+        };
+    }, [selectedChat?._id, flushLocalTypingStop]);
 
     // Cleanup media stream on unmount
     useEffect(() => {
@@ -228,6 +404,34 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         fetchStaff();
     }, [hasChatAccess, apiClient, API]);
 
+    useEffect(() => {
+        if (!hasChatAccess || !canFetchActivePunchedIn || !apiClient || !API?.attendanceActiveStatus) {
+            setActivePunchedInUserIds([]);
+            return;
+        }
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const response = await apiClient.get(API.attendanceActiveStatus);
+                if (cancelled) return;
+                const ids = response.data?.activePunchedInUserIds;
+                if (response.data?.success && Array.isArray(ids)) {
+                    setActivePunchedInUserIds(ids.map((id) => String(id)));
+                } else {
+                    setActivePunchedInUserIds([]);
+                }
+            } catch {
+                if (!cancelled) setActivePunchedInUserIds([]);
+            }
+        };
+        load();
+        const interval = setInterval(load, 60000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [hasChatAccess, canFetchActivePunchedIn, apiClient, API, currentOutletId, selectedChat?._id]);
+
     // Note: Default "All Outlet Staffs" group is automatically created by the server for owners
     // Store-specific groups are no longer created
 
@@ -295,8 +499,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     };
 
     const startRecording = useCallback(async () => {
-        // Don't allow recording if already recording
-        if (isRecording) {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             showToast('Recording already in progress', 'info');
             return;
         }
@@ -322,24 +525,27 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 mediaStreamRef.current = null;
             }
 
-            // Stop any existing recording
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            const prevRec = mediaRecorderRef.current;
+            if (prevRec && prevRec.state !== 'inactive') {
                 try {
-                    mediaRecorder.stop();
+                    prevRec.ondataavailable = null;
+                    prevRec.onstop = null;
+                    prevRec.onerror = null;
+                    prevRec.stop();
                 } catch (e) {
                     console.warn('Error stopping existing recorder:', e);
                 }
+                mediaRecorderRef.current = null;
+                setMediaRecorder(null);
             }
+
+            recordingDiscardRef.current = false;
 
             // Request microphone access
             let stream;
             try {
-                // iOS Safari requires simpler audio constraints
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                
-                const audioConstraints = isIOS 
-                    ? { audio: true } // iOS prefers simple constraints
+                const audioConstraints = isAppleTouchDevice()
+                    ? { audio: true }
                     : {
                         audio: {
                             echoCancellation: true,
@@ -386,12 +592,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 'audio/wav'
             ];
             
-            // Detect iOS
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            
+            const isIOS = isAppleTouchDevice();
+
             // For iOS, prioritize MP4/AAC formats
-            const typesToCheck = isIOS 
+            const typesToCheck = isIOS
                 ? ['audio/mp4', 'audio/m4a', 'audio/aac', ...supportedTypes]
                 : supportedTypes;
             
@@ -426,44 +630,76 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     throw new Error('MediaRecorder is not supported on this device. Please use a different browser or device.');
                 }
             }
-            
+
+            recordingMimeTypeRef.current = mimeType || '';
+
             // Reset chunks array
             recordingChunksRef.current = [];
-            
+
             recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) {
+                if (e.data) {
                     recordingChunksRef.current.push(e.data);
                 }
             };
-            
+
             recorder.onstop = () => {
-                // Stop all tracks to release microphone
+                mediaRecorderRef.current = null;
+                setMediaRecorder(null);
+
                 if (mediaStreamRef.current) {
                     mediaStreamRef.current.getTracks().forEach(track => track.stop());
                     mediaStreamRef.current = null;
                 }
-                
+
+                if (recordingDiscardRef.current) {
+                    recordingDiscardRef.current = false;
+                    recordingChunksRef.current = [];
+                    recordingTimeRef.current = 0;
+                    return;
+                }
+
                 const chunks = recordingChunksRef.current;
-                if (chunks.length > 0) {
-                    // Use the actual mimeType from recorder if available, otherwise use detected one
-                    const finalMimeType = recorder.mimeType || mimeType || 'audio/webm';
-                    const blob = new Blob(chunks, { type: finalMimeType });
-                    setAudioBlob(blob);
-                    const url = URL.createObjectURL(blob);
-                    setAudioUrl(url);
-                } else {
-                    showToast('Recording failed: No audio data captured', 'error');
+                recordingChunksRef.current = [];
+                const validChunks = chunks.filter((c) => c && c.size > 0);
+                const finalMimeType =
+                    recorder.mimeType || recordingMimeTypeRef.current || (isIOS ? 'audio/mp4' : 'audio/webm');
+
+                if (validChunks.length === 0) {
+                    console.warn('[recording] onstop: no audio chunks (device/browser may need different MediaRecorder options)');
+                    showToast('Recording failed: No audio captured. Try again or use another browser.', 'error');
                     setIsRecording(false);
                     setRecordingTime(0);
+                    recordingTimeRef.current = 0;
+                    return;
                 }
-                // Clear chunks after processing
-                recordingChunksRef.current = [];
+
+                const blob = new Blob(validChunks, { type: finalMimeType });
+                if (!blob.size) {
+                    showToast('Recording failed: empty audio file', 'error');
+                    setIsRecording(false);
+                    setRecordingTime(0);
+                    recordingTimeRef.current = 0;
+                    return;
+                }
+
+                setAudioBlob(blob);
+                setAudioUrl(URL.createObjectURL(blob));
+                setIsRecording(false);
+                // Keep recordingTimeRef aligned with visible seconds when recording stops
+                setRecordingTime((t) => {
+                    recordingTimeRef.current = t;
+                    return t;
+                });
             };
 
             recorder.onerror = (e) => {
                 console.error('MediaRecorder error:', e);
                 showToast('Recording error occurred', 'error');
+                mediaRecorderRef.current = null;
+                setMediaRecorder(null);
                 setIsRecording(false);
+                setRecordingTime(0);
+                recordingTimeRef.current = 0;
                 if (recordingTimerRef.current) {
                     clearInterval(recordingTimerRef.current);
                     recordingTimerRef.current = null;
@@ -472,29 +708,39 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     mediaStreamRef.current.getTracks().forEach(track => track.stop());
                     mediaStreamRef.current = null;
                 }
+                recordingChunksRef.current = [];
+                recordingTimeRef.current = 0;
             };
 
-            // Start recording with timeslice to ensure data is collected
             try {
-                // Set the recorder first
+                mediaRecorderRef.current = recorder;
                 setMediaRecorder(recorder);
-                
-                // Start recording
-                recorder.start(100); // Collect data every 100ms
-                
-                // Small delay to ensure state is updated
-                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // iOS Safari often emits no (or empty) data with start() — timesliced start matches Chrome/Android behavior.
+                try {
+                    recorder.start(250);
+                } catch (startSliceErr) {
+                    console.warn('[startRecording] start(250) failed, retrying plain start:', startSliceErr);
+                    recorder.start();
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, isIOS ? 0 : 50));
                 
                 // Verify recording started
                 if (recorder.state === 'recording') {
                     setIsRecording(true);
                     setRecordingTime(0);
+                    recordingTimeRef.current = 0;
                     
                     if (recordingTimerRef.current) {
                         clearInterval(recordingTimerRef.current);
                     }
                     recordingTimerRef.current = setInterval(() => {
-                        setRecordingTime(prev => prev + 1);
+                        setRecordingTime((prev) => {
+                            const next = prev + 1;
+                            recordingTimeRef.current = next;
+                            return next;
+                        });
                     }, 1000);
                 } else {
                     console.error('[startRecording] MediaRecorder state is not recording:', recorder.state);
@@ -504,6 +750,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 console.error('[startRecording] Error starting MediaRecorder:', startError);
                 showToast('Failed to start recording. Please try again.', 'error');
                 setIsRecording(false);
+                mediaRecorderRef.current = null;
                 setMediaRecorder(null);
                 if (mediaStreamRef.current) {
                     mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -514,6 +761,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             console.error('[startRecording] Recording error:', error);
             setIsRecording(false);
             setRecordingTime(0);
+            recordingTimeRef.current = 0;
+            mediaRecorderRef.current = null;
+            setMediaRecorder(null);
             
             if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
                 showToast('Microphone access denied. Please allow microphone access in browser settings.', 'error');
@@ -531,64 +781,74 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 mediaStreamRef.current = null;
             }
         }
-    }, [isRecording, showToast]);
+    }, [showToast]);
 
     const stopRecording = () => {
-        if (mediaRecorder && isRecording) {
+        const rec = mediaRecorderRef.current;
+        if (rec && rec.state === 'recording') {
             try {
-                // Request final data chunk before stopping
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.requestData();
+                if (typeof rec.requestData === 'function') {
+                    try {
+                        rec.requestData();
+                    } catch (rdErr) {
+                        console.warn('[stopRecording] requestData failed (ok on some browsers):', rdErr);
+                    }
                 }
-                mediaRecorder.stop();
-                setIsRecording(false);
-                if (recordingTimerRef.current) {
-                    clearInterval(recordingTimerRef.current);
-                    recordingTimerRef.current = null;
-                }
+                rec.stop();
             } catch (error) {
                 console.error('Error stopping recording:', error);
-                setIsRecording(false);
-                if (recordingTimerRef.current) {
-                    clearInterval(recordingTimerRef.current);
-                    recordingTimerRef.current = null;
+                try {
+                    if (rec.state !== 'inactive') rec.stop();
+                } catch (e2) {
+                    console.warn('[stopRecording] second stop attempt:', e2);
                 }
             }
         }
+
+        if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
     };
 
     const cancelRecording = () => {
-        // Stop recording first
-        if (mediaRecorder && isRecording) {
+        recordingDiscardRef.current = true;
+
+        const rec = mediaRecorderRef.current;
+        if (rec) {
             try {
-                if (mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
+                if (rec.state !== 'inactive') {
+                    rec.stop();
                 }
             } catch (error) {
                 console.error('Error canceling recording:', error);
             }
         }
-        
-        // Clean up stream
+
         if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
             mediaStreamRef.current = null;
         }
-        
+
+        mediaRecorderRef.current = null;
+        setMediaRecorder(null);
+
         setIsRecording(false);
         if (recordingTimerRef.current) {
             clearInterval(recordingTimerRef.current);
             recordingTimerRef.current = null;
         }
-        
-        // Clean up blob URLs to prevent memory leaks
+
         if (audioUrl) {
             URL.revokeObjectURL(audioUrl);
         }
-        
+
         setAudioBlob(null);
         setAudioUrl(null);
         setRecordingTime(0);
+        recordingTimeRef.current = 0;
+        recordingChunksRef.current = [];
     };
 
     const handleFileSelect = (file) => {
@@ -626,7 +886,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     };
 
     const cancelFileSelection = () => {
-        if (filePreview) {
+        if (filePreview && String(filePreview).startsWith('blob:')) {
             URL.revokeObjectURL(filePreview);
         }
         setSelectedFile(null);
@@ -677,6 +937,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         formData.append('fileType', fileToUpload.type);
         formData.append('fileSize', fileToUpload.size.toString());
 
+        // Synchronous preview URL for images — FileReader data URL is async and often null at send time,
+        // which made optimistic bubbles show no image until (sometimes) the server URL loaded.
+        const optimisticImageBlobUrl = selectedFile.type.startsWith('image/')
+            ? URL.createObjectURL(selectedFile)
+            : null;
+
         // Optimistic update
         const tempMessageId = `temp-file-${Date.now()}`;
         const optimisticMessage = {
@@ -686,19 +952,22 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             senderRole: currentUser.role,
             content: selectedFile.name,
             messageType: 'file',
-            fileUrl: filePreview || null,
+            fileUrl: optimisticImageBlobUrl || filePreview || null,
             fileName: selectedFile.name,
-            fileType: selectedFile.type,
-            fileSize: selectedFile.size,
+            fileType: fileToUpload.type,
+            fileSize: fileToUpload.size,
             timestamp: new Date(),
             isOptimistic: true
         };
 
         setMessages(prev => [...prev, optimisticMessage]);
-        const fileToSend = selectedFile;
         const previewToRevoke = filePreview;
         cancelFileSelection();
         scrollToBottom(true);
+
+        const revokeOptimisticBlob = () => {
+            if (optimisticImageBlobUrl) URL.revokeObjectURL(optimisticImageBlobUrl);
+        };
 
         try {
             setUploadProgress(0);
@@ -709,11 +978,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             });
 
             if (response.data.success) {
-                // Revoke preview URL
-                if (previewToRevoke && previewToRevoke.startsWith('blob:')) {
+                revokeOptimisticBlob();
+                if (previewToRevoke && String(previewToRevoke).startsWith('blob:')) {
                     URL.revokeObjectURL(previewToRevoke);
                 }
-                
+
                 // Replace optimistic message with real one
                 setMessages(prev => {
                     const filtered = prev.filter(m => m._id !== tempMessageId);
@@ -726,8 +995,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 scrollToBottom();
                 // Refresh chat list to move chat to top
                 fetchChats();
+            } else {
+                revokeOptimisticBlob();
+                setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+                showToast(response.data?.error || response.data?.message || 'Upload failed', 'error');
             }
         } catch (error) {
+            revokeOptimisticBlob();
             console.error('File upload error:', error);
             setMessages(prev => prev.filter(m => m._id !== tempMessageId));
             
@@ -758,6 +1032,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             return;
         }
 
+        const durationSeconds = Math.max(0, recordingTimeRef.current || recordingTime || 0);
+
         const formData = new FormData();
         // Determine file extension and MIME type (some devices send empty blob.type)
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
@@ -765,7 +1041,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         let fileExtension = 'webm';
         let mimeType = audioBlob.type || '';
         
-        if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('x-m4a')) {
+        if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('x-m4a') || mimeType.includes('video/mp4')) {
             fileExtension = 'm4a';
         } else if (mimeType.includes('aac')) {
             fileExtension = 'aac';
@@ -787,7 +1063,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         
         formData.append('audio', blobToAppend, `voice.${fileExtension}`);
         formData.append('messageType', 'audio');
-        formData.append('audioDuration', recordingTime.toString());
+        formData.append('audioDuration', String(durationSeconds));
         
         // Optimistic update - add voice message immediately
         const tempMessageId = `temp-voice-${Date.now()}`;
@@ -800,7 +1076,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             content: '',
             messageType: 'audio',
             audioUrl: audioUrlForPreview,
-            audioDuration: recordingTime,
+            audioDuration: durationSeconds,
             timestamp: new Date(),
             isOptimistic: true
         };
@@ -809,7 +1085,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         
         // Clean up recording state but keep blob for retry if needed
         const blobToSend = audioBlob;
-        const timeToSend = recordingTime;
+        const timeToSend = durationSeconds;
         
         // Reset recording state
         setIsRecording(false);
@@ -820,6 +1096,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         setRecordingTime(0);
         setAudioBlob(null);
         setAudioUrl(null);
+        recordingTimeRef.current = 0;
         
         scrollToBottom(true); // Instant scroll for optimistic update
         
@@ -873,8 +1150,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!messageInput.trim() || !selectedChat) return;
+        flushLocalTypingStop(selectedChat._id);
         const content = messageInput.trim();
+        const idsToSend = isGroupChatSelected ? [...mentionUserIds] : [];
         setMessageInput('');
+        setMentionUserIds([]);
         
         // Optimistic update - add message immediately
         const tempMessageId = `temp-${Date.now()}`;
@@ -886,7 +1166,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             content: content,
             messageType: 'text',
             timestamp: new Date(),
-            isOptimistic: true
+            isOptimistic: true,
+            ...(idsToSend.length ? {
+                mentions: idsToSend.map(id => String(id)),
+                mentionsDetail: idsToSend.map(id => {
+                    const c = mentionCandidates.find(x => String(x._id) === String(id));
+                    return { _id: String(id), name: c?.name || 'User' };
+                }),
+            } : {}),
         };
         
         setMessages(prev => [...prev, optimisticMessage]);
@@ -910,7 +1197,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         });
         
         try {
-            const response = await apiClient.post(API.sendMessage(selectedChat._id), { content });
+            const payload = idsToSend.length ? { content, mentions: idsToSend } : { content };
+            const response = await apiClient.post(API.sendMessage(selectedChat._id), payload);
             if (response.data.success) {
                 // Replace optimistic message with real one
                 setMessages(prev => {
@@ -932,7 +1220,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             // Revert chat list change on error
             fetchChats();
             showToast('Send failed', 'error'); 
-            setMessageInput(content); 
+            setMessageInput(content);
+            if (idsToSend.length) setMentionUserIds(idsToSend);
         }
     };
 
@@ -994,8 +1283,64 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             const currentUserId = currentUser?._id || currentUser?.id;
             return participantId && currentUserId && participantId.toString() !== currentUserId.toString();
         });
-        return other?.name || other?.email || 'Unknown';
+        if (!other || typeof other !== 'object') return 'Unknown';
+        return participantLabelForViewer(other, currentUser);
     };
+
+    const exitChatThread = useCallback(() => {
+        try {
+            if (typeof window !== 'undefined' && window.history?.state?.pocketposChatThread) {
+                window.history.back();
+                return;
+            }
+        } catch {
+            /* ignore */
+        }
+        setSelectedChat(null);
+        setShowInfo(false);
+    }, []);
+
+    const isMobileChatThreadLayout = useCallback(() => {
+        if (typeof window === 'undefined') return false;
+        return window.innerWidth < 768;
+    }, []);
+
+    const resetThreadSwipeBack = useCallback(() => {
+        threadSwipeBackRef.current = { active: false, x0: 0, y0: 0, edgeEligible: false };
+    }, []);
+
+    const onThreadPanelTouchStart = useCallback((e) => {
+        if (!isMobileChatThreadLayout() || !selectedChatRef.current) return;
+        const t = e.touches?.[0];
+        if (!t) return;
+        const edgePx = 44;
+        threadSwipeBackRef.current = {
+            active: true,
+            x0: t.clientX,
+            y0: t.clientY,
+            edgeEligible: t.clientX <= edgePx,
+        };
+    }, [isMobileChatThreadLayout]);
+
+    const onThreadPanelTouchEnd = useCallback((e) => {
+        const s = threadSwipeBackRef.current;
+        resetThreadSwipeBack();
+        if (!s.active || !s.edgeEligible) return;
+        if (!isMobileChatThreadLayout() || !selectedChatRef.current) return;
+        const t = e.changedTouches?.[0];
+        if (!t) return;
+        const dx = t.clientX - s.x0;
+        const dy = Math.abs(t.clientY - s.y0);
+        const minDx = 72;
+        const maxDy = 110;
+        if (dx >= minDx && dy <= maxDy && dx > dy) {
+            exitChatThread();
+        }
+    }, [exitChatThread, isMobileChatThreadLayout, resetThreadSwipeBack]);
+
+    const onThreadPanelTouchCancel = useCallback(() => {
+        resetThreadSwipeBack();
+    }, [resetThreadSwipeBack]);
 
     const handleCreateChat = async () => {
         if (newChatType === 'group' && (!newChatName.trim() || selectedUsers.length === 0)) {
@@ -1086,9 +1431,17 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 
                 // If the deleted chat was selected, clear selection
                 if (selectedChat?._id === chatId) {
+                    selectedChatRef.current = null;
                     setSelectedChat(null);
                     setMessages([]);
                     setShowInfo(false);
+                    try {
+                        if (typeof window !== 'undefined' && window.history?.state?.pocketposChatThread) {
+                            window.history.back();
+                        }
+                    } catch {
+                        /* ignore */
+                    }
                 }
                 
                 // Refresh chats list
@@ -1160,7 +1513,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     };
 
     if (!hasChatAccess) return (
-        <div className={`h-screen flex flex-col items-center justify-center ${themeBase}`}>
+        <div className={`h-full min-h-0 w-full flex flex-col items-center justify-center ${themeBase}`}>
             <ShieldCheck className={`w-12 h-12 mb-4 opacity-20 ${darkMode ? 'text-slate-400' : 'text-slate-700'}`} />
             <h2 className={`text-xl font-black tracking-tighter uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>Access Restricted</h2>
             <p className="text-xs font-bold text-indigo-500/60 uppercase tracking-widest mt-1">Upgrade to PRO or PREMIUM</p>
@@ -1172,14 +1525,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     }
 
     return (
-        <div className={`flex flex-col md:flex-row ${themeBase} w-full h-full overflow-hidden`}>
+        <div className={`flex flex-col md:flex-row ${themeBase} h-full min-h-0 w-full overflow-hidden overscroll-none`}>
             {/* Sidebar remains standard */}
             <ChatListSidebar
                 chats={chats}
                 selectedChat={selectedChat}
                 onSelectChat={setSelectedChat}
                 staffList={staffList}
-                onNewGroupClick={() => { setShowNewChatModal(true); setNewChatType('group'); }}
                 onQuickMessage={handleQuickMessage}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -1191,17 +1543,24 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 staffUnreadMap={staffUnreadMap}
                 darkMode={darkMode}
                 showOutletInfo={showOutletInfo}
+                viewMode={chatListViewMode}
+                onViewModeChange={setChatListViewMode}
             />
 
             {/* Main Chat Interface */}
             <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full min-h-0 overflow-hidden relative`}>
                 {selectedChat ? (
-                    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden relative">
+                    <div
+                        className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:touch-auto"
+                        onTouchStart={onThreadPanelTouchStart}
+                        onTouchEnd={onThreadPanelTouchEnd}
+                        onTouchCancel={onThreadPanelTouchCancel}
+                    >
                         {/* Fixed Header */}
                         <div className="shrink-0 z-50">
                             <ChatHeader
                                 selectedChat={selectedChat}
-                                onBack={() => setSelectedChat(null)}
+                                onBack={exitChatThread}
                                 getChatDisplayName={getChatDisplayName}
                                 darkMode={darkMode}
                                 showInfo={showInfo}
@@ -1211,11 +1570,15 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 onNavigateToStaffPermissions={onNavigateToStaffPermissions}
                                 onDeleteChat={handleDeleteChat}
                                 showOutletInfo={showOutletInfo}
+                                activePunchedInUserIds={activePunchedInUserIds}
                             />
                         </div>
 
-                        {/* Messages area - scrollable */}
-                        <div ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 pb-4 custom-scrollbar">
+                        {/* Messages area - scrollable; overscroll contained so mic swipe-up does not move the shell */}
+                        <div
+                            ref={chatContainerRef}
+                            className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 pb-4"
+                        >
                             <ChatMessages
                                 messages={messages}
                                 isLoadingMessages={isLoadingMessages}
@@ -1233,11 +1596,39 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
                         {/* Fixed Input section - Footer position (hidden when info page is open) */}
                         {!showInfo && (
-                            <div className={`shrink-0 z-50 ${darkMode ? 'bg-gray-950 border-t border-slate-800' : 'bg-white border-t border-slate-200'} p-4`}>
+                            <div
+                                className={`shrink-0 border-t z-[60] ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} sticky bottom-0 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4`}
+                            >
+                                {typingBannerText ? (
+                                    <div
+                                        className={`mb-2 flex min-h-[1.25rem] items-center gap-2 px-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        <span className="flex items-center gap-0.5" aria-hidden>
+                                            <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-duration:1s]" style={{ animationDelay: '0ms' }} />
+                                            <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-duration:1s]" style={{ animationDelay: '150ms' }} />
+                                            <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-duration:1s]" style={{ animationDelay: '300ms' }} />
+                                        </span>
+                                        <span className="text-[11px] font-bold tracking-tight">{typingBannerText}</span>
+                                    </div>
+                                ) : null}
                                 <ChatInput
                                     messageInput={messageInput}
-                                    onMessageChange={setMessageInput}
+                                    onMessageChange={handleComposerTextChange}
                                     onSendMessage={handleSendMessage}
+                                    groupMentionsEnabled={isGroupChatSelected && mentionCandidates.length > 0}
+                                    mentionCandidates={mentionCandidates}
+                                    onAddMention={(userId, displayName) => {
+                                        const idStr = String(userId);
+                                        setMentionUserIds(prev => (prev.includes(idStr) ? prev : [...prev, idStr]));
+                                        const name = (displayName || 'User').trim() || 'User';
+                                        setMessageInput((prev) => {
+                                            const next = `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}@${name} `;
+                                            Promise.resolve().then(() => scheduleTypingFromText(next));
+                                            return next;
+                                        });
+                                    }}
                                     isRecording={isRecording}
                                     recordingTime={recordingTime}
                                     audioUrl={audioUrl}
@@ -1263,12 +1654,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         chats={chats}
                         onNewChat={() => { setShowNewChatModal(true); setNewChatType('group'); }}
                         darkMode={darkMode}
+                        showStartChatButton={chatListViewMode === 'chats'}
                     />
                 )}
             </div>
 
-            {/* Floating Add button - only on groups list, not when inside a chat */}
-            {!selectedChat && (
+            {/* Floating add (new group) — only on Groups tab, not Staff */}
+            {!selectedChat && chatListViewMode === 'chats' && (
                 <button
                     onClick={() => { setShowNewChatModal(true); setNewChatType('group'); }}
                     className="fixed bottom-24 right-4 md:right-6 z-50 p-4 rounded-full bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
@@ -1300,6 +1692,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 setSelectedUsers={setSelectedUsers}
                 isCreatingChat={isCreatingChat}
                 showOutletInfo={showOutletInfo}
+                currentUser={currentUser}
             />
 
             <style dangerouslySetInnerHTML={{

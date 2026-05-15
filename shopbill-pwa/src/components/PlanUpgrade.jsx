@@ -4,7 +4,8 @@ import {
     Loader, CreditCard, AlertCircle, IndianRupee, XCircle, ChevronRight, Info, ShieldCheck
 } from 'lucide-react';
 import API from '../config/api';
-import PlanCard from './PlanCard'; 
+import PlanCard from './PlanCard';
+import { PlanUpgradeInitialSkeleton } from './skeletons/PageSkeletons'; 
 
 const DEMO_PLANS = [
     {
@@ -359,12 +360,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     const getPlanTextColor = (_pId) => darkMode ? 'text-indigo-400' : 'text-indigo-600';
 
     if (isLoading) {
-        return (
-            <div className={`min-h-screen flex flex-col items-center justify-center ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-                <Loader className="w-10 h-10 animate-spin text-indigo-500" />
-                <p className={`text-[10px] font-black tracking-widest mt-4 ${darkMode ? 'text-gray-500' : 'text-slate-600'}`}>Validating Billing...</p>
-            </div>
-        );
+        return <PlanUpgradeInitialSkeleton darkMode={darkMode} />;
     }
 
     const isPlanExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() &&
@@ -386,25 +382,26 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg} selection:bg-indigo-500/30`}>
-            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-4 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-3 py-3 sm:px-6 sm:py-4 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                         <button 
                             onClick={onBack} 
-                            className={`p-2 rounded-xl transition-all active:scale-95 ${darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                            type="button"
+                            className={`shrink-0 touch-manipulation rounded-xl p-2 transition-all active:scale-95 ${darkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-1.5 sm:p-2 bg-indigo-500/10 rounded-lg text-indigo-500 shrink-0">
-                                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                            <div className="shrink-0 rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500 sm:p-2">
+                                <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
                             </div>
-                            <div>
-                                <h1 className={`text-xl sm:text-2xl font-black tracking-tight leading-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    Subscription <span className="text-indigo-500">Management</span>
+                            <div className="min-w-0">
+                                <h1 className={`truncate text-lg font-black tracking-tight sm:text-2xl ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    Billing <span className="text-indigo-500">&amp; plans</span>
                                 </h1>
-                                <p className={`text-[9px] font-bold tracking-widest uppercase mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Manage your plan
+                                <p className={`mt-0.5 truncate text-[9px] font-bold tracking-wide sm:text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                    Subscription &amp; renewals
                                 </p>
                             </div>
                         </div>
@@ -413,72 +410,83 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 pb-20 space-y-8 md:space-y-10">
-                {/* Current subscription card - matches app card style */}
+            <div className="mx-auto max-w-7xl space-y-5 px-3 pb-28 pt-3 sm:space-y-8 sm:px-4 sm:pb-24 sm:pt-4 md:p-8 md:pb-20 lg:p-10">
                 {currentPlan && (
-                    <section className={`rounded-xl sm:rounded-2xl border p-4 sm:p-6 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shrink-0 ${darkMode ? 'bg-indigo-500/10 border border-slate-700' : 'bg-indigo-50 border border-indigo-100'}`}>
-                                    <Zap className={`w-6 h-6 sm:w-7 sm:h-7 text-indigo-500`} />
-                                    {!isPlanExpiring && (
-                                        <span className="sr-only">Active</span>
-                                    )}
-                                </div>
-                                <div>
-                                    <p className={`text-[10px] font-bold tracking-widest uppercase mb-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Current plan</p>
-                                    <h2 className={`text-lg sm:text-xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{currentPlan}</h2>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${isPlanExpiring ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-                                        <span className={`text-xs font-bold ${isPlanExpiring ? 'text-red-500' : darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                            {isPlanExpiring ? `Expires ${formatDate(planDetails.planEndDate)}` : `Renews ${formatDate(planDetails.planEndDate)}`}
-                                        </span>
+                    <section
+                        className={`overflow-hidden rounded-2xl border shadow-sm ${darkMode ? 'border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'}`}
+                    >
+                        <div className="p-4 sm:p-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <div
+                                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border sm:h-14 sm:w-14 ${darkMode ? 'border-indigo-500/25 bg-indigo-500/10' : 'border-indigo-100 bg-indigo-50'}`}
+                                    >
+                                        <Zap className="h-6 w-6 text-indigo-500 sm:h-7 sm:w-7" />
+                                        {!isPlanExpiring && <span className="sr-only">Active</span>}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className={`mb-0.5 text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                            Current plan
+                                        </p>
+                                        <h2 className={`text-xl font-black tracking-tight sm:text-2xl ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                            {currentPlan}
+                                        </h2>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isPlanExpiring ? 'animate-pulse bg-red-500' : 'bg-emerald-500'}`} />
+                                            <span className={`text-xs font-bold ${isPlanExpiring ? 'text-red-500' : darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                {isPlanExpiring ? `Ends ${formatDate(planDetails.planEndDate)}` : `Renews ${formatDate(planDetails.planEndDate)}`}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={handlePrepareCancellation}
+                                    disabled={isCancelling}
+                                    className={`touch-manipulation w-full shrink-0 rounded-xl border px-4 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 sm:w-auto sm:py-3 ${darkMode ? 'border-slate-700 bg-slate-800/80 text-red-400 hover:border-red-500/40 hover:bg-red-500/10' : 'border-slate-200 bg-white text-red-600 hover:border-red-200 hover:bg-red-50'}`}
+                                >
+                                    {isCancelling ? 'Processing…' : isPlanExpiring ? 'Manage cancellation' : 'Cancel subscription'}
+                                </button>
                             </div>
-                            <button
-                                onClick={handlePrepareCancellation}
-                                disabled={isCancelling}
-                                className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[10px] sm:text-xs tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 shrink-0 ${darkMode ? 'bg-slate-800 border border-slate-700 text-red-400 hover:bg-red-500/10 hover:border-red-500/30' : 'bg-slate-100 border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200'}`}
-                            >
-                                {isCancelling ? 'Processing...' : (isPlanExpiring ? 'Manage cancellation' : 'Cancel subscription')}
-                            </button>
                         </div>
                     </section>
                 )}
 
-                {/* Plan grid */}
-                <div className="space-y-4">
-                    <div>
-                        <h2 className={`text-lg sm:text-xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Choose your plan
+                <section className="space-y-3 sm:space-y-4">
+                    <div className="px-0.5">
+                        <h2 className={`text-lg font-black tracking-tight sm:text-xl ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Compare plans
                         </h2>
-                        <p className={`text-xs font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Upgrade or change your subscription
+                        <p className={`mt-0.5 text-xs font-bold leading-snug sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Swipe on your phone to compare. Tap a plan to upgrade or change.
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="-mx-1 flex gap-3 overflow-x-auto overflow-y-visible px-1 pb-2 pt-1 no-scrollbar snap-x snap-mandatory md:mx-0 md:grid md:max-w-none md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0">
                         {availablePlans.map((plan) => (
-                            <PlanCard
+                            <div
                                 key={plan.id}
-                                plan={plan}
-                                currentPlanName={currentPlan}
-                                isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
-                                isSamePlanAndCancelled={isSamePlanAndCancelled}
-                                isUpgrade={isUpgrade}
-                                isUpgrading={isUpgrading}
-                                isCancelling={isCancelling}
-                                alreadyInTerminalState={alreadyInTerminalState}
-                                formatCurrency={formatCurrency}
-                                getPlanIcon={getPlanIcon}
-                                getPlanColor={getPlanColor}
-                                getPlanTextColor={getPlanTextColor}
-                                handleUpgradeClick={handleUpgradeClick}
-                                darkMode={darkMode}
-                            />
+                                className="flex h-full w-[min(22rem,calc(100vw-2.5rem))] shrink-0 snap-center md:w-full md:min-w-0 md:snap-align-none"
+                            >
+                                <PlanCard
+                                    plan={plan}
+                                    currentPlanName={currentPlan}
+                                    isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
+                                    isSamePlanAndCancelled={isSamePlanAndCancelled}
+                                    isUpgrade={isUpgrade}
+                                    isUpgrading={isUpgrading}
+                                    isCancelling={isCancelling}
+                                    alreadyInTerminalState={alreadyInTerminalState}
+                                    formatCurrency={formatCurrency}
+                                    getPlanIcon={getPlanIcon}
+                                    getPlanColor={getPlanColor}
+                                    getPlanTextColor={getPlanTextColor}
+                                    handleUpgradeClick={handleUpgradeClick}
+                                    darkMode={darkMode}
+                                />
+                            </div>
                         ))}
                     </div>
-                </div>
+                </section>
             </div>
 
             {/* MODALS */}

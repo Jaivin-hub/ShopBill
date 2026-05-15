@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     User, Mail, Phone, MapPin, IndianRupee, Clock, Check, Building, 
-    Edit, Shield, Loader, Save, X, Activity, Globe
+    Edit, Shield, Save, X, Activity, Globe
 } from 'lucide-react';
 import API from '../config/api';
+import { ProfileInitialSkeleton } from './skeletons/PageSkeletons';
 import { validatePhoneNumber, validateEmail, validateShopName, validateTaxId, validateAddress } from '../utils/validation';
 
 // --- HELPER COMPONENT ---
@@ -181,12 +182,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
     };
 
     if (isLoading) {
-        return (
-            <div className={`flex flex-col items-center justify-center min-h-screen ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-                <Loader className="w-6 h-6 animate-spin text-indigo-500" />
-                <p className={`text-[10px] font-bold tracking-[0.3em] mt-6 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`}>Decoding Identity Buffer</p>
-            </div>
-        );
+        return <ProfileInitialSkeleton darkMode={darkMode} />;
     }
 
     // Theme Variables

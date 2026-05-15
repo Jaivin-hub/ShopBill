@@ -5,14 +5,16 @@ import {
     Edit3, Trash2, 
     ArrowUpRight, Building2,
     Loader2, X,
-    AlertCircle, Search, Users
+    AlertCircle, Search, Users, ChevronDown, ChevronUp
 } from 'lucide-react';
 import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import ConfirmationModal from './ConfirmationModal';
 import { isPremiumPlan } from '../utils/subscription';
+import { OutletManagerInitialSkeleton } from './skeletons/PageSkeletons';
+import { participantLabelForViewer } from '../utils/ownerDisplay';
 
-const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage, onOutletsChange }) => {
+const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage, onOutletsChange, openCreateBranchSignal = 0 }) => {
     const [outlets, setOutlets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +42,17 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const [outletToDelete, setOutletToDelete] = useState(null);
     const [outletStaff, setOutletStaff] = useState({}); // { outletId: [staff members] }
     const [loadingStaff, setLoadingStaff] = useState({}); // { outletId: true/false }
-    const fetchingStaffRef = useRef(new Set()); // Track which outlets are currently being fetched
-
+    /** Per outlet: staffId -> 'in' (clocked in) | 'break' */
+    const [outletStaffPresence, setOutletStaffPresence] = useState({});
+    const [staffExpandedByOutlet, setStaffExpandedByOutlet] = useState({});
+    const fetchingStaffRef = useRef(new Set());
+    const fetchingPresenceRef = useRef(new Set());
     const isPremium = isPremiumPlan(currentUser);
+    const isOwner = (currentUser?.role || '').toLowerCase() === 'owner';
 
-    // Styling logic
+    // Styling logic (aligned with Dashboard)
+    const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
+    const headerBg = darkMode ? 'bg-gray-950/80' : 'bg-white/80';
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
@@ -61,6 +69,15 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             outlet.taxId?.toLowerCase().includes(term)
         );
     }, [outlets, debouncedSearchTerm]);
+
+    const outletRequestHeaders = useCallback(
+        (outletIdStr) => {
+            const h = { 'x-store-id': outletIdStr };
+            if (isOwner) h['x-store-context-only'] = '1';
+            return h;
+        },
+        [isOwner]
+    );
 
     // Fetch staff for a specific outlet
     const fetchStaffForOutlet = useCallback(async (outletId) => {
@@ -79,9 +96,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         try {
             // Make API call with outlet-specific header without modifying global defaults
             const response = await apiClient.get(API.staff, {
-                headers: {
-                    'x-store-id': outletIdStr
-                }
+                headers: outletRequestHeaders(outletIdStr),
             });
             
             // Handle both array response and object with data property
@@ -128,7 +143,37 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 return updated;
             });
         }
-    }, [apiClient, API]);
+    }, [apiClient, API, outletRequestHeaders]);
+
+    const fetchActivePresenceForOutlet = useCallback(
+        async (outletId) => {
+            if (!outletId) return;
+            const outletIdStr = String(outletId);
+            if (fetchingPresenceRef.current.has(outletIdStr)) return;
+            fetchingPresenceRef.current.add(outletIdStr);
+            try {
+                const response = await apiClient.get(API.attendanceActiveStatus, {
+                    headers: outletRequestHeaders(outletIdStr),
+                });
+                const list = response.data?.activeAttendance;
+                const map = {};
+                if (Array.isArray(list)) {
+                    list.forEach((row) => {
+                        const sid = row.staffId != null ? String(row.staffId) : null;
+                        if (!sid) return;
+                        map[sid] = row.onBreak ? 'break' : 'in';
+                    });
+                }
+                setOutletStaffPresence((prev) => ({ ...prev, [outletIdStr]: map }));
+            } catch (e) {
+                console.warn(`[OutletManager] Active presence for outlet ${outletIdStr}:`, e?.message || e);
+                setOutletStaffPresence((prev) => ({ ...prev, [outletIdStr]: {} }));
+            } finally {
+                fetchingPresenceRef.current.delete(outletIdStr);
+            }
+        },
+        [apiClient, API, outletRequestHeaders]
+    );
 
     const fetchOutlets = useCallback(async (showLoading = true, preserveOnError = false) => {
         // Prevent duplicate simultaneous calls
@@ -159,14 +204,26 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                     });
                     return updated;
                 });
+                setOutletStaffPresence((prev) => {
+                    const next = { ...prev };
+                    Object.keys(next).forEach((outletId) => {
+                        if (!newOutletIds.has(outletId)) delete next[outletId];
+                    });
+                    return next;
+                });
                 
                 setOutlets(response.data.data);
                 
-                // Fetch staff details only for the currently active outlet (for displaying staff list)
-                const activeOutlet = response.data.data.find(o => String(o._id) === String(currentOutletId));
-                if (activeOutlet && activeOutlet._id && activeOutlet.isActive !== false && activeOutlet.staffCount > 0) {
-                    fetchStaffForOutlet(activeOutlet._id);
-                }
+                // Load staff + live punch status for every branch (no need to switch active outlet)
+                const outletsToDetail = response.data.data.filter(
+                    (o) => o._id && o.isActive !== false && (o.staffCount || 0) > 0
+                );
+                void Promise.all(
+                    outletsToDetail.flatMap((o) => [
+                        fetchStaffForOutlet(o._id),
+                        fetchActivePresenceForOutlet(o._id),
+                    ])
+                ).catch((err) => console.warn('[OutletManager] Branch staff/presence load:', err));
             } else if (response.data.success && !Array.isArray(response.data.data)) {
                 // If response is successful but data is not an array
                 console.warn('[OutletManager] API returned non-array data:', response.data.data);
@@ -202,7 +259,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             setIsLoading(false);
             isFetchingRef.current = false;
         }
-    }, [apiClient, showToast, fetchStaffForOutlet]);
+    }, [apiClient, showToast, fetchStaffForOutlet, fetchActivePresenceForOutlet]);
 
     // Initial load effect - only run once when component mounts or user changes
     const hasInitializedRef = useRef(false);
@@ -238,18 +295,9 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         }
     }, [currentOutletId, isPremium, currentUser, fetchOutlets]);
 
-    // Fetch staff details when currentOutletId changes (only for active outlet)
-    useEffect(() => {
-        if (isPremium && currentUser && currentOutletId) {
-            // Find the outlet in the current list
-            const activeOutlet = outlets.find(o => String(o._id) === String(currentOutletId));
-            if (activeOutlet && activeOutlet.staffCount > 0) {
-                fetchStaffForOutlet(currentOutletId);
-            }
-        }
-    }, [currentOutletId, outlets, isPremium, currentUser, fetchStaffForOutlet]);
+    // Staff/presence for all outlets is loaded in fetchOutlets — no per-outlet refetch here.
 
-    const handleOpenModal = (outlet = null) => {
+    const handleOpenModal = useCallback((outlet = null) => {
         if (outlet) {
             setEditingOutlet(outlet);
             setFormData({
@@ -271,7 +319,15 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         setValidationErrors({});
         setApiError(null);
         setIsModalOpen(true);
-    };
+    }, []);
+
+    const openModalRef = useRef(handleOpenModal);
+    openModalRef.current = handleOpenModal;
+
+    useEffect(() => {
+        if (!openCreateBranchSignal) return;
+        openModalRef.current();
+    }, [openCreateBranchSignal]);
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
@@ -453,12 +509,12 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
 
     if (!isPremium) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-12 text-center">
+            <div className={`flex flex-col items-center justify-center min-h-[60vh] p-12 text-center transition-colors ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
                 <div className="p-6 rounded-full bg-indigo-500/10 mb-6">
                     <Building2 className="w-16 h-16 text-indigo-500" />
                 </div>
-                <h2 className="text-2xl font-black mb-3 uppercase tracking-tight">Enterprise Multi-Store Access</h2>
-                <p className="max-w-md mb-8 text-slate-400 text-sm leading-relaxed">
+                <h2 className={`text-2xl font-black mb-3 uppercase tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Enterprise Multi-Store Access</h2>
+                <p className={`max-w-md mb-8 text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                     Manage up to 10 locations, sync inventory, and track global sales with our Premium Plan.
                 </p>
                 <button onClick={() => window.location.href = '/plan-upgrade'} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-2xl font-black text-xs tracking-widest text-white shadow-xl shadow-indigo-600/20 transition-all active:scale-95">
@@ -469,77 +525,67 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     }
 
     if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-                <p className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase">Syncing Store Network...</p>
-            </div>
-        );
+        return <OutletManagerInitialSkeleton darkMode={darkMode} />;
     }
 
     return (
-        <div className="h-full flex flex-col min-h-0 bg-transparent text-white">
-            {/* Sticky Header */}
-            <header className={`sticky top-0 z-[50] shrink-0 ${darkMode ? 'bg-gray-950/95 backdrop-blur-xl border-b border-slate-800' : 'bg-white/95 backdrop-blur-xl border-b border-slate-200'} shadow-sm`}>
-                <div className="p-4 md:p-6">
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                                <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    STORE NETWORK
-                                </h1>
-                                <p className={`text-xs font-bold tracking-wide opacity-70 mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Managing {outlets.length} active branches across your enterprise
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setShowSearch(!showSearch);
-                                    if (showSearch) {
-                                        setSearchTerm(''); // Clear search when hiding
-                                    }
-                                }}
-                                className={`p-3 rounded-xl border transition-all active:scale-95 shrink-0 ${
-                                    showSearch 
-                                        ? darkMode 
-                                            ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-400' 
-                                            : 'bg-indigo-50 border-indigo-500/50 text-indigo-600'
-                                        : darkMode 
-                                            ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400' 
-                                            : 'bg-white border-slate-200 hover:border-indigo-500/50 text-slate-600 hover:text-indigo-600'
-                                }`}
-                            >
-                                <Search size={18} />
-                            </button>
+        <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
+            <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
+                <div className="max-w-7xl mx-auto flex flex-col gap-4">
+                    <div className="flex justify-between items-center gap-4">
+                        <div className="min-w-0">
+                            <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                Store <span className="text-indigo-500">Network</span>
+                            </h1>
+                            <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] mt-0.5">
+                                Managing {outlets.length} active {outlets.length === 1 ? 'branch' : 'branches'} · Premium multi-store
+                            </p>
                         </div>
-                        
-                        {/* Search Bar - Only show when showSearch is true */}
-                        {showSearch && (
-                            <div className="relative group">
-                                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-600 group-focus-within:text-indigo-500' : 'text-slate-400 group-focus-within:text-indigo-500'} transition-colors`} />
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder="Search by name, address, phone, email, or tax ID..."
-                                    className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${inputBase} border rounded-xl text-[16px] md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
-                                    autoFocus
-                                />
-                                {searchTerm && (
-                                    <X 
-                                        onClick={() => setSearchTerm('')} 
-                                        className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`} 
-                                    />
-                                )}
-                            </div>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowSearch(!showSearch);
+                                if (showSearch) {
+                                    setSearchTerm('');
+                                }
+                            }}
+                            className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 shrink-0 ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} ${
+                                showSearch
+                                    ? darkMode
+                                        ? 'ring-1 ring-indigo-500/40 border-indigo-500/50'
+                                        : 'ring-1 ring-indigo-500/30 border-indigo-200 bg-indigo-50/80'
+                                    : ''
+                            }`}
+                            title="Search branches"
+                            aria-label="Search branches"
+                        >
+                            <Search className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`} />
+                        </button>
                     </div>
+                    {showSearch && (
+                        <div className="relative group">
+                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-600 group-focus-within:text-indigo-500' : 'text-slate-400 group-focus-within:text-indigo-500'} transition-colors`} />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search by name, address, phone, email, or tax ID..."
+                                className={`w-full pl-10 pr-10 py-2.5 md:py-3 ${inputBase} border rounded-xl text-[16px] md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all ${darkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                                autoFocus
+                            />
+                            {searchTerm && (
+                                <X
+                                    onClick={() => setSearchTerm('')}
+                                    className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${darkMode ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'} cursor-pointer transition-colors`}
+                                />
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 
-            {/* Content Area */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="p-4 md:p-8">
+            <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto w-full">
                 <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredOutlets.length === 0 && !isLoading ? (
                         <div className="col-span-full flex flex-col items-center justify-center py-20">
@@ -558,19 +604,27 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                         <article
                             key={outlet._id}
                             className={`group relative p-6 rounded-2xl border transition-all duration-300 ${cardBase} ${
-                                isCurrentActive ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-black' : 'hover:border-slate-600'
+                                isCurrentActive
+                                    ? `ring-2 ring-indigo-500 ring-offset-4 ${darkMode ? 'ring-offset-gray-950' : 'ring-offset-slate-50'}`
+                                    : darkMode
+                                        ? 'hover:border-slate-600'
+                                        : 'hover:border-slate-300'
                             }`}
                         >
                             <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-3xl ${isCurrentActive ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-indigo-400'}`}>
+                                <div className={`p-4 rounded-3xl transition-colors ${isCurrentActive ? 'bg-indigo-500 text-white' : darkMode ? 'bg-slate-800 text-slate-400 group-hover:text-indigo-400' : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
                                     <Store size={24} />
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleOpenModal(outlet)} className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenModal(outlet)}
+                                        className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-indigo-600'}`}
+                                    >
                                         <Edit3 size={16} />
                                     </button>
                                     {!isCurrentActive && (
-                                        <button onClick={() => handleDeleteClick(outlet)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all">
+                                        <button type="button" onClick={() => handleDeleteClick(outlet)} className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:border-red-500 text-red-500 hover:text-white transition-all">
                                             <Trash2 size={16} />
                                         </button>
                                     )}
@@ -578,83 +632,122 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-xl font-black tracking-tight mb-4 truncate">{outlet.name}</h3>
+                                <h3 className={`text-xl font-black tracking-tight mb-4 truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{outlet.name}</h3>
                                 
                                 {/* Contact Information */}
                                 <div className="space-y-2 mb-4">
-                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                        <MapPin size={14} className="text-indigo-500" />
+                                    <div className={`flex items-center gap-2 text-xs font-bold ${subText}`}>
+                                        <MapPin size={14} className="text-indigo-500 shrink-0" />
                                         <span className="truncate">{outlet.address || 'Address not listed'}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                        <Phone size={14} className="text-indigo-500" />
+                                    <div className={`flex items-center gap-2 text-xs font-bold ${subText}`}>
+                                        <Phone size={14} className="text-indigo-500 shrink-0" />
                                         <span>{outlet.phone || 'No contact phone'}</span>
                                     </div>
                                 </div>
 
-                                {/* Staff Section - Separate Card Style */}
+                                {/* Staff Team — every branch; expand to see roster & live shift status */}
                                 <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <Users size={16} className="text-indigo-500" />
-                                            <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Staff Team</span>
-                                        </div>
-                                        <span className={`text-sm font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                            {outlet.staffCount || 0}
-                                        </span>
-                                    </div>
-                                    
-                                    {/* Only show staff details for the currently active outlet */}
-                                    {isCurrentActive && (() => {
-                                        const outletIdStr = String(outlet._id);
-                                        const staffList = outletStaff[outletIdStr];
-                                        const isLoading = loadingStaff[outletIdStr];
-                                        
-                                        if (staffList && staffList.length > 0 && !isLoading) {
-                                            return (
-                                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                                    {staffList.slice(0, 4).map((staff) => (
-                                                        <div key={staff._id || staff.email || Math.random()} className="flex items-center gap-2 text-[11px] font-bold">
-                                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${staff.active ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                                                            <span className={`truncate flex-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                                                {staff.name || staff.email}
-                                                            </span>
-                                                            <span className={`text-[10px] uppercase px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
-                                                                {staff.role || 'Staff'}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                    {staffList.length > 4 && (
-                                                        <div className={`text-[10px] font-bold pt-1 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                                            +{staffList.length - 4} more staff members
-                                                        </div>
-                                                    )}
+                                    <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setStaffExpandedByOutlet((prev) => ({
+                                              ...prev,
+                                              [String(outlet._id)]: !prev[String(outlet._id)],
+                                            }))
+                                          }
+                                          className={`flex w-full items-center justify-between gap-2 rounded-xl py-2 pl-1 pr-2 text-left transition-colors ${darkMode ? 'hover:bg-slate-800/80' : 'hover:bg-slate-50'}`}
+                                          aria-expanded={!!staffExpandedByOutlet[String(outlet._id)]}
+                                        >
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <Users size={16} className="shrink-0 text-indigo-500" aria-hidden />
+                                            <span className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                              Staff Team
+                                            </span>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-2">
+                                            <span className={`text-sm font-black ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                                              {outlet.staffCount || 0}
+                                            </span>
+                                            {staffExpandedByOutlet[String(outlet._id)] ? (
+                                              <ChevronUp className={`h-5 w-5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} aria-hidden />
+                                            ) : (
+                                              <ChevronDown className={`h-5 w-5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} aria-hidden />
+                                            )}
+                                          </div>
+                                        </button>
+
+                                        {staffExpandedByOutlet[String(outlet._id)] &&
+                                          (() => {
+                                            const outletIdStr = String(outlet._id);
+                                            const staffList = outletStaff[outletIdStr];
+                                            const staffLoading = loadingStaff[outletIdStr];
+                                            const presence = outletStaffPresence[outletIdStr] || {};
+
+                                            if (staffList && staffList.length > 0 && !staffLoading) {
+                                              return (
+                                                <div className="mt-2 space-y-2 pl-1">
+                                                  <p className={`text-[9px] font-bold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                    Green clocked in · Amber on break · Gray off shift
+                                                  </p>
+                                                  <div className="max-h-48 space-y-2 overflow-y-auto custom-scrollbar">
+                                                  {staffList.map((staff) => {
+                                                    const sid = String(staff._id || '');
+                                                    const live = presence[sid];
+                                                    const dotClass =
+                                                      live === 'in'
+                                                        ? 'bg-emerald-500'
+                                                        : live === 'break'
+                                                          ? 'bg-amber-400'
+                                                          : darkMode
+                                                            ? 'bg-slate-500'
+                                                            : 'bg-slate-400';
+                                                    return (
+                                                    <div
+                                                      key={staff._id || staff.email}
+                                                      className="flex items-center gap-2 text-[11px] font-bold"
+                                                    >
+                                                      <div title={live === 'in' ? 'Clocked in' : live === 'break' ? 'On break' : 'Not on shift'} className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                                                      <span className={`min-w-0 flex-1 truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                        {participantLabelForViewer(staff, currentUser)}
+                                                      </span>
+                                                      <span
+                                                        className={`shrink-0 rounded px-2 py-0.5 text-[10px] uppercase ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}
+                                                      >
+                                                        {staff.role || 'Staff'}
+                                                      </span>
+                                                    </div>
+                                                    );
+                                                  })}
+                                                  </div>
                                                 </div>
-                                            );
-                                        }
-                                        
-                                        if (!isLoading && (!staffList || staffList.length === 0) && (outlet.staffCount === 0 || !outlet.staffCount)) {
-                                            return (
-                                                <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                    No staff members assigned
+                                              );
+                                            }
+
+                                            if (!staffLoading && (!staffList || staffList.length === 0) && (outlet.staffCount === 0 || !outlet.staffCount)) {
+                                              return (
+                                                <div className={`mt-2 pl-1 text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                  No staff members assigned
                                                 </div>
-                                            );
-                                        }
-                                        
-                                        if (isLoading && outlet.staffCount > 0) {
-                                            return (
-                                                <div className={`text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                    Loading staff details...
+                                              );
+                                            }
+
+                                            if (staffLoading && outlet.staffCount > 0) {
+                                              return (
+                                                <div className={`mt-2 pl-1 text-[11px] font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                  Loading staff details...
                                                 </div>
-                                            );
-                                        }
-                                        
-                                        return null;
-                                    })()}
+                                              );
+                                            }
+
+                                            return null;
+                                          })()}
+                                    </>
                                 </div>
                             </div>
 
-                            <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
+                            <div className={`pt-6 border-t flex items-center justify-between ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                 {isCurrentActive ? (
                                     <div className="flex items-center gap-2 text-emerald-500">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -662,9 +755,14 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                                     </div>
                                 ) : (
                                     <button
+                                        type="button"
                                         onClick={() => handleSwitchOutlet(outlet._id)}
                                         disabled={isSubmitting}
-                                        className="w-full py-3 bg-slate-800 hover:bg-indigo-600 text-white text-[10px] font-black tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 uppercase"
+                                        className={`w-full py-3 text-[10px] font-black tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 uppercase border ${
+                                            darkMode
+                                                ? 'bg-slate-800 border-slate-700 text-white hover:bg-indigo-600 hover:border-indigo-500'
+                                                : 'bg-white border-slate-200 text-slate-800 hover:bg-indigo-600 hover:border-indigo-600 hover:text-white'
+                                        } disabled:opacity-50`}
                                     >
                                         {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
                                         Switch To Hub

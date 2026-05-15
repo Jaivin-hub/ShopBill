@@ -44,7 +44,7 @@ const PlanCard = ({
 
     return (
         <article
-            className={`relative rounded-xl sm:rounded-2xl p-4 sm:p-6 border transition-all flex flex-col ${cardBg} overflow-visible`}
+            className={`relative flex h-full min-h-0 flex-col overflow-visible rounded-xl border transition-all sm:rounded-2xl p-4 sm:p-6 ${cardBg}`}
             itemScope
             itemType="https://schema.org/Offer"
         >

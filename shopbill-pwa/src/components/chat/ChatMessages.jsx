@@ -1,6 +1,7 @@
 import React from 'react';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import { ChatThreadMessagesSkeleton } from '../skeletons/PageSkeletons';
 
 const ChatMessages = ({
     messages,
@@ -16,12 +17,7 @@ const ChatMessages = ({
     participants = []
 }) => {
     if (isLoadingMessages) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-3" />
-                <p className={`text-[10px] font-black tracking-[0.3em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Decrypting Comms...</p>
-            </div>
-        );
+        return <ChatThreadMessagesSkeleton darkMode={darkMode} />;
     }
 
     const safeMessages = Array.isArray(messages) ? messages : [];
@@ -113,6 +109,7 @@ const ChatMessages = ({
                             msg={msg}
                             isOwn={isOwn}
                             currentUser={currentUser}
+                            participants={safeParticipants}
                             darkMode={darkMode}
                             playingAudioId={playingAudioId}
                             onToggleAudio={onToggleAudio}

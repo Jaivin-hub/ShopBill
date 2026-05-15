@@ -41,6 +41,7 @@ const NotificationSchema = new mongoose.Schema({
             'attendance_break_end',
             'attendance_punch_out',
             'staff_shift_assigned',
+            'reports_access_enabled',
             'system', 
             'success', 
             'system_update',

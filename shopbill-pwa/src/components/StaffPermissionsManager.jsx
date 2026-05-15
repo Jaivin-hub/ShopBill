@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
-    ArrowLeft, Plus, Trash2, Users, UserPlus, X, 
+    Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
     ChevronRight, ChevronDown, Power, Info, ShieldAlert, Edit3, AlertCircle, CheckCircle2, XCircle, Paperclip, Eye, Download,
+    Settings2,
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
 import ConfirmationModal from './ConfirmationModal';
 import WorkProfileModal from './WorkProfileModal';
 import { TeamDirectorySkeleton, TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
+import { participantLabelForViewer, participantEmailForViewer, participantRoleLabelForViewer, isStaffViewer, isParticipantOwner } from '../utils/ownerDisplay';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -336,7 +338,7 @@ const PayrollSettlementModal = ({
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [] }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
@@ -431,13 +433,14 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
         if (punchInTime) return formatTimeAgo(punchInTime);
         return null;
     })();
-    const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
     const formatWorkedTime = (minutes) => {
         const totalMinutes = Math.max(0, Number(minutes || 0));
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
         return `${h}h ${m}m`;
     };
+    const maskedOwnerEmail = participantEmailForViewer(staff, currentUser);
+    const roleBadgeNormalCase = isStaffViewer(currentUser) && isParticipantOwner(staff);
     return (
         <div className="space-y-3">
             <div 
@@ -449,8 +452,10 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             {staff.role === 'owner' ? <Crown className="w-5 h-5 md:w-6 md:h-6" /> : <User className="w-5 h-5 md:w-6 md:h-6" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className={`text-sm md:text-base font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{staff.name}</h3>
-                            <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staff.email}</p>
+                            <h3 className={`text-sm md:text-base font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{participantLabelForViewer(staff, currentUser)}</h3>
+                            {maskedOwnerEmail && (
+                            <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{maskedOwnerEmail}</p>
+                            )}
                             {staff.role !== 'owner' && !isPendingActivation && (
                                 <div className="flex items-center gap-2 mt-2">
                                     <div className={`flex items-center gap-1.5 ${isCurrentlyActive 
@@ -484,8 +489,8 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                 </div>
                             )}
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${getRoleStyles(staff.role, darkMode)}`}>
-                                    {staff.role}
+                                <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest ${roleBadgeNormalCase ? 'normal-case' : 'uppercase'} ${getRoleStyles(staff.role, darkMode)}`}>
+                                    {participantRoleLabelForViewer(staff, currentUser)}
                                 </span>
                                 {staff.active && !isPendingActivation && (
                                     <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
@@ -528,11 +533,6 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                             </div>
                                         )}
                                     </div>
-                                )}
-                                {staff?.payrollSummary && staff?.compensation?.salaryMode && staff.compensation.salaryMode !== 'none' && (
-                                    <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>
-                                        {formatCurrency(staff.payrollSummary.totalSalary)} this month
-                                    </span>
                                 )}
                                 {staff?.workSchedule?.enabled && staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
                                     <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
@@ -848,7 +848,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
+const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -871,6 +871,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     const [payrollSettlementNotes, setPayrollSettlementNotes] = useState('');
     const [payrollSettlementAttachment, setPayrollSettlementAttachment] = useState(null);
     const [managementTab, setManagementTab] = useState('team');
+    const [showManagementTabs, setShowManagementTabs] = useState(true);
     const [salaryTab, setSalaryTab] = useState('report');
     const [payrollStatementRows, setPayrollStatementRows] = useState([]);
     void onOpenRolePermissions;
@@ -979,6 +980,14 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
     }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchPayrollStatement]);
 
     const [addStaffError, setAddStaffError] = useState(null);
+
+    useEffect(() => {
+        if (managementTab !== 'team') {
+            setIsAddModalOpen(false);
+            setAddStaffError(null);
+        }
+    }, [managementTab]);
+
     const payrollAttachmentPreviewUrl = useMemo(() => {
         if (!payrollSettlementAttachment) return '';
         return URL.createObjectURL(payrollSettlementAttachment);
@@ -1381,12 +1390,9 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
             <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={onBack} className={`p-2 md:p-2.5 rounded-xl transition-all active:scale-95 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}>
-                            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
-                        <div>
+                <div className="max-w-7xl mx-auto space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
                             <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 Team <span className="text-indigo-500">Management</span>
                             </h1>
@@ -1394,57 +1400,51 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                 Access control & permissions management.
                             </p>
                         </div>
-                    </div>
-                    
-                    <button 
-                        onClick={() => setIsAddModalOpen(true)}
-                        disabled={isLoading || !hasWriteAccess}
-                        className="hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-indigo-500/20"
-                    >
-                        <Plus className="w-4 h-4 mr-2" /> Add Member
-                    </button>
-                    {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                         <button
-                            onClick={onOpenRolePermissions}
-                            className={`hidden sm:flex items-center px-4 md:px-6 py-2 md:py-2.5 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] tracking-widest transition-all active:scale-95 border ${
-                                darkMode
-                                    ? 'text-indigo-300 border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20'
-                                    : 'text-indigo-700 border-indigo-200 bg-indigo-50 hover:bg-indigo-100'
-                            }`}
+                            type="button"
+                            onClick={() => setShowManagementTabs((prev) => !prev)}
+                            className={`p-2.5 rounded-xl border transition-all shrink-0 ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                            title={showManagementTabs ? 'Hide controls' : 'Show controls'}
+                            aria-label={showManagementTabs ? 'Hide controls' : 'Show controls'}
                         >
-                            <ShieldCheck className="w-4 h-4 mr-2" /> Page Access
+                            <Settings2 className="w-4 h-4" />
                         </button>
+                    </div>
+
+                    {showManagementTabs && (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                            <div className={`rounded-xl border p-1 flex gap-1 min-w-0 flex-1 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => setManagementTab('team')}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'team' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                                >
+                                    Team
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setManagementTab('salary')}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'salary' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                                >
+                                    Salary Reports
+                                </button>
+                                {hasOwnerAccess && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setManagementTab('permissions')}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'permissions' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
+                                    >
+                                        Permissions
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
-                <div className={`rounded-xl border p-1 flex gap-1 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                    <button
-                        type="button"
-                        onClick={() => setManagementTab('team')}
-                        className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'team' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
-                    >
-                        Team
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setManagementTab('salary')}
-                        className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'salary' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
-                    >
-                        Salary Reports
-                    </button>
-                    {hasOwnerAccess && (
-                        <button
-                            type="button"
-                            onClick={() => setManagementTab('permissions')}
-                            className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black tracking-widest ${managementTab === 'permissions' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-100')}`}
-                        >
-                            Permissions
-                        </button>
-                    )}
-                </div>
                 {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                     <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
                         <div>
@@ -1748,6 +1748,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
                                         isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
                                         existingShifts={existingShifts}
+                                        currentUser={currentUser}
                                     />
                                 );
                                 })}
@@ -1807,6 +1808,7 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
                                         onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
                                         isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
                                         existingShifts={existingShifts}
+                                        currentUser={currentUser}
                                     />
                                 );
                                 })}
@@ -1817,14 +1819,17 @@ const StaffPermissionsManager = ({ apiClient, onBack, showToast, setConfirmModal
             </div>
             </div>
 
+            {managementTab === 'team' && hasWriteAccess && (
             <button 
+                type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                disabled={isLoading || !hasWriteAccess}
-                className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 disabled:opacity-50"
+                disabled={isLoading}
+                className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 disabled:opacity-50"
                 aria-label="Add new staff member"
             >
                 <Plus className="w-6 h-6" strokeWidth={2.5} />
             </button>
+            )}
             
             <AddStaffModal 
                 isOpen={isAddModalOpen}

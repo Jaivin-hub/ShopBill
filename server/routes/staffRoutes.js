@@ -1160,6 +1160,20 @@ router.put('/:id/permissions', protect, async (req, res) => {
         };
         await staffMember.save();
 
+        if (reports === true && staffMember.userId) {
+            try {
+                await emitAlert(req, req.user.storeId, 'reports_access_enabled', {
+                    staffId: staffMember._id,
+                    targetUserId: staffMember.userId,
+                    message: 'Your Reports access has been enabled. Tap to open Reports.',
+                    link: '/reports',
+                    notificationType: 'reports_access_enabled'
+                });
+            } catch (notifyErr) {
+                console.error('Reports access notification error:', notifyErr.message);
+            }
+        }
+
         const refreshed = await enrichStaffById(staffMember._id);
         return res.json({
             message: `Reports access ${reports ? 'enabled' : 'disabled'} for ${staffMember.name}.`,
@@ -1366,19 +1380,25 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
         if (punchInStart === null || punchInEnd === null || autoPunchOutTime === null) {
             return res.status(400).json({ error: 'Invalid time format. Use HH:mm (24h).' });
         }
+        if (body.enabled === true && !String(punchInStart || '').trim()) {
+            return res.status(400).json({ error: 'Set a punch-in time when using scheduled shift reminders.' });
+        }
         if (!salaryMode) {
             return res.status(400).json({ error: 'Invalid salary mode.' });
         }
         if (!Number.isFinite(salaryAmount) || salaryAmount < 0) {
             return res.status(400).json({ error: 'Salary amount must be 0 or more.' });
         }
+        const endStr = String(punchInEnd || '').trim();
+        const autoOutStr = String(autoPunchOutTime || '').trim();
+        const hasScheduledEnd = Boolean(endStr || autoOutStr);
         staffMember.workSchedule = {
             enabled: body.enabled === true,
             shiftName: String(body.shiftName || '').trim(),
             punchInStart: punchInStart || '',
-            punchInEnd: punchInEnd || '',
-            autoPunchOutTime: punchInEnd || '',
-            autoPunchOutEnabled: true
+            punchInEnd: endStr,
+            autoPunchOutTime: autoOutStr || endStr,
+            autoPunchOutEnabled: hasScheduledEnd
         };
         staffMember.compensation = {
             salaryMode,
@@ -1394,9 +1414,9 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
             const namePart = ws.shiftName ? `${ws.shiftName}: ` : '';
             const endDisp = (ws.autoPunchOutTime || ws.punchInEnd || '').trim();
             shiftMessage =
-                `${namePart}Punch-in window ${ws.punchInStart}–${ws.punchInEnd}. ` +
-                (endDisp ? `Shift end / auto punch-out ${endDisp}. ` : '') +
-                `You will get app reminders 5 minutes before punch-in (${ws.punchInStart}) and when punch-in time begins.`;
+                `${namePart}Scheduled punch-in ${ws.punchInStart}. ` +
+                (endDisp ? `Optional shift end / auto punch-out ${endDisp}. ` : '') +
+                'You will get reminders 5 minutes before and at punch-in time.';
         }
         if (staffMember.userId) {
             try {

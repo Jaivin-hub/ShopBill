@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Search, User, Store, Loader2 } from 'lucide-react';
+import { participantLabelForViewer, participantRoleLabelForViewer, isParticipantOwner, isStaffViewer } from '../../utils/ownerDisplay';
 
 const NewChatModal = ({
     show,
@@ -17,7 +18,8 @@ const NewChatModal = ({
     darkMode,
     setSelectedUsers,
     isCreatingChat = false,
-    showOutletInfo = false
+    showOutletInfo = false,
+    currentUser
 }) => {
     if (!show) return null;
 
@@ -29,9 +31,12 @@ const NewChatModal = ({
     const filteredUsers = safeAvailableUsers.filter(u => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
-        return u.name?.toLowerCase().includes(term) ||
-               u.email?.toLowerCase().includes(term) ||
-               u.role?.toLowerCase().includes(term) ||
+        const label = participantLabelForViewer(u, currentUser);
+        const roleLabel = participantRoleLabelForViewer(u, currentUser);
+        const allowEmailMatch = !(isStaffViewer(currentUser) && isParticipantOwner(u));
+        return label.toLowerCase().includes(term) ||
+               (allowEmailMatch && u.email?.toLowerCase().includes(term)) ||
+               roleLabel.toLowerCase().includes(term) ||
                u.outletName?.toLowerCase().includes(term);
     });
 
@@ -176,10 +181,10 @@ const NewChatModal = ({
                                                     </div>
                                                     <div className="flex-1">
                                                         <p className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                                            {user.name || user.email}
+                                                            {participantLabelForViewer(user, currentUser)}
                                                         </p>
                                                         <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                            {user.role}{showOutletInfo && user.outletName && ` • ${user.outletName}`}
+                                                            {participantRoleLabelForViewer(user, currentUser)}{showOutletInfo && user.outletName && ` • ${user.outletName}`}
                                                         </p>
                                                     </div>
                                                     {isSelected && (

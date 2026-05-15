@@ -1,5 +1,47 @@
 import React from 'react';
-import { Mic, Play, Pause, File, Download, Image as ImageIcon } from 'lucide-react';
+import { Mic, Play, Pause, File, Download } from 'lucide-react';
+import {
+    isStaffViewer,
+    messageContentForStaffViewer,
+    mentionsDetailForStaffViewer,
+    participantLabelForViewer,
+} from '../../utils/ownerDisplay';
+
+function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function TextWithMentions({ content, mentionsDetail, isOwn, darkMode }) {
+    if (!content) return null;
+    const detail = Array.isArray(mentionsDetail) ? mentionsDetail.filter((m) => m && (m.name || '').trim()) : [];
+    if (!detail.length) {
+        return <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{content}</p>;
+    }
+    const sorted = [...detail].sort((a, b) => (b.name || '').length - (a.name || '').length);
+    const pattern = sorted.map((m) => '@' + escapeRegex(m.name)).join('|');
+    if (!pattern) {
+        return <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{content}</p>;
+    }
+    const re = new RegExp(`(${pattern})`, 'g');
+    const parts = content.split(re);
+    const mentionClass = isOwn
+        ? 'font-bold text-white underline decoration-white/50 underline-offset-2'
+        : darkMode
+            ? 'font-bold text-indigo-300'
+            : 'font-bold text-indigo-600';
+    return (
+        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
+            {parts.map((part, i) => {
+                const isMention = sorted.some((m) => part === `@${m.name}`);
+                return isMention ? (
+                    <span key={i} className={mentionClass}>{part}</span>
+                ) : (
+                    <React.Fragment key={i}>{part}</React.Fragment>
+                );
+            })}
+        </p>
+    );
+}
 
 const MessageBubble = ({
     msg,
@@ -10,12 +52,19 @@ const MessageBubble = ({
     formatRecordingTime,
     audioRefs,
     showSenderInfo = true,
-    seenBy = []
+    seenBy = [],
+    currentUser,
+    participants = [],
 }) => {
     const [audioError, setAudioError] = React.useState(false);
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
     const isFileMessage = msg.messageType === 'file' || msg.fileUrl;
     const safeSeenBy = Array.isArray(seenBy) ? seenBy : [];
+    const safeParticipants = Array.isArray(participants) ? participants : [];
+    const displayContent = messageContentForStaffViewer(msg.content, safeParticipants, currentUser);
+    const displayMentions = mentionsDetailForStaffViewer(msg.mentionsDetail, safeParticipants, currentUser);
+    const senderIsOwner = msg.senderRole?.toLowerCase() === 'owner';
+    const staffViewer = isStaffViewer(currentUser);
     
     // Logic for Audio Source
     let audioSrc = null;
@@ -41,7 +90,9 @@ const MessageBubble = ({
         }
     }
 
-    const isImageFile = msg.fileType?.startsWith('image/');
+    const isImageFile =
+        msg.fileType?.startsWith('image/') ||
+        /\.(jpe?g|png|gif|webp|bmp)$/i.test(String(msg.fileName || msg.content || ''));
     const formatFileSize = (bytes) => {
         if (!bytes) return '';
         if (bytes < 1024) return `${bytes}B`;
@@ -54,10 +105,10 @@ const MessageBubble = ({
             {/* SENDER LABEL: Only show for other members and when showSenderInfo is true */}
             {!isOwn && showSenderInfo && (
                 <div className="flex items-center gap-1.5 mb-1 px-1">
-                    {/* For owner, only show role label. For staff, show name and role */}
-                    {msg.senderRole?.toLowerCase() === 'owner' ? (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                            {msg.senderRole}
+                    {/* Staff viewers see the store owner only as "Owner" */}
+                    {senderIsOwner ? (
+                        <span className={`text-[10px] font-black tracking-widest text-indigo-500 ${staffViewer ? 'normal-case' : 'uppercase'}`}>
+                            {staffViewer ? 'Owner' : msg.senderRole}
                         </span>
                     ) : (
                         <>
@@ -136,53 +187,57 @@ const MessageBubble = ({
                         )}
                     </div>
                 ) : isFileMessage && fileSrc ? (
-                    <div className="flex flex-col gap-2 min-w-[200px] max-w-[300px]">
-                        {isImageFile ? (
-                            <a 
-                                href={fileSrc} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="block rounded-lg overflow-hidden"
-                            >
-                                <img 
-                                    src={fileSrc} 
-                                    alt={msg.fileName || 'Image'} 
-                                    className="w-full h-auto max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                />
-                            </a>
-                        ) : null}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl ${isOwn ? 'bg-white/10' : darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                            <div className={`p-2 rounded-lg ${isOwn ? 'bg-white/20' : 'bg-slate-600'}`}>
-                                {isImageFile ? (
-                                    <ImageIcon size={16} className={isOwn ? 'text-white' : 'text-slate-300'} />
-                                ) : (
-                                    <File size={16} className={isOwn ? 'text-white' : 'text-slate-300'} />
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-black truncate ${isOwn ? 'text-white' : darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                                    {msg.fileName || msg.content || 'File'}
-                                </p>
-                                {msg.fileSize && (
-                                    <p className={`text-[9px] font-bold ${isOwn ? 'text-white/70' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        {formatFileSize(msg.fileSize)}
-                                    </p>
-                                )}
-                            </div>
+                    isImageFile ? (
+                        <div className="min-w-[120px] max-w-[300px]">
                             <a
                                 href={fileSrc}
-                                download={msg.fileName || 'file'}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`p-2 rounded-lg transition-transform active:scale-95 ${isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-slate-600 hover:bg-slate-500'}`}
-                                title="Download file"
+                                className="block overflow-hidden rounded-lg"
                             >
-                                <Download size={14} className={isOwn ? 'text-white' : 'text-slate-200'} />
+                                <img
+                                    src={fileSrc}
+                                    alt="Image attachment"
+                                    className="h-auto max-h-[300px] w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+                                />
                             </a>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex min-w-[200px] max-w-[300px] flex-col gap-2">
+                            <div className={`flex items-center gap-3 rounded-xl p-3 ${isOwn ? 'bg-white/10' : darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                <div className={`rounded-lg p-2 ${isOwn ? 'bg-white/20' : 'bg-slate-600'}`}>
+                                    <File size={16} className={isOwn ? 'text-white' : 'text-slate-300'} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className={`truncate text-xs font-black ${isOwn ? 'text-white' : darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
+                                        {msg.fileName || msg.content || 'File'}
+                                    </p>
+                                    {msg.fileSize ? (
+                                        <p className={`text-[9px] font-bold ${isOwn ? 'text-white/70' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            {formatFileSize(msg.fileSize)}
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <a
+                                    href={fileSrc}
+                                    download={msg.fileName || 'file'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`rounded-lg p-2 transition-transform active:scale-95 ${isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-slate-600 hover:bg-slate-500'}`}
+                                    title="Download file"
+                                >
+                                    <Download size={14} className={isOwn ? 'text-white' : 'text-slate-200'} />
+                                </a>
+                            </div>
+                        </div>
+                    )
                 ) : (
-                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    <TextWithMentions
+                        content={displayContent}
+                        mentionsDetail={displayMentions}
+                        isOwn={isOwn}
+                        darkMode={darkMode}
+                    />
                 )}
 
                 {/* TIMESTAMP */}
@@ -194,17 +249,20 @@ const MessageBubble = ({
             {isOwn && safeSeenBy.length > 0 && (
                 <div 
                     className="flex items-center justify-end gap-0.5 mt-1 px-1 animate-in slide-in-from-top-2 fade-in duration-300"
-                    title={`Seen by ${safeSeenBy.map(p => p?.name || '?').join(', ')}`}
+                    title={`Seen by ${safeSeenBy.map((p) => participantLabelForViewer(p, currentUser) || '?').join(', ')}`}
                 >
-                    {safeSeenBy.slice(0, 5).map((p, i) => (
+                    {safeSeenBy.slice(0, 5).map((p, i) => {
+                        const label = participantLabelForViewer(p, currentUser) || '?';
+                        return (
                         <div
                             key={p?._id || p?.id || `seen-${i}`}
                             className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border-2 ${darkMode ? 'bg-slate-800 border-slate-700 text-indigo-300' : 'bg-indigo-100 border-indigo-200 text-indigo-600'}`}
-                            title={p?.name}
+                            title={label}
                         >
-                            {((p?.name) || '?')[0].toUpperCase()}
+                            {label[0].toUpperCase()}
                         </div>
-                    ))}
+                        );
+                    })}
                     {safeSeenBy.length > 5 && (
                         <span className="text-[9px] font-bold text-slate-500">+{safeSeenBy.length - 5}</span>
                     )}

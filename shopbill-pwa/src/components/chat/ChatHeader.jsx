@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
     ArrowLeft, Users, User, X, ShieldCheck, 
     Store, UserPlus, MessageSquare, 
     MoreVertical, Camera, Bell, Lock, Trash2
 } from 'lucide-react';
+import { participantLabelForViewer, participantEmailForViewer, participantRoleLabelForViewer, isParticipantOwner, isStaffViewer } from '../../utils/ownerDisplay';
 
 const ChatHeader = ({
     selectedChat,
@@ -18,7 +19,8 @@ const ChatHeader = ({
     staffList = [],
     onNavigateToStaffPermissions,
     onDeleteChat,
-    showOutletInfo = false
+    showOutletInfo = false,
+    activePunchedInUserIds = []
 }) => {
     const [internalShowInfo, setInternalShowInfo] = useState(false);
     const showInfo = externalShowInfo !== undefined ? externalShowInfo : internalShowInfo;
@@ -27,6 +29,29 @@ const ChatHeader = ({
     const participants = Array.isArray(selectedChat?.participants) ? selectedChat.participants : [];
     const isGroup = selectedChat?.type === 'group' || selectedChat?.isDefault;
     const displayName = getChatDisplayName(selectedChat);
+    const currentUserIdForTitle = currentUser?._id || currentUser?.id;
+    const directOtherParticipant = !isGroup
+        ? participants.find((p) => {
+            const pid = typeof p === 'object' && p !== null ? (p._id || p.id || p) : p;
+            return pid && currentUserIdForTitle && pid.toString() !== currentUserIdForTitle.toString();
+        })
+        : null;
+    const directChatMaskedOwnerTitle = Boolean(
+        isStaffViewer(currentUser) && directOtherParticipant && isParticipantOwner(directOtherParticipant)
+    );
+
+    const directPeerUserId = useMemo(() => {
+        if (isGroup || !directOtherParticipant || typeof directOtherParticipant !== 'object') return '';
+        const id = directOtherParticipant._id ?? directOtherParticipant.id;
+        return id != null ? String(id) : '';
+    }, [isGroup, directOtherParticipant]);
+
+    const showDirectPeerWorkingDot = Boolean(
+        !isGroup &&
+            directPeerUserId &&
+            Array.isArray(activePunchedInUserIds) &&
+            activePunchedInUserIds.includes(directPeerUserId)
+    );
     
     // Check if user is owner
     const isOwner = currentUser?.role?.toLowerCase() === 'owner';
@@ -113,12 +138,17 @@ const ChatHeader = ({
                         }`}>
                             {isGroup ? <Users size={18} /> : <User size={18} />}
                         </div>
-                        {/* Status Glow */}
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 ${darkMode ? 'border-slate-950' : 'border-white'} rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
+                        {showDirectPeerWorkingDot ? (
+                            <div
+                                className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 ${darkMode ? 'border-slate-950' : 'border-white'} rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`}
+                                title="Currently working (punched in)"
+                                aria-hidden
+                            />
+                        ) : null}
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
-                        <h3 className={`text-[13px] font-black truncate tracking-tight uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <h3 className={`text-[13px] font-black truncate tracking-tight ${directChatMaskedOwnerTitle ? 'normal-case' : 'uppercase'} ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             {displayName}
                         </h3>
                         <div className="flex items-center gap-2">
@@ -176,7 +206,7 @@ const ChatHeader = ({
                                         <Camera size={16} />
                                     </button>
                                 </div>
-                                <h2 className={`text-2xl font-black tracking-tight mb-1 uppercase ${darkMode ? 'text-white' : 'text-slate-900'}`}>{displayName}</h2>
+                                <h2 className={`text-2xl font-black tracking-tight mb-1 ${directChatMaskedOwnerTitle ? 'normal-case' : 'uppercase'} ${darkMode ? 'text-white' : 'text-slate-900'}`}>{displayName}</h2>
                                 <p className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
                                     COMMS ID: {selectedChat?._id?.slice(-8).toUpperCase() || 'SYS-NULL'}
                                 </p>
@@ -257,6 +287,7 @@ const ChatHeader = ({
                                             const memberId = typeof member === 'object' && member !== null 
                                                 ? (member._id || member.id || member) 
                                                 : member;
+                                            const memberEmailLine = participantEmailForViewer(member, currentUser);
                                             return (
                                                 <button
                                                     key={memberId}
@@ -273,22 +304,24 @@ const ChatHeader = ({
                                                     </div>
                                                     <div className="flex-1 min-w-0 text-left">
                                                         <div className="flex items-center gap-2">
-                                                            <p className={`text-[13px] font-black truncate uppercase ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                                                                {member.name || member.email || 'Unknown'}
+                                                            <p className={`text-[13px] font-black truncate ${isStaffViewer(currentUser) && isParticipantOwner(member) ? 'normal-case' : 'uppercase'} ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
+                                                                {participantLabelForViewer(member, currentUser)}
                                                             </p>
-                                                            {member.role === 'owner' && <ShieldCheck size={12} className="text-amber-500" />}
+                                                            {isParticipantOwner(member) && <ShieldCheck size={12} className="text-amber-500" />}
                                                         </div>
-                                                        {member.email && (
+                                                        {memberEmailLine && (
                                                             <div className="flex items-center gap-2 opacity-50">
                                                                 <p className={`text-[10px] font-bold truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                                    {member.email}
+                                                                    {memberEmailLine}
                                                                 </p>
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-2 opacity-50 mt-0.5">
                                                             {showOutletInfo && <Store size={10} className="text-indigo-500" />}
                                                             <p className={`text-[9px] font-black uppercase tracking-tighter truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                                {showOutletInfo ? `${member.outletName || 'HQ'} • ${member.role || 'Personnel'}` : (member.role || 'Personnel')}
+                                                                {showOutletInfo
+                                                                    ? `${member.outletName || 'HQ'} • ${participantRoleLabelForViewer(member, currentUser)}`
+                                                                    : participantRoleLabelForViewer(member, currentUser)}
                                                             </p>
                                                         </div>
                                                     </div>

@@ -59,6 +59,16 @@ export async function isPushSupported() {
 /** Scope for Firebase SW to avoid conflict with PWA Workbox SW */
 const FCM_SW_SCOPE = '/firebase-cloud-messaging-push-scope';
 
+function fcmScopeHref() {
+  const path = FCM_SW_SCOPE.endsWith('/') ? FCM_SW_SCOPE : `${FCM_SW_SCOPE}/`;
+  return new URL(path, window.location.origin).href;
+}
+
+function scriptIsFirebaseMessagingSw(reg) {
+  const u = reg?.active?.scriptURL || reg?.waiting?.scriptURL || reg?.installing?.scriptURL || '';
+  return typeof u === 'string' && u.includes('firebase-messaging-sw');
+}
+
 /** Register FCM service worker and wait for activation (avoids conflict with PWA Workbox SW) */
 async function getFCMServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) {
@@ -66,37 +76,53 @@ async function getFCMServiceWorkerRegistration() {
     return null;
   }
   const scopeNorm = FCM_SW_SCOPE.endsWith('/') ? FCM_SW_SCOPE : `${FCM_SW_SCOPE}/`;
-  let reg = await navigator.serviceWorker.getRegistration(scopeNorm);
-  if (reg?.active) {
-    console.log('[Push][Firebase] Reusing active FCM SW registration');
-    return reg;
-  }
+  const scopeHref = fcmScopeHref();
+  let reg = null;
   try {
-    console.log('[Push][Firebase] Registering FCM service worker scope=', scopeNorm);
-    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: scopeNorm, updateViaCache: 'none' });
-    console.log('[Push][Firebase] FCM service worker register call succeeded');
+    const all = await navigator.serviceWorker.getRegistrations();
+    reg = all.find((r) => r.scope === scopeHref) || all.find((r) => scriptIsFirebaseMessagingSw(r)) || null;
+  } catch {
+    reg = null;
+  }
+
+  if (!reg) {
+    try {
+      console.log('[Push][Firebase] Registering FCM service worker scope=', scopeNorm);
+      reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: scopeNorm,
+        updateViaCache: 'none',
+        type: 'classic',
+      });
+      console.log('[Push][Firebase] FCM service worker register call succeeded');
+    } catch (e) {
+      console.warn('[Firebase] SW register failed:', e?.message);
+      return null;
+    }
+  } else {
+    console.log('[Push][Firebase] Found existing FCM registration, updating');
     try {
       await reg.update();
     } catch (updErr) {
       console.warn('[Push][Firebase] reg.update():', updErr?.message || updErr);
     }
-  } catch (e) {
-    console.warn('[Firebase] SW register failed:', e?.message);
-    return null;
   }
-  const sw = reg.installing || reg.waiting;
+
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const waitMs = isMobile ? 12000 : 8000;
+  const waitMs = isMobile ? 15000 : 10000;
+  const sw = reg.installing || reg.waiting;
   if (sw) {
     await new Promise((resolve) => {
-      const done = () => { if (reg.active) resolve(); };
+      const done = () => {
+        if (reg.active) resolve();
+      };
       sw.addEventListener('statechange', done);
       if (reg.active) done();
       else setTimeout(resolve, waitMs);
     });
   }
-  if (!reg.active) {
-    console.warn('[Push][Firebase] FCM service worker not active after wait');
+
+  if (!reg.active || !scriptIsFirebaseMessagingSw(reg)) {
+    console.warn('[Push][Firebase] FCM service worker not active or wrong script after wait');
     return null;
   }
   console.log('[Push][Firebase] FCM service worker active');
@@ -139,7 +165,14 @@ export async function requestNotificationPermissionAndToken(vapidKey) {
       console.warn('[Push][Firebase] Messaging instance unavailable');
       return null;
     }
-    const token = await getToken(m, { vapidKey, serviceWorkerRegistration: swReg });
+    let token = await getToken(m, { vapidKey, serviceWorkerRegistration: swReg });
+    if (!token) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const swReg2 = await getFCMServiceWorkerRegistration();
+      if (swReg2) {
+        token = await getToken(m, { vapidKey, serviceWorkerRegistration: swReg2 });
+      }
+    }
     if (token) {
       console.log(`[Push][Firebase] FCM token generated tokenTail=...${token.slice(-12)}`);
     } else {

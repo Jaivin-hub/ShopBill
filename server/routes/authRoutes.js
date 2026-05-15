@@ -9,6 +9,7 @@ const Chat = require('../models/Chat');
 const { protect } = require('../middleware/authMiddleware');
 const sendEmail = require('../utils/sendEmail');
 const { emitAlert, notifySuperadminsNewShop } = require('./notificationRoutes');
+const { syncDefaultOutletGroupName } = require('../utils/defaultOutletChat');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -507,6 +508,9 @@ router.put('/profile', protect, async (req, res) => {
                 // Keep user-level business identity in sync so UI areas reading currentUser.shopName stay fresh.
                 if (shopName !== undefined) user.shopName = store.name;
                 await user.save();
+                if (shopName !== undefined) {
+                    await syncDefaultOutletGroupName(user._id, store);
+                }
                 return res.json({
                     success: true,
                     message: 'Profile updated successfully',
@@ -534,6 +538,9 @@ router.put('/profile', protect, async (req, res) => {
                 if (taxId !== undefined) store.taxId = taxId;
                 if (address !== undefined) store.address = address;
                 await store.save();
+                if (shopName !== undefined && store.ownerId) {
+                    await syncDefaultOutletGroupName(store.ownerId, store);
+                }
                 // Persist personal fields (phone/profileImageUrl) for manager account too.
                 await user.save();
                 // Notify owner that a manager updated business information

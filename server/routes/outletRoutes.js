@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Chat = require('../models/Chat');
 const Staff = require('../models/Staff');
 const { deleteStoreCascade } = require('../utils/deleteStoreCascade');
+const { syncDefaultOutletGroupName } = require('../utils/defaultOutletChat');
 const router = express.Router();
 
 /**
@@ -293,6 +294,10 @@ router.put('/:id', protect, authorize('owner'), async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         );
+
+        if (updatedOutlet && updateData.name !== undefined) {
+            await syncDefaultOutletGroupName(req.user.id, updatedOutlet);
+        }
 
         res.json({
             success: true,

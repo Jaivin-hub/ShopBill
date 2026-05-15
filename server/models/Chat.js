@@ -18,6 +18,11 @@ const MessageSchema = new mongoose.Schema({
     fileType: { type: String, default: null }, // MIME type of the file
     fileSize: { type: Number, default: null }, // File size in bytes
     messageType: { type: String, enum: ['text', 'audio', 'file'], default: 'text' },
+    /** Group @-mentions: user ids tagged in this text message */
+    mentions: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
     timestamp: { type: Date, default: Date.now }
 }, { _id: true });
 
