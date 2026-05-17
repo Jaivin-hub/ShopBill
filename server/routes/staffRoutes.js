@@ -1289,17 +1289,32 @@ router.get('/payroll-statement', protect, async (req, res) => {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
         const monthFilter = String(req.query?.month || '').trim();
+        const fromMonth = String(req.query?.from || '').trim();
+        const toMonth = String(req.query?.to || '').trim();
+        const staffIdFilter = String(req.query?.staffId || '').trim();
+        const monthKeyPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
         const wantsCsv = String(req.query?.format || '').toLowerCase() === 'csv';
-        const staffList = await Staff.find({ storeId: req.user.storeId })
+        const staffQuery = { storeId: req.user.storeId };
+        if (staffIdFilter) staffQuery._id = staffIdFilter;
+        const staffList = await Staff.find(staffQuery)
             .select('name role compensation payrollSettlements')
             .lean();
+        const monthInFilterRange = (month) => {
+            if (!month || !monthKeyPattern.test(month)) return false;
+            if (monthFilter) return month === monthFilter;
+            if (fromMonth && month < fromMonth) return false;
+            if (toMonth && month > toMonth) return false;
+            return true;
+        };
         const rows = [];
         staffList.forEach((member) => {
             const settlements = Array.isArray(member?.payrollSettlements) ? member.payrollSettlements : [];
             settlements.forEach((entry) => {
                 if (entry?.paid !== true) return;
                 const month = String(entry?.month || '');
-                if (monthFilter && month !== monthFilter) return;
+                if (monthFilter || fromMonth || toMonth) {
+                    if (!monthInFilterRange(month)) return;
+                }
                 rows.push({
                     staffId: String(member?._id || ''),
                     staffName: member?.name || 'Unknown',
@@ -1347,7 +1362,7 @@ router.get('/payroll-statement', protect, async (req, res) => {
                 ].join(','))
             ];
             const csv = csvLines.join('\n');
-            const fileSuffix = monthFilter || 'all-months';
+            const fileSuffix = monthFilter || (fromMonth && toMonth ? `${fromMonth}_to_${toMonth}` : fromMonth || toMonth || 'all-months');
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', `attachment; filename="payroll-statement-${fileSuffix}.csv"`);
             return res.status(200).send(csv);
@@ -1397,8 +1412,12 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
         if (punchInStart === null || punchInEnd === null || autoPunchOutTime === null) {
             return res.status(400).json({ error: 'Invalid time format. Use HH:mm (24h).' });
         }
-        if (body.enabled === true && !String(punchInStart || '').trim()) {
-            return res.status(400).json({ error: 'Set a punch-in time when using scheduled shift reminders.' });
+        const startStr = String(punchInStart || '').trim();
+        const endStr = String(punchInEnd || '').trim();
+        const hasShiftWindow = Boolean(startStr && endStr);
+        const partialShift = Boolean((startStr || endStr) && !hasShiftWindow);
+        if (partialShift) {
+            return res.status(400).json({ error: 'Set both punch-in and punch-out times, or clear both to turn off reminders.' });
         }
         if (!salaryMode) {
             return res.status(400).json({ error: 'Invalid salary mode.' });
@@ -1406,13 +1425,12 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
         if (!Number.isFinite(salaryAmount) || salaryAmount < 0) {
             return res.status(400).json({ error: 'Salary amount must be 0 or more.' });
         }
-        const endStr = String(punchInEnd || '').trim();
         const autoOutStr = String(autoPunchOutTime || '').trim();
         const hasScheduledEnd = Boolean(endStr || autoOutStr);
         staffMember.workSchedule = {
-            enabled: body.enabled === true,
+            enabled: hasShiftWindow,
             shiftName: String(body.shiftName || '').trim(),
-            punchInStart: punchInStart || '',
+            punchInStart: startStr,
             punchInEnd: endStr,
             autoPunchOutTime: autoOutStr || endStr,
             autoPunchOutEnabled: hasScheduledEnd

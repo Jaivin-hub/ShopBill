@@ -3,7 +3,7 @@ import {
     Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
     ChevronRight, ChevronDown, Power, Info, ShieldAlert, Edit3, AlertCircle, CheckCircle2, XCircle, Paperclip, Eye, Download,
-    Settings2,
+    Settings2, Filter,
 } from 'lucide-react';
 import API from '../config/api';
 import AttendanceCalendar from './AttendanceCalendar';
@@ -235,6 +235,81 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
 const formatRs = (value) =>
     `Rs ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
+const getCurrentMonthKey = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const addMonthsToMonthKey = (monthKey, delta) => {
+    const [y, m] = String(monthKey || '').split('-').map(Number);
+    if (!y || !m) return monthKey;
+    const d = new Date(y, m - 1 + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const formatMonthLabel = (monthKey) => {
+    const [y, m] = String(monthKey || '').split('-').map(Number);
+    if (!y || !m) return monthKey || '—';
+    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+};
+
+const listRecentMonthKeys = (count = 36) => {
+    const keys = [];
+    let cur = getCurrentMonthKey();
+    for (let i = 0; i < count; i += 1) {
+        keys.push(cur);
+        cur = addMonthsToMonthKey(cur, -1);
+    }
+    return keys;
+};
+
+const buildPayrollHistoryQueryParams = ({ period, fromMonth, toMonth, singleMonth, staffId }) => {
+    const params = new URLSearchParams();
+    if (staffId) params.set('staffId', staffId);
+    if (singleMonth) {
+        params.set('month', singleMonth);
+        return params;
+    }
+    const current = getCurrentMonthKey();
+    let from = '';
+    let to = '';
+    switch (period) {
+        case '3m':
+            from = addMonthsToMonthKey(current, -2);
+            to = current;
+            break;
+        case '6m':
+            from = addMonthsToMonthKey(current, -5);
+            to = current;
+            break;
+        case '12m':
+            from = addMonthsToMonthKey(current, -11);
+            to = current;
+            break;
+        case 'this_year': {
+            const y = new Date().getFullYear();
+            from = `${y}-01`;
+            to = current;
+            break;
+        }
+        case 'last_year': {
+            const y = new Date().getFullYear() - 1;
+            from = `${y}-01`;
+            to = `${y}-12`;
+            break;
+        }
+        case 'custom':
+            from = fromMonth || '';
+            to = toMonth || '';
+            break;
+        default:
+            break;
+    }
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return params;
+};
+
 const PayrollSettlementModal = ({
     isOpen,
     darkMode,
@@ -455,8 +530,10 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     useEffect(() => {
         const ws = staff?.workSchedule || {};
         const normalizedShiftName = String(ws.shiftName || '').trim();
+        const start = String(ws.punchInStart || '').trim();
+        const end = String(ws.punchInEnd || '').trim();
         setScheduleForm({
-            enabled: ws.enabled === true,
+            enabled: Boolean(start && end),
             shiftName: normalizedShiftName,
             punchInStart: ws.punchInStart || '',
             punchInEnd: ws.punchInEnd || '',
@@ -624,7 +701,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                         )}
                                     </div>
                                 )}
-                                {staff?.workSchedule?.enabled && staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
+                                {staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
                                     <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
                                         Shift Enabled
                                     </span>
@@ -961,6 +1038,14 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const [showManagementTabs, setShowManagementTabs] = useState(true);
     const [salaryTab, setSalaryTab] = useState('report');
     const [payrollStatementRows, setPayrollStatementRows] = useState([]);
+    const [payrollStatementSummary, setPayrollStatementSummary] = useState({ totalEntries: 0, totalPaid: 0 });
+    const [payrollHistoryPeriod, setPayrollHistoryPeriod] = useState('all');
+    const [payrollHistoryFrom, setPayrollHistoryFrom] = useState('');
+    const [payrollHistoryTo, setPayrollHistoryTo] = useState('');
+    const [payrollHistoryMonth, setPayrollHistoryMonth] = useState('');
+    const [payrollHistoryStaffId, setPayrollHistoryStaffId] = useState('');
+    const [payrollHistoryLoading, setPayrollHistoryLoading] = useState(false);
+    const [showPayrollHistoryFilters, setShowPayrollHistoryFilters] = useState(false);
     void onOpenRolePermissions;
 
     const effectiveRole = (currentUserRole || currentUser?.role || 'owner').toLowerCase();
@@ -1044,17 +1129,40 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
             console.error('Failed to fetch active status:', error);
         }
     }, [apiClient, hasReadAccess]);
+    const payrollHistoryQueryParams = useMemo(
+        () =>
+            buildPayrollHistoryQueryParams({
+                period: payrollHistoryPeriod,
+                fromMonth: payrollHistoryFrom,
+                toMonth: payrollHistoryTo,
+                singleMonth: payrollHistoryMonth,
+                staffId: payrollHistoryStaffId,
+            }),
+        [payrollHistoryPeriod, payrollHistoryFrom, payrollHistoryTo, payrollHistoryMonth, payrollHistoryStaffId]
+    );
+
     const fetchPayrollStatement = useCallback(async () => {
         if (!hasWriteAccess || !apiClient) return;
+        setPayrollHistoryLoading(true);
         try {
-            const res = await apiClient.get(API.staffPayrollStatement);
+            const query = payrollHistoryQueryParams.toString();
+            const url = query ? `${API.staffPayrollStatement}?${query}` : API.staffPayrollStatement;
+            const res = await apiClient.get(url);
             const rows = Array.isArray(res?.data?.rows) ? res.data.rows : [];
+            const summary = res?.data?.summary || {};
             setPayrollStatementRows(rows);
+            setPayrollStatementSummary({
+                totalEntries: Number(summary.totalEntries || rows.length),
+                totalPaid: Number(summary.totalPaid || 0),
+            });
         } catch (error) {
             if (error?.cancelled) return;
             setPayrollStatementRows([]);
+            setPayrollStatementSummary({ totalEntries: 0, totalPaid: 0 });
+        } finally {
+            setPayrollHistoryLoading(false);
         }
-    }, [API.staffPayrollStatement, apiClient, hasWriteAccess]);
+    }, [API.staffPayrollStatement, apiClient, hasWriteAccess, payrollHistoryQueryParams]);
 
     useEffect(() => {
         fetchStaff();
@@ -1069,6 +1177,25 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         
         return () => clearInterval(interval);
     }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchPayrollStatement]);
+
+    useEffect(() => {
+        if (managementTab !== 'salary' || salaryTab !== 'history' || !hasWriteAccess) return;
+        fetchPayrollStatement();
+    }, [managementTab, salaryTab, hasWriteAccess, fetchPayrollStatement]);
+
+    useEffect(() => {
+        if (salaryTab !== 'history') setShowPayrollHistoryFilters(false);
+    }, [salaryTab]);
+
+    const payrollHistoryFiltersActive = useMemo(
+        () =>
+            payrollHistoryPeriod !== 'all'
+            || Boolean(payrollHistoryStaffId)
+            || Boolean(payrollHistoryMonth)
+            || Boolean(payrollHistoryFrom)
+            || Boolean(payrollHistoryTo),
+        [payrollHistoryPeriod, payrollHistoryStaffId, payrollHistoryMonth, payrollHistoryFrom, payrollHistoryTo]
+    );
 
     const [addStaffError, setAddStaffError] = useState(null);
 
@@ -1316,13 +1443,15 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const downloadPayrollStatement = useCallback(async () => {
         if (!hasWriteAccess || !apiClient) return;
         try {
-            const res = await apiClient.get(`${API.staffPayrollStatement}?format=csv`, {
+            const params = new URLSearchParams(payrollHistoryQueryParams);
+            params.set('format', 'csv');
+            const res = await apiClient.get(`${API.staffPayrollStatement}?${params.toString()}`, {
                 responseType: 'blob',
             });
             const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const monthStamp = new Date().toISOString().slice(0, 10);
+            const monthStamp = payrollHistoryMonth || payrollHistoryFrom || new Date().toISOString().slice(0, 10);
             link.href = url;
             link.setAttribute('download', `payroll-statement-${monthStamp}.csv`);
             document.body.appendChild(link);
@@ -1333,7 +1462,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         } catch (error) {
             if (showToast) showToast('Failed to download payroll statement.', 'error');
         }
-    }, [API.staffPayrollStatement, apiClient, hasWriteAccess, showToast]);
+    }, [API.staffPayrollStatement, apiClient, hasWriteAccess, payrollHistoryQueryParams, payrollHistoryFrom, payrollHistoryMonth, showToast]);
 
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
@@ -1465,6 +1594,11 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
             return String(a?.name || '').localeCompare(String(b?.name || ''));
         });
     }, [staff, activeStaffIds]);
+    const payrollHistoryStaffOptions = useMemo(
+        () => orderedStaff.filter((s) => s.role !== 'owner'),
+        [orderedStaff]
+    );
+    const payrollHistoryMonthOptions = useMemo(() => listRecentMonthKeys(36), []);
     const workingStaff = orderedStaff.filter((s) => s.role !== 'owner' && activeStaffIds.has(String(s._id || '')));
     const nonWorkingStaff = orderedStaff.filter((s) => !(s.role !== 'owner' && activeStaffIds.has(String(s._id || ''))));
     const existingShifts = useMemo(() => {
@@ -1750,10 +1884,123 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                             );
                         })}
                         {salaryTab === 'history' && (
-                        <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
-                            <p className={`text-[10px] font-black tracking-[0.2em] uppercase mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Paid Salary History</p>
-                            {payrollStatementRows.length === 0 ? (
-                                <p className={`text-[11px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>No settled salary records yet.</p>
+                        <div className={`rounded-xl border p-3 space-y-3 min-w-0 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-white'}`}>
+                            <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${darkMode ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'}`}>
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        {payrollHistoryLoading ? 'Loading…' : `${payrollStatementSummary.totalEntries} record${payrollStatementSummary.totalEntries === 1 ? '' : 's'}`}
+                                    </p>
+                                    <p className={`text-[11px] font-black ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                                        Total paid: {formatRs(payrollStatementSummary.totalPaid)}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPayrollHistoryFilters((v) => !v)}
+                                    aria-expanded={showPayrollHistoryFilters}
+                                    aria-label={showPayrollHistoryFilters ? 'Hide salary history filters' : 'Show salary history filters'}
+                                    title={showPayrollHistoryFilters ? 'Hide filters' : 'Filter history'}
+                                    className={`relative touch-manipulation shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+                                        showPayrollHistoryFilters
+                                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                                            : darkMode
+                                                ? 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                                                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <Filter className="w-4 h-4" aria-hidden />
+                                    {payrollHistoryFiltersActive && !showPayrollHistoryFilters && (
+                                        <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-900" aria-hidden />
+                                    )}
+                                </button>
+                            </div>
+                            {showPayrollHistoryFilters && (
+                            <div className={`space-y-2 min-w-0 rounded-lg border p-3 border-dashed ${darkMode ? 'border-slate-700' : 'border-slate-300'}`}>
+                                <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Filters</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                                    <label className="min-w-0 block">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Period</span>
+                                        <select
+                                            value={payrollHistoryPeriod}
+                                            onChange={(e) => {
+                                                setPayrollHistoryPeriod(e.target.value);
+                                                if (e.target.value !== 'custom') {
+                                                    setPayrollHistoryFrom('');
+                                                    setPayrollHistoryTo('');
+                                                }
+                                            }}
+                                            className={`mt-1 w-full min-w-0 min-h-[40px] px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                        >
+                                            <option value="all">All time</option>
+                                            <option value="3m">Last 3 months</option>
+                                            <option value="6m">Last 6 months</option>
+                                            <option value="12m">Last 12 months</option>
+                                            <option value="this_year">This year</option>
+                                            <option value="last_year">Last year</option>
+                                            <option value="custom">Custom range</option>
+                                        </select>
+                                    </label>
+                                    <label className="min-w-0 block">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Staff</span>
+                                        <select
+                                            value={payrollHistoryStaffId}
+                                            onChange={(e) => setPayrollHistoryStaffId(e.target.value)}
+                                            className={`mt-1 w-full min-w-0 min-h-[40px] px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                        >
+                                            <option value="">All staff</option>
+                                            {payrollHistoryStaffOptions.map((member) => (
+                                                <option key={member._id} value={String(member._id)}>
+                                                    {member.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="min-w-0 block sm:col-span-2">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Specific month (optional)</span>
+                                        <select
+                                            value={payrollHistoryMonth}
+                                            onChange={(e) => setPayrollHistoryMonth(e.target.value)}
+                                            className={`mt-1 w-full min-w-0 min-h-[40px] px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                        >
+                                            <option value="">Any month in period</option>
+                                            {payrollHistoryMonthOptions.map((monthKey) => (
+                                                <option key={monthKey} value={monthKey}>
+                                                    {formatMonthLabel(monthKey)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                                {payrollHistoryPeriod === 'custom' && !payrollHistoryMonth && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <label className="min-w-0 block">
+                                            <span className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>From</span>
+                                            <input
+                                                type="month"
+                                                value={payrollHistoryFrom}
+                                                onChange={(e) => setPayrollHistoryFrom(e.target.value)}
+                                                className={`mt-1 w-full min-w-0 min-h-[40px] px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                            />
+                                        </label>
+                                        <label className="min-w-0 block">
+                                            <span className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>To</span>
+                                            <input
+                                                type="month"
+                                                value={payrollHistoryTo}
+                                                onChange={(e) => setPayrollHistoryTo(e.target.value)}
+                                                className={`mt-1 w-full min-w-0 min-h-[40px] px-2 py-2 rounded-lg border text-[11px] font-bold ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                            )}
+                            {payrollHistoryLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className={`w-6 h-6 animate-spin ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                                </div>
+                            ) : payrollStatementRows.length === 0 ? (
+                                <p className={`text-[11px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>No settled salary records for this filter.</p>
                             ) : (
                                 <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
                                     {payrollStatementRows.map((row, idx) => (

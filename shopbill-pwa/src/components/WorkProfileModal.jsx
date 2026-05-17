@@ -42,6 +42,7 @@ export default function WorkProfileModal({
   showToast,
 }) {
   const [shiftPickerOpen, setShiftPickerOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState('shift');
   const shiftComboRef = useRef(null);
   const shiftNameInputRef = useRef(null);
 
@@ -69,7 +70,10 @@ export default function WorkProfileModal({
   }, [shiftPickerOpen]);
 
   useEffect(() => {
-    if (!isOpen) setShiftPickerOpen(false);
+    if (!isOpen) {
+      setShiftPickerOpen(false);
+      setProfileTab('shift');
+    }
   }, [isOpen]);
 
   const applyShiftTemplate = useCallback(
@@ -103,8 +107,8 @@ export default function WorkProfileModal({
 
   const startOk = Boolean(String(scheduleForm.punchInStart || '').trim());
   const endOk = Boolean(String(scheduleForm.punchInEnd || '').trim());
-  const canSaveShift =
-    !isSavingWorkSchedule && (!scheduleForm.enabled || (startOk && endOk));
+  const partialShift = (startOk || endOk) && !(startOk && endOk);
+  const canSaveShift = !isSavingWorkSchedule && !partialShift;
 
   const sheetBg = darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200';
   const inputClass = darkMode
@@ -114,26 +118,22 @@ export default function WorkProfileModal({
   const sectionClass = darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-slate-50/80';
 
   const handleSave = async () => {
-    if (scheduleForm.enabled === true) {
-      if (!String(scheduleForm.punchInStart || '').trim()) {
-        showToast?.('Set expected punch-in time.', 'error');
-        return;
-      }
-      if (!String(scheduleForm.punchInEnd || '').trim()) {
-        showToast?.('Set punch-out (shift end) time.', 'error');
-        return;
-      }
+    if (partialShift) {
+      showToast?.('Set both expected punch-in and punch-out times, or clear both to turn off reminders.', 'error');
+      return;
     }
     const normalizedName = String(scheduleForm.shiftName || '').trim();
     const key = normalizedName.toLowerCase();
     const matchedShift = key ? existingShiftMap?.get?.(key) : null;
     const end = String(scheduleForm.punchInEnd || '').trim();
-    const hasShiftWindow = Boolean(String(scheduleForm.punchInStart || '').trim() && end);
+    const start = String(scheduleForm.punchInStart || '').trim();
+    const hasShiftWindow = Boolean(start && end);
     const normalizedForm = {
       ...scheduleForm,
+      punchInStart: start,
       punchInEnd: end,
       autoPunchOutTime: end,
-      enabled: scheduleForm.enabled === true && hasShiftWindow,
+      enabled: hasShiftWindow,
       shiftName: matchedShift?.name || normalizedName,
     };
     const saved = await onSaveWorkSchedule?.(staff, normalizedForm);
@@ -182,28 +182,61 @@ export default function WorkProfileModal({
           </button>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 py-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 py-4 space-y-4">
 
           {canManageWorkHours && staff.role !== 'owner' && (
             <>
-              <section className={`rounded-xl border p-4 space-y-4 min-w-0 ${sectionClass}`}>
-                <div className="flex items-center gap-2">
-                  <Clock className={`w-4 h-4 shrink-0 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${labelClass}`}>Shift schedule</p>
-                </div>
+              <div
+                role="tablist"
+                aria-label="Work profile sections"
+                className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={profileTab === 'shift'}
+                  onClick={() => {
+                    setProfileTab('shift');
+                    setShiftPickerOpen(false);
+                  }}
+                  className={`touch-manipulation flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black tracking-wide transition-all ${
+                    profileTab === 'shift'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                      : darkMode
+                        ? 'text-slate-400 hover:text-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Clock className="w-4 h-4 shrink-0" aria-hidden />
+                  Shift
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={profileTab === 'pay'}
+                  onClick={() => {
+                    setProfileTab('pay');
+                    setShiftPickerOpen(false);
+                  }}
+                  className={`touch-manipulation flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black tracking-wide transition-all ${
+                    profileTab === 'pay'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                      : darkMode
+                        ? 'text-slate-400 hover:text-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <IndianRupee className="w-4 h-4 shrink-0" aria-hidden />
+                  Salary
+                </button>
+              </div>
 
-                <label className="flex items-center gap-3 cursor-pointer touch-manipulation">
-                  <input
-                    type="checkbox"
-                    checked={scheduleForm.enabled === true}
-                    onChange={(e) => setScheduleForm((p) => ({ ...p, enabled: e.target.checked }))}
-                    className="w-5 h-5 rounded border-slate-500 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className={`text-sm font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                    Use scheduled shift for punch-in reminders
-                  </span>
-                </label>
-
+              {profileTab === 'shift' && (
+              <section
+                role="tabpanel"
+                aria-label="Shift schedule"
+                className={`rounded-xl border p-3 sm:p-4 space-y-4 min-w-0 overflow-hidden ${sectionClass}`}
+              >
                 <div className="min-w-0">
                   <label
                     htmlFor={`work-profile-shift-name-${staff?._id || 's'}`}
@@ -343,20 +376,20 @@ export default function WorkProfileModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 min-w-0">
-                  <div className="min-w-0">
+                <div className="flex flex-col gap-3 min-w-0 overflow-hidden md:grid md:grid-cols-2 md:gap-4">
+                  <div className="min-w-0 w-full overflow-hidden">
                     <label className={`text-[10px] font-black uppercase tracking-wider ${labelClass}`}>Expected punch-in</label>
                     <input
                       type="time"
                       value={scheduleForm.punchInStart}
                       onChange={(e) => setScheduleForm((p) => ({ ...p, punchInStart: e.target.value }))}
-                      className={`mt-1 w-full max-w-full min-w-0 box-border min-h-[44px] px-2 sm:px-3 py-2 rounded-xl border text-[16px] sm:text-sm font-bold tabular-nums leading-normal ${inputClass}`}
+                      className={`mt-1 block w-full min-w-0 max-w-full box-border min-h-[44px] px-2 py-2 rounded-xl border text-base font-bold tabular-nums leading-normal appearance-none [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit]:min-w-0 ${inputClass}`}
                     />
-                    <p className={`mt-1 text-[10px] sm:text-[11px] font-bold tabular-nums truncate ${darkMode ? 'text-cyan-300' : 'text-indigo-600'}`}>
+                    <p className={`mt-1 text-[10px] font-bold tabular-nums truncate ${darkMode ? 'text-cyan-300' : 'text-indigo-600'}`}>
                       {formatTime12Hour(scheduleForm.punchInStart)}
                     </p>
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 w-full overflow-hidden">
                     <label className={`text-[10px] font-black uppercase tracking-wider ${labelClass}`}>Punch out</label>
                     <input
                       type="time"
@@ -368,23 +401,25 @@ export default function WorkProfileModal({
                           autoPunchOutTime: e.target.value,
                         }))
                       }
-                      className={`mt-1 w-full max-w-full min-w-0 box-border min-h-[44px] px-2 sm:px-3 py-2 rounded-xl border text-[16px] sm:text-sm font-bold tabular-nums leading-normal ${inputClass}`}
+                      className={`mt-1 block w-full min-w-0 max-w-full box-border min-h-[44px] px-2 py-2 rounded-xl border text-base font-bold tabular-nums leading-normal appearance-none [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit]:min-w-0 ${inputClass}`}
                     />
-                    <p className={`mt-1 text-[10px] sm:text-[11px] font-bold tabular-nums truncate ${darkMode ? 'text-violet-300' : 'text-violet-600'}`}>
+                    <p className={`mt-1 text-[10px] font-bold tabular-nums truncate ${darkMode ? 'text-violet-300' : 'text-violet-600'}`}>
                       {formatTime12Hour(scheduleForm.punchInEnd)}
                     </p>
                   </div>
                 </div>
                 <p className={`text-[10px] sm:text-[11px] font-bold leading-relaxed ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                  Reminders use punch-in. Punch-out sets shift end and optional auto punch-out.
+                  Saving punch-in and punch-out enables reminders (5 min before and at punch-in). Punch-out also sets shift end and optional auto punch-out.
                 </p>
               </section>
+              )}
 
-              <section className={`rounded-xl border p-4 space-y-3 min-w-0 ${sectionClass}`}>
-                <div className="flex items-center gap-2">
-                  <IndianRupee className={`w-4 h-4 shrink-0 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${labelClass}`}>Pay (optional)</p>
-                </div>
+              {profileTab === 'pay' && (
+              <section
+                role="tabpanel"
+                aria-label="Salary"
+                className={`rounded-xl border p-3 sm:p-4 space-y-3 min-w-0 ${sectionClass}`}
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                   <div className="min-w-0">
                     <label className={`text-[10px] font-black uppercase tracking-wider ${labelClass}`}>Salary</label>
@@ -417,6 +452,7 @@ export default function WorkProfileModal({
                   {scheduleForm.salaryMode === 'none' && 'Salary tracking is off for this person.'}
                 </p>
               </section>
+              )}
             </>
           )}
         </div>

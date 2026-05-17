@@ -33,69 +33,19 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTexti
         if (!isOpen) { setCsvData(''); setFile(null); setError(null); }
     }, [isOpen]);
 
-    const parsePdfTextToCsv = (text) => {
-        const lines = String(text || '')
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean);
-        if (lines.length === 0) return '';
-        const hasHeader = lines[0].toLowerCase().includes('name') && lines[0].toLowerCase().includes('price');
-        if (hasHeader) return lines.join('\n');
-        const generatedRows = ['name,price,quantity,reorderlevel,hsn'];
-        lines.forEach((line) => {
-            if (line.toLowerCase().includes('name') && line.toLowerCase().includes('price')) return;
-            let parts = line.split(',').map(p => p.trim()).filter(Boolean);
-            if (parts.length < 3) parts = line.split(/\s{2,}|\t+/).map(p => p.trim()).filter(Boolean);
-            if (parts.length >= 3) {
-                const [name, price, quantity, reorderlevel = '5', hsn = ''] = parts;
-                generatedRows.push(`${name},${price},${quantity},${reorderlevel},${hsn}`);
-            }
-        });
-        return generatedRows.length > 1 ? generatedRows.join('\n') : '';
-    };
-
-    const extractPdfText = async (file) => {
-        const pdfjs = await import('pdfjs-dist');
-        const bytes = await file.arrayBuffer();
-        const loadingTask = pdfjs.getDocument({ data: bytes, disableWorker: true });
-        const pdf = await loadingTask.promise;
-        const pages = [];
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-            const page = await pdf.getPage(pageNum);
-            const content = await page.getTextContent();
-            const text = content.items.map((item) => item.str).join(' ');
-            pages.push(text);
-        }
-        return pages.join('\n');
-    };
-
-    const handleFileChange = async (e) => {
+    const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
         if (!selectedFile) return;
         const lowerName = selectedFile.name.toLowerCase();
-        if (lowerName.endsWith('.csv')) {
-            setFile(selectedFile);
-            setError(null);
-            const reader = new FileReader();
-            reader.onload = (event) => setCsvData(event.target.result);
-            reader.readAsText(selectedFile);
-        } else if (lowerName.endsWith('.pdf')) {
-            setFile(selectedFile);
-            setError(null);
-            try {
-                const rawText = await extractPdfText(selectedFile);
-                const derivedCsv = parsePdfTextToCsv(rawText);
-                if (!derivedCsv) {
-                    setError('Could not parse PDF rows. Use table-style PDF with name, price, quantity.');
-                    return;
-                }
-                setCsvData(derivedCsv);
-            } catch {
-                setError('Failed to read PDF. Try CSV or a clearer PDF table.');
-            }
-        } else {
-            setError('Select a valid CSV or PDF.');
+        if (!lowerName.endsWith('.csv')) {
+            setError('Select a valid CSV file.');
+            return;
         }
+        setFile(selectedFile);
+        setError(null);
+        const reader = new FileReader();
+        reader.onload = (event) => setCsvData(event.target.result);
+        reader.readAsText(selectedFile);
     };
 
     const parseCSV = (text) => {
@@ -161,7 +111,6 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTexti
                         <p className={`text-[10px] leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             File must include a header row with: <strong className="text-indigo-400">name, price, quantity</strong>. 
                             Optional: <span className="">reorderlevel, hsn{isTextileShop ? ', brand, fabric, season, collection, size, color, variantlabel, sku' : ''}</span>.
-                            <span className="block mt-2">PDF upload is supported for table-like files where rows contain product name, price, and quantity.</span>
                             {isTextileShop && (
                                 <span className="block mt-2 text-amber-600/90 dark:text-amber-400/90">
                                     For one row per size/color: add <strong>size</strong> and/or <strong>color</strong> (or <strong>variantlabel</strong>). New products become variant items; matching name + variant merges stock.
@@ -171,7 +120,7 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTexti
                     </div>
 
                     <div className="space-y-4">
-                        <input type="file" accept=".csv,.pdf,application/pdf,text/csv" onChange={handleFileChange} className={`w-full text-[10px] ${darkMode ? 'text-gray-400' : 'text-slate-500'} file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[9px] file:font-black file: ${darkMode ? 'file:bg-slate-800 file:text-white' : 'file:bg-slate-200 file:text-slate-700'} cursor-pointer`} />
+                        <input type="file" accept=".csv,text/csv" onChange={handleFileChange} className={`w-full text-[10px] ${darkMode ? 'text-gray-400' : 'text-slate-500'} file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[9px] file:font-black file: ${darkMode ? 'file:bg-slate-800 file:text-white' : 'file:bg-slate-200 file:text-slate-700'} cursor-pointer`} />
                         <textarea value={csvData} onChange={(e) => setCsvData(e.target.value)} placeholder="Paste CSV data here..." rows="5" className={`w-full p-4 ${innerBg} border ${darkMode ? 'border-slate-800 text-emerald-400' : 'border-slate-200 text-emerald-600'} rounded-xl text-xs font-mono placeholder-gray-700 focus:outline-none focus:border-indigo-500 transition-all no-zoom-input`} />
                     </div>
 
