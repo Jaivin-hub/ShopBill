@@ -44,6 +44,58 @@ function normalizeMentionUserIds(rawIds, participantIds, senderId) {
     return out;
 }
 
+/** Enrich participant user ids for client (matches GET /chats shape). */
+async function enrichChatParticipants(participantIds) {
+    const ids = (participantIds || []).map((p) => (p && p._id ? p._id : p));
+    const enriched = await Promise.all(
+        ids.map(async (userId) => {
+            const participant = await User.findById(userId).select('name email role profileImageUrl').lean();
+            if (!participant) return null;
+            const staffRecord = await Staff.findOne({ userId, active: true })
+                .populate('storeId', 'name')
+                .lean();
+            if (staffRecord) {
+                return {
+                    _id: participant._id,
+                    name: staffRecord.name || participant.name || participant.email,
+                    email: staffRecord.email || participant.email,
+                    role: staffRecord.role || participant.role,
+                    profileImageUrl: participant.profileImageUrl,
+                    outletId: staffRecord.storeId?._id,
+                    outletName: staffRecord.storeId?.name,
+                };
+            }
+            return {
+                _id: participant._id,
+                name: participant.name || participant.email,
+                email: participant.email,
+                role: participant.role,
+                profileImageUrl: participant.profileImageUrl,
+            };
+        })
+    );
+    return enriched.filter(Boolean);
+}
+
+function getCreatedByIdFromChat(chat) {
+    const cb = chat?.createdBy;
+    if (!cb) return null;
+    if (typeof cb === 'object' && cb._id) return cb._id.toString();
+    return String(cb);
+}
+
+/** Client-facing chat flags (creator id, default group, etc.) */
+function chatMetaForClient(chat) {
+    if (!chat) return {};
+    return {
+        createdById: getCreatedByIdFromChat(chat),
+        isDefault: Boolean(chat.isDefault),
+        type: chat.type,
+        name: chat.name,
+        isGroupChat: Boolean(chat.isGroupChat || chat.type === 'group'),
+    };
+}
+
 async function buildMentionsDetail(mentionIds) {
     if (!mentionIds?.length) return [];
     const ids = mentionIds.map(m => (m.toString ? m.toString() : String(m)));
@@ -434,8 +486,11 @@ router.get('/chats', protect, async (req, res) => {
                 ).length;
             }
             
+            const createdById = getCreatedByIdFromChat(chatObj);
+
             return {
                 ...chatObj,
+                createdById,
                 participants: enrichedParticipants,
                 messages: lastMessage ? [lastMessage] : [],
                 unreadCount: unreadCount
@@ -565,7 +620,8 @@ router.get('/:chatId/messages', protect, async (req, res) => {
             data: {
                 messages: messagesWithMentionDetails,
                 lastReadBy: lastReadByPlain,
-                participants: participantsPopulated
+                participants: participantsPopulated,
+                chat: chatMetaForClient(chat),
             },
             total: chat.messages.length,
             page: parseInt(page),
@@ -653,15 +709,23 @@ router.post('/create', protect, async (req, res) => {
             outletId: finalOutletId,
             createdBy: req.user.id,
             messages: [],
-            requiredPlan
+            requiredPlan,
+            isGroupChat: type === 'group',
         });
 
         const populatedChat = await Chat.findById(newChat._id)
             .populate('participants', 'name email role profileImageUrl')
             .populate('outletId', 'name')
-            .populate('createdBy', 'name');
+            .populate('createdBy', 'name')
+            .lean();
 
-        res.json({ success: true, data: populatedChat });
+        res.json({
+            success: true,
+            data: {
+                ...populatedChat,
+                ...chatMetaForClient(populatedChat),
+            },
+        });
     } catch (error) {
         console.error('Create Chat Error:', error);
         res.status(500).json({ error: 'Failed to create chat' });
@@ -1162,6 +1226,106 @@ router.get('/users', protect, async (req, res) => {
     } catch (error) {
         console.error('Get Users Error:', error);
         res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+/**
+ * @route DELETE /api/chat/:chatId/participants/:userId
+ * @desc Remove a member from a group (group creator only)
+ * @access Private (PRO/PREMIUM)
+ */
+router.delete('/:chatId/participants/:userId', protect, async (req, res) => {
+    try {
+        const { chatId, userId: targetUserId } = req.params;
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (!(await checkPlan(user, 'PRO'))) {
+            return res.status(403).json({
+                error: 'Chat feature is only available for PRO and PREMIUM plan users',
+            });
+        }
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        if (chat.type !== 'group' && !chat.isGroupChat) {
+            return res.status(400).json({ error: 'Members can only be removed from group chats' });
+        }
+
+        if (chat.isDefault) {
+            return res.status(400).json({ error: 'Members cannot be removed from default outlet groups' });
+        }
+
+        const creatorId = chat.createdBy?.toString?.() || String(chat.createdBy || '');
+        if (!creatorId || creatorId !== req.user.id.toString()) {
+            return res.status(403).json({ error: 'Only the group creator can remove members' });
+        }
+
+        if (!chat.participants.some((p) => p.toString() === req.user.id.toString())) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const targetId = targetUserId?.toString?.() || String(targetUserId || '');
+        if (!targetId) {
+            return res.status(400).json({ error: 'Invalid member id' });
+        }
+
+        if (targetId === req.user.id.toString()) {
+            return res.status(400).json({ error: 'You cannot remove yourself. Leave the group instead.' });
+        }
+
+        if (targetId === creatorId) {
+            return res.status(400).json({ error: 'The group creator cannot be removed' });
+        }
+
+        if (!chat.participants.some((p) => p.toString() === targetId)) {
+            return res.status(404).json({ error: 'Member is not in this group' });
+        }
+
+        chat.participants = chat.participants.filter((p) => p.toString() !== targetId);
+        if (chat.participants.length < 2) {
+            return res.status(400).json({ error: 'A group must have at least two members' });
+        }
+
+        if (chat.lastReadBy) {
+            if (chat.lastReadBy instanceof Map) {
+                chat.lastReadBy.delete(targetId);
+            } else if (typeof chat.lastReadBy === 'object') {
+                delete chat.lastReadBy[targetId];
+            }
+        }
+
+        await chat.save();
+
+        const enrichedParticipants = await enrichChatParticipants(chat.participants);
+        const payload = {
+            chatId: chat._id,
+            participants: enrichedParticipants,
+            removedUserId: targetId,
+        };
+
+        const io = req.app.get('socketio');
+        if (io) {
+            chat.participants.forEach((pid) => {
+                io.to(`user_${pid}`).emit('chat_participants_updated', payload);
+            });
+            io.to(`user_${targetId}`).emit('removed_from_chat', { chatId: chat._id });
+        }
+
+        res.json({
+            success: true,
+            message: 'Member removed from group',
+            data: { participants: enrichedParticipants },
+        });
+    } catch (error) {
+        console.error('Remove Chat Participant Error:', error);
+        res.status(500).json({ error: 'Failed to remove member from group' });
     }
 });
 

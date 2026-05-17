@@ -17,20 +17,20 @@ import { isPremiumPlan, isProOrPremium } from '../utils/subscription';
 import { requestPushFromGesture } from '../utils/pushOnGesture';
 
 const PERMISSION_PAGE_LABELS = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'billing', label: 'Billing' },
-    { id: 'khata', label: 'Ledger' },
-    { id: 'salesActivity', label: 'Sales History' },
-    { id: 'inventory', label: 'Stock Management' },
-    { id: 'scm', label: 'Supply Chain' },
-    { id: 'reports', label: 'Reports' },
-    { id: 'chat', label: 'Messages' },
-    { id: 'notifications', label: 'Notifications' },
-    { id: 'profile', label: 'Profile' },
-    { id: 'settings', label: 'Settings' },
-    { id: 'staffPermissions', label: 'Team Management' }
-    ,{ id: 'offers', label: 'Offers' }
+    { id: 'dashboard', label: 'Dashboard', roles: ['manager', 'cashier'] },
+    { id: 'billing', label: 'Billing', roles: ['manager', 'cashier'] },
+    { id: 'khata', label: 'Ledger', roles: ['manager', 'cashier'] },
+    { id: 'salesActivity', label: 'Sales History', roles: ['manager', 'cashier'] },
+    { id: 'inventory', label: 'Stock Management', roles: ['manager', 'cashier'] },
+    { id: 'scm', label: 'Supply Chain', roles: ['manager', 'cashier'] },
+    { id: 'staffPermissions', label: 'Team Management', roles: ['manager'] },
+    { id: 'offers', label: 'Offers', roles: ['manager', 'cashier'] },
 ];
+
+const CASHIER_LOCKED_PAGE_KEYS = new Set(['staffPermissions']);
+
+const roleCanConfigurePage = (page, roleKey) =>
+    Array.isArray(page.roles) && page.roles.includes(roleKey);
 
 const ROLE_DEFAULT_ACCESS = {
     manager: {
@@ -40,13 +40,8 @@ const ROLE_DEFAULT_ACCESS = {
         salesActivity: true,
         inventory: true,
         scm: true,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: true,
-        staffPermissions: true
-        ,offers: true
+        staffPermissions: true,
+        offers: true,
     },
     cashier: {
         dashboard: true,
@@ -55,14 +50,9 @@ const ROLE_DEFAULT_ACCESS = {
         salesActivity: true,
         inventory: false,
         scm: false,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: false,
-        staffPermissions: false
-        ,offers: false
-    }
+        staffPermissions: false,
+        offers: false,
+    },
 };
 
 // Temporarily disabled: role permissions page/entry points.
@@ -187,10 +177,15 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
             try {
                 const response = await apiClient.get(API.staffRolePermissions);
                 if (response.data?.permissions) {
-                    setPermissions({
-                        manager: { ...ROLE_DEFAULT_ACCESS.manager, ...(response.data.permissions.manager || {}) },
-                        cashier: { ...ROLE_DEFAULT_ACCESS.cashier, ...(response.data.permissions.cashier || {}) }
-                    });
+                    const mgr = {};
+                    const csh = {};
+                    for (const { id } of PERMISSION_PAGE_LABELS) {
+                        mgr[id] = response.data.permissions.manager?.[id] === true;
+                        csh[id] = CASHIER_LOCKED_PAGE_KEYS.has(id)
+                            ? false
+                            : response.data.permissions.cashier?.[id] === true;
+                    }
+                    setPermissions({ manager: mgr, cashier: csh });
                 }
             } catch (error) {
                 if (showToast) showToast(error.response?.data?.error || 'Failed to load page permissions.', 'error');
@@ -202,6 +197,7 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
     }, [apiClient, showToast]);
 
     const togglePermission = (roleKey, pageKey) => {
+        if (roleKey === 'cashier' && CASHIER_LOCKED_PAGE_KEYS.has(pageKey)) return;
         setPermissions((prev) => ({
             ...prev,
             [roleKey]: {
@@ -214,7 +210,14 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            await apiClient.put(API.staffRolePermissions, permissions);
+            const payload = { manager: {}, cashier: {} };
+            for (const { id } of PERMISSION_PAGE_LABELS) {
+                payload.manager[id] = permissions.manager[id] === true;
+                payload.cashier[id] = CASHIER_LOCKED_PAGE_KEYS.has(id)
+                    ? false
+                    : permissions.cashier[id] === true;
+            }
+            await apiClient.put(API.staffRolePermissions, payload);
             if (showToast) showToast('Role page permissions updated.', 'success');
         } catch (error) {
             if (showToast) showToast(error.response?.data?.error || 'Failed to save page permissions.', 'error');
@@ -236,7 +239,7 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
         <div className="max-w-5xl mx-auto space-y-4">
             <div className={`${cardClass} border rounded-2xl p-4 md:p-6`}>
                 <h3 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>Manager & Cashier Page Access</h3>
-                <p className={`text-xs mt-1 ${mutedClass}`}>Enable or disable each app page for roles in this outlet. Unticked means blocked.</p>
+                <p className={`text-xs mt-1 ${mutedClass}`}>Enable or disable each app page for roles in this outlet. Messages, notifications, profile, and settings are always available to staff.</p>
             </div>
             <div className={`${cardClass} border rounded-2xl overflow-hidden`}>
                 <div className={`grid grid-cols-12 px-4 py-3 border-b text-[10px] font-black tracking-widest uppercase ${darkMode ? 'border-gray-800 text-gray-400 bg-gray-950/60' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
@@ -256,7 +259,11 @@ const RolePermissionsPanel = ({ apiClient, showToast, darkMode }) => {
                                 <input type="checkbox" checked={permissions.manager[page.id] === true} onChange={() => togglePermission('manager', page.id)} className="h-4 w-4 accent-indigo-600" />
                             </div>
                             <div className="col-span-3 flex justify-center">
-                                <input type="checkbox" checked={permissions.cashier[page.id] === true} onChange={() => togglePermission('cashier', page.id)} className="h-4 w-4 accent-indigo-600" />
+                                {roleCanConfigurePage(page, 'cashier') ? (
+                                    <input type="checkbox" checked={permissions.cashier[page.id] === true} onChange={() => togglePermission('cashier', page.id)} className="h-4 w-4 accent-indigo-600" />
+                                ) : (
+                                    <span className={`text-[10px] font-black ${darkMode ? 'text-gray-600' : 'text-slate-400'}`} aria-hidden>—</span>
+                                )}
                             </div>
                         </div>
                     ))

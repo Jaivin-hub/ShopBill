@@ -13,7 +13,7 @@ const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
 const canEditBusinessAddress = (role) => role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
 
-const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser }) => {
+const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser, canAccessPage }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
 
     // --- States ---
@@ -261,6 +261,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         return allActions
             .filter(action => action.roles.includes(userRole))
             .filter(action => !(isProOwner && action.page === 'billing'))
+            .filter(action => typeof canAccessPage !== 'function' || canAccessPage(action.page))
             .sort((a, b) => {
                 const orderA = a.order[userRole];
                 const orderB = b.order[userRole];
@@ -268,7 +269,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 if (orderB === null) return -1;
                 return orderA - orderB;
             });
-    }, [userRole, currentUser?.plan, fetchDashboardData]);
+    }, [userRole, currentUser?.plan, fetchDashboardData, canAccessPage]);
 
     const EmptyState = ({ icon: Icon, title, message, actionText, onAction }) => (
         <div className="flex flex-col items-center justify-center py-8 text-center px-4">

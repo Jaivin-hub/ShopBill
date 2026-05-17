@@ -24,8 +24,10 @@ const Header = ({
     showToast,
     hasModalOpen = false,
     outlets = [], // Receive outlets from parent to avoid duplicate fetching
-    onOpenAddBranchFromHub
+    onOpenAddBranchFromHub,
+    canAccessPage,
 }) => {
+    const staffCan = (pageId) => typeof canAccessPage === 'function' && canAccessPage(pageId);
     const [showStoreHub, setShowStoreHub] = useState(false);
     const [isSwitching, setIsSwitching] = useState(false);
     const [switchingOutletId, setSwitchingOutletId] = useState(null);
@@ -237,7 +239,7 @@ const Header = ({
                 className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] flex justify-between items-center backdrop-blur-md overscroll-none [transform:translate3d(0,0,0)] ${headerBg} transition-all duration-300 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-4 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] ${hasModalOpen ? 'opacity-0 pointer-events-none invisible' : ''}`}
                 aria-hidden={hasModalOpen}
             >
-                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setCurrentPage('dashboard'); setShowStoreHub(false); }}>
+                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { if (staffCan('dashboard')) { setCurrentPage('dashboard'); setShowStoreHub(false); } }}>
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
                         <CreditCard className="w-5 h-5 text-white" />
                     </div>
@@ -268,19 +270,24 @@ const Header = ({
                         {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
                     </button>
 
-                    <button onClick={() => { setCurrentPage('notifications'); setShowStoreHub(false); }} className={`${getButtonClasses('notifications')} relative`}>
-                        <Bell className="w-5 h-5" />
-                        {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
-                                {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
-                            </span>
-                        )}
-                    </button>
+                    {staffCan('notifications') && (
+                        <button onClick={() => { setCurrentPage('notifications'); setShowStoreHub(false); }} className={`${getButtonClasses('notifications')} relative`}>
+                            <Bell className="w-5 h-5" />
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                                    {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
 
                     {/* Settings in header for Premium/Pro Manager only; Basic plan Manager and Cashier use footer */}
-                    {!isOwner && userRole?.toLowerCase() === 'manager' && (currentUser?.plan?.toUpperCase() === 'PREMIUM' || currentUser?.plan?.toUpperCase() === 'PRO') && (
-                        <button 
-                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }} 
+                    {!isOwner &&
+                        staffCan('settings') &&
+                        userRole?.toLowerCase() === 'manager' &&
+                        (currentUser?.plan?.toUpperCase() === 'PREMIUM' || currentUser?.plan?.toUpperCase() === 'PRO') && (
+                        <button
+                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }}
                             className={getButtonClasses('settings')}
                             aria-label="Settings"
                         >
@@ -288,15 +295,17 @@ const Header = ({
                         </button>
                     )}
 
-                    <button onClick={() => { setCurrentPage('profile'); setShowStoreHub(false); }} className={getButtonClasses('profile')}>
-                        <User className="w-5 h-5" />
-                    </button>
+                    {staffCan('profile') && (
+                        <button onClick={() => { setCurrentPage('profile'); setShowStoreHub(false); }} className={getButtonClasses('profile')}>
+                            <User className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
             </header>
 
             {/* Expansion Panel (Store Hub) - hidden when a modal is open so modal has focus */}
             {isPremium && isOwner && showStoreHub && !hasModalOpen && (
-                <div className={`fixed top-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
+                <div className={`fixed top-[var(--app-mobile-header-offset)] left-0 right-0 z-[105] border-b p-4 animate-in slide-in-from-top duration-300 ${hubBg}`}>
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-[10px] font-black tracking-widest opacity-50 uppercase">Select Active Branch</span>
                         <button 

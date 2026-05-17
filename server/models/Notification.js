@@ -41,6 +41,7 @@ const NotificationSchema = new mongoose.Schema({
             'attendance_break_end',
             'attendance_punch_out',
             'staff_shift_assigned',
+            'attendance_shift_reminder',
             'reports_access_enabled',
             'system', 
             'success', 
@@ -86,7 +87,9 @@ const NotificationSchema = new mongoose.Schema({
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', index: true },
         customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true },
         variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
-        staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null }
+        staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
+        reminderKey: { type: String, default: null },
+        reminderKind: { type: String, default: null },
     },
     createdAt: { 
         type: Date, 

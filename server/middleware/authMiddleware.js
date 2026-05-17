@@ -164,7 +164,8 @@ const protect = async (req, res, next) => {
             req.user.activeStoreId = storeId;
         } else if (user.role !== 'superadmin') {
             req.user = user;
-            req.user.storeId = user.activeStoreId;
+            // activeStoreId is set from Staff.storeId in the staff block above
+            req.user.storeId = user.activeStoreId || null;
         } else {
             req.user = user;
         }

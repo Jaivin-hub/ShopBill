@@ -45,28 +45,53 @@ const PAGE_ACCESS_LABELS = {
     salesActivity: 'Sales History',
     inventory: 'Stock',
     scm: 'Supply Chain',
-    reports: 'Reports',
-    chat: 'Messages',
-    notifications: 'Notifications',
-    profile: 'Profile',
-    settings: 'Settings',
-    staffPermissions: 'Team Management'
+    staffPermissions: 'Team Management',
+    offers: 'Offers',
 };
-const PERMISSION_PAGE_LABELS = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'billing', label: 'Billing' },
-    { id: 'khata', label: 'Ledger' },
-    { id: 'salesActivity', label: 'Sales History' },
-    { id: 'inventory', label: 'Stock' },
-    { id: 'scm', label: 'Supply Chain' },
-    { id: 'reports', label: 'Reports' },
-    { id: 'chat', label: 'Messages' },
-    { id: 'notifications', label: 'Notifications' },
-    { id: 'profile', label: 'Profile' },
-    { id: 'settings', label: 'Settings' },
-    { id: 'staffPermissions', label: 'Team Management' },
-    { id: 'offers', label: 'Offers' },
+
+/** Owner-configurable pages in Grant Permissions (matches server grantable keys). */
+const ALL_GRANTABLE_ROLE_PAGE_KEYS = [
+    'dashboard',
+    'billing',
+    'khata',
+    'salesActivity',
+    'inventory',
+    'scm',
+    'staffPermissions',
+    'offers',
 ];
+
+/** Rows in Grant Permissions — `roles` lists which columns show a checkbox. */
+const GRANTABLE_PERMISSION_PAGE_LABELS = [
+    { id: 'dashboard', label: 'Dashboard', roles: ['manager', 'cashier'] },
+    { id: 'billing', label: 'Billing', roles: ['manager', 'cashier'] },
+    { id: 'khata', label: 'Ledger', roles: ['manager', 'cashier'] },
+    { id: 'salesActivity', label: 'Sales History', roles: ['manager', 'cashier'] },
+    { id: 'inventory', label: 'Stock', roles: ['manager', 'cashier'] },
+    { id: 'scm', label: 'Supply Chain', roles: ['manager', 'cashier'] },
+    { id: 'staffPermissions', label: 'Team Management', roles: ['manager'] },
+    { id: 'offers', label: 'Offers', roles: ['manager', 'cashier'] },
+];
+
+/** Cashiers never get Team Management — no checkbox in Grant Permissions. */
+const CASHIER_LOCKED_PAGE_KEYS = new Set(['staffPermissions']);
+
+const ROLE_PAGE_IDS = ALL_GRANTABLE_ROLE_PAGE_KEYS;
+
+const roleCanConfigurePage = (page, roleKey) =>
+    Array.isArray(page.roles) && page.roles.includes(roleKey);
+
+const sanitizeRolePagePermissions = (permissions = {}) => {
+    const mgr = {};
+    const csh = {};
+    for (const id of ALL_GRANTABLE_ROLE_PAGE_KEYS) {
+        mgr[id] = permissions?.manager?.[id] === true;
+        csh[id] = CASHIER_LOCKED_PAGE_KEYS.has(id)
+            ? false
+            : permissions?.cashier?.[id] === true;
+    }
+    return { manager: mgr, cashier: csh };
+};
 
 // Temporarily disabled: Team Management shortcut to role permissions page.
 const ENABLE_ROLE_PERMISSIONS_SHORTCUT = false;
@@ -207,12 +232,20 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
     );
 };
 
+const formatRs = (value) =>
+    `Rs ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
 const PayrollSettlementModal = ({
     isOpen,
     darkMode,
     staffMember,
     month,
     amount,
+    baseSalary,
+    otSalary,
+    carryForwardIn,
+    settlementPreset,
+    setSettlementPreset,
     settlementAmount,
     setSettlementAmount,
     notes,
@@ -236,15 +269,27 @@ const PayrollSettlementModal = ({
     const workedMins = totalMinutes % 60;
     const overtimeHours = Math.floor(overtimeMinutes / 60);
     const overtimeMins = overtimeMinutes % 60;
+    const base = Math.max(0, Number(baseSalary || 0));
+    const ot = Math.max(0, Number(otSalary || 0));
+    const carry = Math.max(0, Number(carryForwardIn || 0));
+    const fullTotal = Math.max(0, Number(amount || 0));
     const payNow = Math.max(0, Number(settlementAmount || 0));
-    const remainingAmount = Math.max(0, Number(amount || 0) - payNow);
+    const remainingAmount = Math.max(0, fullTotal - payNow);
+    const presetBtn = (active) =>
+        `px-2.5 py-2 rounded-lg text-[9px] font-black tracking-wider border transition-colors ${
+            active
+                ? 'bg-indigo-600 border-indigo-500 text-white'
+                : darkMode
+                    ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                    : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+        }`;
     const monthLabel = month
         ? new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
         : '-';
     return (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-[220] p-3 sm:p-4">
-            <div className={`${modalBg} w-full max-w-lg rounded-xl sm:rounded-2xl border overflow-hidden`}>
-                <div className={`p-3 sm:p-4 border-b flex items-center justify-between ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'}`}>
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[220] flex items-end sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className={`${modalBg} w-full max-w-lg max-h-[min(92dvh,calc(100vh-1rem))] sm:max-h-[min(88dvh,calc(100vh-2rem))] rounded-xl sm:rounded-2xl border overflow-hidden flex flex-col my-auto`}>
+                <div className={`shrink-0 p-3 sm:p-4 border-b flex items-center justify-between ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'}`}>
                     <div>
                         <h3 className={`text-base sm:text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Mark Salary Settled</h3>
                         <p className={`text-[9px] font-black tracking-[0.2em] uppercase mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staffMember.name}</p>
@@ -253,7 +298,7 @@ const PayrollSettlementModal = ({
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                <div className="p-4 space-y-4">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-3 custom-scrollbar">
                     <div className={`rounded-lg border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-slate-50'}`}>
                         <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Month: {monthLabel}</p>
                         <p className={`text-[10px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -263,24 +308,69 @@ const PayrollSettlementModal = ({
                             Overtime: {overtimeHours}h {overtimeMins}m
                         </p>
                         <p className={`text-[10px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {salaryMode === 'hourly' ? 'Hourly' : salaryMode === 'daily' ? 'Daily' : 'Salary'} salary Rs {rate.toLocaleString('en-IN')}
+                            {salaryMode === 'hourly' ? 'Hourly' : salaryMode === 'daily' ? 'Daily' : 'Salary'} rate {formatRs(rate)}
+                            {salaryMode === 'daily' ? ` · ${totalDays} day(s)` : ''}
                         </p>
-                        <p className={`text-sm font-black mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Calculated Amount: Rs {Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                        <div className={`mt-3 space-y-1.5 rounded-lg border p-2.5 ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white'}`}>
+                            <div className="flex justify-between gap-2">
+                                <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Base salary</span>
+                                <span className={`text-[10px] font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatRs(base)}</span>
+                            </div>
+                            {ot > 0 && (
+                                <div className="flex justify-between gap-2">
+                                    <span className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>OT pay</span>
+                                    <span className={`text-[10px] font-black ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>{formatRs(ot)}</span>
+                                </div>
+                            )}
+                            {carry > 0 && (
+                                <div className="flex justify-between gap-2">
+                                    <span className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Previous balance</span>
+                                    <span className={`text-[10px] font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatRs(carry)}</span>
+                                </div>
+                            )}
+                            <div className={`flex justify-between gap-2 pt-1.5 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                <span className={`text-[11px] font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>Total due</span>
+                                <span className={`text-[11px] font-black ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>{formatRs(fullTotal)}</span>
+                            </div>
+                        </div>
                     </div>
                     <div>
-                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pay Amount</label>
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Settlement type</label>
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button type="button" disabled={isSubmitting} className={presetBtn(settlementPreset === 'full')} onClick={() => setSettlementPreset('full')}>
+                                Salary + OT
+                            </button>
+                            <button type="button" disabled={isSubmitting} className={presetBtn(settlementPreset === 'base_only')} onClick={() => setSettlementPreset('base_only')}>
+                                Base only
+                            </button>
+                            <button type="button" disabled={isSubmitting} className={presetBtn(settlementPreset === 'custom')} onClick={() => setSettlementPreset('custom')}>
+                                Custom
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className={`text-[9px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pay amount</label>
                         <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={settlementAmount}
-                            onChange={(e) => setSettlementAmount(e.target.value)}
-                            className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${inputBg}`}
+                            onChange={(e) => {
+                                setSettlementAmount(e.target.value);
+                                setSettlementPreset('custom');
+                            }}
+                            className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${inputBg} ${settlementPreset !== 'custom' ? 'opacity-90' : ''}`}
                             placeholder="Enter paid amount"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || settlementPreset !== 'custom'}
+                            readOnly={settlementPreset !== 'custom'}
                         />
                         <p className={`text-[11px] font-bold mt-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            Remaining to next month: Rs {remainingAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                            Remaining to next month: {formatRs(remainingAmount)}
+                            {settlementPreset === 'base_only' && ot > 0 ? (
+                                <span className={`block mt-0.5 text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                                    Unpaid OT ({formatRs(ot)}) will carry forward with any other balance.
+                                </span>
+                            ) : null}
                         </p>
                     </div>
 
@@ -289,7 +379,7 @@ const PayrollSettlementModal = ({
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            rows={3}
+                            rows={2}
                             className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${inputBg}`}
                             placeholder="Settlement note..."
                             disabled={isSubmitting}
@@ -323,7 +413,7 @@ const PayrollSettlementModal = ({
                         )}
                     </div>
                 </div>
-                <div className={`p-3 sm:p-4 border-t flex justify-end gap-2 ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-200 bg-slate-50'}`}>
+                <div className={`shrink-0 p-3 sm:p-4 border-t flex justify-end gap-2 ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-200 bg-slate-50'}`}>
                     <button type="button" onClick={onClose} disabled={isSubmitting} className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-wider ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-white border border-slate-200 text-slate-700'}`}>
                         Cancel
                     </button>
@@ -338,7 +428,7 @@ const PayrollSettlementModal = ({
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, currentPagePermissions, onToggleReportsPermission, reportsPermissionUpdating, canManageIndividualPermissions, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
@@ -612,10 +702,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             setScheduleForm={setScheduleForm}
                             existingShifts={existingShifts}
                             existingShiftMap={existingShiftMap}
-                            canManageIndividualPermissions={canManageIndividualPermissions}
                             canManageWorkHours={canManageWorkHours}
-                            onToggleReportsPermission={onToggleReportsPermission}
-                            reportsPermissionUpdating={reportsPermissionUpdating}
                             onSaveWorkSchedule={onSaveWorkSchedule}
                             isSavingWorkSchedule={isSavingWorkSchedule}
                             showToast={showToast}
@@ -848,7 +935,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions }) => {
+const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions, canAccessTeamManagement: canAccessTeamManagementProp }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -862,12 +949,12 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const [rolePagePermissions, setRolePagePermissions] = useState({ manager: {}, cashier: {} });
     const [isSavingRolePermissions, setIsSavingRolePermissions] = useState(false);
     const [showGrantPermissions, setShowGrantPermissions] = useState(false);
-    const [permissionUpdatingId, setPermissionUpdatingId] = useState(null);
     const [scheduleUpdatingId, setScheduleUpdatingId] = useState(null);
     const [payrollUpdatingId, setPayrollUpdatingId] = useState(null);
     const [payrollConfirmingId, setPayrollConfirmingId] = useState(null);
     const [payrollSettlementModal, setPayrollSettlementModal] = useState(null);
     const [payrollSettlementAmount, setPayrollSettlementAmount] = useState('');
+    const [payrollSettlementPreset, setPayrollSettlementPreset] = useState('full');
     const [payrollSettlementNotes, setPayrollSettlementNotes] = useState('');
     const [payrollSettlementAttachment, setPayrollSettlementAttachment] = useState(null);
     const [managementTab, setManagementTab] = useState('team');
@@ -876,11 +963,18 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const [payrollStatementRows, setPayrollStatementRows] = useState([]);
     void onOpenRolePermissions;
 
-    // Ensure we have write/read access
     const effectiveRole = (currentUserRole || currentUser?.role || 'owner').toLowerCase();
-    const hasWriteAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
+    const canAccessTeamManagement = useMemo(() => {
+        if (typeof canAccessTeamManagementProp === 'boolean') return canAccessTeamManagementProp;
+        if (effectiveRole === 'owner') return true;
+        if (effectiveRole === 'manager') {
+            return currentUser?.permissions?.pages?.staffPermissions === true;
+        }
+        return false;
+    }, [canAccessTeamManagementProp, effectiveRole, currentUser?.permissions?.pages?.staffPermissions]);
     const hasOwnerAccess = effectiveRole === 'owner';
-    const hasReadAccess = effectiveRole === 'owner' || effectiveRole === 'manager';
+    const hasReadAccess = canAccessTeamManagement;
+    const hasWriteAccess = canAccessTeamManagement && (effectiveRole === 'owner' || effectiveRole === 'manager');
 
     const fetchStaff = useCallback(async () => {
         if (!hasReadAccess || !apiClient) {
@@ -912,10 +1006,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         try {
             const response = await apiClient.get(API.staffRolePermissions);
             if (response.data?.permissions) {
-                setRolePagePermissions({
-                    manager: response.data.permissions.manager || {},
-                    cashier: response.data.permissions.cashier || {}
-                });
+                setRolePagePermissions(sanitizeRolePagePermissions(response.data.permissions));
             }
         } catch (error) {
             if (error?.cancelled) return;
@@ -1049,6 +1140,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     };
 
     const toggleRolePermission = (roleKey, pageId) => {
+        if (roleKey === 'cashier' && CASHIER_LOCKED_PAGE_KEYS.has(pageId)) return;
         setRolePagePermissions((prev) => ({
             ...prev,
             [roleKey]: {
@@ -1059,31 +1151,24 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     };
 
     const handleSaveRolePermissions = async () => {
-        if (!hasWriteAccess) return;
+        if (!hasOwnerAccess) return;
         setIsSavingRolePermissions(true);
         try {
-            await apiClient.put(API.staffRolePermissions, rolePagePermissions);
+            const mgr = {};
+            const csh = {};
+            for (const id of ALL_GRANTABLE_ROLE_PAGE_KEYS) {
+                mgr[id] = rolePagePermissions?.manager?.[id] === true;
+                csh[id] = CASHIER_LOCKED_PAGE_KEYS.has(id)
+                    ? false
+                    : rolePagePermissions?.cashier?.[id] === true;
+            }
+            await apiClient.put(API.staffRolePermissions, { manager: mgr, cashier: csh });
             if (showToast) showToast('Team page permissions updated.', 'success');
             await fetchRolePermissions();
         } catch (error) {
             if (showToast) showToast(error.response?.data?.error || 'Failed to save page permissions.', 'error');
         } finally {
             setIsSavingRolePermissions(false);
-        }
-    };
-    const handleToggleReportsPermission = async (staffMember) => {
-        if (!hasOwnerAccess || !staffMember?._id || staffMember.role !== 'Manager') return;
-        const nextReports = !(staffMember?.permissions?.reports === true);
-        setPermissionUpdatingId(String(staffMember._id));
-        try {
-            const res = await apiClient.put(API.staffPermissionUpdate(staffMember._id), { reports: nextReports });
-            const updated = res?.data?.staff;
-            setStaff((prev) => prev.map((s) => (String(s._id) === String(staffMember._id) ? { ...s, ...(updated || {}), permissions: { ...(s.permissions || {}), reports: nextReports } } : s)));
-            if (showToast) showToast(`Reports access ${nextReports ? 'enabled' : 'disabled'} for ${staffMember.name}.`, 'success');
-        } catch (error) {
-            if (showToast) showToast(error.response?.data?.error || 'Failed to update individual permission.', 'error');
-        } finally {
-            setPermissionUpdatingId(null);
         }
     };
     const handleSaveStaffWorkSchedule = async (staffMember, scheduleForm) => {
@@ -1110,13 +1195,8 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         if (!hasWriteAccess || !staffMember?._id) return;
         setPayrollUpdatingId(String(staffMember._id));
         try {
-            const res = await apiClient.put(API.staffPayrollSettlementUpdate(staffMember._id), payload);
-            const updated = res?.data?.staff;
-            if (updated) {
-                setStaff((prev) => prev.map((s) => (String(s._id) === String(staffMember._id) ? { ...s, ...updated } : s)));
-            } else {
-                await fetchStaff();
-            }
+            await apiClient.put(API.staffPayrollSettlementUpdate(staffMember._id), payload);
+            await fetchStaff();
             await fetchPayrollStatement();
             if (showToast) showToast(payload.paid ? 'Payroll marked settled.' : 'Payroll marked pending.', 'success');
         } catch (error) {
@@ -1126,19 +1206,30 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         }
     }, [apiClient, API.staffPayrollSettlementUpdate, fetchPayrollStatement, fetchStaff, hasWriteAccess, showToast]);
 
-    const openPayrollSettlementModal = useCallback((staffMember, month, amount) => {
+    const openPayrollSettlementModal = useCallback((staffMember, month) => {
+        const summary = staffMember?.payrollSummary || {};
+        const totalSalary = Number(summary.totalSalary || 0);
+        const baseSalary = Number(summary.baseSalary || 0);
+        const otSalary = Number(summary.otSalary || 0);
+        const carryForwardIn = Number(summary.carryForwardIn || 0);
+        const salaryWithoutOt = Math.round((baseSalary + carryForwardIn) * 100) / 100;
         setPayrollSettlementModal({
             staffId: String(staffMember?._id || ''),
             staffName: staffMember?.name || '',
             month: String(month || ''),
-            amount: Number(amount || 0),
+            amount: totalSalary,
+            baseSalary,
+            otSalary,
+            carryForwardIn,
+            salaryWithoutOt,
             salaryMode: String(staffMember?.compensation?.salaryMode || 'none'),
             salaryRate: Number(staffMember?.compensation?.amount || 0),
-            totalMinutes: Number(staffMember?.payrollSummary?.totalMinutes || 0),
-            overtimeMinutes: Number(staffMember?.payrollSummary?.overtimeMinutes || 0),
-            totalDays: Number(staffMember?.payrollSummary?.totalDays || 0),
+            totalMinutes: Number(summary.totalMinutes || 0),
+            overtimeMinutes: Number(summary.overtimeMinutes || 0),
+            totalDays: Number(summary.totalDays || 0),
         });
-        setPayrollSettlementAmount(String(Number(amount || 0)));
+        setPayrollSettlementPreset('full');
+        setPayrollSettlementAmount(String(totalSalary));
         setPayrollSettlementNotes('');
         setPayrollSettlementAttachment(null);
     }, []);
@@ -1146,10 +1237,20 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const closePayrollSettlementModal = useCallback(() => {
         setPayrollSettlementModal(null);
         setPayrollSettlementAmount('');
+        setPayrollSettlementPreset('full');
         setPayrollSettlementNotes('');
         setPayrollSettlementAttachment(null);
         setPayrollConfirmingId(null);
     }, []);
+
+    useEffect(() => {
+        if (!payrollSettlementModal) return;
+        if (payrollSettlementPreset === 'full') {
+            setPayrollSettlementAmount(String(Number(payrollSettlementModal.amount || 0)));
+        } else if (payrollSettlementPreset === 'base_only') {
+            setPayrollSettlementAmount(String(Number(payrollSettlementModal.salaryWithoutOt || 0)));
+        }
+    }, [payrollSettlementPreset, payrollSettlementModal]);
 
     const confirmPayrollSettlement = useCallback(async () => {
         if (!payrollSettlementModal?.staffId) return;
@@ -1158,6 +1259,15 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         const calculatedAmount = Math.max(0, Number(payrollSettlementModal.amount || 0));
         const enteredAmount = Math.max(0, Number(payrollSettlementAmount || 0));
         const settlementAmount = Math.min(calculatedAmount, enteredAmount);
+        const presetLabels = {
+            full: 'Salary + OT',
+            base_only: 'Base salary only (OT unpaid)',
+            custom: 'Custom amount',
+        };
+        const presetNote = presetLabels[payrollSettlementPreset] || '';
+        const combinedNotes = [payrollSettlementNotes?.trim(), presetNote && `Settlement: ${presetNote}`]
+            .filter(Boolean)
+            .join('\n');
 
         let attachmentPayload = {};
         try {
@@ -1181,7 +1291,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                 paid: true,
                 amount: settlementAmount,
                 calculatedAmount,
-                notes: payrollSettlementNotes || '',
+                notes: combinedNotes,
                 ...attachmentPayload
             });
             closePayrollSettlementModal();
@@ -1199,6 +1309,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         payrollSettlementAmount,
         payrollSettlementModal,
         payrollSettlementNotes,
+        payrollSettlementPreset,
         showToast,
         staff
     ]);
@@ -1465,7 +1576,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                         <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
                             <div>
                                 <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Grant Permissions</p>
-                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control page access for Manager and Cashier roles.</p>
+                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control page access for Manager and Cashier. Messages, notifications, profile, and settings are always available to staff.</p>
                             </div>
                             <button
                                 type="button"
@@ -1483,7 +1594,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                     <div className="col-span-3 text-center">Cashier</div>
                                 </div>
                                 <div className="mt-2 rounded-lg border overflow-hidden">
-                                    {PERMISSION_PAGE_LABELS.map((page) => (
+                                    {GRANTABLE_PERMISSION_PAGE_LABELS.map((page) => (
                                         <div key={page.id} className={`grid grid-cols-12 items-center px-3 py-2.5 border-b last:border-b-0 ${darkMode ? 'border-slate-800 bg-slate-900/30' : 'border-slate-100 bg-white'}`}>
                                             <div className={`col-span-6 text-[12px] font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{page.label}</div>
                                             <div className="col-span-3 flex justify-center">
@@ -1495,12 +1606,21 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                                 />
                                             </div>
                                             <div className="col-span-3 flex justify-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={rolePagePermissions?.cashier?.[page.id] === true}
-                                                    onChange={() => toggleRolePermission('cashier', page.id)}
-                                                    className="h-4 w-4 accent-indigo-600"
-                                                />
+                                                {roleCanConfigurePage(page, 'cashier') ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={rolePagePermissions?.cashier?.[page.id] === true}
+                                                        onChange={() => toggleRolePermission('cashier', page.id)}
+                                                        className="h-4 w-4 accent-indigo-600"
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        className={`text-[10px] font-black tabular-nums ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}
+                                                        aria-hidden
+                                                    >
+                                                        —
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -1616,7 +1736,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                                             });
                                                             return;
                                                         }
-                                                        openPayrollSettlementModal(member, member?.payrollSummary?.month, totalSalary);
+                                                        openPayrollSettlementModal(member, member?.payrollSummary?.month);
                                                     }}
                                                     disabled={payrollUpdatingId === String(member._id)}
                                                     className="px-2 py-1 rounded text-[9px] font-black tracking-wider bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60"
@@ -1645,6 +1765,11 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                             <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                 {row.month} · {row.salaryMode} · Settled {row.paidAt ? new Date(row.paidAt).toLocaleDateString('en-IN') : ''}
                                             </p>
+                                            {Number(row.calculatedAmount || 0) > 0 && Number(row.calculatedAmount) !== Number(row.amount || 0) && (
+                                                <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                    Due {formatRs(row.calculatedAmount)} · Paid {formatRs(row.amount)}
+                                                </p>
+                                            )}
                                             <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                                 Marked by: {row.settledByName || 'Unknown'}{row.settledByRole ? ` (${row.settledByRole})` : ''}
                                             </p>
@@ -1709,12 +1834,6 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                 const isOnBreak = att?.onBreak || false;
                                 const breakStart = att?.breakStart || null;
                                 const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
-                                const roleKey = s.role === 'Manager' ? 'manager' : s.role === 'Cashier' ? 'cashier' : null;
-                                const effectiveRolePages = roleKey
-                                    ? Object.entries(rolePagePermissions[roleKey] || {})
-                                        .filter(([, isAllowed]) => isAllowed === true)
-                                        .map(([pageKey]) => PAGE_ACCESS_LABELS[pageKey] || pageKey)
-                                    : [];
                                 return (
                                     <StaffStatusButton
                                         key={s._id}
@@ -1738,10 +1857,6 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                         isOnBreak={isOnBreak}
                                         breakStart={breakStart}
                                         breakDurationMinutes={breakDurationMinutes}
-                                        currentPagePermissions={effectiveRolePages}
-                                        onToggleReportsPermission={handleToggleReportsPermission}
-                                        reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
-                                        canManageIndividualPermissions={hasOwnerAccess}
                                         canManageWorkHours={hasWriteAccess}
                                         onSaveWorkSchedule={handleSaveStaffWorkSchedule}
                                         isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
@@ -1769,12 +1884,6 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                 const isOnBreak = att?.onBreak || false;
                                 const breakStart = att?.breakStart || null;
                                 const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
-                                const roleKey = s.role === 'Manager' ? 'manager' : s.role === 'Cashier' ? 'cashier' : null;
-                                const effectiveRolePages = roleKey
-                                    ? Object.entries(rolePagePermissions[roleKey] || {})
-                                        .filter(([, isAllowed]) => isAllowed === true)
-                                        .map(([pageKey]) => PAGE_ACCESS_LABELS[pageKey] || pageKey)
-                                    : [];
                                 return (
                                     <StaffStatusButton
                                         key={s._id}
@@ -1798,10 +1907,6 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                         isOnBreak={isOnBreak}
                                         breakStart={breakStart}
                                         breakDurationMinutes={breakDurationMinutes}
-                                        currentPagePermissions={effectiveRolePages}
-                                        onToggleReportsPermission={handleToggleReportsPermission}
-                                        reportsPermissionUpdating={permissionUpdatingId === String(s._id)}
-                                        canManageIndividualPermissions={hasOwnerAccess}
                                         canManageWorkHours={hasWriteAccess}
                                         onSaveWorkSchedule={handleSaveStaffWorkSchedule}
                                         isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
@@ -1824,7 +1929,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
                 disabled={isLoading}
-                className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 disabled:opacity-50"
+                className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 disabled:opacity-50"
                 aria-label="Add new staff member"
             >
                 <Plus className="w-6 h-6" strokeWidth={2.5} />
@@ -1870,6 +1975,11 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                 } : null}
                 month={payrollSettlementModal?.month || ''}
                 amount={payrollSettlementModal?.amount || 0}
+                baseSalary={payrollSettlementModal?.baseSalary || 0}
+                otSalary={payrollSettlementModal?.otSalary || 0}
+                carryForwardIn={payrollSettlementModal?.carryForwardIn || 0}
+                settlementPreset={payrollSettlementPreset}
+                setSettlementPreset={setPayrollSettlementPreset}
                 settlementAmount={payrollSettlementAmount}
                 setSettlementAmount={setPayrollSettlementAmount}
                 notes={payrollSettlementNotes}

@@ -12,6 +12,12 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { onForegroundMessage, isPushSupported, ensureFcmServiceWorkerReady } from './lib/firebase';
 import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
 import { requestPushFromGesture } from './utils/pushOnGesture';
+import {
+  primeSwipeHaptic,
+  pulseSwipePageHaptic,
+  registerPwaSwipeHapticWarmup,
+  registerPwaSwipeHapticLifecycle,
+} from './utils/swipeHaptic';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
 import SEO from './components/SEO';
@@ -51,17 +57,6 @@ const Chat = lazy(() => import('./components/Chat'));
 /** Used to avoid reloading on first SW install: controllerchange also fires when the page gets its first controlling worker. */
 const SW_CONTROLLER_URL_KEY = 'pocketpos_sw_controller_url';
 const normalizeSwScriptUrl = (url) => (url || '').split('?')[0];
-
-/** Single ~10ms pulse when a horizontal swipe changes tabs (mechanical “tick”); Android et al.; iOS has no Vibration API. */
-function pulseSwipeHaptic() {
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(10);
-    }
-  } catch {
-    /* ignore */
-  }
-}
 
 const UpdatePrompt = () => {
   const [show, setShow] = useState(false);
@@ -353,37 +348,33 @@ const SUPERADMIN_NAV_ITEMS = [
     { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
-const DEFAULT_ROLE_PAGE_ACCESS = {
-  manager: {
-    dashboard: true,
-    billing: true,
-    khata: true,
-    salesActivity: true,
-    inventory: true,
-    scm: true,
-    reports: false,
-    chat: true,
-    notifications: true,
-    profile: true,
-    settings: true,
-    staffPermissions: true,
-    offers: true,
-  },
-  cashier: {
-    dashboard: true,
-    billing: true,
-    khata: true,
-    salesActivity: true,
-    inventory: false,
-    scm: false,
-    reports: false,
-    chat: true,
-    notifications: true,
-    profile: true,
-    settings: true,
-    staffPermissions: false,
-    offers: false,
-  },
+/** Grantable keys — must match server `GRANTABLE_ROLE_PAGE_PERMISSION_KEYS`. */
+const STAFF_GRANTABLE_PAGE_KEYS = [
+  'dashboard',
+  'billing',
+  'khata',
+  'salesActivity',
+  'inventory',
+  'scm',
+  'staffPermissions',
+  'offers',
+];
+
+/** Always available to staff — not shown in Grant Permissions. */
+const STAFF_COMMON_PAGE_KEYS = ['chat', 'notifications', 'profile', 'settings'];
+
+const STAFF_PAGE_PERMISSION_KEYS = [...STAFF_GRANTABLE_PAGE_KEYS, ...STAFF_COMMON_PAGE_KEYS];
+
+const normalizeStaffPagesFromServer = (raw) => {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const key of STAFF_GRANTABLE_PAGE_KEYS) {
+    out[key] = typeof src[key] === 'boolean' ? src[key] : false;
+  }
+  for (const key of STAFF_COMMON_PAGE_KEYS) {
+    out[key] = true;
+  }
+  return out;
 };
 
 const checkDeepLinkPath = () => {
@@ -435,6 +426,9 @@ const App = () => {
     return lastSelectedOutletId || user?.activeStoreId || null;
   });
   const [isChatSelected, setIsChatSelected] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' ? !window.matchMedia('(min-width: 768px)').matches : false
+  );
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [hasModalOpen, setHasModalOpen] = useState(false);
@@ -451,6 +445,7 @@ const App = () => {
   const hasStaffPunchedInRef = useRef(false);
   const hasResolvedAttendanceStatusRef = useRef(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
+  const mainScrollRef = useRef(null);
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
   // Deep links (staff-setup, reset-password): stable listeners; compare via ref to avoid effect churn on every page change.
@@ -491,23 +486,21 @@ const App = () => {
   const planUpper = currentUser?.plan?.toUpperCase();
   const isPremium = planUpper === 'PREMIUM';
   const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
-  const rolePageDefaults = userRole === USER_ROLES.MANAGER ? DEFAULT_ROLE_PAGE_ACCESS.manager : DEFAULT_ROLE_PAGE_ACCESS.cashier;
   const rolePagePermissions = useMemo(() => {
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return null;
-    return {
-      ...rolePageDefaults,
-      ...(currentUser?.permissions?.pages || {}),
-    };
-  }, [userRole, currentUser?.permissions?.pages, rolePageDefaults]);
+    const serverPages = currentUser?.permissions?.pages;
+    if (serverPages && typeof serverPages === 'object' && !Array.isArray(serverPages)) {
+      return normalizeStaffPagesFromServer(serverPages);
+    }
+    /* No server map yet (stale session): deny all until GET /profile fills permissions.pages */
+    return normalizeStaffPagesFromServer({});
+  }, [userRole, currentUser?.permissions?.pages]);
   const canAccessPage = useCallback((pageId) => {
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return true;
-    // Always allow utility settings and sales history access for staff.
-    if (pageId === 'settings' || pageId === 'salesActivity') return true;
-    // Messages must stay visible for staff so chat does not disappear from footer.
-    if (pageId === 'chat' && (userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER)) return true;
-    // Manager-specific reports grant should immediately unlock Reports page visibility.
-    if (pageId === 'reports' && userRole === USER_ROLES.MANAGER && currentUser?.permissions?.reports === true) return true;
-    if (userRole === USER_ROLES.MANAGER && pageId === 'staffPermissions') return true;
+    if (STAFF_COMMON_PAGE_KEYS.includes(pageId)) return true;
+    if (pageId === 'reports' && userRole === USER_ROLES.MANAGER && currentUser?.permissions?.reports === true) {
+      return true;
+    }
     return rolePagePermissions?.[pageId] === true;
   }, [userRole, rolePagePermissions, currentUser?.permissions?.reports]);
   const mergeCurrentUserFields = useCallback((partial) => {
@@ -633,12 +626,25 @@ const App = () => {
 
   // Navigate and push current page to back stack (so swipe-back can return). Use opts.replace to clear stack (e.g. logout, back-to-origin).
   const navigateTo = useCallback((page, opts) => {
+    const publicIds = new Set(['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate']);
+    if (
+      !publicIds.has(page) &&
+      currentUser &&
+      userRole !== USER_ROLES.OWNER &&
+      userRole !== USER_ROLES.SUPERADMIN &&
+      rolePagePermissions &&
+      Object.prototype.hasOwnProperty.call(rolePagePermissions, page) &&
+      !canAccessPage(page)
+    ) {
+      showToast('Access restricted by owner permissions.', 'info');
+      return;
+    }
     if (opts?.replace) backStackRef.current = [];
     if (page !== currentPage) {
       if (!opts?.replace) backStackRef.current = [...backStackRef.current, currentPage];
       setCurrentPage(page);
     }
-  }, [currentPage]);
+  }, [currentPage, currentUser, userRole, rolePagePermissions, canAccessPage, showToast]);
 
   const handleStaffPromptSkip = useCallback(() => {
     setShowStaffPunchPrompt(false);
@@ -1201,7 +1207,12 @@ useEffect(() => {
       _id: uid,
       id: user.id ?? user._id ?? uid,
       role: user.role.toLowerCase(),
-      permissions: user.permissions || {},
+      permissions: (() => {
+        const r = String(user.role || '').toLowerCase();
+        const perms = user.permissions || {};
+        if (r === 'owner' || r === 'superadmin') return perms;
+        return { ...perms, pages: normalizeStaffPagesFromServer(perms.pages || {}) };
+      })(),
     };
     localStorage.setItem('userToken', token);
     localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
@@ -1336,16 +1347,24 @@ useEffect(() => {
         const response = await apiClient.get(API.profile);
         if (response.data?.success && response.data?.user) {
           const serverUser = response.data.user;
+          const serverRole = String(serverUser.role ?? cu.role ?? '').toLowerCase();
+          const mergedPermissions = serverUser.permissions || cu.permissions || {};
           let updatedUser = {
             ...cu,
-            role: serverUser.role ?? cu.role,
+            role: serverRole,
             plan: serverUser.plan ?? cu.plan,
             shopName: serverUser.shopName ?? cu.shopName,
             id: serverUser.id ?? cu.id,
             _id: serverUser.id ?? cu._id,
             activeStoreId: serverUser.activeStoreId ?? cu.activeStoreId,
             shopId: serverUser.shopId ?? cu.shopId,
-            permissions: serverUser.permissions || cu.permissions || {},
+            permissions:
+              serverRole !== USER_ROLES.OWNER && serverRole !== USER_ROLES.SUPERADMIN
+                ? {
+                    ...mergedPermissions,
+                    pages: normalizeStaffPagesFromServer(mergedPermissions.pages || {}),
+                  }
+                : mergedPermissions,
           };
           if (updatedUser.role !== 'owner' && updatedUser.role !== 'superadmin') {
             try {
@@ -1410,12 +1429,11 @@ useEffect(() => {
   const navItems = useMemo(() => {
     if (userRole === USER_ROLES.SUPERADMIN) return SUPERADMIN_NAV_ITEMS;
     const userPlan = currentUser?.plan?.toUpperCase();
-    // Managers/cashiers should always have chat access; owner chat remains plan-gated.
-    const hasChatAccess =
-      userRole === USER_ROLES.MANAGER ||
-      userRole === USER_ROLES.CASHIER ||
-      userPlan === 'PRO' ||
-      userPlan === 'PREMIUM';
+    const ownerChatAllowed = userPlan === 'PRO' || userPlan === 'PREMIUM';
+    const includeChatNav =
+      userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER
+        ? canAccessPage('chat')
+        : ownerChatAllowed;
     const standardNav = [
       { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 1, manager: 1, cashier: 1 } },
       { id: 'billing', name: 'Billing', icon: Barcode, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: null, manager: 2, cashier: 1 } },
@@ -1423,7 +1441,7 @@ useEffect(() => {
       { id: 'inventory', name: 'Stock', icon: Package, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: 4, cashier: null } },
       ...(hasSupplyChainAccess ? [{ id: 'scm', name: 'Supply Chain', icon: Truck, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER], displayOrder: { owner: null, manager: null, cashier: null } }] : []),
       { id: 'reports', name: 'Reports', icon: TrendingUp, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 4, manager: null, cashier: null } },
-      ...(hasChatAccess ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 3, manager: null, cashier: null } }] : []),
+      ...(includeChatNav ? [{ id: 'chat', name: 'Messages', icon: MessageCircle, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER], displayOrder: { owner: 3, manager: null, cashier: null } }] : []),
     ];
     return standardNav.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
   }, [userRole, hasSupplyChainAccess, currentUser?.plan, canAccessPage]);
@@ -1476,65 +1494,6 @@ useEffect(() => {
     return { primaryNavItems: primary, secondaryNavItems: sortedSecondary };
   }, [navItems, userRole, currentUser?.plan, canAccessPage]);
 
-  // Ordered page ids for swipe navigation (matches footer tabs; Settings added when it's a direct tab)
-  const swipeablePageIds = useMemo(() => {
-    const ids = primaryNavItems.map(item => item.id);
-    const hasDirectSettings = (userRole === USER_ROLES.CASHIER) || (userRole === USER_ROLES.MANAGER && (currentUser?.plan?.toUpperCase() !== 'PREMIUM' && currentUser?.plan?.toUpperCase() !== 'PRO'));
-    if (hasDirectSettings && !ids.includes('settings')) ids.push('settings');
-    return ids;
-  }, [primaryNavItems, userRole, currentUser?.plan]);
-
-  const handleSwipeNavigation = useCallback((direction) => {
-    // Swipe right = back: prefer back stack (Profile → Dashboard, Settings child → Settings), else previous tab
-    if (direction === 'right') {
-      if (backStackRef.current.length > 0) {
-        const backPage = backStackRef.current[backStackRef.current.length - 1];
-        backStackRef.current = backStackRef.current.slice(0, -1);
-        pulseSwipeHaptic();
-        setSlideDirection('right');
-        setCurrentPage(backPage);
-        setTimeout(() => setSlideDirection(null), 320);
-        return;
-      }
-      const idx = swipeablePageIds.indexOf(currentPage);
-      if (idx > 0) {
-        const prevId = swipeablePageIds[idx - 1];
-        pulseSwipeHaptic();
-        setSlideDirection('right');
-        setCurrentPage(prevId);
-        setTimeout(() => setSlideDirection(null), 320);
-      }
-      return;
-    }
-    // Swipe left = next tab only when on a tab
-    const idx = swipeablePageIds.indexOf(currentPage);
-    if (idx === -1) return;
-    if (idx < swipeablePageIds.length - 1) {
-      const nextId = swipeablePageIds[idx + 1];
-      pulseSwipeHaptic();
-      setSlideDirection('left');
-      setCurrentPage(nextId);
-      setTimeout(() => setSlideDirection(null), 320);
-    }
-  }, [swipeablePageIds, currentPage]);
-
-  const handleTouchStart = useCallback((e) => {
-    const t = e.touches?.[0];
-    if (t) {
-      touchStartRef.current = { x: t.clientX, y: t.clientY };
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-    const t = e.changedTouches?.[0];
-    if (!t) return;
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    if (Math.abs(dx) <= Math.abs(dy) || Math.abs(dx) < 50) return; // require horizontal swipe
-    if (dx < 0) handleSwipeNavigation('left');
-    else handleSwipeNavigation('right');
-  }, [handleSwipeNavigation]);
-
   const utilityNavItems = useMemo(() => {
     const filtered = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
     return filtered.sort((a, b) => {
@@ -1545,12 +1504,17 @@ useEffect(() => {
     });
   }, [userRole, canAccessPage]);
 
-  // Footer More menu: for owner exclude Notifications & Profile (in header); Settings always last
+  /** Notifications & Profile are in the header — omit from mobile footer / More menu for every role. */
+  const MOBILE_FOOTER_EXCLUDED_PAGE_IDS = new Set(['notifications', 'profile']);
+
+  // Footer More menu utility rows (no notifications/profile); Settings always last
   const moreMenuUtilityItems = useMemo(() => {
-    let items = UTILITY_NAV_ITEMS_CONFIG.filter(item => item.roles.includes(userRole) && canAccessPage(item.id));
-    if (userRole === USER_ROLES.OWNER) {
-      items = items.filter(item => item.id !== 'notifications' && item.id !== 'profile');
-    }
+    const items = UTILITY_NAV_ITEMS_CONFIG.filter(
+      (item) =>
+        item.roles.includes(userRole) &&
+        canAccessPage(item.id) &&
+        !MOBILE_FOOTER_EXCLUDED_PAGE_IDS.has(item.id)
+    );
     return items.sort((a, b) => {
       if (a.id === 'settings') return 1;
       if (b.id === 'settings') return -1;
@@ -1572,6 +1536,188 @@ useEffect(() => {
     secondary.forEach(item => byId.set(item.id, item));
     return order.map(id => byId.get(id)).filter(Boolean);
   }, [userRole, moreMenuUtilityItems, secondaryNavItems]);
+
+  /** Max icons on the mobile footer bar, including the More button when overflow exists. */
+  const MOBILE_FOOTER_MAX_SLOTS = 5;
+
+  /** More sheet order: Team Management first when present; Settings last. */
+  const sortMobileMoreMenuItems = (items) => {
+    if (!items?.length) return items;
+    const team = items.find((item) => item.id === 'staffPermissions');
+    if (!team) return items;
+    const rest = items.filter((item) => item.id !== 'staffPermissions');
+    const settings = rest.find((item) => item.id === 'settings');
+    const middle = rest.filter((item) => item.id !== 'settings');
+    return settings ? [team, ...middle, settings] : [team, ...middle];
+  };
+
+  // Mobile footer: ≤5 destinations = all on bar (no More); >5 = 4 on bar + More (5 slots total)
+  const mobileFooterPool = useMemo(() => {
+    const seen = new Set();
+    const pool = [];
+    const add = (item) => {
+      if (!item || seen.has(item.id) || MOBILE_FOOTER_EXCLUDED_PAGE_IDS.has(item.id)) return;
+      seen.add(item.id);
+      pool.push(item);
+    };
+    primaryNavItems.forEach(add);
+    secondaryNavItems.forEach(add);
+    if (userRole === USER_ROLES.OWNER && footerMoreMenuItems) {
+      footerMoreMenuItems.forEach(add);
+    } else {
+      moreMenuUtilityItems.forEach(add);
+    }
+    return pool;
+  }, [primaryNavItems, secondaryNavItems, footerMoreMenuItems, moreMenuUtilityItems, userRole]);
+
+  const { mobileFooterTabs, mobileMoreItems } = useMemo(() => {
+    const pool = mobileFooterPool;
+    if (pool.length <= MOBILE_FOOTER_MAX_SLOTS) {
+      return { mobileFooterTabs: pool, mobileMoreItems: [] };
+    }
+    const barTabCount = MOBILE_FOOTER_MAX_SLOTS - 1; // reserve one slot for More
+    let bar = pool.slice(0, barTabCount);
+    let more = pool.slice(barTabCount);
+    const chatInMoreIdx = more.findIndex((item) => item.id === 'chat');
+    if (chatInMoreIdx !== -1) {
+      const chatItem = more[chatInMoreIdx];
+      more = more.filter((_, i) => i !== chatInMoreIdx);
+      const displaced = bar[bar.length - 1];
+      bar = [...bar.slice(0, -1), chatItem];
+      if (displaced) more = [displaced, ...more];
+    }
+    return { mobileFooterTabs: bar, mobileMoreItems: sortMobileMoreMenuItems(more) };
+  }, [mobileFooterPool]);
+
+  useEffect(() => {
+    if (mobileMoreItems.length === 0) setShowMoreMenu(false);
+  }, [mobileMoreItems.length]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => {
+      const mobile = !mq.matches;
+      setIsMobileViewport(mobile);
+      if (!mobile) setShowMoreMenu(false);
+    };
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const swipeablePageIds = useMemo(() => mobileFooterPool.map((item) => item.id), [mobileFooterPool]);
+
+  const showAppUI = useMemo(
+    () =>
+      Boolean(currentUser) &&
+      !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(
+        currentPage
+      ),
+    [currentUser, currentPage]
+  );
+
+  const canSwipeNavigate = useCallback(
+    (direction) => {
+      if (direction === 'right') {
+        if (backStackRef.current.length > 0) return true;
+        const idx = swipeablePageIds.indexOf(currentPage);
+        return idx > 0;
+      }
+      const idx = swipeablePageIds.indexOf(currentPage);
+      return idx !== -1 && idx < swipeablePageIds.length - 1;
+    },
+    [swipeablePageIds, currentPage]
+  );
+
+  const handleSwipeNavigation = useCallback((direction) => {
+    // Swipe right = back: prefer back stack (Profile → Dashboard, Settings child → Settings), else previous tab
+    if (direction === 'right') {
+      if (backStackRef.current.length > 0) {
+        const backPage = backStackRef.current[backStackRef.current.length - 1];
+        backStackRef.current = backStackRef.current.slice(0, -1);
+        setSlideDirection('right');
+        setCurrentPage(backPage);
+        setTimeout(() => setSlideDirection(null), 320);
+        return;
+      }
+      const idx = swipeablePageIds.indexOf(currentPage);
+      if (idx > 0) {
+        const prevId = swipeablePageIds[idx - 1];
+        setSlideDirection('right');
+        setCurrentPage(prevId);
+        setTimeout(() => setSlideDirection(null), 320);
+      }
+      return;
+    }
+    // Swipe left = next tab only when on a tab
+    const idx = swipeablePageIds.indexOf(currentPage);
+    if (idx === -1) return;
+    if (idx < swipeablePageIds.length - 1) {
+      const nextId = swipeablePageIds[idx + 1];
+      setSlideDirection('left');
+      setCurrentPage(nextId);
+      setTimeout(() => setSlideDirection(null), 320);
+    }
+  }, [swipeablePageIds, currentPage]);
+
+  const handleTouchStart = useCallback((e) => {
+    if (!isMobileViewport) return;
+    primeSwipeHaptic();
+    const t = e.touches?.[0];
+    if (t) {
+      touchStartRef.current = { x: t.clientX, y: t.clientY };
+    }
+  }, [isMobileViewport]);
+
+  const handleTouchEnd = useCallback(
+    (e) => {
+      if (!isMobileViewport) return;
+      const t = e.changedTouches?.[0];
+      if (!t) return;
+      const dx = t.clientX - touchStartRef.current.x;
+      const dy = t.clientY - touchStartRef.current.y;
+      if (Math.abs(dx) <= Math.abs(dy) || Math.abs(dx) < 50) return;
+      const direction = dx < 0 ? 'left' : 'right';
+      if (canSwipeNavigate(direction)) {
+        // iOS: must run in same touchend turn, before setState
+        pulseSwipePageHaptic();
+      }
+      handleSwipeNavigation(direction);
+    },
+    [isMobileViewport, canSwipeNavigate, handleSwipeNavigation]
+  );
+
+  /** Unlock swipe tick audio in installed PWA / iOS (first tap + after resume from background). */
+  useEffect(() => {
+    if (!showAppUI) return;
+    const offWarmup = registerPwaSwipeHapticWarmup();
+    const offLifecycle = registerPwaSwipeHapticLifecycle();
+    return () => {
+      offWarmup();
+      offLifecycle();
+    };
+  }, [showAppUI]);
+
+  /** Native passive listeners on main — reliable in installed PWA (full scroll area, iOS standalone). */
+  useEffect(() => {
+    if (!showAppUI || !isMobileViewport || currentPage === 'chat') return;
+    const el = mainScrollRef.current;
+    if (!el) return;
+
+    const onStart = (e) => handleTouchStart(e);
+    const onEnd = (e) => handleTouchEnd(e);
+
+    const onCancel = (e) => handleTouchEnd(e);
+
+    el.addEventListener('touchstart', onStart, { capture: true, passive: true });
+    el.addEventListener('touchend', onEnd, { capture: true, passive: true });
+    el.addEventListener('touchcancel', onCancel, { capture: true, passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart, true);
+      el.removeEventListener('touchend', onEnd, true);
+      el.removeEventListener('touchcancel', onCancel, true);
+    };
+  }, [showAppUI, isMobileViewport, currentPage, handleTouchStart, handleTouchEnd]);
 
   useEffect(() => {
     const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
@@ -1599,7 +1745,26 @@ useEffect(() => {
     if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
     if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
-    if (currentPage === 'staffPermissions') return <StaffPermissionsManager apiClient={apiClient} showToast={showToast} currentUser={currentUser} darkMode={darkMode} onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }} onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }} />;
+    if (currentPage === 'staffPermissions') {
+      if (userRole !== USER_ROLES.OWNER && !canAccessPage('staffPermissions')) {
+        return (
+          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
+            <p className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Team Management is not available for your role.</p>
+          </div>
+        );
+      }
+      return (
+        <StaffPermissionsManager
+          apiClient={apiClient}
+          showToast={showToast}
+          currentUser={currentUser}
+          darkMode={darkMode}
+          canAccessTeamManagement={userRole === USER_ROLES.OWNER || canAccessPage('staffPermissions')}
+          onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }}
+          onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }}
+        />
+      );
+    }
     if (currentPage === 'passwordChange') return <ChangePasswordForm apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} onLogout={logout} darkMode={darkMode} />;
 
     if (currentPage === 'checkout') {
@@ -1669,7 +1834,8 @@ useEffect(() => {
       currentOutletId,
       onOutletSwitch: handleOutletSwitch,
       requestAttendanceDecision,
-      onUserFieldsUpdated: mergeCurrentUserFields
+      onUserFieldsUpdated: mergeCurrentUserFields,
+      canAccessPage,
     };
 
     const componentKey = `${currentPage}-${currentOutletId}`;
@@ -1692,7 +1858,7 @@ useEffect(() => {
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} openCreateBranchSignal={openCreateBranchSignal} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => navigateTo('dashboard', { replace: true })} />;
             case 'offers': return <OffersManager key={componentKey} {...commonProps} />;
-            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={() => setCurrentPage('staffPermissions')} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={canAccessPage('staffPermissions') ? () => navigateTo('staffPermissions') : undefined} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
@@ -1700,8 +1866,6 @@ useEffect(() => {
     );
   };
 
-  const showAppUI = currentUser && !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(currentPage);
-  
   // Reset chat selection state when leaving chat page
   useEffect(() => {
     if (currentPage !== 'chat') {
@@ -1781,10 +1945,11 @@ useEffect(() => {
             showToast={showToast}
             hasModalOpen={hasModalOpen}
             outlets={outlets}
-            onOpenAddBranchFromHub={() => {
+    onOpenAddBranchFromHub={() => {
               setOpenCreateBranchSignal((n) => n + 1);
               navigateTo('outlets');
             }}
+            canAccessPage={canAccessPage}
           />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -1912,10 +2077,12 @@ useEffect(() => {
                 </div>
             </aside>
           )}
-          <main className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 overscroll-none ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-x-hidden overflow-y-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] md:pt-0 overflow-x-hidden overflow-y-hidden md:pb-6' : 'md:ml-64 pt-[max(4rem,calc(3.25rem+env(safe-area-inset-top,0px)))] md:pt-6 overflow-x-hidden overflow-y-auto md:pb-6')) : 'w-full overflow-y-auto overflow-x-hidden custom-scrollbar'}`}>
+          <main
+            ref={mainScrollRef}
+            className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 overscroll-none ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-x-hidden overflow-y-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-6 md:pb-6 overflow-x-hidden overflow-y-hidden' : 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-6 md:pb-6 overflow-x-hidden overflow-y-auto')) : 'w-full overflow-y-auto overflow-x-hidden custom-scrollbar'}`}
+          >
             <div
               className={`${currentPage === 'chat' && isChatSelected ? 'h-full min-h-0 flex-1 overflow-hidden' : (currentPage === 'chat' ? 'h-full min-h-0 flex-1 overflow-hidden' : `max-w-7xl mx-auto w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'} ${showAppUI ? 'overflow-x-hidden' : ''}`}
-              {...(showAppUI && currentPage !== 'chat' ? { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } : {})}
             >
               <div
                 className={`${
@@ -1937,50 +2104,38 @@ useEffect(() => {
             </div>
         </main>
         </div>
-        {showAppUI && !isChatSelected && (
+        {showAppUI && !isChatSelected && isMobileViewport && (
           <>
             <nav
               aria-label="Main navigation"
-              className={`relative z-[50] flex w-full shrink-0 flex-col border-t md:hidden shadow-[0_-15px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl overscroll-none pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] ${darkMode ? 'bg-gray-950/95 border-gray-900' : 'bg-white/95 border-slate-200'}`}
-              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
+              className={`app-mobile-tab-bar flex z-[50] border-t shadow-[0_-8px_20px_rgba(0,0,0,0.25)] overscroll-none ${darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200'}`}
             >
-              <div className="flex min-h-[3.5rem] flex-1 items-stretch justify-evenly gap-0.5 px-1 sm:px-2">
-              {!showMoreMenu && primaryNavItems.map(item => (
-                <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
-                  {currentPage === item.id && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
-                    <item.icon className={`w-7 h-7 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
+              <div className="app-mobile-tab-bar-inner px-1">
+              {!showMoreMenu && mobileFooterTabs.map((item) => (
+                <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={`touch-manipulation relative flex h-full min-w-0 max-w-[5.5rem] flex-1 items-center justify-center transition-colors ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
+                  {currentPage === item.id && <span className="absolute top-0 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-indigo-500" aria-hidden />}
+                  <div className={`relative rounded-lg p-1 ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
+                    <item.icon className={`h-6 w-6 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                     {item.id === 'chat' && chatUnreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-inherit">
                         {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                       </span>
                     )}
                   </div>
                 </button>
               ))}
-              {/* Cashier or Basic plan Manager: direct Settings icon in footer. Owner / Premium-Pro Manager: More button when they have secondary/utility items */}
-              {(userRole === USER_ROLES.CASHIER || (userRole === USER_ROLES.MANAGER && currentUser?.plan?.toUpperCase() !== 'PREMIUM' && currentUser?.plan?.toUpperCase() !== 'PRO')) ? (
-                <button
-                  type="button"
-                  onClick={() => navigateTo('settings')}
-                  className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${currentPage === 'settings' ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
-                >
-                  {currentPage === 'settings' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all relative ${currentPage === 'settings' ? 'bg-indigo-500/10' : ''}`}>
-                    <Settings className={`w-7 h-7 ${currentPage === 'settings' ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-                  </div>
-                </button>
-              ) : (secondaryNavItems.length > 0 || utilityNavItems.length > 0) && (
+              {mobileMoreItems.length > 0 && (
                 <button 
                   type="button"
                   onClick={() => setShowMoreMenu(!showMoreMenu)} 
-                  className={`touch-manipulation flex min-w-0 flex-1 max-w-[5.5rem] flex-col items-center justify-center gap-0.5 py-1.5 px-1 sm:px-2 transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  aria-label={showMoreMenu ? 'Close more menu' : 'More pages'}
+                  className={`touch-manipulation relative flex h-full min-w-0 max-w-[5.5rem] flex-1 items-center justify-center transition-colors ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
-                  {(showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id)) && <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.8)]" />}
-                  <div className={`p-1.5 rounded-xl transition-all relative ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => (item.id === 'settings' || item.id === 'staffPermissions') && currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
-                    <MoreHorizontal className={`w-7 h-7 ${showMoreMenu || secondaryNavItems.some(item => currentPage === item.id) || utilityNavItems.some(item => item.id === 'settings' && currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-                    {chatUnreadCount > 0 && secondaryNavItems.some(item => item.id === 'chat') && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full ring-2 ring-inherit bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                  {(showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id)) && <span className="absolute top-0 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-indigo-500" aria-hidden />}
+                  <div className={`relative rounded-lg p-1 ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
+                    <MoreHorizontal className={`h-6 w-6 ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                    {chatUnreadCount > 0 && mobileMoreItems.some(item => item.id === 'chat') && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-inherit">
                         {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                       </span>
                     )}
@@ -1992,7 +2147,7 @@ useEffect(() => {
 
             {/* More Menu Modal */}
             {showMoreMenu && (
-              <div className="fixed inset-0 z-[60] md:hidden" onClick={() => setShowMoreMenu(false)}>
+              <div className="app-mobile-more-menu fixed inset-0 z-[60]" onClick={() => setShowMoreMenu(false)}>
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                 <div 
                   className={`fixed bottom-0 left-0 right-0 rounded-t-2xl rounded-b-none border-t border-l border-r shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[100dvh] overflow-y-auto custom-scrollbar pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}
@@ -2009,8 +2164,7 @@ useEffect(() => {
                   </div>
                   <div className="px-2 pt-2 pb-2">
                     {/* Owner: Team management, Inventory, Billing, [Supply Chain], Settings. Others: utility then secondary */}
-                    {footerMoreMenuItems ? (
-                      footerMoreMenuItems.map(item => (
+                    {mobileMoreItems.map((item) => (
                         <button
                           key={item.id}
                           onClick={() => {
@@ -2025,51 +2179,13 @@ useEffect(() => {
                         >
                           <item.icon className="w-5 h-5" />
                           <span className="text-sm font-bold">{item.name}</span>
+                          {item.id === 'chat' && chatUnreadCount > 0 && (
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
+                              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                            </span>
+                          )}
                         </button>
-                      ))
-                    ) : (
-                      <>
-                        {moreMenuUtilityItems.map(item => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              navigateTo(item.id);
-                              setShowMoreMenu(false);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
-                              currentPage === item.id
-                                ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                                : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                            }`}
-                          >
-                            <item.icon className="w-5 h-5" />
-                            <span className="text-sm font-bold">{item.name}</span>
-                          </button>
-                        ))}
-                        {secondaryNavItems.map(item => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              navigateTo(item.id);
-                              setShowMoreMenu(false);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 last:mb-0 relative ${
-                              currentPage === item.id
-                                ? darkMode ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                                : darkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-slate-50 text-slate-700'
-                            }`}
-                          >
-                            <item.icon className="w-5 h-5" />
-                            <span className="text-sm font-bold">{item.name}</span>
-                            {item.id === 'chat' && chatUnreadCount > 0 && (
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse shadow-lg shadow-rose-900/40">
-                                {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </>
-                    )}
+                      ))}
                   </div>
                 </div>
               </div>

@@ -198,6 +198,15 @@ const emitAlert = async (req, storeId, type, data) => {
                 staffId: data.staffId || null
             };
             break;
+        case 'attendance_shift_reminder':
+            title = data.title || 'Shift reminder';
+            category = 'Info';
+            message = data.message || 'Punch-in reminder for your shift.';
+            metadata = {
+                staffId: data.staffId || null,
+                reminderKind: data.reminderKind || null
+            };
+            break;
         case 'reports_access_enabled':
             title = 'Reports Access Enabled';
             category = 'Info';
@@ -415,6 +424,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     if (type === 'inventory_low' || type === 'credit_exceeded') return 'alert';
                     if (
                         type === 'staff_shift_assigned' ||
+                        type === 'attendance_shift_reminder' ||
                         type === 'attendance_punch_in' ||
                         type === 'attendance_break_start' ||
                         type === 'attendance_break_end' ||

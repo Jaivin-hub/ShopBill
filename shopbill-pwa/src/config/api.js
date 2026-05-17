@@ -124,6 +124,7 @@ const API = {
     chatMessages: (chatId) => `${API_BASE_URL}/chat/${chatId}/messages`, // GET (Get messages for a chat)
     sendMessage: (chatId) => `${API_BASE_URL}/chat/${chatId}/message`, // POST (Send a message)
     deleteChat: (chatId) => `${API_BASE_URL}/chat/${chatId}`, // DELETE (Delete a custom chat group)
+    removeChatParticipant: (chatId, userId) => `${API_BASE_URL}/chat/${chatId}/participants/${userId}`, // DELETE (Creator removes group member)
     // ------------------------------------------
 }
 

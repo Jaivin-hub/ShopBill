@@ -446,7 +446,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
       {/* Add new customer – FAB visible on all breakpoints (mobile + desktop) */}
       <button
         onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
+        className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
         aria-label="Create new account"
       >
         <UserPlus className="w-6 h-6" strokeWidth={2.5} />

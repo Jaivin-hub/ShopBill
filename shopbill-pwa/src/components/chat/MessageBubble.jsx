@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveChatAudioUrl, resolveChatFileUrl } from '../../utils/chatMediaUrl';
 import { Mic, Play, Pause, File, Download } from 'lucide-react';
 import {
     isStaffViewer,
@@ -66,29 +67,8 @@ const MessageBubble = ({
     const senderIsOwner = msg.senderRole?.toLowerCase() === 'owner';
     const staffViewer = isStaffViewer(currentUser);
     
-    // Logic for Audio Source
-    let audioSrc = null;
-    if (msg.audioUrl) {
-        if (msg.audioUrl.startsWith('http') || msg.audioUrl.startsWith('blob:')) {
-            audioSrc = msg.audioUrl;
-        } else {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
-            const pathPart = msg.audioUrl.startsWith('/uploads/') ? msg.audioUrl : `/uploads/audio/${msg.audioUrl}`;
-            audioSrc = `${baseUrl.replace(/\/api\/?$/, '')}/api${pathPart}`;
-        }
-    }
-
-    // Logic for File Source
-    let fileSrc = null;
-        if (msg.fileUrl) {
-        if (msg.fileUrl.startsWith('http') || msg.fileUrl.startsWith('blob:')) {
-            fileSrc = msg.fileUrl;
-        } else {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://server.pocketpos.io/api';
-            const pathPart = msg.fileUrl.startsWith('/uploads/') ? msg.fileUrl : `/uploads/files/${msg.fileUrl}`;
-            fileSrc = `${baseUrl.replace(/\/api\/?$/, '')}/api${pathPart}`;
-        }
-    }
+    const audioSrc = resolveChatAudioUrl(msg.audioUrl);
+    const fileSrc = resolveChatFileUrl(msg.fileUrl);
 
     const isImageFile =
         msg.fileType?.startsWith('image/') ||
@@ -166,22 +146,19 @@ const MessageBubble = ({
                             </div>
                         </div>
                         <audio
-                            ref={el => { 
+                            ref={(el) => {
                                 if (el) {
                                     audioRefs.current[msg._id] = el;
-                                    // Set audio attributes for better compatibility
                                     el.preload = 'metadata';
-                                    el.crossOrigin = 'anonymous';
-                                    // Add error handler
+                                    el.playsInline = true;
+                                    el.setAttribute('playsinline', '');
+                                    el.setAttribute('webkit-playsinline', '');
                                     el.onerror = () => setAudioError(true);
-                                    // Add loaded event handler
-                                    el.onloadedmetadata = () => {};
                                 }
                             }}
                             src={audioSrc}
                             onEnded={() => onToggleAudio(null, null)}
                             preload="metadata"
-                            crossOrigin="anonymous"
                         />
                         </>
                         )}

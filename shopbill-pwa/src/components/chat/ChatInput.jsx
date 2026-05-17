@@ -1,5 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Mic, Send, X, Square, Paperclip, File, AtSign } from 'lucide-react';
+import { Mic, Send, X, Square, Paperclip, File, AtSign, Lock } from 'lucide-react';
+
+const TAP_MAX_MS = 420;
+const HOLD_MS = 420;
+const SWIPE_UP_PX = 28;
+const TAP_MOVE_MAX_PX = 14;
 
 const ChatInput = ({
     messageInput,
@@ -29,141 +34,182 @@ const ChatInput = ({
     const mentionWrapRef = useRef(null);
     const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
 
-    /** Phones / tablets: swipe up on mic or hold to record (tap-to-record stays on fine pointers e.g. desktop). */
-    const [coarsePointer, setCoarsePointer] = useState(() =>
-        typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches === true
-    );
-    const [micGestureHint, setMicGestureHint] = useState(false);
+    const [micHint, setMicHint] = useState('');
+    const [recordingLocked, setRecordingLocked] = useState(false);
     const micGestureRef = useRef({
-        longPressTimer: null,
         pointerId: null,
+        holdTimer: null,
         x0: 0,
         y0: 0,
-        fired: false,
+        downAt: 0,
+        mode: null,
+        startedThisGesture: false,
+        tapHandled: false,
     });
-    const micWindowGestureCleanupRef = useRef(null);
+    const micCleanupRef = useRef(null);
 
-    useEffect(() => {
-        const mq = window.matchMedia?.('(pointer: coarse)');
-        if (!mq) return undefined;
-        const fn = () => setCoarsePointer(mq.matches);
-        mq.addEventListener('change', fn);
-        return () => mq.removeEventListener('change', fn);
-    }, []);
-
-    const clearMicLongPress = useCallback(() => {
-        const t = micGestureRef.current.longPressTimer;
+    const clearHoldTimer = useCallback(() => {
+        const t = micGestureRef.current.holdTimer;
         if (t) {
             clearTimeout(t);
-            micGestureRef.current.longPressTimer = null;
+            micGestureRef.current.holdTimer = null;
         }
     }, []);
 
-    const cleanupMicWindowGesture = useCallback(() => {
-        const fn = micWindowGestureCleanupRef.current;
+    const cleanupMicListeners = useCallback(() => {
+        const fn = micCleanupRef.current;
         if (fn) {
             try {
                 fn();
             } catch {
                 /* ignore */
             }
-            micWindowGestureCleanupRef.current = null;
+            micCleanupRef.current = null;
         }
     }, []);
 
     const resetMicGesture = useCallback(() => {
-        clearMicLongPress();
-        cleanupMicWindowGesture();
+        clearHoldTimer();
+        cleanupMicListeners();
         micGestureRef.current.pointerId = null;
-        micGestureRef.current.fired = false;
-        setMicGestureHint(false);
-    }, [clearMicLongPress, cleanupMicWindowGesture]);
+        micGestureRef.current.mode = null;
+        micGestureRef.current.startedThisGesture = false;
+        micGestureRef.current.tapHandled = false;
+        setMicHint('');
+        setRecordingLocked(false);
+    }, [clearHoldTimer, cleanupMicListeners]);
 
     useEffect(() => () => resetMicGesture(), [resetMicGesture]);
 
-    const fireMicRecording = useCallback(async () => {
-        if (micGestureRef.current.fired) return;
-        micGestureRef.current.fired = true;
-        clearMicLongPress();
-        setMicGestureHint(false);
-        if (!onStartRecording) {
-            console.error('[ChatInput] onStartRecording is not defined');
-            return;
-        }
+    const beginRecording = useCallback(async () => {
+        const g = micGestureRef.current;
+        if (g.startedThisGesture || !onStartRecording) return;
+        g.startedThisGesture = true;
+        clearHoldTimer();
         try {
             await onStartRecording();
-        } catch (error) {
-            console.error('[ChatInput] onStartRecording:', error);
+        } catch (err) {
+            console.error('[ChatInput] onStartRecording:', err);
+            g.startedThisGesture = false;
         }
-    }, [clearMicLongPress, onStartRecording]);
+    }, [clearHoldTimer, onStartRecording]);
+
+    const endRecordingFromGesture = useCallback(() => {
+        onStopRecording?.();
+    }, [onStopRecording]);
 
     const onMicPointerDown = useCallback(
         (e) => {
             if (e.button !== 0 || !onStartRecording) return;
-            const useTouchLikeGesture =
-                coarsePointer && (e.pointerType === 'touch' || e.pointerType === 'pen');
-            if (!useTouchLikeGesture) return;
 
-            cleanupMicWindowGesture();
+            resetMicGesture();
 
             const ptrId = e.pointerId;
             const x0 = e.clientX;
             const y0 = e.clientY;
-            micGestureRef.current.x0 = x0;
-            micGestureRef.current.y0 = y0;
-            micGestureRef.current.pointerId = ptrId;
-            micGestureRef.current.fired = false;
-            setMicGestureHint(true);
+            const downAt = Date.now();
 
-            const docMove = (ev) => {
-                if (ev.pointerId !== ptrId || micGestureRef.current.fired) return;
+            micGestureRef.current = {
+                ...micGestureRef.current,
+                pointerId: ptrId,
+                x0,
+                y0,
+                downAt,
+                mode: null,
+                startedThisGesture: false,
+                tapHandled: false,
+            };
+
+            try {
+                e.currentTarget.setPointerCapture(ptrId);
+            } catch {
+                /* ignore */
+            }
+
+            const onMove = (ev) => {
+                if (ev.pointerId !== ptrId) return;
                 const dy = y0 - ev.clientY;
                 const dx = Math.abs(ev.clientX - x0);
-                if (dy > 8 && dy > dx * 0.45) {
-                    try {
-                        ev.preventDefault();
-                    } catch {
-                        /* ignore */
-                    }
+                if (dy > SWIPE_UP_PX && dy > dx * 0.5) {
+                    micGestureRef.current.mode = 'lock';
+                    clearHoldTimer();
+                    setRecordingLocked(true);
+                    setMicHint('Locked — tap stop when done');
+                    void beginRecording();
                 }
-                if (dy > 36 && dy > dx * 0.65) {
-                    void fireMicRecording();
+            };
+
+            const onUp = (ev) => {
+                if (ev.pointerId !== ptrId) return;
+                cleanupMicListeners();
+                clearHoldTimer();
+
+                const g = micGestureRef.current;
+                const elapsed = Date.now() - downAt;
+                const moved = Math.hypot(ev.clientX - x0, ev.clientY - y0);
+                const locked = g.mode === 'lock';
+
+                if (locked) {
+                    g.pointerId = null;
                     return;
                 }
-                const moved = Math.hypot(ev.clientX - x0, ev.clientY - y0);
-                if (moved > 16 && dy < 16) {
-                    clearMicLongPress();
+
+                if (g.mode === 'hold' || (g.startedThisGesture && elapsed >= HOLD_MS - 40)) {
+                    endRecordingFromGesture();
+                    g.pointerId = null;
+                    g.mode = null;
+                    g.startedThisGesture = false;
+                    setMicHint('');
+                    return;
                 }
+
+                if (!g.startedThisGesture && !g.tapHandled && elapsed < TAP_MAX_MS && moved < TAP_MOVE_MAX_PX) {
+                    g.tapHandled = true;
+                    if (isRecording) {
+                        endRecordingFromGesture();
+                    } else {
+                        void beginRecording();
+                    }
+                } else if (g.startedThisGesture) {
+                    endRecordingFromGesture();
+                }
+
+                g.pointerId = null;
+                g.mode = null;
+                g.startedThisGesture = false;
+                setMicHint('');
             };
 
-            const docEnd = (ev) => {
-                if (ev.pointerId !== ptrId) return;
-                window.removeEventListener('pointermove', docMove);
-                window.removeEventListener('pointerup', docEnd);
-                window.removeEventListener('pointercancel', docEnd);
-                micWindowGestureCleanupRef.current = null;
-                clearMicLongPress();
-                micGestureRef.current.pointerId = null;
-                micGestureRef.current.fired = false;
-                setMicGestureHint(false);
+            micCleanupRef.current = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                window.removeEventListener('pointercancel', onUp);
             };
 
-            micWindowGestureCleanupRef.current = () => {
-                window.removeEventListener('pointermove', docMove);
-                window.removeEventListener('pointerup', docEnd);
-                window.removeEventListener('pointercancel', docEnd);
-            };
+            window.addEventListener('pointermove', onMove, { passive: true });
+            window.addEventListener('pointerup', onUp);
+            window.addEventListener('pointercancel', onUp);
 
-            window.addEventListener('pointermove', docMove, { passive: false });
-            window.addEventListener('pointerup', docEnd);
-            window.addEventListener('pointercancel', docEnd);
+            setMicHint('Tap · hold · swipe up');
 
-            clearMicLongPress();
-            micGestureRef.current.longPressTimer = setTimeout(() => {
-                void fireMicRecording();
-            }, 480);
+            clearHoldTimer();
+            micGestureRef.current.holdTimer = setTimeout(() => {
+                const g2 = micGestureRef.current;
+                if (g2.pointerId !== ptrId || g2.mode === 'lock' || g2.startedThisGesture) return;
+                g2.mode = 'hold';
+                setMicHint('Release to finish');
+                void beginRecording();
+            }, HOLD_MS);
         },
-        [clearMicLongPress, coarsePointer, cleanupMicWindowGesture, fireMicRecording, onStartRecording]
+        [
+            beginRecording,
+            cleanupMicListeners,
+            clearHoldTimer,
+            endRecordingFromGesture,
+            isRecording,
+            onStartRecording,
+            resetMicGesture,
+        ]
     );
 
     useEffect(() => {
@@ -208,16 +254,34 @@ const ChatInput = ({
                     <div className="flex-1 flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-2">
                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                         <span className="text-[11px] font-black tracking-widest text-red-500 uppercase">
-                            LIVE RECORDING: {formatRecordingTime(recordingTime)}
+                            {recordingLocked ? (
+                                <span className="inline-flex items-center gap-1">
+                                    <Lock size={10} className="shrink-0" />
+                                    Locked · {formatRecordingTime(recordingTime)}
+                                </span>
+                            ) : (
+                                <>Recording · {formatRecordingTime(recordingTime)}</>
+                            )}
                         </span>
                     </div>
-                    <button 
-                        onClick={onCancelRecording}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            resetMicGesture();
+                            onCancelRecording?.();
+                        }}
                         className={`text-[10px] font-black uppercase px-2 transition-colors ${darkMode ? 'text-slate-500 hover:text-red-500' : 'text-slate-600 hover:text-red-600'}`}
                     >
                         Cancel
                     </button>
-                    <ActionButton onClick={onStopRecording} icon={Square} color="red" />
+                    <ActionButton
+                        onClick={() => {
+                            resetMicGesture();
+                            onStopRecording?.();
+                        }}
+                        icon={Square}
+                        color="red"
+                    />
                 </div>
             ) : audioUrl ? (
                 /* VOICE PREVIEW — one row; upload bar only while sending */
@@ -381,42 +445,25 @@ const ChatInput = ({
 
                     {!messageInput.trim() ? (
                         <div className="relative z-50 shrink-0">
-                            {coarsePointer && micGestureHint && !isRecording ? (
+                            {micHint && !isRecording ? (
                                 <div
                                     className={`pointer-events-none absolute bottom-full left-1/2 z-[60] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest shadow-lg ${
                                         darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-800 text-white'
                                     }`}
                                     aria-hidden
                                 >
-                                    Swipe up or hold
+                                    {micHint}
                                 </div>
                             ) : null}
                             <button
                                 type="button"
                                 onPointerDown={onMicPointerDown}
-                                onClick={async (e) => {
-                                    if (coarsePointer) {
-                                        return;
-                                    }
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (!onStartRecording) {
-                                        console.error('[ChatInput] onStartRecording is not defined');
-                                        return;
-                                    }
-                                    try {
-                                        await onStartRecording();
-                                    } catch (error) {
-                                        console.error('[ChatInput] onStartRecording:', error);
-                                    }
-                                }}
-                                className={`relative shrink-0 rounded-2xl p-2.5 transition-all hover:scale-105 active:scale-95 sm:p-3 touch-manipulation ${
+                                onContextMenu={(e) => e.preventDefault()}
+                                className={`relative shrink-0 rounded-2xl p-2.5 transition-all hover:scale-105 active:scale-95 sm:p-3 touch-manipulation select-none ${
                                     darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
-                                aria-label={
-                                    coarsePointer ? 'Voice: swipe up on the mic or press and hold to record' : 'Start voice recording'
-                                }
-                                title={coarsePointer ? 'Swipe up or hold to record' : 'Start voice recording'}
+                                aria-label="Voice: tap to toggle, hold to record, swipe up to lock"
+                                title="Tap · hold · swipe up to record"
                             >
                                 <Mic size={18} strokeWidth={2.5} />
                             </button>

@@ -25,7 +25,7 @@ const formatTime12Hour = (value) => {
 };
 
 /**
- * Centered dialog (portaled to document.body), viewport-safe height — work schedule, pay, and manager reports toggle.
+ * Centered dialog (portaled to document.body), viewport-safe height — work schedule and pay.
  */
 export default function WorkProfileModal({
   isOpen,
@@ -36,10 +36,7 @@ export default function WorkProfileModal({
   setScheduleForm,
   existingShifts = [],
   existingShiftMap,
-  canManageIndividualPermissions,
   canManageWorkHours,
-  onToggleReportsPermission,
-  reportsPermissionUpdating,
   onSaveWorkSchedule,
   isSavingWorkSchedule,
   showToast,
@@ -186,42 +183,6 @@ export default function WorkProfileModal({
         </header>
 
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 py-4 space-y-5">
-          {canManageIndividualPermissions && staff.role === 'Manager' && (
-            <section className={`rounded-xl border p-4 ${sectionClass}`}>
-              <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-3 ${labelClass}`}>Access</p>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <p className={`text-sm font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>Reports section</p>
-                  <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Let this manager open Reports &amp; analytics.
-                  </p>
-                </div>
-                {staff?.permissions?.reports === true && (
-                  <span
-                    className={`self-start text-[9px] font-black px-2 py-1 rounded-lg border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-emerald-100 text-emerald-800 border-emerald-300'}`}
-                  >
-                    On
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => onToggleReportsPermission?.(staff)}
-                disabled={reportsPermissionUpdating}
-                className={`mt-3 w-full sm:w-auto px-4 py-3 rounded-xl text-[11px] font-black tracking-widest transition-all disabled:opacity-60 ${
-                  staff?.permissions?.reports === true
-                    ? darkMode
-                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                    : darkMode
-                      ? 'bg-slate-800 text-slate-200 border border-slate-700'
-                      : 'bg-white text-slate-800 border border-slate-200'
-                }`}
-              >
-                {reportsPermissionUpdating ? 'Updating…' : staff?.permissions?.reports === true ? 'Turn off reports' : 'Turn on reports'}
-              </button>
-            </section>
-          )}
 
           {canManageWorkHours && staff.role !== 'owner' && (
             <>

@@ -925,7 +925,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </div>
 
       {cart.length > 0 && (
-        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[calc(3.5rem+max(0.5rem,env(safe-area-inset-bottom,0px)))]`}>
+        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[var(--app-mobile-footer-offset)]`}>
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:pb-5">
             {/* Mobile: single compact row */}
             <div className="w-full md:flex-1 flex flex-row md:flex-row items-center gap-2 md:gap-4">

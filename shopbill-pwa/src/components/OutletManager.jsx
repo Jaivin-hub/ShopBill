@@ -780,7 +780,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             {/* FAB: Add New Branch Button - Floating Icon */}
             <button 
                 onClick={() => handleOpenModal()} 
-                className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
+                className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
                 aria-label="Add new branch"
             >
                 <Plus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />

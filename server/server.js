@@ -225,11 +225,17 @@ const startServer = async () => {
             console.log(`[Push] Push notification logs active.`);
         });
 
-        // Shift reminders + auto punch-out scheduler (runs every minute).
-        runAttendanceAutomation(io).catch(() => {});
-        setInterval(() => {
-            runAttendanceAutomation(io).catch(() => {});
-        }, 60 * 1000);
+        // Shift reminders + auto punch-out scheduler (aligned to each clock minute).
+        const scheduleAttendanceAutomation = () => {
+            runAttendanceAutomation(io).catch((err) => {
+                console.error('Attendance automation run failed:', err?.message || err);
+            });
+        };
+        const msUntilNextMinute = 60000 - (Date.now() % 60000);
+        setTimeout(() => {
+            scheduleAttendanceAutomation();
+            setInterval(scheduleAttendanceAutomation, 60 * 1000);
+        }, msUntilNextMinute);
     } catch (error) {
         console.error('Startup Error:', error);
         process.exit(1);

@@ -26,6 +26,7 @@ const StoreSchema = new mongoose.Schema({
     settings: {
         lowStockThreshold: { type: Number, default: 5 },
         receiptFooter: { type: String, default: 'Thank you for shopping!' },
+        /** Owner-controlled page access for Manager/Cashier (grant permissions UI). */
         rolePagePermissions: {
             manager: {
                 dashboard: { type: Boolean, default: true },
@@ -34,12 +35,8 @@ const StoreSchema = new mongoose.Schema({
                 salesActivity: { type: Boolean, default: true },
                 inventory: { type: Boolean, default: true },
                 scm: { type: Boolean, default: true },
-                reports: { type: Boolean, default: false },
-                chat: { type: Boolean, default: true },
-                notifications: { type: Boolean, default: true },
-                profile: { type: Boolean, default: true },
-                settings: { type: Boolean, default: true },
-                staffPermissions: { type: Boolean, default: true }
+                staffPermissions: { type: Boolean, default: true },
+                offers: { type: Boolean, default: true }
             },
             cashier: {
                 dashboard: { type: Boolean, default: true },
@@ -48,12 +45,8 @@ const StoreSchema = new mongoose.Schema({
                 salesActivity: { type: Boolean, default: true },
                 inventory: { type: Boolean, default: false },
                 scm: { type: Boolean, default: false },
-                reports: { type: Boolean, default: false },
-                chat: { type: Boolean, default: true },
-                notifications: { type: Boolean, default: true },
-                profile: { type: Boolean, default: true },
-                settings: { type: Boolean, default: false },
-                staffPermissions: { type: Boolean, default: false }
+                staffPermissions: { type: Boolean, default: false },
+                offers: { type: Boolean, default: false }
             }
         },
         attendancePolicy: {

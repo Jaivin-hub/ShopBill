@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
-import { ChatThreadMessagesSkeleton } from '../skeletons/PageSkeletons';
+import ChatSpinner from './ChatSpinner';
 
 const ChatMessages = ({
     messages,
@@ -14,13 +14,20 @@ const ChatMessages = ({
     audioRefs,
     messagesEndRef,
     lastReadBy = {},
-    participants = []
+    participants = [],
+    onThreadRendered,
 }) => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+
+    useLayoutEffect(() => {
+        if (isLoadingMessages || safeMessages.length === 0) return;
+        onThreadRendered?.();
+    }, [isLoadingMessages, safeMessages.length, onThreadRendered]);
+
     if (isLoadingMessages) {
-        return <ChatThreadMessagesSkeleton darkMode={darkMode} />;
+        return <ChatSpinner darkMode={darkMode} label="Loading messages" className="flex-1 py-20 min-h-[40vh]" />;
     }
 
-    const safeMessages = Array.isArray(messages) ? messages : [];
     if (safeMessages.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 opacity-30">

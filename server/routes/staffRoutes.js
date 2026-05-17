@@ -31,66 +31,12 @@ const payrollAttachmentUpload = multer({
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
-const ROLE_PAGE_PERMISSION_KEYS = [
-    'dashboard',
-    'billing',
-    'khata',
-    'salesActivity',
-    'inventory',
-    'scm',
-    'reports',
-    'chat',
-    'notifications',
-    'profile',
-    'settings',
-    'staffPermissions'
-];
-
-const DEFAULT_ROLE_PAGE_PERMISSIONS = {
-    manager: {
-        dashboard: true,
-        billing: true,
-        khata: true,
-        salesActivity: true,
-        inventory: true,
-        scm: true,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: true,
-        staffPermissions: true
-    },
-    cashier: {
-        dashboard: true,
-        billing: true,
-        khata: true,
-        salesActivity: true,
-        inventory: false,
-        scm: false,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: false,
-        staffPermissions: false
-    }
-};
-
-const normalizeRolePermissionPayload = (payload = {}) => {
-    const managerPayload = payload.manager || {};
-    const cashierPayload = payload.cashier || {};
-    const normalized = { manager: {}, cashier: {} };
-    for (const key of ROLE_PAGE_PERMISSION_KEYS) {
-        normalized.manager[key] = typeof managerPayload[key] === 'boolean'
-            ? managerPayload[key]
-            : DEFAULT_ROLE_PAGE_PERMISSIONS.manager[key];
-        normalized.cashier[key] = typeof cashierPayload[key] === 'boolean'
-            ? cashierPayload[key]
-            : DEFAULT_ROLE_PAGE_PERMISSIONS.cashier[key];
-    }
-    return normalized;
-};
+const {
+    GRANTABLE_ROLE_PAGE_PERMISSION_KEYS,
+    normalizeRolePermissionPayload,
+    staffCanAccessGrantablePage,
+} = require('../utils/rolePagePermissions');
+const { formatHHmmTo12Hour } = require('../utils/formatTime12Hour');
 
 const getStoreRolePermissions = (storeDoc) => {
     const existing = storeDoc?.settings?.rolePagePermissions || {};
@@ -101,6 +47,26 @@ const getStoreRolePermissions = (storeDoc) => {
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
 // to match the convention established in authRoutes.js and StaffSchema.
 const isowner = (userRole) => userRole === 'owner';
+
+/** Managers need outlet grant for Team Management; owners always pass. */
+const ensureManagerTeamManagementAccess = async (req, res) => {
+    if (isowner(req.user.role)) return true;
+    if (req.user.role !== 'Manager') return true;
+    if (!req.user.storeId) {
+        res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
+        return false;
+    }
+    const storeForAccess = await Store.findById(req.user.storeId).select('settings.rolePagePermissions').lean();
+    if (!staffCanAccessGrantablePage(
+        storeForAccess?.settings?.rolePagePermissions || {},
+        'manager',
+        'staffPermissions'
+    )) {
+        res.status(403).json({ error: 'Access denied. Team Management is disabled for your role.' });
+        return false;
+    }
+    return true;
+};
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const normalizeTimeOrEmpty = (value) => {
     if (value == null) return '';
@@ -117,6 +83,40 @@ const getNextMonthKey = (monthKey) => {
     if (!Number.isFinite(year) || !Number.isFinite(month)) return '';
     const dt = new Date(year, month, 1);
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+/** Split monthly pay into base (regular) and OT amounts for salary reports. */
+const computePayrollAmounts = ({ salaryMode, rate, payableMinutes, payableOvertimeMinutes, payableDays, carryForwardIn = 0 }) => {
+    const amount = Number(rate || 0);
+    const totalMins = Math.max(0, Number(payableMinutes || 0));
+    const otMins = Math.max(0, Number(payableOvertimeMinutes || 0));
+    const regularMins = Math.max(0, totalMins - otMins);
+    const days = Math.max(0, Number(payableDays || 0));
+    const carry = Math.max(0, Number(carryForwardIn || 0));
+    let baseSalary = 0;
+    let otSalary = 0;
+    if (salaryMode === 'hourly') {
+        baseSalary = (regularMins / 60) * amount;
+        otSalary = (otMins / 60) * amount;
+    } else if (salaryMode === 'daily') {
+        baseSalary = days * amount;
+        // OT supplement: same rate treated as per-hour for OT minutes
+        otSalary = (otMins / 60) * amount;
+    }
+    const baseSalaryRounded = roundMoney(baseSalary);
+    const otSalaryRounded = roundMoney(otSalary);
+    const totalSalary = roundMoney(baseSalaryRounded + otSalaryRounded + carry);
+    return {
+        regularMinutes: regularMins,
+        baseSalary: baseSalaryRounded,
+        otSalary: otSalaryRounded,
+        totalSalary,
+        salaryWithOt: roundMoney(baseSalaryRounded + otSalaryRounded),
+        salaryWithoutOt: roundMoney(baseSalaryRounded + carry),
+        totalWithOt: totalSalary,
+    };
 };
 
 async function resolveSettlementActorInfo(req) {
@@ -235,11 +235,12 @@ router.get('/', protect, async (req, res) => {
     }
 
     try {
-        // Find all staff belonging to the user's stores
         if (!req.user.storeId) {
             console.log('[staffRoutes] GET /api/staff → 400 missing storeId', { role: req.user.role });
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
         }
+        if (!(await ensureManagerTeamManagementAccess(req, res))) return;
+
         const staffList = await Staff.find({ storeId: req.user.storeId })
             .select('name email role phone active storeId userId permissions workSchedule compensation payrollSettlements')
             .populate('userId', 'resetPasswordToken')
@@ -354,22 +355,27 @@ router.get('/', protect, async (req, res) => {
                 payableOvertimeMinutes = overtimeAfterSettlement;
                 payableDays = dayKeysAfterSettlement.size;
             }
-            let totalSalary = 0;
-            if (salaryMode === 'hourly') {
-                totalSalary = (payableMinutes / 60) * amount;
-            } else if (salaryMode === 'daily') {
-                totalSalary = payableDays * amount;
-            }
-            totalSalary += Number(carryForwardIn || 0);
+            const payrollAmounts = computePayrollAmounts({
+                salaryMode,
+                rate: amount,
+                payableMinutes,
+                payableOvertimeMinutes,
+                payableDays,
+                carryForwardIn,
+            });
+            const totalSalary = payrollAmounts.totalSalary;
             return {
                 ...enriched,
                 payrollSummary: {
                     month: monthKey,
                     totalMinutes: payableMinutes,
+                    regularMinutes: payrollAmounts.regularMinutes,
                     overtimeMinutes: payableOvertimeMinutes,
                     totalDays: payableDays,
-                    totalSalary: Math.round(totalSalary * 100) / 100,
-                    isSettled: currentSettlement?.paid === true && Math.round(totalSalary * 100) / 100 <= 0,
+                    baseSalary: payrollAmounts.baseSalary,
+                    otSalary: payrollAmounts.otSalary,
+                    totalSalary,
+                    isSettled: currentSettlement?.paid === true && totalSalary <= 0,
                     settledAt: currentSettlement?.paidAt || null,
                     attachmentUrl: currentSettlement?.attachmentUrl || '',
                     attachmentName: currentSettlement?.attachmentName || '',
@@ -404,7 +410,8 @@ router.post('/', protect, async (req, res) => {
         console.log('[staffRoutes] POST /api/staff → 403 not owner/manager', { role: actorRole });
         return res.status(403).json({ error: 'Access denied. Only owner or manager can add new staff.' });
     }
-    
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
+
     const { name, email, role, phone } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
     let ownerIdResolved = req.user.id;
@@ -722,6 +729,7 @@ router.put('/:id/active', protect, async (req, res) => {
         console.log('[staffRoutes] PUT /:id/active → 403 not owner/manager');
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff status.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
 
     const { active: targetActive } = req.body;
     if (typeof targetActive !== 'boolean') {
@@ -781,6 +789,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
         console.log('[staffRoutes] PUT /:id/toggle → 403 not owner/manager');
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff status.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
 
     const staffId = req.params.id;
 
@@ -852,7 +861,8 @@ router.delete('/:id', protect, async (req, res) => {
         console.log('[staffRoutes] DELETE /:id → 403 not owner/manager');
         return res.status(403).json({ error: 'Access denied. Only owner or manager can remove staff.' });
     }
-    
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
+
     const staffId = req.params.id;
 
     try {
@@ -984,6 +994,7 @@ router.put('/:id', protect, async (req, res, next) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
 
     const staffId = req.params.id;
     const nextName = String(req.body?.name || '').trim();
@@ -1058,8 +1069,8 @@ router.put('/:id', protect, async (req, res, next) => {
 // @access  Private (owner/manager)
 // ====================================================================
 router.get('/role-permissions', protect, async (req, res) => {
-    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
-        return res.status(403).json({ error: 'Access denied. Only owner or manager can view role permissions.' });
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can view role permissions.' });
     }
 
     try {
@@ -1077,7 +1088,7 @@ router.get('/role-permissions', protect, async (req, res) => {
 
         return res.json({
             permissions: getStoreRolePermissions(store),
-            pages: ROLE_PAGE_PERMISSION_KEYS
+            pages: GRANTABLE_ROLE_PAGE_PERMISSION_KEYS
         });
     } catch (error) {
         console.error('Role permissions fetch error:', error.message);
@@ -1088,11 +1099,11 @@ router.get('/role-permissions', protect, async (req, res) => {
 // ====================================================================
 // @route   PUT /api/staff/role-permissions
 // @desc    Update outlet-level page permissions for Manager and Cashier
-// @access  Private (owner/manager)
+// @access  Private (owner only)
 // ====================================================================
 router.put('/role-permissions', protect, async (req, res) => {
-    if (!isowner(req.user.role) && req.user.role !== 'Manager') {
-        return res.status(403).json({ error: 'Access denied. Only owner or manager can update role permissions.' });
+    if (!isowner(req.user.role)) {
+        return res.status(403).json({ error: 'Access denied. Only the owner can update role permissions.' });
     }
 
     try {
@@ -1101,6 +1112,7 @@ router.put('/role-permissions', protect, async (req, res) => {
         }
 
         const nextPermissions = normalizeRolePermissionPayload(req.body || {});
+        // Full replace — grantable keys only; legacy chat/settings fields under manager/cashier are dropped.
         const storeFilter = isowner(req.user.role)
             ? { _id: req.user.storeId, ownerId: req.user.id }
             : { _id: req.user.storeId };
@@ -1117,7 +1129,7 @@ router.put('/role-permissions', protect, async (req, res) => {
         return res.json({
             message: 'Role page permissions updated successfully.',
             permissions: getStoreRolePermissions(updatedStore),
-            pages: ROLE_PAGE_PERMISSION_KEYS
+            pages: GRANTABLE_ROLE_PAGE_PERMISSION_KEYS
         });
     } catch (error) {
         console.error('Role permissions update error:', error.message);
@@ -1134,6 +1146,7 @@ router.put('/:id/permissions', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update staff permissions.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
 
     const staffId = req.params.id;
     const { reports } = req.body || {};
@@ -1194,6 +1207,7 @@ router.get('/attendance-settings', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can view attendance settings.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
@@ -1227,6 +1241,7 @@ router.put('/attendance-settings', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update attendance settings.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
@@ -1268,6 +1283,7 @@ router.get('/payroll-statement', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can view payroll statement.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
@@ -1361,6 +1377,7 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update work schedules.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
@@ -1412,9 +1429,11 @@ router.put('/:id/work-schedule', protect, async (req, res) => {
             shiftMessage = 'Shift schedule was turned off for your account. Punch-in reminders will not be sent until a shift is enabled again.';
         } else {
             const namePart = ws.shiftName ? `${ws.shiftName}: ` : '';
-            const endDisp = (ws.autoPunchOutTime || ws.punchInEnd || '').trim();
+            const startDisp = formatHHmmTo12Hour(ws.punchInStart);
+            const endRaw = (ws.autoPunchOutTime || ws.punchInEnd || '').trim();
+            const endDisp = endRaw ? formatHHmmTo12Hour(endRaw) : '';
             shiftMessage =
-                `${namePart}Scheduled punch-in ${ws.punchInStart}. ` +
+                `${namePart}Scheduled punch-in ${startDisp}. ` +
                 (endDisp ? `Optional shift end / auto punch-out ${endDisp}. ` : '') +
                 'You will get reminders 5 minutes before and at punch-in time.';
         }
@@ -1447,6 +1466,7 @@ router.put('/:id/payroll-settlement', protect, async (req, res) => {
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can update payroll settlement.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });
@@ -1538,6 +1558,7 @@ router.post('/:id/payroll-attachment', protect, payrollAttachmentUpload.single('
     if (!isowner(req.user.role) && req.user.role !== 'Manager') {
         return res.status(403).json({ error: 'Access denied. Only owner or manager can upload payroll attachments.' });
     }
+    if (!(await ensureManagerTeamManagementAccess(req, res))) return;
     try {
         if (!req.user.storeId) {
             return res.status(400).json({ error: 'No active outlet selected. Please select an outlet first.' });

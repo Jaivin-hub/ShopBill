@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { 
     ArrowLeft, Users, User, X, ShieldCheck, 
     Store, UserPlus, MessageSquare, 
-    MoreVertical, Camera, Bell, Lock, Trash2
+    MoreVertical, Camera, Bell, Lock, Trash2, UserMinus
 } from 'lucide-react';
 import { participantLabelForViewer, participantEmailForViewer, participantRoleLabelForViewer, isParticipantOwner, isStaffViewer } from '../../utils/ownerDisplay';
+import { getChatCreatorId, isChatGroupCreator, isCustomChatGroup } from '../../utils/chatGroup';
 
 const ChatHeader = ({
     selectedChat,
@@ -19,6 +20,8 @@ const ChatHeader = ({
     staffList = [],
     onNavigateToStaffPermissions,
     onDeleteChat,
+    onRemoveMember,
+    removingMemberId = null,
     showOutletInfo = false,
     activePunchedInUserIds = []
 }) => {
@@ -59,26 +62,17 @@ const ChatHeader = ({
     // Count all participants in the group (total members)
     const memberCount = participants.length;
     
-    // Check if this is a custom group (can be deleted)
-    const isCustomGroup = isGroup && !selectedChat?.isDefault;
+    const isCustomGroup = isCustomChatGroup(selectedChat);
     
-    // Check if current user is the creator of the group
     const currentUserId = currentUser?._id || currentUser?.id;
-    // Handle createdBy - it can be an object (populated) or just an ID string
-    let chatCreatorId = null;
-    if (selectedChat?.createdBy) {
-        if (typeof selectedChat.createdBy === 'object' && selectedChat.createdBy !== null) {
-            // If populated, it might have _id or just be the ID
-            chatCreatorId = selectedChat.createdBy._id || selectedChat.createdBy;
-        } else {
-            // If it's just an ID string
-            chatCreatorId = selectedChat.createdBy;
-        }
-    }
-    const isCreator = currentUserId && chatCreatorId && String(currentUserId) === String(chatCreatorId);
-    
-    // Can delete if it's a custom group and user is the creator
+    const chatCreatorId = getChatCreatorId(selectedChat);
+    const isCreator = isChatGroupCreator(selectedChat, currentUser);
+
     const canDelete = isCustomGroup && (isCreator || isOwner);
+
+    /** Only the user who created this custom group can remove other members */
+    const canRemoveMembers =
+        isCustomGroup && isCreator && typeof onRemoveMember === 'function';
     
     // Get outlet ID from selected chat
     const chatOutletId = selectedChat?.outletId?._id || selectedChat?.outletId;
@@ -261,6 +255,11 @@ const ChatHeader = ({
 
                             {/* Members List */}
                             <div className="p-6">
+                                {canRemoveMembers ? (
+                                    <p className={`text-[10px] font-bold mb-4 ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
+                                        You created this group. Tap remove beside a member to remove them.
+                                    </p>
+                                ) : null}
                                 <p className="text-[10px] font-black tracking-[0.3em] text-indigo-500 uppercase mb-6">
                                     {isGroup ? (
                                         memberCount > 0 
@@ -288,16 +287,26 @@ const ChatHeader = ({
                                                 ? (member._id || member.id || member) 
                                                 : member;
                                             const memberEmailLine = participantEmailForViewer(member, currentUser);
+                                            const memberIdStr = memberId != null ? String(memberId) : '';
+                                            const canRemoveThisMember =
+                                                canRemoveMembers &&
+                                                memberIdStr &&
+                                                memberIdStr !== String(currentUserId || '') &&
+                                                memberIdStr !== String(chatCreatorId || '');
                                             return (
-                                                <button
+                                                <div
                                                     key={memberId}
+                                                    className={`w-full flex items-center gap-2 p-3 rounded-2xl border border-transparent ${isGroup ? darkMode ? 'hover:border-slate-800/50 hover:bg-white/[0.02]' : 'hover:border-slate-300 hover:bg-slate-50' : ''} transition-all group`}
+                                                >
+                                                <button
+                                                    type="button"
                                                     onClick={() => {
                                                         if (isGroup) {
                                                             setShowInfo(false);
                                                             onQuickMessage?.(memberId);
                                                         }
                                                     }}
-                                                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border border-transparent ${isGroup ? darkMode ? 'hover:border-slate-800/50 hover:bg-white/[0.02]' : 'hover:border-slate-300 hover:bg-slate-50' : ''} transition-all group ${isGroup ? 'cursor-pointer' : 'cursor-default'}`}
+                                                    className={`flex flex-1 min-w-0 items-center gap-4 text-left ${isGroup ? 'cursor-pointer' : 'cursor-default'}`}
                                                 >
                                                     <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 group-hover:-rotate-3 transition-transform ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                                                         <User size={18} className={darkMode ? 'text-slate-600 group-hover:text-indigo-400' : 'text-slate-600 group-hover:text-indigo-600'} />
@@ -325,10 +334,27 @@ const ChatHeader = ({
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    {isGroup && (
-                                                        <MessageSquare size={14} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    {isGroup && !canRemoveThisMember && (
+                                                        <MessageSquare size={14} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                                     )}
                                                 </button>
+                                                {canRemoveThisMember ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={removingMemberId === memberIdStr}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onRemoveMember(memberIdStr);
+                                                        }}
+                                                        className={`shrink-0 flex items-center gap-1 px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors disabled:opacity-50 ${darkMode ? 'text-slate-500 hover:bg-red-500/10 hover:text-red-400' : 'text-slate-500 hover:bg-red-50 hover:text-red-600'}`}
+                                                        aria-label={`Remove ${participantLabelForViewer(member, currentUser)} from group`}
+                                                        title="Remove from group"
+                                                    >
+                                                        <UserMinus size={16} />
+                                                        <span className="hidden sm:inline">Remove</span>
+                                                    </button>
+                                                ) : null}
+                                                </div>
                                             );
                                         })}
                                 </div>

@@ -14,50 +14,52 @@ const { syncDefaultOutletGroupName } = require('../utils/defaultOutletChat');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const DEFAULT_ROLE_PAGE_PERMISSIONS = {
-    manager: {
-        dashboard: true,
-        billing: true,
-        khata: true,
-        salesActivity: true,
-        inventory: true,
-        scm: true,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: true,
-        staffPermissions: true
-    },
-    cashier: {
-        dashboard: true,
-        billing: true,
-        khata: true,
-        salesActivity: true,
-        inventory: false,
-        scm: false,
-        reports: false,
-        chat: true,
-        notifications: true,
-        profile: true,
-        settings: false,
-        staffPermissions: false
+const { resolveRolePagePermissions, denyAllStaffPages } = require('../utils/rolePagePermissions');
+
+/** Resolve outlet store settings for role-page permissions (staff User may lack shopId on some records). */
+const findStaffOutletStoreForPermissions = async (user, staffStoreId) => {
+    if (!staffStoreId) return null;
+    let ownerId = user.shopId;
+    if (!ownerId) {
+        const storeDoc = await Store.findById(staffStoreId).select('ownerId').lean();
+        ownerId = storeDoc?.ownerId;
     }
+    if (!ownerId) return null;
+    return Store.findOne({
+        _id: staffStoreId,
+        ownerId,
+        isActive: true
+    }).select('settings name taxId address ownerId').lean();
 };
 
-const resolveRolePagePermissions = (storeRolePermissions = {}, role = '') => {
-    const normalizedRole = String(role || '').toLowerCase();
-    if (normalizedRole === 'manager') {
-        return { ...DEFAULT_ROLE_PAGE_PERMISSIONS.manager, ...(storeRolePermissions.manager || {}) };
+/** Outlet role page access for staff (Manager/Cashier) — same rules as GET /api/profile */
+const buildStaffEffectivePermissions = async (user, activeStoreId) => {
+    const role = String(user?.role || '').toLowerCase();
+    if (role === 'owner' || role === 'superadmin') {
+        return {
+            reports: true,
+            pages: resolveRolePagePermissions({}, role)
+        };
     }
-    if (normalizedRole === 'cashier') {
-        return { ...DEFAULT_ROLE_PAGE_PERMISSIONS.cashier, ...(storeRolePermissions.cashier || {}) };
+    const staffRecord = await Staff.findOne({ userId: user._id })
+        .select('permissions role storeId')
+        .lean();
+    const resolvedStoreId = staffRecord?.storeId || activeStoreId || user.activeStoreId || null;
+    const staffStore = resolvedStoreId
+        ? await findStaffOutletStoreForPermissions(user, resolvedStoreId)
+        : null;
+    const storeRolePermissions = staffStore?.settings?.rolePagePermissions || {};
+    const rolePages = staffStore
+        ? resolveRolePagePermissions(storeRolePermissions, role)
+        : denyAllStaffPages();
+    const mergedPages = { ...rolePages };
+    if (role === 'manager' && staffRecord?.permissions?.reports === true) {
+        mergedPages.reports = true;
     }
-    const allEnabled = Object.keys(DEFAULT_ROLE_PAGE_PERMISSIONS.manager).reduce((acc, key) => {
-        acc[key] = true;
-        return acc;
-    }, {});
-    return allEnabled;
+    return {
+        reports: mergedPages.reports === true,
+        pages: mergedPages
+    };
 };
 
 // Function from server.js
@@ -189,9 +191,18 @@ router.post('/login', async (req, res) => {
 
             // For staff, ensure activeStoreId is in the response so client can send x-store-id and use store context
             let activeStoreId = user.activeStoreId || null;
-            if ((user.role === 'Manager' || user.role === 'Cashier') && !activeStoreId) {
+            const roleLower = String(user.role || '').toLowerCase();
+            if (roleLower === 'manager' || roleLower === 'cashier') {
                 const staffRecord = await Staff.findOne({ userId: user._id }).select('storeId').lean();
                 if (staffRecord?.storeId) activeStoreId = staffRecord.storeId;
+            }
+
+            let effectivePermissions = {
+                reports: user.role === 'owner' || user.role === 'superadmin',
+                pages: resolveRolePagePermissions({}, user.role)
+            };
+            if (user.role !== 'owner' && user.role !== 'superadmin') {
+                effectivePermissions = await buildStaffEffectivePermissions(user, activeStoreId);
             }
 
             res.json({
@@ -206,6 +217,7 @@ router.post('/login', async (req, res) => {
                     shopName: shopName, // Include registered business name
                     businessType: ownerAccount?.businessType || user.businessType || 'grocery',
                     activeStoreId: activeStoreId || undefined,
+                    permissions: effectivePermissions,
                     pushNotificationsEnabled: user.pushNotificationsEnabled !== false
                 }
             });
@@ -383,6 +395,7 @@ router.get('/profile', protect, async (req, res) => {
             reports: user.role === 'owner' || user.role === 'superadmin',
             pages: resolveRolePagePermissions({}, user.role)
         };
+        let resolvedOutletId = null;
 
         // Check if we have an active outlet/store context (for Premium plans)
         const storeId = req.user.storeId || req.user.activeStoreId;
@@ -398,38 +411,46 @@ router.get('/profile', protect, async (req, res) => {
                 taxId = store.taxId || user.taxId || '';
                 address = store.address || user.address || '';
             }
-        } else if (user.role !== 'owner' && user.role !== 'superadmin' && user.shopId) {
-            const staffStoreId = req.user.storeId || req.user.activeStoreId;
-            const staffQuery = staffStoreId
-                ? { userId: user._id, storeId: staffStoreId }
-                : { userId: user._id };
-            const staffRecord = await Staff.findOne(staffQuery).select('name permissions role').lean();
+        } else if (user.role !== 'owner' && user.role !== 'superadmin') {
+            const staffRecord = await Staff.findOne({ userId: user._id })
+                .select('name permissions role storeId')
+                .lean();
             if (staffRecord?.name) {
                 profileName = staffRecord.name;
             }
-            const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl businessType');
-            if (businessDetails) {
-                shopName = businessDetails.shopName || shopName;
-                taxId = businessDetails.taxId || taxId;
-                address = businessDetails.address || address;
-                currency = businessDetails.currency || currency;
-                profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
-                businessType = businessDetails.businessType || businessType;
-            }
-            if (staffStoreId) {
-                const store = await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).lean();
-                if (store) {
-                    if (store.name) shopName = store.name;
-                    if (store.taxId) taxId = store.taxId;
-                    if (store.address) address = store.address;
+
+            resolvedOutletId = staffRecord?.storeId || req.user.storeId || req.user.activeStoreId || null;
+
+            if (user.shopId) {
+                const businessDetails = await User.findById(user.shopId).select('shopName taxId address currency profileImageUrl businessType');
+                if (businessDetails) {
+                    shopName = businessDetails.shopName || shopName;
+                    taxId = businessDetails.taxId || taxId;
+                    address = businessDetails.address || address;
+                    currency = businessDetails.currency || currency;
+                    profileImageUrl = businessDetails.profileImageUrl || profileImageUrl;
+                    businessType = businessDetails.businessType || businessType;
                 }
             }
-            const staffStore = staffStoreId
-                ? await Store.findOne({ _id: staffStoreId, ownerId: user.shopId, isActive: true }).select('settings').lean()
-                : null;
-            const storeRolePermissions = staffStore?.settings?.rolePagePermissions || {};
-            const rolePages = resolveRolePagePermissions(storeRolePermissions, user.role);
-            const mergedPages = { ...rolePages };
+
+            let outletDoc = null;
+            if (user.shopId && resolvedOutletId) {
+                outletDoc = await Store.findOne({ _id: resolvedOutletId, ownerId: user.shopId, isActive: true }).lean();
+            }
+            if (!outletDoc && resolvedOutletId) {
+                outletDoc = await findStaffOutletStoreForPermissions(user, resolvedOutletId);
+            }
+            if (outletDoc) {
+                if (outletDoc.name) shopName = outletDoc.name;
+                if (outletDoc.taxId) taxId = outletDoc.taxId;
+                if (outletDoc.address) address = outletDoc.address;
+            }
+
+            const storeRolePermissions = outletDoc?.settings?.rolePagePermissions || {};
+            const staffRolePages = outletDoc
+                ? resolveRolePagePermissions(storeRolePermissions, user.role)
+                : denyAllStaffPages();
+            const mergedPages = { ...staffRolePages };
             if (String(user.role).toLowerCase() === 'manager' && staffRecord?.permissions?.reports === true) {
                 mergedPages.reports = true;
             }
@@ -437,6 +458,9 @@ router.get('/profile', protect, async (req, res) => {
                 reports: mergedPages.reports === true,
                 pages: mergedPages
             };
+            if (resolvedOutletId) {
+                user.activeStoreId = resolvedOutletId;
+            }
         }
 
         res.json({
@@ -448,7 +472,9 @@ router.get('/profile', protect, async (req, res) => {
                 phone: user.phone,
                 role: user.role,
                 shopId: user.shopId || null,
-                activeStoreId: user.activeStoreId || null,
+                activeStoreId: (user.role !== 'owner' && user.role !== 'superadmin' && resolvedOutletId)
+                    ? resolvedOutletId
+                    : (user.activeStoreId || null),
                 // Business Details (outlet-specific for owners, user-level for others)
                 shopName: shopName,
                 taxId: taxId,
