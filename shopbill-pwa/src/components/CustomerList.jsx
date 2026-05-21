@@ -3,6 +3,11 @@ import {
     History, Search, ShieldAlert, CheckCircle2, UserCircle2, BellRing,
     AlertCircle, Pencil, Banknote, Trash2
 } from 'lucide-react';
+import {
+  isReminderOnCooldown,
+  getReminderCooldownRemainingMs,
+  formatReminderCooldownTitle,
+} from '../utils/ledgerReminderCooldown';
 
 const CustomerList = ({ 
     customersList, 
@@ -41,9 +46,11 @@ const CustomerList = ({
         const creditLimit = customer.creditLimit || 0;
         const isOverLimit = creditLimit > 0 && outstandingAmount > creditLimit;
         
-        // COOLDOWN LOGIC: Prevent re-sending for 120 seconds (2 minutes)
-        const lastSentTimestamp = sentReminders[customer._id];
-        const isRecentlySent = lastSentTimestamp && (Date.now() - lastSentTimestamp < 120000);
+        // Cooldown: one week after a reminder was sent
+        const isOnReminderCooldown = isReminderOnCooldown(customer._id, sentReminders);
+        const reminderCooldownTitle = isOnReminderCooldown
+            ? formatReminderCooldownTitle(getReminderCooldownRemainingMs(customer._id, sentReminders))
+            : 'Send reminder';
         
         let statusConfig = {
             label: 'Settled', color: 'text-emerald-500', bg: 'bg-emerald-500/10',
@@ -140,7 +147,7 @@ const CustomerList = ({
                             <Pencil size={16} strokeWidth={2} />
                         </button>
                     )}
-                    {openDeleteModal && (
+                    {openDeleteModal && outstandingAmount <= 0 && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -170,15 +177,15 @@ const CustomerList = ({
                                 e.stopPropagation();
                                 openRemindModal(customer);
                             }}
-                            disabled={isRecentlySent}
+                            disabled={isOnReminderCooldown}
                             className={`p-2 rounded-lg transition-colors ${
-                                isRecentlySent
-                                    ? 'text-emerald-500 cursor-not-allowed'
+                                isOnReminderCooldown
+                                    ? 'text-emerald-500 cursor-not-allowed opacity-80'
                                     : darkMode ? 'text-slate-400 hover:text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:text-amber-600 hover:bg-slate-100'
                             }`}
-                            title={isRecentlySent ? "Reminder sent recently" : "Send reminder"}
+                            title={reminderCooldownTitle}
                         >
-                            {isRecentlySent ? (
+                            {isOnReminderCooldown ? (
                                 <CheckCircle2 size={16} strokeWidth={2} />
                             ) : (
                                 <BellRing size={16} strokeWidth={2} />

@@ -56,7 +56,7 @@ const NewChatModal = ({
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 chat-scroll custom-scrollbar">
                     {/* Group Name */}
                     {newChatType === 'group' && (
                         <div>

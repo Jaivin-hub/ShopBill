@@ -7,6 +7,8 @@ import {
     mentionsDetailForStaffViewer,
     participantLabelForViewer,
 } from '../../utils/ownerDisplay';
+import ReplyQuote from './ReplyQuote';
+import { CornerDownRight } from 'lucide-react';
 
 function escapeRegex(s) {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -52,10 +54,13 @@ const MessageBubble = ({
     onToggleAudio,
     formatRecordingTime,
     audioRefs,
+    registerChatAudioRef,
+    audioPlaybackPercent = 0,
     showSenderInfo = true,
     seenBy = [],
     currentUser,
     participants = [],
+    onReply,
 }) => {
     const [audioError, setAudioError] = React.useState(false);
     const isVoiceMessage = msg.messageType === 'audio' || msg.audioUrl;
@@ -69,6 +74,17 @@ const MessageBubble = ({
     
     const audioSrc = resolveChatAudioUrl(msg.audioUrl);
     const fileSrc = resolveChatFileUrl(msg.fileUrl);
+    const isAudioPlaying = playingAudioId === msg._id;
+    const playbackPct = Math.min(1, Math.max(0, Number(audioPlaybackPercent) || 0));
+    const totalVoiceSec = msg.audioDuration ? Math.floor(msg.audioDuration) : 0;
+    const elapsedVoiceSec =
+        totalVoiceSec > 0 ? Math.min(totalVoiceSec, Math.floor(playbackPct * totalVoiceSec)) : 0;
+    const voiceTimeLabel =
+        totalVoiceSec > 0 && (isAudioPlaying || playbackPct > 0)
+            ? `${formatRecordingTime(elapsedVoiceSec)} / ${formatRecordingTime(totalVoiceSec)}`
+            : totalVoiceSec > 0
+              ? formatRecordingTime(totalVoiceSec)
+              : 'Voice';
 
     const isImageFile =
         msg.fileType?.startsWith('image/') ||
@@ -81,7 +97,7 @@ const MessageBubble = ({
     };
 
     return (
-        <div className={`max-w-[85%] md:max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        <div className={`group relative max-w-[85%] md:max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
             {/* SENDER LABEL: Only show for other members and when showSenderInfo is true */}
             {!isOwn && showSenderInfo && (
                 <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -110,12 +126,37 @@ const MessageBubble = ({
 
             {/* MESSAGE BUBBLE */}
             <div 
-                className={`relative px-4 py-3 shadow-xl transition-all duration-200 ${
+                className={`relative px-4 py-3 shadow-xl transition-all duration-200 ${onReply && !msg.isOptimistic ? 'pr-9' : ''} ${
                     isOwn 
                     ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none shadow-lg shadow-indigo-600/20' // Your Message: Blue (matching send button) + Right-corner flat
                     : darkMode ? 'bg-slate-800 border border-slate-700 text-slate-100 rounded-2xl rounded-tl-none' : 'bg-white border border-slate-200 text-slate-900 rounded-2xl rounded-tl-none' // Their Message: Left-corner flat
                 }`}
             >
+                {onReply && !msg.isOptimistic ? (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onReply(msg);
+                        }}
+                        className={`absolute top-1.5 right-1.5 z-10 rounded-md p-1 opacity-60 transition-opacity hover:opacity-100 ${
+                            isOwn ? 'text-white/90 hover:bg-white/15' : darkMode ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'
+                        }`}
+                        aria-label="Reply to message"
+                        title="Reply"
+                    >
+                        <CornerDownRight size={14} strokeWidth={2.5} />
+                    </button>
+                ) : null}
+                {msg.replyTo ? (
+                    <ReplyQuote
+                        replyTo={msg.replyTo}
+                        currentUser={currentUser}
+                        isOwn={isOwn}
+                        darkMode={darkMode}
+                        compact
+                    />
+                ) : null}
                 {isVoiceMessage && audioSrc ? (
                     <div className="flex items-center gap-4 min-w-[200px]">
                         {audioError ? (
@@ -129,32 +170,30 @@ const MessageBubble = ({
                             onClick={() => onToggleAudio(msg._id, audioSrc)}
                             className={`p-2 rounded-xl transition-transform active:scale-95 ${isOwn ? 'bg-white/20' : 'bg-slate-800'}`}
                         >
-                            {playingAudioId === msg._id ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                            {isAudioPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
                         </button>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                                 <Mic size={12} className="opacity-50" />
-                                <span className="text-[10px] font-black uppercase tracking-tighter">
-                                    {msg.audioDuration ? formatRecordingTime(Math.floor(msg.audioDuration)) : 'Voice'}
+                                <span className="text-[10px] font-black uppercase tracking-tighter tabular-nums">
+                                    {voiceTimeLabel}
                                 </span>
                             </div>
-                            <div className={`w-full h-1 rounded-full ${isOwn ? 'bg-white/20' : 'bg-slate-700'}`}>
+                            <div className={`relative w-full h-1.5 rounded-full overflow-hidden ${isOwn ? 'bg-white/25' : darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
                                 <div 
-                                    className={`h-full rounded-full transition-all ${isOwn ? 'bg-white' : 'bg-indigo-500'}`} 
-                                    style={{ width: playingAudioId === msg._id ? '100%' : '0%' }} 
+                                    className={`h-full rounded-full ${isOwn ? 'bg-white' : 'bg-indigo-500'} ${isAudioPlaying ? '' : 'transition-[width] duration-150 ease-out'}`} 
+                                    style={{ width: `${Math.round(playbackPct * 100)}%` }} 
                                 />
                             </div>
                         </div>
                         <audio
                             ref={(el) => {
-                                if (el) {
+                                if (registerChatAudioRef) {
+                                    registerChatAudioRef(msg._id, el);
+                                } else if (el) {
                                     audioRefs.current[msg._id] = el;
-                                    el.preload = 'metadata';
-                                    el.playsInline = true;
-                                    el.setAttribute('playsinline', '');
-                                    el.setAttribute('webkit-playsinline', '');
-                                    el.onerror = () => setAudioError(true);
                                 }
+                                if (el) el.onerror = () => setAudioError(true);
                             }}
                             src={audioSrc}
                             onEnded={() => onToggleAudio(null, null)}

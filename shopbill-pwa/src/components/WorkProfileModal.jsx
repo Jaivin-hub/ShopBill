@@ -42,6 +42,8 @@ export default function WorkProfileModal({
   showToast,
 }) {
   const [shiftPickerOpen, setShiftPickerOpen] = useState(false);
+  /** When null, dropdown shows all team shifts; set only while user types to search. */
+  const [shiftSearchQuery, setShiftSearchQuery] = useState(null);
   const [profileTab, setProfileTab] = useState('shift');
   const shiftComboRef = useRef(null);
   const shiftNameInputRef = useRef(null);
@@ -49,10 +51,15 @@ export default function WorkProfileModal({
   const shiftList = useMemo(() => (Array.isArray(existingShifts) ? existingShifts : []), [existingShifts]);
 
   const filteredShifts = useMemo(() => {
-    const q = String(scheduleForm?.shiftName || '').trim().toLowerCase();
-    if (!q) return shiftList;
+    const q = shiftSearchQuery;
+    if (q == null || q === '') return shiftList;
     return shiftList.filter((s) => String(s?.name || '').toLowerCase().includes(q));
-  }, [shiftList, scheduleForm?.shiftName]);
+  }, [shiftList, shiftSearchQuery]);
+
+  const openShiftPicker = useCallback(() => {
+    setShiftSearchQuery(null);
+    setShiftPickerOpen(true);
+  }, []);
 
   useEffect(() => {
     if (!shiftPickerOpen) return undefined;
@@ -72,6 +79,7 @@ export default function WorkProfileModal({
   useEffect(() => {
     if (!isOpen) {
       setShiftPickerOpen(false);
+      setShiftSearchQuery(null);
       setProfileTab('shift');
     }
   }, [isOpen]);
@@ -87,6 +95,7 @@ export default function WorkProfileModal({
         punchInEnd: end,
         autoPunchOutTime: end,
       }));
+      setShiftSearchQuery(null);
       setShiftPickerOpen(false);
     },
     [setScheduleForm]
@@ -94,6 +103,7 @@ export default function WorkProfileModal({
 
   const startAddNewShift = useCallback(() => {
     setScheduleForm((p) => ({ ...p, shiftName: '' }));
+    setShiftSearchQuery('');
     setShiftPickerOpen(false);
     setTimeout(() => {
       const el = shiftNameInputRef.current;
@@ -261,8 +271,13 @@ export default function WorkProfileModal({
                         id={`work-profile-shift-name-${staff?._id || 's'}`}
                         type="text"
                         value={scheduleForm.shiftName}
-                        onChange={(e) => setScheduleForm((p) => ({ ...p, shiftName: e.target.value }))}
-                        onFocus={() => setShiftPickerOpen(true)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setScheduleForm((p) => ({ ...p, shiftName: v }));
+                          setShiftSearchQuery(String(v).trim().toLowerCase());
+                          setShiftPickerOpen(true);
+                        }}
+                        onFocus={openShiftPicker}
                         placeholder="Search team shifts or type a new name"
                         autoComplete="off"
                         role="combobox"
@@ -278,7 +293,13 @@ export default function WorkProfileModal({
                         tabIndex={-1}
                         aria-label={shiftPickerOpen ? 'Close shift list' : 'Open shift list'}
                         aria-expanded={shiftPickerOpen}
-                        onClick={() => setShiftPickerOpen((o) => !o)}
+                        onClick={() => {
+                          if (shiftPickerOpen) {
+                            setShiftPickerOpen(false);
+                          } else {
+                            openShiftPicker();
+                          }
+                        }}
                         className={`touch-manipulation shrink-0 px-2.5 transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
                       >
                         <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${shiftPickerOpen ? 'rotate-180' : ''}`} />

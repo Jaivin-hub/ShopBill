@@ -1,21 +1,33 @@
 import React, { useEffect } from 'react';
 import { 
     CreditCard, Receipt, Package, Users, LineChart, 
-    UserCog, Cloud, Truck, ChevronRight, CheckCircle2, 
-    MessageCircle, ClipboardList, Bell, XCircle
+    Truck, CheckCircle2, 
+    Bell, XCircle,
+    WifiOff, RefreshCw, Wallet, Clock, Building2, UserCog
 } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
 
 const content = {
     tagline: "#1 Shop Management Tool",
     title: "Your Shop, Fully Managed. Right in your Pocket",
-    subtitle: "Pocket POS turns your phone into a powerful business partner. Stop the paperwork, save your time, and track every single rupee without the stress.",
+    subtitle: "Pocket POS turns your phone into a powerful business partner. Bill even without internet or power, sync when you're back online, and run multi-outlet teams from one app.",
     getStarted: "Log In",
     startTrial: "Start Your Free Trial",
     exploreFeatures: "See How It Works",
     featuresTitle: "Everything You Need to Run Your Shop",
-    featuresSubtitle: "From super-fast billing to tracking your suppliers, we handle the boring stuff so you can focus on your customers.",
-    
+    featuresSubtitle: "From offline-ready billing to multi-outlet chat, shift tracking, and payroll—built for shops that cannot stop when the network drops.",
+    highlightsTitle: "Built for Real Shop Floors",
+    highlightsSubtitle: "The tools owners ask for most—offline sales, outlet-wide messaging, staff shifts, and salary settlement.",
+
+    offlineBilling: "Bill Without Internet or Power",
+    offlineBillingDesc: "Keep selling when Wi‑Fi fails or power cuts out. Bills stay saved on your device and auto-sync to the cloud the moment you're back online—nothing lost, no double entry.",
+    multiOutletChat: "Multi-Outlet Real-Time Chat",
+    multiOutletChatDesc: "Separate group chats per outlet plus direct messages across your store network. Coordinate staff instantly—no missed calls or scattered WhatsApp groups.",
+    teamShifts: "Team Shifts & Punch-In Alerts",
+    teamShiftsDesc: "Set work schedules and shifts per staff member. Owners and managers get real-time alerts when staff punch in, take breaks, or finish their shift.",
+    salaryPayroll: "Salary Reports & Mark Settlement",
+    salaryPayrollDesc: "Monthly payroll with hours, overtime, and base pay in one view. Mark salaries as settled, attach notes, and keep a clear payment history for every team member.",
+
     // Features
     fastPOS: "Quick & Easy Billing",
     fastPOSDesc: "Finish sales in seconds. No more long lines or math mistakes. Print clear bills and keep your counter moving.",
@@ -27,14 +39,12 @@ const content = {
     khataDesc: "No more notebooks! Track who owes you money, send polite payment reminders, and keep your credit accounts crystal clear.",
     reports: "Simple Sales Insights",
     reportsDesc: "See your daily profit and top items with one tap. Understand your busy hours and make better choices for your business.",
-    realTimeSales: "Real-Time Sales & Notifications",
-    realTimeSalesDesc: "See sales as they happen and get instant alerts for new orders, low stock, and important updates—so you're always in the loop.",
     cloudSync: "Safe & Always Ready",
     cloudSyncDesc: "Your data is backed up safely in the cloud. If you switch phones, your data is right there waiting for you. 100% secure.",
-    teamManagement: "Team Management & Attendance Tracker",
-    teamManagementDesc: "Manage your staff efficiently. Track check-ins, shifts, and attendance in real time. Assign roles and monitor performance—all in one place.",
-    realTimeChat: "Real-Time Chat System",
-    realTimeChatDesc: "Connect instantly with your team. Send announcements, discuss orders, and coordinate shifts—no more missed calls or scattered WhatsApp groups.",
+    teamManagement: "Team Management & Roles",
+    teamManagementDesc: "Invite staff, assign Manager or Cashier roles, and control page access. Track pending setup, active accounts, and deactivated members in one place.",
+    realTimeChat: "Push Alerts & Notifications",
+    realTimeChatDesc: "Low stock, credit sales, ledger payments, staff activation, and attendance updates—delivered instantly to the right people in your team.",
 
     testimonialQuote: "\"Pocket POS saved me hours every week. Managing my credit accounts (Khata) used to be a headache, now it's just a tap away. It’s the best help my shop ever had.\"",
     testimonialAuthor: "Ravi Sharma",
@@ -67,10 +77,14 @@ const content = {
     multishopManagement: "Multishop management",
     upTo10Outlets: "Up to 10 outlets management",
     allIncluded: "All features included",
-    basicExcluded2: "Realtime team chat system",
+    basicExcluded2: "Multi-outlet real-time chat",
     basicExcluded3: "Auto SMS Payment Reminders",
     basicExcluded4: "Multishop management",
     basicExcluded5: "Supplier Management",
+    offlineBillingFeature: "Offline billing with auto-sync",
+    teamShiftFeature: "Work shifts & punch-in alerts",
+    multiOutletChatFeature: "Multi-outlet real-time chat",
+    salarySettlementFeature: "Salary reports & mark settlement",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     support: "Help & Support",
@@ -207,20 +221,41 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                 {/* Features */}
                 <section id="features" className={`pt-24 pb-12 ${bgColor} transition-colors duration-300`}>
                     <div className="max-w-7xl mx-auto px-4">
-                        <div className="text-center mb-20">
+                        <div className="text-center mb-12">
                             <h2 className={`text-3xl md:text-5xl font-black ${titleColor}  tracking-tighter mb-4 transition-colors duration-300`}>{content.featuresTitle}</h2>
-                            <p className={`${descColor} font-bold transition-colors duration-300`}>{content.featuresSubtitle}</p>
+                            <p className={`${descColor} font-bold max-w-3xl mx-auto transition-colors duration-300`}>{content.featuresSubtitle}</p>
                         </div>
+
+                        <div className="mb-16">
+                            <div className="text-center mb-10">
+                                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400 mb-2">{content.highlightsTitle}</p>
+                                <p className={`${subtitleColor} text-sm font-bold max-w-2xl mx-auto`}>{content.highlightsSubtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FeatureItem
+                                    icon={<WifiOff />}
+                                    title={content.offlineBilling}
+                                    desc={content.offlineBillingDesc}
+                                    color="indigo"
+                                    darkMode={darkMode}
+                                    highlighted
+                                    badge="Most important"
+                                />
+                                <FeatureItem icon={<Building2 />} title={content.multiOutletChat} desc={content.multiOutletChatDesc} color="cyan" darkMode={darkMode} />
+                                <FeatureItem icon={<Clock />} title={content.teamShifts} desc={content.teamShiftsDesc} color="rose" darkMode={darkMode} />
+                                <FeatureItem icon={<Wallet />} title={content.salaryPayroll} desc={content.salaryPayrollDesc} color="emerald" darkMode={darkMode} />
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <FeatureItem icon={<Receipt />} title={content.fastPOS} desc={content.fastPOSDesc} color="indigo" darkMode={darkMode} />
                             <FeatureItem icon={<Package />} title={content.stockControl} desc={content.stockControlDesc} color="teal" darkMode={darkMode} />
                             <FeatureItem icon={<Truck />} title={content.supplyChain} desc={content.supplyChainDesc} color="amber" darkMode={darkMode} />
                             <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
                             <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
-                            <FeatureItem icon={<ClipboardList />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
-                            <FeatureItem icon={<MessageCircle />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="cyan" darkMode={darkMode} />
-                            <FeatureItem icon={<Bell />} title={content.realTimeSales} desc={content.realTimeSalesDesc} color="orange" darkMode={darkMode} />
-                            <FeatureItem icon={<Cloud />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
+                            <FeatureItem icon={<UserCog />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
+                            <FeatureItem icon={<Bell />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="orange" darkMode={darkMode} />
+                            <FeatureItem icon={<RefreshCw />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                         </div>
                     </div>
                 </section>
@@ -249,8 +284,8 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 price="2199" 
                                 featured={true}
                                 desc={content.proDesc} 
-                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.basicExcluded2, content.employeeAuditLogs]} 
-                                excludedItems={[content.basicExcluded4]}
+                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.offlineBillingFeature, content.teamShiftFeature, content.multiOutletChatFeature, content.employeeAuditLogs]} 
+                                excludedItems={[content.basicExcluded4, content.salarySettlementFeature]}
                                 btn={content.choosePro} 
                                 onSelect={() => onSelectPlan('PRO')} 
                                 darkMode={darkMode}
@@ -259,7 +294,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 plan={content.premiumPlan} 
                                 price="4999" 
                                 desc={content.premiumDesc} 
-                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.basicExcluded2, content.employeeAuditLogs, content.multishopManagement, content.upTo10Outlets]} 
+                                items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.offlineBillingFeature, content.teamShiftFeature, content.multiOutletChatFeature, content.salarySettlementFeature, content.employeeAuditLogs, content.multishopManagement, content.upTo10Outlets]} 
                                 btn={content.choosePremium} 
                                 onSelect={() => onSelectPlan('PREMIUM')} 
                                 darkMode={darkMode}
@@ -284,12 +319,17 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
     );
 };
 
-const FeatureItem = ({ icon, title, desc, color, darkMode = true }) => {
+const FeatureItem = ({ icon, title, desc, color, darkMode = true, highlighted = false, badge = null }) => {
     const cardBg = darkMode ? 'bg-gray-900/50' : 'bg-white';
     const titleText = darkMode ? 'text-white' : 'text-slate-900';
     const descText = darkMode ? 'text-gray-500' : 'text-slate-600';
     return (
-    <div className={`feature-card ${cardBg} p-8 rounded-[2rem] transition-colors duration-300`}>
+    <div className={`feature-card ${cardBg} p-8 rounded-[2rem] transition-colors duration-300 ${highlighted ? 'ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/10 md:col-span-2' : ''}`}>
+        {badge ? (
+            <span className="inline-flex items-center gap-1.5 mb-4 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400">
+                {badge}
+            </span>
+        ) : null}
         <div className="flex items-center gap-4 mb-4">
             <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center bg-${color}-500/10 text-${color}-500`}>
                 {React.cloneElement(icon, { size: 24 })}

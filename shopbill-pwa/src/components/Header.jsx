@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     User, Bell, Sun, Moon, 
     CreditCard, LayoutGrid, Store, Plus, ChevronRight,
-    Loader2, Settings
+    Loader2
 } from 'lucide-react';
 import { isPremiumPlan } from '../utils/subscription';
 
@@ -278,20 +278,6 @@ const Header = ({
                                     {unreadCount > 99 ? '99+' : unreadCount > 9 ? '9+' : unreadCount}
                                 </span>
                             )}
-                        </button>
-                    )}
-
-                    {/* Settings in header for Premium/Pro Manager only; Basic plan Manager and Cashier use footer */}
-                    {!isOwner &&
-                        staffCan('settings') &&
-                        userRole?.toLowerCase() === 'manager' &&
-                        (currentUser?.plan?.toUpperCase() === 'PREMIUM' || currentUser?.plan?.toUpperCase() === 'PRO') && (
-                        <button
-                            onClick={() => { setCurrentPage('settings'); setShowStoreHub(false); }}
-                            className={getButtonClasses('settings')}
-                            aria-label="Settings"
-                        >
-                            <Settings className="w-5 h-5" />
                         </button>
                     )}
 

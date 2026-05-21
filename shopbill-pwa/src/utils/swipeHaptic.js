@@ -149,20 +149,22 @@ export function primeSwipeHaptic() {
 
 export function registerPwaSwipeHapticWarmup() {
   if (typeof document === 'undefined') return () => {};
-  if (!isIOSDevice() && !isStandalonePwa()) return () => {};
 
   const onGesture = () => {
     primeSwipeHaptic();
-    document.removeEventListener('touchstart', onGesture, true);
-    document.removeEventListener('touchend', onGesture, true);
+    try {
+      buildTickDataUri();
+    } catch {
+      /* ignore */
+    }
   };
 
   document.addEventListener('touchstart', onGesture, { capture: true, passive: true });
-  document.addEventListener('touchend', onGesture, { capture: true, passive: true });
+  document.addEventListener('pointerdown', onGesture, { capture: true, passive: true });
 
   return () => {
     document.removeEventListener('touchstart', onGesture, true);
-    document.removeEventListener('touchend', onGesture, true);
+    document.removeEventListener('pointerdown', onGesture, true);
   };
 }
 
@@ -187,6 +189,9 @@ export function pulseSwipePageHaptic() {
   } catch {
     /* ignore */
   }
+
+  unlockAudio();
+  primeSwipeHaptic();
 
   const ios = isIOSDevice();
 

@@ -71,7 +71,16 @@ apiClient.interceptors.request.use(
     const isStaffApi = /\/staff(\/|$|\?)/.test(url);
     // Bill drafts: duplicate GET/POST can cancel in-flight saves or list loads and break POS drafts UX
     const isBillDraftApi = /\/bill-drafts(\/|$|\?)/.test(url);
-    const skipDuplicateCancel = isPaymentOrSignup || isChatMessage || isChatFetch || isStaffApi || isDeviceTokenApi || isBillDraftApi;
+    // Offline queue flush: never cancel in-flight POSTs (auto-sync + Sync now share the same payloads)
+    const isOfflineQueueSync = Boolean(config.headers?.['x-offline-client-id']);
+    const skipDuplicateCancel =
+      isPaymentOrSignup ||
+      isChatMessage ||
+      isChatFetch ||
+      isStaffApi ||
+      isDeviceTokenApi ||
+      isBillDraftApi ||
+      isOfflineQueueSync;
 
     // Cancel previous identical request if still pending (skip for payment/signup)
     if (!skipDuplicateCancel && activeRequests.has(cacheKey)) {

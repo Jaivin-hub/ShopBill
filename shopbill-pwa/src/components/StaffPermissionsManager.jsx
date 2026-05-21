@@ -105,6 +105,33 @@ const getRoleStyles = (role, darkMode) => {
     }
 };
 
+const getStaffMemberId = (s) => (s?._id != null ? String(s._id) : '');
+
+const isStaffPendingInvite = (s) =>
+    s?.activationInvitePending === true ||
+    (s?.passwordSetupStatus === 'pending' && !s.active);
+
+/** Deactivated after invite was revoked — no password yet; reactivate resends activation email. */
+const isStaffInviteRevoked = (s) =>
+    !s?.active &&
+    !isStaffPendingInvite(s) &&
+    s?.canReactivateAccount === false &&
+    s?.passwordSetupStatus === 'completed';
+
+const canShowReactivateButton = (s) => {
+    if (s?.active || isStaffPendingInvite(s)) return false;
+    if (s?.canReactivateAccount === true) return true;
+    if (isStaffInviteRevoked(s)) return true;
+    if (s?.canReactivateAccount == null && s?.passwordSetupStatus === 'completed') return true;
+    return false;
+};
+
+const TEAM_FILTER_TABS = [
+    { id: 'working', label: 'On shift' },
+    { id: 'active', label: 'Active' },
+    { id: 'inactive', label: 'Pending / off' },
+];
+
 // --- EditStaffModal ---
 const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmitting, darkMode, canEditRole }) => {
     const [selectedRole, setSelectedRole] = useState('');
@@ -507,6 +534,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
+    const pendingInfoRef = useRef(null);
     const [scheduleForm, setScheduleForm] = useState({
         enabled: false,
         shiftName: '',
@@ -516,7 +544,6 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
         salaryMode: 'none',
         salaryAmount: ''
     });
-    const pendingInfoRef = useRef(null);
     const existingShiftMap = useMemo(() => {
         const map = new Map();
         (existingShifts || []).forEach((shift) => {
@@ -608,6 +635,21 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     };
     const maskedOwnerEmail = participantEmailForViewer(staff, currentUser);
     const roleBadgeNormalCase = isStaffViewer(currentUser) && isParticipantOwner(staff);
+    const isPendingInvite = isStaffPendingInvite(staff);
+    const needsResendInvite = isStaffInviteRevoked(staff);
+    const showReactivateButton = canShowReactivateButton(staff);
+    const showDeactivateButton = isPendingInvite || staff.active || showReactivateButton;
+    const showDeleteButton = !staff.active && !isPendingInvite;
+    const showWorkProfileAndAttendance =
+        staff.role !== 'owner' && staff.active && !isPendingInvite;
+
+    useEffect(() => {
+        if (!showWorkProfileAndAttendance) {
+            setShowDetails(false);
+            setShowAttendance(false);
+        }
+    }, [showWorkProfileAndAttendance]);
+
     return (
         <div className="space-y-3">
             <div 
@@ -623,7 +665,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                             {maskedOwnerEmail && (
                             <p className={`text-[11px] md:text-xs font-bold truncate mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{maskedOwnerEmail}</p>
                             )}
-                            {staff.role !== 'owner' && !isPendingActivation && (
+                            {showWorkProfileAndAttendance && (
                                 <div className="flex items-center gap-2 mt-2">
                                     <div className={`flex items-center gap-1.5 ${isCurrentlyActive 
                                         ? (isOnBreak 
@@ -672,7 +714,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                     </span>
                                 )}
                                 {isPendingActivation && (
-                                    <div className="relative flex items-center gap-1" ref={pendingInfoRef}>
+                                    <div ref={pendingInfoRef} className="relative inline-block">
                                         <span className={`text-[9px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase flex items-center gap-1 ${darkMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-amber-200 text-amber-800 border-amber-400'}`}>
                                             <AlertCircle className="w-2.5 h-2.5" />
                                             Pending Setup
@@ -685,13 +727,13 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                                 e.stopPropagation();
                                                 setShowPendingInfo((v) => !v);
                                             }}
-                                            className={`touch-manipulation rounded-full p-1 transition-colors ${darkMode ? 'text-amber-400 hover:bg-amber-500/20' : 'text-amber-700 hover:bg-amber-100'}`}
+                                            className={`pending-setup-info-blink touch-manipulation absolute -top-1.5 -right-1.5 z-10 flex h-[18px] w-[18px] items-center justify-center rounded-full border shadow-sm transition-colors ${darkMode ? 'border-amber-500/50 bg-slate-900 text-amber-400 hover:bg-amber-500/20' : 'border-amber-400 bg-white text-amber-700 hover:bg-amber-100'}`}
                                         >
-                                            <Info className="w-3.5 h-3.5" />
+                                            <Info className="w-3 h-3" />
                                         </button>
                                         {showPendingInfo && (
                                             <div
-                                                className={`absolute left-0 top-full z-30 mt-1.5 max-w-[min(100vw-2rem,22rem)] p-3 rounded-xl border shadow-lg ${darkMode ? 'bg-slate-900 border-amber-500/30 text-slate-200' : 'bg-white border-amber-200 text-slate-800'}`}
+                                                className={`absolute left-0 top-full z-30 mt-2 max-w-[min(100vw-2rem,22rem)] p-3 rounded-xl border shadow-lg ${darkMode ? 'bg-slate-900 border-amber-500/30 text-slate-200' : 'bg-white border-amber-200 text-slate-800'}`}
                                                 role="tooltip"
                                             >
                                                 <p className="text-[10px] sm:text-[11px] font-bold leading-relaxed">
@@ -701,7 +743,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                         )}
                                     </div>
                                 )}
-                                {staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
+                                {showWorkProfileAndAttendance && staff?.workSchedule?.punchInStart && staff?.workSchedule?.punchInEnd && (
                                     <span className={`text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded border tracking-widest uppercase ${darkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}>
                                         Shift Enabled
                                     </span>
@@ -711,41 +753,48 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                     </div>
                     
                     <div className={`flex items-center gap-2 md:gap-3 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 ${borderStyle}`}>
+                        {showDeactivateButton && (
                         <div className="flex-1 sm:flex-none">
                     <button
+                        type="button"
                         onClick={() => onToggleActive(staff)}
                         disabled={isActionDisabled}
                         className={`touch-manipulation min-h-[44px] w-full sm:w-auto px-4 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[11px] md:text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                            staff.active
-                            ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
-                            : isPendingActivation
+                            staff.active || isPendingInvite
                             ? (darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white' : 'bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-600 hover:text-white')
                             : (darkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white')
                         } disabled:opacity-20`}
                     >
                         <Power className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                        {staff.active || isPendingActivation ? 'Deactivate Account' : 'Reactivate Account'}
+                        {staff.active || isPendingInvite
+                            ? 'Deactivate Account'
+                            : needsResendInvite
+                                ? 'Resend Invitation'
+                                : 'Reactivate Account'}
                     </button>
                         </div>
+                        )}
 
-                        <button
-                            onClick={() => onEdit(staff)}
-                            disabled={isActionDisabled} 
-                            className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
-                        >
-                            <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
-                        
-                        {/* Delete: inactive staff (includes pending activation — never completed setup) */}
-                        {!staff.active && (
+                        {staff.active && !isPendingInvite && (
                             <button
+                                type="button"
+                                onClick={() => onEdit(staff)}
+                                disabled={isActionDisabled}
+                                title="Edit name and role"
+                                aria-label="Edit staff profile"
+                                className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-indigo-400 bg-slate-900 border border-slate-800 hover:bg-indigo-600 hover:text-white' : 'text-indigo-600 bg-slate-50 border border-slate-200 hover:bg-indigo-600 hover:text-white'}`}
+                            >
+                                <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+                        )}
+                        
+                        {/* Delete: after pending invite is deactivated, or for deactivated active accounts */}
+                        {showDeleteButton && (
+                            <button
+                                type="button"
                                 onClick={() => onRemove(staff)}
                                 disabled={isActionDisabled}
-                                title={
-                                    isPendingActivation
-                                        ? 'Delete this pending invite and remove the account from your team'
-                                        : 'Delete permanently – removes all data; staff cannot log in again'
-                                }
+                                title="Delete permanently – removes all data; staff cannot log in again"
                                 className={`touch-manipulation min-h-[44px] min-w-[44px] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl transition-all active:scale-95 disabled:opacity-20 ${darkMode ? 'text-red-500 bg-slate-900 border border-slate-800 hover:bg-red-500 hover:text-white' : 'text-red-600 bg-slate-50 border border-slate-200 hover:bg-red-600 hover:text-white'}`}
                             >
                                 <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
@@ -753,7 +802,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                         )}
                     </div>
                 </div>
-                {staff.role !== 'owner' && !isPendingActivation && (
+                {showWorkProfileAndAttendance && (
                     <div className="mt-3 space-y-2">
                         <div className="grid grid-cols-2 gap-2">
                             <button
@@ -764,6 +813,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                                 {showDetails ? 'Close work profile' : 'Work profile'}
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setShowAttendance(!showAttendance)}
                                 className={`w-full py-2 px-3 rounded-lg text-[11px] font-black tracking-wider transition-all ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
                             >
@@ -787,7 +837,7 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
                     </div>
                 )}
             </div>
-            {showAttendance && staff.role !== 'owner' && apiClient && API && showToast && (
+            {showAttendance && showWorkProfileAndAttendance && apiClient && API && showToast && (
                 <AttendanceCalendar
                     apiClient={apiClient}
                     API={API}
@@ -1035,6 +1085,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const [payrollSettlementNotes, setPayrollSettlementNotes] = useState('');
     const [payrollSettlementAttachment, setPayrollSettlementAttachment] = useState(null);
     const [managementTab, setManagementTab] = useState('team');
+    const [teamFilterTab, setTeamFilterTab] = useState('active');
     const [showManagementTabs, setShowManagementTabs] = useState(true);
     const [salaryTab, setSalaryTab] = useState('report');
     const [payrollStatementRows, setPayrollStatementRows] = useState([]);
@@ -1170,10 +1221,10 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         fetchRolePermissions();
         fetchPayrollStatement();
         
-        // Refresh active status every 60 seconds
+        // Refresh active status (also triggers server auto punch-out check)
         const interval = setInterval(() => {
             fetchActiveStatus();
-        }, 60000);
+        }, 30000);
         
         return () => clearInterval(interval);
     }, [fetchStaff, fetchActiveStatus, fetchRolePermissions, fetchPayrollStatement]);
@@ -1218,11 +1269,15 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     }, [payrollAttachmentPreviewUrl]);
 
     const handleAddStaff = async (formData, resetForm) => {
-        if (!hasOwnerAccess) return;
+        if (!hasWriteAccess) return;
         setAddStaffError(null); // Clear previous error
         setIsProcessing(true);
         try {
-            const response = await apiClient.post(API.staff, formData);
+            const response = await apiClient.post(API.staff, {
+                ...formData,
+                name: String(formData.name || '').trim(),
+                email: String(formData.email || '').trim().toLowerCase(),
+            });
             // Server returns emailDispatch when an email was queued — see Network tab or console (Render logs often omit stdout).
             if (response.data?.emailDispatch) {
                 console.warn('[Staff] emailDispatch (SMTP debug from API):', response.data.emailDispatch);
@@ -1467,11 +1522,8 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
 
-        const isPendingActivation =
-            staffMember.passwordSetupStatus === 'pending' && !staffMember.active;
-
         // Pending invite: same endpoint revokes token (does not activate without password)
-        if (isPendingActivation) {
+        if (isStaffPendingInvite(staffMember)) {
             const showModal = externalSetConfirmModal || setConfirmModal;
             showModal({
                 message: `This stops the activation link for ${staffMember.name}. They have not finished setup. You can remove them from the team or add them again with the same email to send a new invitation.`,
@@ -1505,8 +1557,12 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         // If activating, do it directly without confirmation
         if (!staffMember.active) {
             try {
-                await apiClient.put(API.staffSetActive(staffMember._id), { active: true });
-                if (showToast) showToast('Staff account activated successfully.', 'success');
+                const response = await apiClient.put(API.staffSetActive(staffMember._id), { active: true });
+                const msg = response.data?.message
+                    || (response.data?.resentInvite
+                        ? 'A new activation email has been sent.'
+                        : 'Staff account activated successfully.');
+                if (showToast) showToast(msg, 'success');
                 await fetchStaff();
             } catch (error) {
                 if (showToast) showToast(error.response?.data?.error || 'Failed to activate account.', 'error');
@@ -1599,8 +1655,52 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         [orderedStaff]
     );
     const payrollHistoryMonthOptions = useMemo(() => listRecentMonthKeys(36), []);
-    const workingStaff = orderedStaff.filter((s) => s.role !== 'owner' && activeStaffIds.has(String(s._id || '')));
-    const nonWorkingStaff = orderedStaff.filter((s) => !(s.role !== 'owner' && activeStaffIds.has(String(s._id || ''))));
+    const teamStaffBuckets = useMemo(() => {
+        const currentlyWorking = [];
+        const activeAccounts = [];
+        const deactivatedAccounts = [];
+        const pending = [];
+
+        orderedStaff.forEach((s) => {
+            if (s.role === 'owner') {
+                if (s.active) activeAccounts.unshift(s);
+                return;
+            }
+            const id = getStaffMemberId(s);
+            if (isStaffPendingInvite(s)) {
+                pending.push(s);
+                return;
+            }
+            if (s.active) {
+                activeAccounts.push(s);
+                if (activeStaffIds.has(id)) currentlyWorking.push(s);
+            } else {
+                deactivatedAccounts.push(s);
+            }
+        });
+
+        const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
+        currentlyWorking.sort(byName);
+        activeAccounts.sort((a, b) => {
+            if (a.role === 'owner') return -1;
+            if (b.role === 'owner') return 1;
+            return byName(a, b);
+        });
+        deactivatedAccounts.sort(byName);
+        pending.sort(byName);
+
+        return { currentlyWorking, activeAccounts, deactivatedAccounts, pending };
+    }, [orderedStaff, activeStaffIds]);
+
+    const teamFilterCounts = useMemo(
+        () => ({
+            working: teamStaffBuckets.currentlyWorking.length,
+            active: teamStaffBuckets.activeAccounts.length,
+            inactive:
+                teamStaffBuckets.pending.length + teamStaffBuckets.deactivatedAccounts.length,
+        }),
+        [teamStaffBuckets]
+    );
     const existingShifts = useMemo(() => {
         const shiftByKey = new Map();
         (staff || []).forEach((s) => {
@@ -1626,6 +1726,75 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         const m = totalMinutes % 60;
         return `${h}h ${m}m`;
     };
+
+    const formatWorkedSummary = (totalDays, totalMinutes) => {
+        const days = Math.max(0, Number(totalDays || 0));
+        const dayWord = days === 1 ? 'day' : 'days';
+        return `${days} ${dayWord} - ${formatWorkedTime(totalMinutes)}`;
+    };
+
+    const renderStaffMember = useCallback(
+        (s) => {
+            const isActionDisabled = !hasWriteAccess || s.role === 'owner';
+            const isPendingActivation = isStaffPendingInvite(s);
+            const staffIdKey = getStaffMemberId(s);
+            const isCurrentlyActive = staffIdKey ? activeStaffIds.has(staffIdKey) : false;
+            const att = staffIdKey ? activeStaffMap[staffIdKey] : null;
+            return (
+                <StaffStatusButton
+                    key={s._id}
+                    staff={s}
+                    isActionDisabled={isActionDisabled}
+                    isPendingActivation={isPendingActivation}
+                    onToggleActive={handleToggleActive}
+                    onEdit={(staff) => {
+                        const pending = isStaffPendingInvite(staff);
+                        if (pending || !staff.active) return;
+                        setSelectedStaff(staff);
+                        setIsEditModalOpen(true);
+                    }}
+                    onRemove={handleRemoveStaff}
+                    darkMode={darkMode}
+                    borderStyle={borderStyle}
+                    cardBase={cardBase}
+                    apiClient={apiClient}
+                    API={API}
+                    showToast={showToast}
+                    isCurrentlyActive={isCurrentlyActive}
+                    punchInTime={att?.punchIn}
+                    isOnBreak={att?.onBreak || false}
+                    breakStart={att?.breakStart || null}
+                    breakDurationMinutes={att?.breakDurationMinutes ?? 0}
+                    canManageWorkHours={hasWriteAccess}
+                    onSaveWorkSchedule={handleSaveStaffWorkSchedule}
+                    isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
+                    onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
+                    isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
+                    existingShifts={existingShifts}
+                    currentUser={currentUser}
+                />
+            );
+        },
+        [
+            hasWriteAccess,
+            handleToggleActive,
+            handleRemoveStaff,
+            darkMode,
+            borderStyle,
+            cardBase,
+            apiClient,
+            API,
+            showToast,
+            activeStaffIds,
+            activeStaffMap,
+            handleSaveStaffWorkSchedule,
+            scheduleUpdatingId,
+            handleUpdatePayrollSettlement,
+            payrollUpdatingId,
+            existingShifts,
+            currentUser,
+        ]
+    );
 
     if (isLoading && !hasLoadedOnce) {
         return <TeamManagementInitialSkeleton darkMode={darkMode} />;
@@ -1710,7 +1879,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                         <div className={`px-4 md:px-5 py-3 border-b flex items-center justify-between ${borderStyle}`}>
                             <div>
                                 <p className={`text-[10px] font-black tracking-[0.2em] uppercase ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Grant Permissions</p>
-                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Control page access for Manager and Cashier. Messages, notifications, profile, and settings are always available to staff.</p>
+                                <p className={`text-[11px] font-bold mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Set page access for Manager and Cashier. Messages, notifications, profile, and settings always stay on.</p>
                             </div>
                             <button
                                 type="button"
@@ -1834,7 +2003,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                     </div>
                                     <div className="mt-2 flex items-center justify-between gap-2">
                                         <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                            Worked: {member?.payrollSummary?.totalDays || 0} days, {formatWorkedTime(member?.payrollSummary?.totalMinutes || 0)}
+                                            Worked: {formatWorkedSummary(member?.payrollSummary?.totalDays, member?.payrollSummary?.totalMinutes)}
                                         </p>
                                             {Number(member?.payrollSummary?.overtimeMinutes || 0) > 0 && (
                                                 <p className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
@@ -2064,106 +2233,99 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                             </div>
                         ) : (
                             <>
-                                {workingStaff.length > 0 && (
-                                    <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
-                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                                            Currently Working ({workingStaff.length})
-                                        </p>
-                                    </div>
+                                <div
+                                    role="tablist"
+                                    aria-label="Team directory filters"
+                                    className={`rounded-xl border p-1 grid grid-cols-3 gap-1 min-w-0 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}
+                                >
+                                    {TEAM_FILTER_TABS.map((tab) => {
+                                        const count = teamFilterCounts[tab.id] ?? 0;
+                                        const selected = teamFilterTab === tab.id;
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                role="tab"
+                                                aria-selected={selected}
+                                                aria-label={`${tab.label}, ${count}`}
+                                                onClick={() => setTeamFilterTab(tab.id)}
+                                                className={`min-w-0 px-1.5 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black tracking-wide transition-all flex flex-col items-center justify-center gap-0.5 leading-tight ${
+                                                    selected
+                                                        ? 'bg-indigo-600 text-white'
+                                                        : darkMode
+                                                          ? 'text-slate-300 hover:bg-slate-800'
+                                                          : 'text-slate-700 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span className="text-center w-full">{tab.label}</span>
+                                                <span
+                                                    className={`tabular-nums text-[9px] sm:text-[10px] ${selected ? 'text-indigo-100/90' : darkMode ? 'text-slate-500' : 'text-slate-500'}`}
+                                                    aria-hidden
+                                                >
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {teamFilterTab === 'working' && (
+                                    teamStaffBuckets.currentlyWorking.length > 0 ? (
+                                        teamStaffBuckets.currentlyWorking.map(renderStaffMember)
+                                    ) : (
+                                        <div className={`p-8 md:p-12 text-center rounded-xl md:rounded-2xl border ${cardBase}`}>
+                                            <p className={`text-sm font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                No one is punched in right now.
+                                            </p>
+                                        </div>
+                                    )
                                 )}
-                                {workingStaff.map((s) => {
-                                const isActionDisabled = !hasWriteAccess || s.role === 'owner';
-                                const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
-                                const staffIdKey = s._id != null ? String(s._id) : '';
-                                const isCurrentlyActive = staffIdKey ? activeStaffIds.has(staffIdKey) : false;
-                                const att = staffIdKey ? activeStaffMap[staffIdKey] : null;
-                                const punchInTime = att?.punchIn;
-                                const isOnBreak = att?.onBreak || false;
-                                const breakStart = att?.breakStart || null;
-                                const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
-                                return (
-                                    <StaffStatusButton
-                                        key={s._id}
-                                        staff={s}
-                                        isActionDisabled={isActionDisabled}
-                                        isPendingActivation={isPendingActivation}
-                                        onToggleActive={handleToggleActive}
-                                        onEdit={(staff) => {
-                                            setSelectedStaff(staff);
-                                            setIsEditModalOpen(true);
-                                        }}
-                                        onRemove={handleRemoveStaff}
-                                        darkMode={darkMode}
-                                        borderStyle={borderStyle}
-                                        cardBase={cardBase}
-                                        apiClient={apiClient}
-                                        API={API}
-                                        showToast={showToast}
-                                        isCurrentlyActive={isCurrentlyActive}
-                                        punchInTime={punchInTime}
-                                        isOnBreak={isOnBreak}
-                                        breakStart={breakStart}
-                                        breakDurationMinutes={breakDurationMinutes}
-                                        canManageWorkHours={hasWriteAccess}
-                                        onSaveWorkSchedule={handleSaveStaffWorkSchedule}
-                                        isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
-                                        onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
-                                        isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
-                                        existingShifts={existingShifts}
-                                        currentUser={currentUser}
-                                    />
-                                );
-                                })}
-                                {nonWorkingStaff.length > 0 && (
-                                    <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
-                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                            Offline / Inactive ({nonWorkingStaff.length})
-                                        </p>
-                                    </div>
+
+                                {teamFilterTab === 'active' && (
+                                    teamStaffBuckets.activeAccounts.length > 0 ? (
+                                        teamStaffBuckets.activeAccounts.map(renderStaffMember)
+                                    ) : (
+                                        <div className={`p-8 md:p-12 text-center rounded-xl md:rounded-2xl border ${cardBase}`}>
+                                            <p className={`text-sm font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                No active staff accounts.
+                                            </p>
+                                        </div>
+                                    )
                                 )}
-                                {nonWorkingStaff.map((s) => {
-                                const isActionDisabled = !hasWriteAccess || s.role === 'owner';
-                                const isPendingActivation = s.passwordSetupStatus === 'pending' && !s.active;
-                                const staffIdKey = s._id != null ? String(s._id) : '';
-                                const isCurrentlyActive = staffIdKey ? activeStaffIds.has(staffIdKey) : false;
-                                const att = staffIdKey ? activeStaffMap[staffIdKey] : null;
-                                const punchInTime = att?.punchIn;
-                                const isOnBreak = att?.onBreak || false;
-                                const breakStart = att?.breakStart || null;
-                                const breakDurationMinutes = att?.breakDurationMinutes ?? 0;
-                                return (
-                                    <StaffStatusButton
-                                        key={s._id}
-                                        staff={s}
-                                        isActionDisabled={isActionDisabled}
-                                        isPendingActivation={isPendingActivation}
-                                        onToggleActive={handleToggleActive}
-                                        onEdit={(staff) => {
-                                            setSelectedStaff(staff);
-                                            setIsEditModalOpen(true);
-                                        }}
-                                        onRemove={handleRemoveStaff}
-                                        darkMode={darkMode}
-                                        borderStyle={borderStyle}
-                                        cardBase={cardBase}
-                                        apiClient={apiClient}
-                                        API={API}
-                                        showToast={showToast}
-                                        isCurrentlyActive={isCurrentlyActive}
-                                        punchInTime={punchInTime}
-                                        isOnBreak={isOnBreak}
-                                        breakStart={breakStart}
-                                        breakDurationMinutes={breakDurationMinutes}
-                                        canManageWorkHours={hasWriteAccess}
-                                        onSaveWorkSchedule={handleSaveStaffWorkSchedule}
-                                        isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
-                                        onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
-                                        isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
-                                        existingShifts={existingShifts}
-                                        currentUser={currentUser}
-                                    />
-                                );
-                                })}
+
+                                {teamFilterTab === 'inactive' && (
+                                    teamStaffBuckets.pending.length > 0 ||
+                                    teamStaffBuckets.deactivatedAccounts.length > 0 ? (
+                                        <>
+                                            {teamStaffBuckets.pending.length > 0 && (
+                                                <>
+                                                    <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+                                                            Pending setup ({teamStaffBuckets.pending.length})
+                                                        </p>
+                                                    </div>
+                                                    {teamStaffBuckets.pending.map(renderStaffMember)}
+                                                </>
+                                            )}
+                                            {teamStaffBuckets.deactivatedAccounts.length > 0 && (
+                                                <>
+                                                    <div className={`rounded-xl border px-3 py-2 ${teamStaffBuckets.pending.length > 0 ? 'mt-3' : ''} ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+                                                        <p className={`text-[10px] font-black tracking-widest uppercase ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                            Deactivated ({teamStaffBuckets.deactivatedAccounts.length})
+                                                        </p>
+                                                    </div>
+                                                    {teamStaffBuckets.deactivatedAccounts.map(renderStaffMember)}
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className={`p-8 md:p-12 text-center rounded-xl md:rounded-2xl border ${cardBase}`}>
+                                            <p className={`text-sm font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                No pending or deactivated staff.
+                                            </p>
+                                        </div>
+                                    )
+                                )}
                             </>
                         )}
                     </div>

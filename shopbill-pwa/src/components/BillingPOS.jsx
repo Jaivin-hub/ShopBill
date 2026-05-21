@@ -4,6 +4,27 @@ import PaymentModal, { WALK_IN_CUSTOMER } from './PaymentModal';
 import ScannerModal from './ScannerModal';
 import { useDebounce } from '../hooks/useDebounce';
 import { BillingTerminalInitialSkeleton } from './skeletons/PageSkeletons';
+import { isBrowserOnline } from '../offline/connectivity';
+import { savePosCatalog, loadPosCatalog, getActiveStoreId } from '../offline/catalogCache';
+import { fetchPosCatalogWithCache } from '../offline/fetchWithCatalog';
+import { enqueueOfflineSale } from '../offline/syncQueue';
+import { applyCartToLocalInventory } from '../offline/inventoryLocal';
+import {
+  fetchRecentSalesWithCache,
+  buildOfflineSaleRecord,
+  prependRecentSale,
+  markRecentSalesReadLocal,
+  findCachedSaleById,
+} from '../offline/recentSalesCache';
+import { registerCustomerWithCache } from '../offline/customersOffline';
+import {
+  fetchBillDraftsWithCache,
+  saveBillDraftWithCache,
+  deleteBillDraftWithCache,
+  isOfflineDraftId,
+} from '../offline/billDraftsCache';
+import { useOffline } from '../contexts/OfflineContext';
+import OfflineUnavailableState from './OfflineUnavailableState';
 
 /** Restore cart lines from a saved draft; clamp qty to current stock; drop missing products. */
 function restoreCartFromDraftLines(lines, inventory, showToast) {
@@ -109,23 +130,45 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const [savingBillDraft, setSavingBillDraft] = useState(false);
   const [activeBillDraftId, setActiveBillDraftId] = useState(null);
   const [paymentCustomerPreset, setPaymentCustomerPreset] = useState(null);
+  const [catalogUnavailable, setCatalogUnavailable] = useState(false);
+  const [recentSalesFromCache, setRecentSalesFromCache] = useState(false);
+  const [billDraftsFromCache, setBillDraftsFromCache] = useState(false);
+  const { refreshPendingCount, isOnline, runAutoSync } = useOffline();
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    const storeId = getActiveStoreId();
     try {
-      const [invResponse, custResponse, offersResponse] = await Promise.all([
-        apiClient.get(API.inventory),
-        apiClient.get(API.customers),
-        apiClient.get(API.offers).catch(() => ({ data: { offers: [] } })),
-      ]);
-      setInventory(invResponse.data || []);
-      setCustomers(custResponse.data || []);
-      const loadedOffers = Array.isArray(offersResponse?.data)
-        ? offersResponse.data
-        : (Array.isArray(offersResponse?.data?.offers) ? offersResponse.data.offers : []);
-      setOffers(loadedOffers);
+      const result = await fetchPosCatalogWithCache({
+        apiClient,
+        inventoryUrl: API.inventory,
+        customersUrl: API.customers,
+        offersUrl: API.offers,
+        storeId,
+      });
+      if (result.cancelled) return;
+      if (result.source === 'unavailable') {
+        setCatalogUnavailable(true);
+        setInventory([]);
+        setCustomers([]);
+        setOffers([]);
+        if (!isBrowserOnline()) {
+          showToast('No saved catalog for offline billing. Open Billing once while online.', 'warning');
+        } else {
+          showToast('Could not load products. Check your connection.', 'error');
+        }
+        return;
+      }
+      setCatalogUnavailable(false);
+      setInventory(result.inventory || []);
+      setCustomers(result.customers || []);
+      setOffers(result.offers || []);
+      if (result.source === 'cache') {
+        showToast('Offline — using saved product catalog', 'warning');
+      }
     } catch (error) {
+      setCatalogUnavailable(true);
       showToast('Error loading POS data.', 'error');
     } finally {
       setIsLoading(false);
@@ -142,14 +185,29 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, []); // Empty deps - only run on mount
 
-  // Fetch recent sales (response includes lastReadAt for badge count). silent=true = no spinner, refresh in background.
+  // Fetch recent sales: live API when online, cached + pending offline sales when offline.
   const fetchRecentSales = useCallback(async (silent = false) => {
     if (!silent) setIsLoadingSales(true);
+    const storeId = getActiveStoreId();
     try {
-      const response = await apiClient.get(`${API.sales}?limit=10`);
-      setRecentSales(response.data?.sales || []);
-      if (response.data?.lastReadAt != null) {
-        setSalesLastReadAt(response.data.lastReadAt instanceof Date ? response.data.lastReadAt : new Date(response.data.lastReadAt));
+      const result = await fetchRecentSalesWithCache({
+        apiClient,
+        salesUrl: API.sales,
+        storeId,
+      });
+      if (result.cancelled) return;
+      setRecentSales(result.sales || []);
+      setRecentSalesFromCache(result.source === 'cache');
+      if (result.lastReadAt != null) {
+        setSalesLastReadAt(result.lastReadAt);
+      }
+      if (result.source === 'unavailable' && !silent) {
+        showToast(
+          isBrowserOnline()
+            ? 'Could not load recent sales'
+            : 'No saved recent sales. Open Billing once while online.',
+          'warning'
+        );
       }
     } catch (error) {
       if (error?.cancelled || error?.message?.includes?.('cancelled')) return;
@@ -163,11 +221,19 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   // When user opens Recent Sales modal: mark read, then refresh list (silent if we already have data to avoid double loading)
   const handleOpenRecentSales = useCallback(async () => {
     setIsRecentSalesOpen(true);
-    try {
-      const readRes = await apiClient.post(`${API.sales}/mark-recent-read`);
-      const at = readRes?.data?.lastReadAt;
-      if (at) setSalesLastReadAt(at instanceof Date ? at : new Date(at));
-    } catch (e) {
+    const storeId = getActiveStoreId();
+    if (isBrowserOnline()) {
+      try {
+        const readRes = await apiClient.post(`${API.sales}/mark-recent-read`);
+        const at = readRes?.data?.lastReadAt;
+        if (at) setSalesLastReadAt(at instanceof Date ? at : new Date(at));
+      } catch (e) {
+        setSalesLastReadAt(new Date());
+      }
+    } else if (storeId) {
+      const at = await markRecentSalesReadLocal(storeId);
+      setSalesLastReadAt(new Date(at));
+    } else {
       setSalesLastReadAt(new Date());
     }
     fetchRecentSales(recentSales.length > 0);
@@ -187,6 +253,16 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, [apiClient, API, fetchRecentSales]);
 
+  useEffect(() => {
+    if (isOnline && hasFetchedRecentSalesRef.current) {
+      fetchRecentSales(true);
+    }
+  }, [isOnline, fetchRecentSales]);
+
+  useEffect(() => {
+    if (isOnline) runAutoSync();
+  }, [isOnline, runAutoSync]);
+
   // Register refresh with App so socket 'new_sale' can trigger immediate count update on billing page
   useEffect(() => {
     if (refreshRecentSalesRef) refreshRecentSalesRef.current = fetchRecentSales;
@@ -195,22 +271,47 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     };
   }, [refreshRecentSalesRef, fetchRecentSales]);
 
-  const fetchBillDrafts = useCallback(async () => {
+  const fetchBillDrafts = useCallback(async (silent = false) => {
     if (!API?.billDrafts) return;
+    const storeId = getActiveStoreId();
     try {
-      const res = await apiClient.get(API.billDrafts);
-      setBillDrafts(res.data?.drafts || []);
+      const result = await fetchBillDraftsWithCache({
+        apiClient,
+        draftsUrl: API.billDrafts,
+        storeId,
+      });
+      if (result.cancelled) return;
+      setBillDrafts(result.drafts || []);
+      setBillDraftsFromCache(result.source === 'cache' || result.source === 'offline');
+      if (result.source === 'unavailable' && !silent) {
+        showToast(
+          isBrowserOnline()
+            ? 'Could not load drafts'
+            : 'No saved drafts. Open Billing once while online.',
+          'warning'
+        );
+      }
     } catch (e) {
       if (e?.cancelled || e?.message?.includes?.('cancelled')) return;
       console.error('Bill drafts fetch:', e);
       const msg = e.response?.data?.error;
-      if (msg) showToast?.(msg, 'error');
+      if (msg && !silent) showToast?.(msg, 'error');
     }
   }, [apiClient, API.billDrafts, showToast]);
 
+  const hasFetchedBillDraftsRef = useRef(false);
   useEffect(() => {
-    fetchBillDrafts();
-  }, [fetchBillDrafts]);
+    if (!hasFetchedBillDraftsRef.current && apiClient && API?.billDrafts) {
+      hasFetchedBillDraftsRef.current = true;
+      fetchBillDrafts(true);
+    }
+  }, [apiClient, API, fetchBillDrafts]);
+
+  useEffect(() => {
+    if (isOnline && hasFetchedBillDraftsRef.current) {
+      fetchBillDrafts(true);
+    }
+  }, [isOnline, fetchBillDrafts]);
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -240,14 +341,36 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   }, [apiClient, API.profile]);
 
   // Fetch sale detail for viewing (call after setting selectedSale to list item so modal opens immediately)
-  const fetchSaleDetail = useCallback(async (saleId) => {
+  const fetchSaleDetail = useCallback(async (saleId, listSale = null) => {
     setIsFetchingSaleDetail(true);
     try {
+      if (!isBrowserOnline()) {
+        const storeId = getActiveStoreId();
+        const cached =
+          (listSale && String(listSale._id) === String(saleId) ? listSale : null) ||
+          (storeId ? await findCachedSaleById(storeId, saleId) : null);
+        if (cached) {
+          if (cached._id && closedBillIdRef.current === cached._id) return;
+          setSelectedSale(cached);
+          return;
+        }
+        showToast('Bill details unavailable offline', 'warning');
+        setSelectedSale(null);
+        return;
+      }
       const response = await apiClient.get(`${API.sales}/${saleId}`);
       const data = response.data;
       if (data?._id && closedBillIdRef.current === data._id) return;
       setSelectedSale(data);
     } catch (error) {
+      const storeId = getActiveStoreId();
+      const cached =
+        (listSale && String(listSale._id) === String(saleId) ? listSale : null) ||
+        (storeId ? await findCachedSaleById(storeId, saleId) : null);
+      if (cached) {
+        setSelectedSale(cached);
+        return;
+      }
       console.error('Error fetching sale detail:', error);
       showToast('Failed to load bill details', 'error');
       setSelectedSale(null);
@@ -273,7 +396,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     if (sale._id && id === sale._id && Date.now() - at < 500) return;
     closedBillIdRef.current = null;
     setSelectedSale(sale);
-    fetchSaleDetail(sale._id);
+    fetchSaleDetail(sale._id, sale);
   }, [fetchSaleDetail]);
 
   // --- Core POS Logic ---
@@ -562,24 +685,38 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       customerName: paymentCustomerPreset && String(paymentCustomerPreset.id) !== 'walk_in' ? (paymentCustomerPreset.name || '') : '',
     };
     setSavingBillDraft(true);
+    const storeId = getActiveStoreId();
     try {
-      if (activeBillDraftId) {
-        await apiClient.put(API.billDraftById(activeBillDraftId), body);
-        showToast('Draft updated', 'success');
-      } else {
-        const res = await apiClient.post(API.billDrafts, body);
-        const id = res.data?.draft?._id;
-        if (id) setActiveBillDraftId(id);
-        showToast('Draft saved', 'success');
-      }
-      await fetchBillDrafts();
+      const result = await saveBillDraftWithCache({
+        apiClient,
+        draftsUrl: API.billDrafts,
+        draftById: API.billDraftById,
+        storeId,
+        body,
+        draftId: activeBillDraftId,
+      });
+      if (result.draft?._id) setActiveBillDraftId(result.draft._id);
+      if (result.drafts) setBillDrafts(result.drafts);
+      await refreshPendingCount();
+      const offline = result.source === 'offline';
+      showToast(
+        offline
+          ? activeBillDraftId
+            ? 'Draft updated offline — will sync when online'
+            : 'Draft saved offline — will sync when online'
+          : activeBillDraftId
+            ? 'Draft updated'
+            : 'Draft saved',
+        'success'
+      );
+      if (!offline) await fetchBillDrafts(true);
     } catch (e) {
       const msg = e.response?.data?.error || e.message || 'Failed to save draft';
       showToast(msg, 'error');
     } finally {
       setSavingBillDraft(false);
     }
-  }, [API, cart, totalAmount, activeBillDraftId, paymentCustomerPreset, apiClient, showToast, fetchBillDrafts]);
+  }, [API, cart, totalAmount, activeBillDraftId, paymentCustomerPreset, apiClient, showToast, fetchBillDrafts, refreshPendingCount]);
 
   const resumeBillDraft = useCallback(async (draft) => {
     if (cart.length > 0) {
@@ -587,14 +724,20 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       if (!ok) return;
     }
     let d = draft;
-    try {
-      if (!d.items || d.items.length === 0) {
-        const res = await apiClient.get(API.billDraftById(d._id));
+    const needsFetch =
+      (!d.items || d.items.length === 0) &&
+      isBrowserOnline() &&
+      !isOfflineDraftId(d._id);
+    if (needsFetch) {
+      try {
+        const res = await apiClient.get(API.billDraftById(d._id), {
+          headers: { 'x-skip-attendance-prompt': '1' },
+        });
         d = res.data?.draft;
+      } catch (e) {
+        showToast(e.response?.data?.error || 'Failed to load draft', 'error');
+        return;
       }
-    } catch (e) {
-      showToast(e.response?.data?.error || 'Failed to load draft', 'error');
-      return;
     }
     if (!d?.items?.length) {
       showToast('Draft is empty.', 'error');
@@ -633,15 +776,25 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     if (!API?.billDraftById) return;
     const ok = typeof window !== 'undefined' && window.confirm('Delete this draft?');
     if (!ok) return;
+    const storeId = getActiveStoreId();
     try {
-      await apiClient.delete(API.billDraftById(id));
+      const result = await deleteBillDraftWithCache({
+        apiClient,
+        draftById: API.billDraftById,
+        storeId,
+        draftId: id,
+      });
       if (String(activeBillDraftId) === String(id)) setActiveBillDraftId(null);
-      showToast('Draft deleted', 'success');
-      await fetchBillDrafts();
+      setBillDrafts(result.drafts || []);
+      await refreshPendingCount();
+      showToast(
+        result.source === 'offline' ? 'Draft removed — will sync when online' : 'Draft deleted',
+        'success'
+      );
     } catch (err) {
       showToast(err.response?.data?.error || 'Failed to delete', 'error');
     }
-  }, [API, activeBillDraftId, apiClient, showToast, fetchBillDrafts]);
+  }, [API, activeBillDraftId, apiClient, showToast, refreshPendingCount]);
 
   const handleOpenPaymentModal = useCallback(async () => {
     try {
@@ -686,20 +839,90 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       amountCredited: parseFloat(amountCredited) || 0,
     };
 
+    const offlineClientId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const salePayload = { ...saleData, offlineClientId };
+
+    if (!isBrowserOnline()) {
+      const storeId = getActiveStoreId();
+      await enqueueOfflineSale(salePayload, storeId);
+      const nextInventory = applyCartToLocalInventory(inventory, cart);
+      setInventory(nextInventory);
+      if (storeId) {
+        const cached = await loadPosCatalog(storeId);
+        let nextCustomers = cached?.customers || [];
+        const credited = parseFloat(amountCredited) || 0;
+        const custId = saleData.customerId;
+        if (credited > 0 && custId && String(custId) !== 'walk_in') {
+          nextCustomers = nextCustomers.map((c) => {
+            if (String(c._id || c.id) !== String(custId)) return c;
+            return {
+              ...c,
+              outstandingCredit: (parseFloat(c.outstandingCredit) || 0) + credited,
+            };
+          });
+          setCustomers(nextCustomers);
+        }
+        if (cached) {
+          await savePosCatalog(storeId, {
+            inventory: nextInventory,
+            customers: nextCustomers,
+            offers: cached.offers,
+          });
+        }
+      }
+      await refreshPendingCount();
+      const offlineRecord = buildOfflineSaleRecord(salePayload);
+      if (storeId) {
+        const updated = await prependRecentSale(storeId, offlineRecord);
+        setRecentSales(updated);
+        setRecentSalesFromCache(true);
+      } else {
+        setRecentSales((prev) => [offlineRecord, ...prev].slice(0, 10));
+        setRecentSalesFromCache(true);
+      }
+      showToast('Sale saved offline. It will sync when you are back online.', 'success');
+      const draftIdToRemove = activeBillDraftId;
+      setCart([]);
+      setIsPaymentModalOpen(false);
+      setPaymentCustomerPreset(null);
+      setActiveBillDraftId(null);
+      if (draftIdToRemove && storeId) {
+        try {
+          const { drafts } = await deleteBillDraftWithCache({
+            apiClient,
+            draftById: API.billDraftById,
+            storeId,
+            draftId: draftIdToRemove,
+          });
+          setBillDrafts(drafts || []);
+        } catch (_) { /* ignore */ }
+      }
+      return;
+    }
+
     try {
       const draftIdToRemove = activeBillDraftId;
-      const response = await apiClient.post(API.sales, saleData, { headers: { 'x-skip-attendance-prompt': '1' } });
+      const response = await apiClient.post(API.sales, salePayload, { headers: { 'x-skip-attendance-prompt': '1' } });
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
       setPaymentCustomerPreset(null);
       if (draftIdToRemove && API.billDraftById) {
         try {
-          await apiClient.delete(API.billDraftById(draftIdToRemove));
+          const { drafts } = await deleteBillDraftWithCache({
+            apiClient,
+            draftById: API.billDraftById,
+            storeId: getActiveStoreId(),
+            draftId: draftIdToRemove,
+          });
+          setBillDrafts(drafts || []);
         } catch (_) { /* ignore */ }
       }
       setActiveBillDraftId(null);
-      fetchBillDrafts();
+      fetchBillDrafts(true);
       fetchData(); // Refresh inventory and customer balances
       // Optimistic update: prepend new sale so badge count shows instantly
       const newSale = response?.data?.newSale;
@@ -711,7 +934,50 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // Re-throw so the Modal can catch "Credit Limit Exceeded" errors
       throw error; 
     }
-  }, [totalAmount, cart, apiClient, API.sales, API.billDraftById, fetchData, fetchRecentSales, fetchBillDrafts, showToast, activeBillDraftId])
+  }, [
+    totalAmount,
+    cart,
+    inventory,
+    apiClient,
+    API.sales,
+    API.billDraftById,
+    fetchData,
+    fetchRecentSales,
+    fetchBillDrafts,
+    showToast,
+    activeBillDraftId,
+    refreshPendingCount,
+  ])
+
+  const handleRegisterCustomer = useCallback(
+    async (dataToSend) => {
+      const storeId = getActiveStoreId();
+      const result = await registerCustomerWithCache({
+        apiClient,
+        payload: dataToSend,
+        storeId,
+      });
+      const customer = { ...result.customer, id: result.customer._id || result.customer.id };
+      setCustomers((prev) => {
+        const id = String(customer.id);
+        if (prev.some((c) => String(c._id || c.id) === id)) {
+          return prev.map((c) => (String(c._id || c.id) === id ? customer : c));
+        }
+        return [customer, ...prev];
+      });
+      await refreshPendingCount();
+      return customer;
+    },
+    [apiClient, refreshPendingCount]
+  );
+
+  const handleCustomerAdded = useCallback((customer) => {
+    const id = String(customer._id || customer.id);
+    setCustomers((prev) => {
+      if (prev.some((c) => String(c._id || c.id) === id)) return prev;
+      return [customer, ...prev];
+    });
+  }, []);
 
   const handlePhysicalScannerInput = (e) => {
     if (e.key === 'Enter' && searchTerm) {
@@ -727,6 +993,27 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   const inputBase = darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900';
 
   if (isLoading && !hasLoadedOnce) return <BillingTerminalInitialSkeleton darkMode={darkMode} />;
+
+  if (catalogUnavailable) {
+    return (
+      <div className={`h-full flex flex-col min-h-0 ${themeBase}`}>
+        <OfflineUnavailableState
+          darkMode={darkMode}
+          title={isOnline ? 'Billing could not load' : 'Billing unavailable offline'}
+          description={
+            isOnline
+              ? 'Product data did not load. Check your connection and try again.'
+              : 'Open Billing once while online on this device to save your product catalog. After that, you can bill customers offline.'
+          }
+          onRetry={() => {
+            setCatalogUnavailable(false);
+            hasFetchedRef.current = false;
+            fetchData();
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
@@ -1001,9 +1288,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         allCustomers={allCustomers}
         processPayment={processPayment}
         showToast={showToast}
-        apiClient={apiClient}
         darkMode={darkMode}
         customerPreset={paymentCustomerPreset}
+        onRegisterCustomer={handleRegisterCustomer}
+        onAddNewCustomer={handleCustomerAdded}
       />
       {/* Bill drafts: pause billing and resume later */}
       {isBillDraftsModalOpen && (
@@ -1024,7 +1312,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     Draft bills
                   </h3>
                   <p className={`text-xs font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Resume a saved cart or delete old drafts
+                    {billDraftsFromCache && !isOnline
+                      ? 'Showing saved drafts from this device (includes unsynced changes)'
+                      : 'Resume a saved cart or delete old drafts'}
                   </p>
                 </div>
               </div>
@@ -1084,6 +1374,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                               </>
                             )}
                           </div>
+                          {d.offlinePending && (
+                            <p className="text-[9px] font-black text-sky-600 dark:text-sky-400 mt-1 uppercase tracking-wider">
+                              Pending sync
+                            </p>
+                          )}
                           {isActive && (
                             <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 mt-1 uppercase tracking-wider">
                               In cart — Save draft updates this row
@@ -1156,7 +1451,9 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     Recent Sales
                   </h3>
                   <p className={`text-xs font-bold mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Click on any bill to view details
+                    {recentSalesFromCache && !isOnline
+                      ? 'Saved bills on this device — refreshes when online'
+                      : 'Click on any bill to view details'}
                   </p>
                 </div>
               </div>
@@ -1225,6 +1522,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                                   <span className={`text-[10px] font-bold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     {sale.paymentMethod}
                                   </span>
+                                </>
+                              )}
+                              {sale.offlinePending && (
+                                <>
+                                  <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                                  <span className="text-[10px] font-bold uppercase text-amber-500">Pending sync</span>
                                 </>
                               )}
                             </div>

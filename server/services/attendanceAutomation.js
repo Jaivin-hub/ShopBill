@@ -1,35 +1,19 @@
 const Store = require('../models/Store');
 const Staff = require('../models/Staff');
-const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendPushNotification } = require('./firebaseAdmin');
 const { collectPushTokens } = require('../utils/pushTokens');
 const { formatHHmmTo12Hour } = require('../utils/formatTime12Hour');
+const {
+    formatDateKeyInTz,
+    getClockMinutesInTz,
+    applyAutoPunchOutForStore,
+} = require('../utils/attendanceAutoPunchOut');
 
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const REMINDER_GRACE_MINUTES = 3;
 let isRunning = false;
-
-/** Wall-clock for shift times (HH:mm) — default India; override with ATTENDANCE_TZ (e.g. America/New_York). */
-const ATTENDANCE_TZ = process.env.ATTENDANCE_TZ || 'Asia/Kolkata';
-
-const formatDateKeyInTz = (date) =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: ATTENDANCE_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-
-const getClockMinutesInTz = (date) => {
-    const formatted = new Intl.DateTimeFormat('en-GB', {
-        timeZone: ATTENDANCE_TZ,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).format(date);
-    const match = String(formatted).match(/(\d{1,2}):(\d{2})/);
-    if (!match) return 0;
-    const h = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10);
-    return (h * 60) + m;
-};
 
 const timeToMinutes = (value) => {
     const t = String(value || '').trim();
@@ -210,60 +194,18 @@ const sendShiftReminderToStaff = async ({ io, userId, title, message, soundCateg
     }
 };
 
-const processAutoPunchOut = async ({ io, store, staffList, now }) => {
-    const staffById = new Map(staffList.map((s) => [String(s._id), s]));
-    const activeAttendance = await Attendance.find({
-        storeId: store._id,
-        status: 'active',
-        punchOut: null,
-    });
-
-    for (const attendance of activeAttendance) {
-        const staff = staffById.get(String(attendance.staffId));
-        if (!staff) continue;
-        const effective = resolveEffectiveSchedule(staff?.workSchedule || {});
-        if (!effective.shiftEnabled) continue;
-        const endMins = timeToMinutes(effective.punchInEnd);
-        if (endMins == null) continue;
-
-        const baseDate = new Date(attendance.date || attendance.punchIn || now);
-        const cutoffAt = new Date(
-            baseDate.getFullYear(),
-            baseDate.getMonth(),
-            baseDate.getDate(),
-            Math.floor(endMins / 60),
-            endMins % 60,
-            0,
-            0
-        );
-        const punchInMins = (new Date(attendance.punchIn || baseDate).getHours() * 60) + new Date(attendance.punchIn || baseDate).getMinutes();
-        if (endMins <= punchInMins) {
-            cutoffAt.setDate(cutoffAt.getDate() + 1);
-        }
-
-        if (now >= cutoffAt) {
-            if (attendance.onBreak) {
-                const activeBreak = attendance.breaks && attendance.breaks.find((b) => !b.breakEnd);
-                if (activeBreak) {
-                    activeBreak.breakEnd = now;
-                    activeBreak.breakDuration = Math.round((activeBreak.breakEnd - activeBreak.breakStart) / (1000 * 60));
-                }
-                attendance.onBreak = false;
-            }
-
-            attendance.punchOut = now;
-            attendance.status = 'completed';
-            await attendance.save();
-
+const processAutoPunchOut = async ({ io, store }) => {
+    await applyAutoPunchOutForStore(store._id, {
+        onPunchedOut: async ({ staff }) => {
             const staffUserId = staff?.userId?._id || staff?.userId;
             await sendShiftReminderToStaff({
                 io,
                 userId: staffUserId,
                 title: 'Auto Punch-Out Completed',
-                message: `${staff?.name || 'Staff'}: you were auto punched out at shift/shop close time.`,
+                message: `${staff?.name || 'Staff'}: you were auto punched out at your scheduled punch-out time.`,
             });
-        }
-    }
+        },
+    });
 };
 
 const runAttendanceAutomation = async (io) => {
@@ -284,7 +226,7 @@ const runAttendanceAutomation = async (io) => {
 
             if (staffList.length === 0) continue;
             await processShiftNotifications({ io, store, staffList, now });
-            await processAutoPunchOut({ io, store, staffList, now });
+            await processAutoPunchOut({ io, store });
         }
     } catch (error) {
         console.error('Attendance automation error:', error.message);

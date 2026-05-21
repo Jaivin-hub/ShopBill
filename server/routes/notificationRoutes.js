@@ -22,7 +22,7 @@ const emitAlert = async (req, storeId, type, data) => {
     let message = '';
     let metadata = {};
     const storeIdStr = storeId.toString();
-    const actorId = req.user._id; // Track who performed the action
+    const actorId = req.user?._id || data?.actorUserId || null; // Track who performed the action
     const pushTraceId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[Push][${pushTraceId}] emitAlert start type=${type} store=${storeIdStr} actor=${actorId?.toString?.() || 'unknown'} role=${req.user?.role || 'unknown'}`);
     
@@ -36,7 +36,8 @@ const emitAlert = async (req, storeId, type, data) => {
             message = `Low stock alert: ${data.name} (${data.quantity} remaining)`;
             metadata = { 
                 itemId: data._id,
-                variantId: data.variantId || null
+                variantId: data.variantId || null,
+                link: '/inventory',
             };
             break;
         case 'credit_exceeded':
@@ -215,6 +216,17 @@ const emitAlert = async (req, storeId, type, data) => {
                 ...(data.staffId ? { staffId: data.staffId } : {})
             };
             break;
+        case 'staff_account_activated':
+            title = 'Staff Account Activated';
+            category = 'Success';
+            message = data.message || `${data.staffName || 'A team member'} has completed setup and can now sign in.`;
+            metadata = {
+                ...(data.staffId ? { staffId: data.staffId } : {}),
+                staffName: data.staffName || null,
+                staffRole: data.staffRole || null,
+                link: '/staffPermissions',
+            };
+            break;
         default:
             title = 'System Notification';
             category = 'Info';
@@ -257,8 +269,8 @@ const emitAlert = async (req, storeId, type, data) => {
         if (io) {
             // Smart notification targeting: Only send to relevant users, excluding the actor
             try {
-                const actorIdStr = actorId.toString();
-                const actorRole = req.user.role || null; // 'owner', 'Manager', 'Cashier'
+                const actorIdStr = actorId ? actorId.toString() : '';
+                const actorRole = req.user?.role || null; // 'owner', 'Manager', 'Cashier'
 
                 // Ledger payment: notify owner + all active staff
                 const isLedgerPayment = type === 'ledger_payment';
@@ -275,6 +287,7 @@ const emitAlert = async (req, storeId, type, data) => {
                     'attendance_punch_out'
                 ].includes(type);
                 const isStaffShiftAssigned = type === 'staff_shift_assigned';
+                const isStaffAccountActivated = type === 'staff_account_activated';
                 const hasDirectTarget = Boolean(data?.targetUserId);
                 const actorRoleLower = (actorRole || '').toLowerCase();
 
@@ -288,6 +301,20 @@ const emitAlert = async (req, storeId, type, data) => {
                 const targetUserIds = new Set();
                 const isLowStockAlert = type === 'inventory_low';
 
+                // Staff finished invite setup: notify store owner + active managers (not the new staff member).
+                if (isStaffAccountActivated) {
+                    if (store?.ownerId) {
+                        const ownerIdStr = store.ownerId.toString();
+                        if (!actorId || ownerIdStr !== actorIdStr) targetUserIds.add(ownerIdStr);
+                    }
+                    staffMembers.forEach((staff) => {
+                        if (staff.role === 'Manager' && staff.userId) {
+                            const staffUserIdStr = staff.userId.toString();
+                            if (!actorId || staffUserIdStr !== actorIdStr) targetUserIds.add(staffUserIdStr);
+                        }
+                    });
+                }
+
                 // Low stock: notify ALL users including the actor (person who added/updated should also be informed)
                 if (isLowStockAlert) {
                     if (store && store.ownerId) targetUserIds.add(store.ownerId.toString());
@@ -297,7 +324,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Price update: notify owner + all managers (actor excluded below).
-                if (!isLowStockAlert && isInventoryPriceUpdated && store && store.ownerId) {
+                if (!isLowStockAlert && !isStaffAccountActivated && isInventoryPriceUpdated && store && store.ownerId) {
                     targetUserIds.add(store.ownerId.toString());
                     staffMembers.forEach(staff => {
                         if (staff.role === 'Manager' && staff.userId) {
@@ -307,7 +334,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Stock/price field updates: notify owner + all staff; actor gets no push (see below).
-                if (!isLowStockAlert && isInventoryFieldUpdate && store && store.ownerId) {
+                if (!isLowStockAlert && !isStaffAccountActivated && isInventoryFieldUpdate && store && store.ownerId) {
                     targetUserIds.add(store.ownerId.toString());
                     staffMembers.forEach(staff => {
                         if (staff.userId) targetUserIds.add(staff.userId.toString());
@@ -315,7 +342,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Bulk upload: Manager/Cashier → notify owner only; Owner → notify managers and cashiers
-                if (!isLowStockAlert && isBulkUpload) {
+                if (!isLowStockAlert && !isStaffAccountActivated && isBulkUpload) {
                     const ownerIdStr = store?.ownerId?.toString();
                     if (actorRoleLower === 'owner') {
                         staffMembers.forEach(staff => {
@@ -327,7 +354,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 }
 
                 // Credit limit updated (ledger limit): Owner → Manager+Cashier; Manager → Owner+Cashier; Cashier → Owner+Manager
-                if (!isLowStockAlert && isCreditLimitUpdated && store && store.ownerId) {
+                if (!isLowStockAlert && !isStaffAccountActivated && isCreditLimitUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     if (actorRoleLower === 'owner') {
                         // Owner updated: notify all staff (managers and cashiers)
@@ -351,7 +378,7 @@ const emitAlert = async (req, storeId, type, data) => {
 
                 // Owner default targeting (ledger payments handled separately).
                 // Important: for manager/cashier actions, owner must ALWAYS be notified.
-                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated && store && store.ownerId) {
+                if (!isLowStockAlert && !isStaffAccountActivated && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated && store && store.ownerId) {
                     const ownerIdStr = store.ownerId.toString();
                     const actorIsOwner = actorRoleLower === 'owner' || ownerIdStr === actorIdStr;
                     if (isLedgerPayment || !actorIsOwner) {
@@ -371,7 +398,7 @@ const emitAlert = async (req, storeId, type, data) => {
                 // - ledger_payment: notify all staff (manager + cashier)
                 // - credit_sale: notify only managers (not cashiers)
                 // Skip for bulk upload and credit_limit_updated (handled above).
-                if (!isLowStockAlert && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated) {
+                if (!isLowStockAlert && !isStaffAccountActivated && !isBulkUpload && !isCreditLimitUpdated && !isInventoryPriceUpdated) {
                     staffMembers.forEach(staff => {
                         if (staff.userId) {
                             const staffUserIdStr = staff.userId.toString();
@@ -479,7 +506,7 @@ const emitAlert = async (req, storeId, type, data) => {
                             soundCategory: pushSoundCategory,
                             data: {
                                 type: 'notification',
-                                link: data?.link || '/notifications',
+                                link: data?.link || metadata?.link || (type === 'inventory_low' ? '/inventory' : '/notifications'),
                                 notificationId: newNotification._id?.toString() || '',
                                 storeId: storeIdStr,
                                 notificationType: data?.notificationType || type,

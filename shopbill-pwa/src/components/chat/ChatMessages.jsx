@@ -12,17 +12,22 @@ const ChatMessages = ({
     onToggleAudio,
     formatRecordingTime,
     audioRefs,
+    registerChatAudioRef,
+    audioProgressMap = {},
     messagesEndRef,
     lastReadBy = {},
     participants = [],
     onThreadRendered,
+    onReply,
 }) => {
     const safeMessages = Array.isArray(messages) ? messages : [];
 
+    const lastMessageId = safeMessages[safeMessages.length - 1]?._id;
+
     useLayoutEffect(() => {
-        if (isLoadingMessages || safeMessages.length === 0) return;
+        if (isLoadingMessages || !lastMessageId) return;
         onThreadRendered?.();
-    }, [isLoadingMessages, safeMessages.length, onThreadRendered]);
+    }, [isLoadingMessages, lastMessageId, onThreadRendered]);
 
     if (isLoadingMessages) {
         return <ChatSpinner darkMode={darkMode} label="Loading messages" className="flex-1 py-20 min-h-[40vh]" />;
@@ -122,8 +127,11 @@ const ChatMessages = ({
                             onToggleAudio={onToggleAudio}
                             formatRecordingTime={formatRecordingTime}
                             audioRefs={audioRefs}
+                            registerChatAudioRef={registerChatAudioRef}
+                            audioPlaybackPercent={audioProgressMap[msg._id] ?? 0}
                             showSenderInfo={showSenderInfo}
                             seenBy={seenByForMessage[msg._id] || []}
+                            onReply={onReply}
                         />
                     </div>
                 );

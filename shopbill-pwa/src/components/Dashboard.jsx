@@ -118,7 +118,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         if ((userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && apiClient && API) {
             const interval = setInterval(() => {
                 fetchAttendanceStatus();
-            }, 60000); // Every 60 seconds
+            }, 30000); // Triggers server auto punch-out via GET /attendance/current
             return () => clearInterval(interval);
         }
     }, [userRole, apiClient, API, fetchAttendanceStatus]);

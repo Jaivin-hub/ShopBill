@@ -184,6 +184,16 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
         return text;
     };
 
+    const navigateFromNotification = (notification, targetPage) => {
+        if (!targetPage || typeof setCurrentPage !== 'function') return;
+        const type = String(notification?.type || '').toLowerCase();
+        if (targetPage === 'inventory' && type === 'inventory_low') {
+            setCurrentPage(targetPage, { lowStockSort: true });
+            return;
+        }
+        setCurrentPage(targetPage);
+    };
+
     const getNotificationTargetPage = (notification) => {
         const type = String(notification?.type || '').toLowerCase();
         const roleLower = String(userRole || '').toLowerCase();
@@ -196,6 +206,7 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
         if (type === 'ledger_payment' || type === 'ledger_credit' || type === 'credit_sale' || type === 'customer_added' || type === 'credit_limit_updated') return 'khata';
         if (type === 'new_shop_registered') return 'superadmin_users';
         if (type === 'profile_updated') return 'profile';
+        if (type === 'staff_account_activated') return 'staffPermissions';
         return null;
     };
 
@@ -277,11 +288,11 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
                                 key={uniqueId} 
                                 role={isClickable ? 'button' : undefined}
                                 tabIndex={isClickable ? 0 : undefined}
-                                onClick={isClickable ? () => setCurrentPage(targetPage) : undefined}
+                                onClick={isClickable ? () => navigateFromNotification(notification, targetPage) : undefined}
                                 onKeyDown={isClickable ? (e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                         e.preventDefault();
-                                        setCurrentPage(targetPage);
+                                        navigateFromNotification(notification, targetPage);
                                     }
                                 } : undefined}
                                 className={`group relative flex items-start gap-5 p-5 rounded-2xl border transition-all duration-300 ${cardBase(isNew)} ${darkMode ? glow : ''} hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-2 ${isClickable ? 'cursor-pointer' : ''}`}

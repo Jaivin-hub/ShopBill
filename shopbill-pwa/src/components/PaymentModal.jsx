@@ -5,12 +5,23 @@ import {
     UserPlus, Banknote, Smartphone, Receipt, Plus, Phone, CheckCircle,
     UserCheck, History, Info
 } from 'lucide-react'; 
-import API from '../config/api'; 
+import { isBrowserOnline } from '../offline/connectivity';
 
 export const WALK_IN_CUSTOMER = { id: 'walk_in', name: 'Walk-in Customer', outstandingCredit: 0, creditLimit: 0 };
 export const ADD_NEW_CUSTOMER_ID = 'add_new';
 
-const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], processPayment, showToast, darkMode, onAddNewCustomer, apiClient, customerPreset = null }) => {
+const PaymentModal = ({
+    isOpen,
+    onClose,
+    totalAmount,
+    allCustomers = [],
+    processPayment,
+    showToast,
+    darkMode,
+    onAddNewCustomer,
+    onRegisterCustomer,
+    customerPreset = null,
+}) => {
     const dropdownRef = useRef(null);
     const [localSelectedCustomer, setLocalSelectedCustomer] = useState(WALK_IN_CUSTOMER);
     const [amountPaidInput, setAmountPaidInput] = useState('');
@@ -143,20 +154,27 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
 
         if (Object.keys(errors).length > 0) return setFormErrors(errors);
 
+        if (!onRegisterCustomer) {
+            showToast('Customer registration is unavailable.', 'error');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const dataToSend = {
                 name: newCustomerName.trim(),
-                phone: newCustomerPhone.trim().replace(/[^0-9]/g, ''), 
-                creditLimit: parseFloat(newCustomerCreditLimit), 
-                initialDue: 0
+                phone: newCustomerPhone.trim().replace(/[^0-9]/g, ''),
+                creditLimit: parseFloat(newCustomerCreditLimit),
+                initialDue: 0,
             };
-            const response = await apiClient.post(API.customers, dataToSend);
-            const data = response?.data;
-            const newC = data?.customer ?? (data?._id && data?.name ? data : null);
+            const newC = await onRegisterCustomer(dataToSend);
             if (newC) {
                 const customerForSelect = { ...newC, id: newC._id || newC.id };
-                showToast(`Customer "${newC.name}" added!`, 'success');
+                if (!isBrowserOnline()) {
+                    showToast(`Customer "${newC.name}" saved offline — will sync when online`, 'success');
+                } else {
+                    showToast(`Customer "${newC.name}" added!`, 'success');
+                }
                 setLocalSelectedCustomer(customerForSelect);
                 setPaymentType('Credit');
                 onAddNewCustomer?.(customerForSelect);
@@ -166,8 +184,15 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
             }
         } catch (error) {
             if (error?.cancelled || error?.message?.includes?.('cancelled')) return;
-            showToast(error.response?.data?.message || 'Failed to add customer', 'error');
-        } finally { setIsSubmitting(false); }
+            const msg =
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message ||
+                'Failed to add customer';
+            showToast(msg, 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleConfirmPayment = async () => {
@@ -240,6 +265,11 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                 />
                             </div>
                         </div>
+                        {!isBrowserOnline() && (
+                            <p className="text-[10px] font-bold text-amber-600 text-center">
+                                Offline — account saves on this device and syncs when you are back online.
+                            </p>
+                        )}
                         <button type="submit" disabled={isSubmitting}
                             className="w-full py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]">
                             {isSubmitting ? 'Creating...' : 'Save & Select Customer'}
@@ -358,6 +388,9 @@ const PaymentModal = ({ isOpen, onClose, totalAmount, allCustomers = [], process
                                                         <div className="text-left">
                                                             <p className={`text-[10px] font-black uppercase ${localSelectedCustomer.id === c.id ? 'text-indigo-500' : ''}`}>{c.name}</p>
                                                             {c.phone && <p className="text-[8px] opacity-50 font-bold">{c.phone}</p>}
+                                                            {c.offlinePending && (
+                                                                <p className="text-[8px] font-bold text-amber-500 uppercase">Pending sync</p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {!c.isAction && c.outstandingCredit > 0 && (

@@ -11,6 +11,7 @@ import EmptyChatView from './chat/EmptyChatView';
 import { ChatInitialSkeleton } from './skeletons/PageSkeletons';
 import { participantLabelForViewer } from '../utils/ownerDisplay';
 import { isChatGroupCreator, normalizeChatRecord } from '../utils/chatGroup';
+import { buildClientReplySnapshot } from '../utils/chatReply';
 
 /** iOS / iPadOS Safari needs different MediaRecorder behavior than Chrome/Android */
 function isAppleTouchDevice() {
@@ -19,7 +20,7 @@ function isAppleTouchDevice() {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onUnreadCountChange, onNavigateToStaffPermissions }) => {
+const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onThreadSwipeConsumed, onUnreadCountChange, onNavigateToStaffPermissions }) => {
     // Styling Vars matching Dashboard architecture
     const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
@@ -56,6 +57,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [removingMemberId, setRemovingMemberId] = useState(null);
     /** Sidebar list: Groups vs Staff — controls where “new group” FAB appears */
     const [chatListViewMode, setChatListViewMode] = useState('chats');
+    const [replyingTo, setReplyingTo] = useState(null);
     
     // Voice recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -64,12 +66,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [audioUrl, setAudioUrl] = useState(null);
     const [mediaRecorder, setMediaRecorder] = useState(null);
     const [playingAudioId, setPlayingAudioId] = useState(null);
+    const [audioProgressMap, setAudioProgressMap] = useState({});
     const [showInfo, setShowInfo] = useState(false);
     
     // File upload state
     const [selectedFile, setSelectedFile] = useState(null);
     const [filePreview, setFilePreview] = useState(null);
     const [isUploadingFile, setIsUploadingFile] = useState(false);
+    const [isSendingVoice, setIsSendingVoice] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     
     // Seen/read receipts
@@ -93,6 +97,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const recordingMimeTypeRef = useRef('');
     /** When user cancels, ignore onstop blob (avoids race repopulating preview) */
     const recordingDiscardRef = useRef(false);
+    /** Stop requested before MediaRecorder reached "recording" (fast release after hold) */
+    const stopWhenRecordingReadyRef = useRef(false);
     const typingLocalActiveRef = useRef(false);
     const typingIdleTimerRef = useRef(null);
     const remoteTypingTimeoutsRef = useRef({});
@@ -100,6 +106,14 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const threadHistorySyncedIdRef = useRef(null);
     /** Mobile: swipe from left edge to return to Groups & Staff list (same as header back / OS back). */
     const threadSwipeBackRef = useRef({ active: false, x0: 0, y0: 0, edgeEligible: false });
+    const fetchChatsRef = useRef(null);
+    const fetchMessagesRef = useRef(null);
+    const onUnreadCountChangeRef = useRef(onUnreadCountChange);
+    const showToastRef = useRef(showToast);
+    const currentUserRef = useRef(currentUser);
+    onUnreadCountChangeRef.current = onUnreadCountChange;
+    showToastRef.current = showToast;
+    currentUserRef.current = currentUser;
 
     // Constants
     const isPro = currentUser?.plan?.toUpperCase() === 'PRO';
@@ -115,11 +129,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [activePunchedInUserIds, setActivePunchedInUserIds] = useState([]);
 
     // Notify parent when chat selection changes (to hide/show main header)
+    const notifyChatSelection = useCallback((open) => {
+        onChatSelectionChange?.(!!open);
+    }, [onChatSelectionChange]);
+
     useEffect(() => {
-        if (onChatSelectionChange) {
-            onChatSelectionChange(!!selectedChat);
-        }
-    }, [selectedChat, onChatSelectionChange]);
+        notifyChatSelection(!!selectedChat);
+    }, [selectedChat, notifyChatSelection]);
 
     // Map "open thread" to a history entry so OS / edge back returns to Groups & Staff list (same chat page).
     useEffect(() => {
@@ -147,10 +163,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             if (!selectedChatRef.current) return;
             setSelectedChat(null);
             setShowInfo(false);
+            notifyChatSelection(false);
+            onThreadSwipeConsumed?.();
         };
         window.addEventListener('popstate', onPopState);
         return () => window.removeEventListener('popstate', onPopState);
-    }, []);
+    }, [notifyChatSelection, onThreadSwipeConsumed]);
 
     const isGroupChatSelected = !!(selectedChat && (selectedChat.type === 'group' || selectedChat.isDefault || selectedChat.isGroupChat));
     const mentionCandidates = useMemo(() => {
@@ -329,7 +347,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             });
             
             // Refresh chats from server to get accurate data
-            fetchChats();
+            fetchChatsRef.current?.();
         });
 
         return () => {
@@ -386,8 +404,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 const fetchedChats = Array.isArray(raw) ? raw : [];
                 setChats(fetchedChats);
                 const totalUnread = fetchedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
-                // Map unread counts for direct chats by staff user id
-                const currentUserId = currentUser?._id || currentUser?.id;
+                const cu = currentUserRef.current;
+                const currentUserId = cu?._id || cu?.id;
                 const unreadMap = {};
                 fetchedChats.forEach(chat => {
                     if (chat.type === 'direct' && Array.isArray(chat.participants)) {
@@ -402,36 +420,34 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     }
                 });
                 setStaffUnreadMap(unreadMap);
-                if (onUnreadCountChange) {
-                    onUnreadCountChange(totalUnread);
-                }
+                onUnreadCountChangeRef.current?.(totalUnread);
             }
-        } catch (error) { console.error('Failed to fetch chats:', error); }
-        finally { setIsLoading(false); }
-    }, [hasChatAccess, apiClient, API, onUnreadCountChange, currentUser]);
+        } catch (error) {
+            console.error('Failed to fetch chats:', error);
+            showToastRef.current?.(
+                error.response?.data?.error || 'Failed to load message groups. Please try again.',
+                'error'
+            );
+        } finally { setIsLoading(false); }
+    }, [hasChatAccess, apiClient, API]);
+    fetchChatsRef.current = fetchChats;
+
+    const stickThreadToBottomRef = useRef(true);
 
     const scrollToBottom = useCallback((instant = false) => {
         const scroll = () => {
             const container = chatContainerRef.current;
-            if (container) {
-                container.scrollTop = container.scrollHeight;
-            }
-            if (messagesEndRef.current) {
-                messagesEndRef.current.scrollIntoView({
-                    behavior: instant ? 'auto' : 'smooth',
-                    block: 'end',
-                });
-            }
+            if (!container) return;
+            const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+            container.scrollTop = maxScroll;
         };
+        scroll();
         if (instant) {
-            scroll();
             requestAnimationFrame(() => {
                 scroll();
                 requestAnimationFrame(scroll);
             });
-            setTimeout(scroll, 0);
-            setTimeout(scroll, 80);
-            setTimeout(scroll, 200);
+            [0, 50, 120, 280, 500, 800].forEach((ms) => setTimeout(scroll, ms));
         } else {
             requestAnimationFrame(() => setTimeout(scroll, 0));
         }
@@ -454,11 +470,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             : prev
                     );
                 }
-                fetchChats();
+                fetchChatsRef.current?.();
             }
-        } catch (error) { showToast('Failed to load messages', 'error'); }
+        } catch (error) { showToastRef.current?.('Failed to load messages', 'error'); }
         finally { setIsLoadingMessages(false); }
-    }, [apiClient, API, showToast, fetchChats]);
+    }, [apiClient, API]);
+    fetchMessagesRef.current = fetchMessages;
 
     useEffect(() => {
         if (!hasChatAccess) return;
@@ -501,44 +518,72 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         };
     }, [hasChatAccess, canFetchActivePunchedIn, apiClient, API, currentOutletId, selectedChat?._id]);
 
-    // Note: Default "All Outlet Staffs" group is automatically created by the server for owners
-    // Store-specific groups are no longer created
-
-    // Only fetch on mount or when access changes
     const hasFetchedChatsRef = useRef(false);
     useEffect(() => {
-        if (hasChatAccess && !hasFetchedChatsRef.current) {
-            hasFetchedChatsRef.current = true;
-            fetchChats();
-        } else if (!hasChatAccess) {
+        if (!hasChatAccess) {
             hasFetchedChatsRef.current = false;
+            return;
+        }
+        if (!hasFetchedChatsRef.current) {
+            hasFetchedChatsRef.current = true;
+            fetchChatsRef.current?.();
         }
     }, [hasChatAccess]);
 
     useEffect(() => {
-        if (selectedChat) {
-            fetchMessages(selectedChat._id);
-        } else {
+        const chatId = selectedChat?._id;
+        setReplyingTo(null);
+        if (!chatId) {
             setMessages([]);
             setChatLastReadBy({});
             setChatParticipants([]);
+            return;
         }
-    }, [selectedChat, fetchMessages]);
+        stickThreadToBottomRef.current = true;
+        fetchMessagesRef.current?.(chatId);
+    }, [selectedChat?._id]);
 
-    // Anchor to the latest message when a thread finishes loading (list must be in DOM, not spinner)
+    const handleReplyToMessage = useCallback((msg) => {
+        if (!msg?._id || msg.isOptimistic) return;
+        setReplyingTo(buildClientReplySnapshot(msg));
+    }, []);
+
+    const lastMessageAnchorId =
+        messages.length > 0 ? messages[messages.length - 1]?._id : null;
+
+    // Anchor to latest message when thread opens / messages finish loading
     useLayoutEffect(() => {
-        if (!selectedChat?._id || isLoadingMessages || messages.length === 0) return;
-
+        if (!selectedChat?._id || isLoadingMessages || !lastMessageAnchorId) return;
+        stickThreadToBottomRef.current = true;
         scrollToBottom(true);
-        const id1 = setTimeout(() => scrollToBottom(true), 50);
-        const id2 = setTimeout(() => scrollToBottom(true), 200);
-        const id3 = setTimeout(() => scrollToBottom(true), 400);
-        return () => {
-            clearTimeout(id1);
-            clearTimeout(id2);
-            clearTimeout(id3);
+    }, [selectedChat?._id, isLoadingMessages, lastMessageAnchorId, scrollToBottom]);
+
+    // Keep bottom pinned while layout settles (images, bubbles) after opening a thread
+    useEffect(() => {
+        const container = chatContainerRef.current;
+        if (!container || !selectedChat?._id) return;
+
+        const onUserScroll = () => {
+            const nearBottom =
+                container.scrollHeight - container.scrollTop - container.clientHeight < 96;
+            if (!nearBottom) stickThreadToBottomRef.current = false;
         };
-    }, [selectedChat?._id, isLoadingMessages, messages.length, scrollToBottom]);
+        container.addEventListener('scroll', onUserScroll, { passive: true });
+
+        const ro = new ResizeObserver(() => {
+            if (!stickThreadToBottomRef.current || isLoadingMessages) return;
+            const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+            container.scrollTop = maxScroll;
+        });
+        ro.observe(container);
+        const inner = container.firstElementChild;
+        if (inner) ro.observe(inner);
+
+        return () => {
+            container.removeEventListener('scroll', onUserScroll);
+            ro.disconnect();
+        };
+    }, [selectedChat?._id, isLoadingMessages]);
 
     const formatRecordingTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -753,7 +798,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                     });
                 };
                 // Allow final timeslice to arrive on slow Android / iOS WebViews
-                setTimeout(finalize, isIOS ? 200 : 120);
+                setTimeout(finalize, isIOS ? 280 : 180);
             };
 
             recorder.onerror = (e) => {
@@ -806,6 +851,20 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             return next;
                         });
                     }, 1000);
+
+                    if (stopWhenRecordingReadyRef.current) {
+                        stopWhenRecordingReadyRef.current = false;
+                        try {
+                            if (typeof recorder.requestData === 'function') recorder.requestData();
+                        } catch {
+                            /* ignore */
+                        }
+                        recorder.stop();
+                        if (recordingTimerRef.current) {
+                            clearInterval(recordingTimerRef.current);
+                            recordingTimerRef.current = null;
+                        }
+                    }
                 } else {
                     console.error('[startRecording] MediaRecorder state is not recording:', recorder.state);
                     throw new Error(`MediaRecorder failed to start. State: ${recorder.state}`);
@@ -849,7 +908,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     const stopRecording = () => {
         const rec = mediaRecorderRef.current;
-        if (rec && rec.state === 'recording') {
+        if (rec && (rec.state === 'recording' || rec.state === 'paused')) {
             try {
                 if (typeof rec.requestData === 'function') {
                     try {
@@ -868,7 +927,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 }
             }
         } else {
-            setIsRecording(false);
+            // Recorder still starting (getUserMedia / start()) — stop once it is active
+            stopWhenRecordingReadyRef.current = true;
         }
 
         if (recordingTimerRef.current) {
@@ -879,6 +939,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     const cancelRecording = () => {
         recordingDiscardRef.current = true;
+        stopWhenRecordingReadyRef.current = false;
 
         const rec = mediaRecorderRef.current;
         if (rec) {
@@ -1001,6 +1062,10 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         formData.append('fileName', fileToUpload.name);
         formData.append('fileType', fileToUpload.type);
         formData.append('fileSize', fileToUpload.size.toString());
+        const replyId = replyingTo?.messageId || replyingTo?._id;
+        if (replyId) formData.append('replyToMessageId', String(replyId));
+        const replySnapshot = replyingTo ? { ...replyingTo } : null;
+        if (replyId) setReplyingTo(null);
 
         // Synchronous preview URL for images — FileReader data URL is async and often null at send time,
         // which made optimistic bubbles show no image until (sometimes) the server URL loaded.
@@ -1022,7 +1087,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             fileType: fileToUpload.type,
             fileSize: fileToUpload.size,
             timestamp: new Date(),
-            isOptimistic: true
+            isOptimistic: true,
+            ...(replySnapshot ? { replyTo: replySnapshot } : {}),
         };
 
         setMessages(prev => [...prev, optimisticMessage]);
@@ -1037,7 +1103,6 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         try {
             setUploadProgress(0);
             const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000,
                 onUploadProgress: (e) => setUploadProgress(e.loaded && e.total ? Math.round((e.loaded / e.total) * 100) : 0)
             });
@@ -1089,6 +1154,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             showToast('No audio recording to send', 'error');
             return;
         }
+        if (isSendingVoice) return;
 
         // Validate blob size (max 10MB)
         if (audioBlob.size > 10 * 1024 * 1024) {
@@ -1129,7 +1195,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         formData.append('audio', blobToAppend, `voice.${fileExtension}`);
         formData.append('messageType', 'audio');
         formData.append('audioDuration', String(durationSeconds));
-        
+        const replyId = replyingTo?.messageId || replyingTo?._id;
+        if (replyId) formData.append('replyToMessageId', String(replyId));
+
+        const replySnapshot = replyingTo ? { ...replyingTo } : null;
+        if (replyId) setReplyingTo(null);
+
         // Optimistic update - add voice message immediately
         const tempMessageId = `temp-voice-${Date.now()}`;
         const audioUrlForPreview = URL.createObjectURL(audioBlob);
@@ -1143,7 +1214,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             audioUrl: audioUrlForPreview,
             audioDuration: durationSeconds,
             timestamp: new Date(),
-            isOptimistic: true
+            isOptimistic: true,
+            ...(replySnapshot ? { replyTo: replySnapshot } : {}),
         };
         
         setMessages(prev => [...prev, optimisticMessage]);
@@ -1166,9 +1238,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         scrollToBottom(true); // Instant scroll for optimistic update
         
         try {
+            setIsSendingVoice(true);
             setUploadProgress(0);
             const response = await apiClient.post(API.sendMessage(selectedChat._id), formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000,
                 onUploadProgress: (e) => setUploadProgress(e.loaded && e.total ? Math.round((e.loaded / e.total) * 100) : 0)
             });
@@ -1199,6 +1271,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             
             // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m._id !== tempMessageId));
+
+            // Restore preview so user can retry send
+            setAudioBlob(blobToSend);
+            setAudioUrl(URL.createObjectURL(blobToSend));
+            setRecordingTime(timeToSend);
+            recordingTimeRef.current = timeToSend;
             
             // Show specific error message
             if (error.response) {
@@ -1209,6 +1287,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             } else {
                 showToast('Failed to send voice message', 'error');
             }
+        } finally {
+            setIsSendingVoice(false);
+            setUploadProgress(0);
         }
     };
 
@@ -1218,8 +1299,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         flushLocalTypingStop(selectedChat._id);
         const content = messageInput.trim();
         const idsToSend = isGroupChatSelected ? [...mentionUserIds] : [];
+        const replyId = replyingTo?.messageId || replyingTo?._id;
+        const replySnapshot = replyingTo ? { ...replyingTo } : null;
         setMessageInput('');
         setMentionUserIds([]);
+        setReplyingTo(null);
         
         // Optimistic update - add message immediately
         const tempMessageId = `temp-${Date.now()}`;
@@ -1232,6 +1316,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             messageType: 'text',
             timestamp: new Date(),
             isOptimistic: true,
+            ...(replySnapshot ? { replyTo: replySnapshot } : {}),
             ...(idsToSend.length ? {
                 mentions: idsToSend.map(id => String(id)),
                 mentionsDetail: idsToSend.map(id => {
@@ -1262,7 +1347,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         });
         
         try {
-            const payload = idsToSend.length ? { content, mentions: idsToSend } : { content };
+            const payload = { content };
+            if (idsToSend.length) payload.mentions = idsToSend;
+            if (replyId) payload.replyToMessageId = String(replyId);
             const response = await apiClient.post(API.sendMessage(selectedChat._id), payload);
             if (response.data.success) {
                 // Replace optimistic message with real one
@@ -1290,6 +1377,73 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
     };
 
+    const detachChatAudioListeners = useCallback((el) => {
+        if (!el) return;
+        if (el._chatOnTimeUpdate) {
+            el.removeEventListener('timeupdate', el._chatOnTimeUpdate);
+            el._chatOnTimeUpdate = null;
+        }
+        if (el._chatOnEnded) {
+            el.removeEventListener('ended', el._chatOnEnded);
+            el._chatOnEnded = null;
+        }
+        if (el._chatOnPlaying) {
+            el.removeEventListener('playing', el._chatOnPlaying);
+            el._chatOnPlaying = null;
+        }
+    }, []);
+
+    const registerChatAudioRef = useCallback(
+        (messageId, el) => {
+            const prev = audioRefs.current[messageId];
+            if (prev && prev !== el) detachChatAudioListeners(prev);
+
+            if (!el) {
+                delete audioRefs.current[messageId];
+                return;
+            }
+
+            audioRefs.current[messageId] = el;
+            el.preload = 'metadata';
+            el.playsInline = true;
+            el.setAttribute('playsinline', '');
+            el.setAttribute('webkit-playsinline', '');
+
+            const syncProgress = () => {
+                const dur = el.duration;
+                if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+                const pct = Math.min(1, Math.max(0, el.currentTime / dur));
+                setAudioProgressMap((map) => {
+                    if (map[messageId] === pct) return map;
+                    return { ...map, [messageId]: pct };
+                });
+            };
+
+            const onTimeUpdate = () => syncProgress();
+
+            const onEnded = () => {
+                try {
+                    el.currentTime = 0;
+                } catch {
+                    /* ignore */
+                }
+                setAudioProgressMap((map) => ({ ...map, [messageId]: 0 }));
+                setPlayingAudioId((current) => (current === messageId ? null : current));
+            };
+
+            const onPlaying = () => syncProgress();
+
+            detachChatAudioListeners(el);
+            el._chatOnTimeUpdate = onTimeUpdate;
+            el._chatOnEnded = onEnded;
+            el._chatOnPlaying = onPlaying;
+            el.addEventListener('timeupdate', onTimeUpdate);
+            el.addEventListener('ended', onEnded);
+            el.addEventListener('playing', onPlaying);
+        },
+        [detachChatAudioListeners]
+    );
+
     const toggleAudio = (messageId, audioSrc) => {
         if (!messageId || !audioSrc) {
             setPlayingAudioId(null);
@@ -1303,6 +1457,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                 try {
                     audio.pause();
                     audio.currentTime = 0;
+                    setAudioProgressMap((map) => ({ ...map, [messageId]: 0 }));
                     audio.setAttribute('data-chat-audio-src', audioSrc);
                     audio.src = audioSrc;
                     audio.load();
@@ -1324,15 +1479,36 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         if (playingAudioId && audioRefs.current[playingAudioId]) {
             const prev = audioRefs.current[playingAudioId];
             prev.pause();
-            prev.currentTime = 0;
         }
 
         applySrc();
 
+        const dur = audio.duration;
+        if (
+            audio.ended ||
+            (Number.isFinite(dur) && dur > 0 && audio.currentTime >= dur - 0.05)
+        ) {
+            try {
+                audio.currentTime = 0;
+            } catch {
+                /* ignore */
+            }
+            setAudioProgressMap((map) => ({ ...map, [messageId]: 0 }));
+        }
+
         const playPromise = audio.play();
         if (playPromise !== undefined) {
             playPromise
-                .then(() => setPlayingAudioId(messageId))
+                .then(() => {
+                    setPlayingAudioId(messageId);
+                    const dur = audio.duration;
+                    if (dur && Number.isFinite(dur) && dur > 0) {
+                        setAudioProgressMap((map) => ({
+                            ...map,
+                            [messageId]: Math.min(1, Math.max(0, audio.currentTime / dur)),
+                        }));
+                    }
+                })
                 .catch((error) => {
                     if (error?.name === 'NotAllowedError') {
                         showToast('Tap play again to hear the voice note.', 'info');
@@ -1368,9 +1544,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             setChatLastReadBy({});
             setChatParticipants([]);
             setIsLoadingMessages(true);
+            stickThreadToBottomRef.current = true;
         }
         setSelectedChat(normalized);
-    }, []);
+        notifyChatSelection(!!normalized);
+    }, [notifyChatSelection]);
 
     const selectChat = openChat;
 
@@ -1381,6 +1559,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const exitChatThread = useCallback(() => {
         try {
             if (typeof window !== 'undefined' && window.history?.state?.pocketposChatThread) {
+                onThreadSwipeConsumed?.();
                 window.history.back();
                 return;
             }
@@ -1389,7 +1568,9 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
         setSelectedChat(null);
         setShowInfo(false);
-    }, []);
+        notifyChatSelection(false);
+        onThreadSwipeConsumed?.();
+    }, [notifyChatSelection, onThreadSwipeConsumed]);
 
     const isMobileChatThreadLayout = useCallback(() => {
         if (typeof window === 'undefined') return false;
@@ -1402,6 +1583,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
 
     const onThreadPanelTouchStart = useCallback((e) => {
         if (!isMobileChatThreadLayout() || !selectedChatRef.current) return;
+        e.stopPropagation();
         const t = e.touches?.[0];
         if (!t) return;
         const edgePx = 44;
@@ -1414,6 +1596,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     }, [isMobileChatThreadLayout]);
 
     const onThreadPanelTouchEnd = useCallback((e) => {
+        e.stopPropagation();
         const s = threadSwipeBackRef.current;
         resetThreadSwipeBack();
         if (!s.active || !s.edgeEligible) return;
@@ -1429,7 +1612,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
         }
     }, [exitChatThread, isMobileChatThreadLayout, resetThreadSwipeBack]);
 
-    const onThreadPanelTouchCancel = useCallback(() => {
+    const onThreadPanelTouchCancel = useCallback((e) => {
+        e.stopPropagation();
         resetThreadSwipeBack();
     }, [resetThreadSwipeBack]);
 
@@ -1554,13 +1738,11 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             return;
         }
 
-        // Only allow deletion of custom groups (not default groups)
         if (chatToDelete.isDefault) {
-            showToast('Default groups cannot be deleted', 'error');
+            showToast('Default outlet groups cannot be deleted', 'error');
             return;
         }
 
-        // Confirm deletion
         const confirmed = window.confirm('Are you sure you want to delete this group? This action cannot be undone.');
         if (!confirmed) {
             return;
@@ -1691,7 +1873,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full min-h-0 overflow-hidden relative`}>
                 {selectedChat ? (
                     <div
-                        className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:touch-auto"
+                        className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden md:touch-auto"
                         onTouchStart={onThreadPanelTouchStart}
                         onTouchEnd={onThreadPanelTouchEnd}
                         onTouchCancel={onThreadPanelTouchCancel}
@@ -1719,7 +1901,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                         {/* Messages area - scrollable; overscroll contained so mic swipe-up does not move the shell */}
                         <div
                             ref={chatContainerRef}
-                            className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 pb-4"
+                            className="chat-scroll custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 pb-4"
                         >
                             <ChatMessages
                                 messages={messages}
@@ -1730,21 +1912,24 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                 onToggleAudio={toggleAudio}
                                 formatRecordingTime={formatRecordingTime}
                                 audioRefs={audioRefs}
+                                registerChatAudioRef={registerChatAudioRef}
+                                audioProgressMap={audioProgressMap}
                                 messagesEndRef={messagesEndRef}
                                 lastReadBy={chatLastReadBy}
                                 participants={chatParticipants}
                                 onThreadRendered={handleThreadRendered}
+                                onReply={handleReplyToMessage}
                             />
                         </div>
 
                         {/* Fixed Input section - Footer position (hidden when info page is open) */}
                         {!showInfo && (
                             <div
-                                className={`shrink-0 border-t z-[60] ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} sticky bottom-0 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4`}
+                                className={`shrink-0 overflow-visible border-t z-[60] ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} sticky bottom-0 px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom,0px))] sm:px-4 sm:pt-3 sm:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]`}
                             >
                                 {typingBannerText ? (
                                     <div
-                                        className={`mb-2 flex min-h-[1.25rem] items-center gap-2 px-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                                        className={`mb-1 flex min-h-[1rem] items-center gap-1.5 px-0.5 sm:mb-2 sm:min-h-[1.25rem] sm:gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
                                         role="status"
                                         aria-live="polite"
                                     >
@@ -1753,7 +1938,7 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                             <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-duration:1s]" style={{ animationDelay: '150ms' }} />
                                             <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-duration:1s]" style={{ animationDelay: '300ms' }} />
                                         </span>
-                                        <span className="text-[11px] font-bold tracking-tight">{typingBannerText}</span>
+                                        <span className="text-[10px] font-bold tracking-tight sm:text-[11px]">{typingBannerText}</span>
                                     </div>
                                 ) : null}
                                 <ChatInput
@@ -1786,8 +1971,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                                     onSendFile={sendFileMessage}
                                     onCancelFile={cancelFileSelection}
                                     isUploadingFile={isUploadingFile}
+                                    isSendingVoice={isSendingVoice}
                                     uploadProgress={uploadProgress}
                                     darkMode={darkMode}
+                                    replyingTo={replyingTo}
+                                    onCancelReply={() => setReplyingTo(null)}
+                                    currentUser={currentUser}
                                 />
                             </div>
                         )}

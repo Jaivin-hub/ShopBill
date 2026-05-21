@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertTriangle, PackageSearch } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import InventoryContent from './InventoryContent';
+import OfflineUnavailableState from './OfflineUnavailableState';
 import { StockHubInitialSkeleton } from './skeletons/PageSkeletons';
 import { useDebounce } from '../hooks/useDebounce';
 import { exportRowsToExcel } from '../utils/exportExcel';
+import { fetchInventoryWithCache } from '../offline/fetchWithCatalog';
+import { getActiveStoreId } from '../offline/catalogCache';
+import { isBrowserOnline } from '../offline/connectivity';
+import { useOffline } from '../contexts/OfflineContext';
 
 // --- Configuration and Constants ---
 const USER_ROLES = {
@@ -43,6 +48,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     /** Inventory GET in flight — drives full-page skeleton first load, grid skeleton on refresh. */
     const [dataLoading, setDataLoading] = useState(true);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+    const [catalogUnavailable, setCatalogUnavailable] = useState(false);
+    const { isOnline } = useOffline();
 
     // --- UI/Form States ---
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -73,11 +80,32 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
     // --- Data Fetching Logic (Memoized for Pattern Consistency) ---
     const fetchInventory = useCallback(async () => {
         setDataLoading(true);
+        const storeId = getActiveStoreId();
         try {
-            const response = await apiClient.get(API.inventory);
-            setInventory(response.data);
+            const result = await fetchInventoryWithCache({
+                apiClient,
+                inventoryUrl: API.inventory,
+                storeId,
+            });
+            if (result.cancelled) return;
+            if (result.source === 'unavailable') {
+                setCatalogUnavailable(true);
+                setInventory([]);
+                if (!isBrowserOnline()) {
+                    showToast('No saved stock list offline. Open Stock or Billing once while online.', 'warning');
+                } else {
+                    showToast('Could not load inventory. Check your connection.', 'error');
+                }
+                return;
+            }
+            setCatalogUnavailable(false);
+            setInventory(result.data || []);
+            if (result.source === 'cache') {
+                showToast('Offline — showing last saved stock (edits need internet)', 'warning');
+            }
         } catch (error) {
-            console.error("Inventory Fetch Error:", error);
+            console.error('Inventory Fetch Error:', error);
+            setCatalogUnavailable(true);
             showToast('System Link Failure: Could not sync inventory.', 'error');
         } finally {
             setDataLoading(false);
@@ -402,6 +430,26 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
 
     if (dataLoading && !hasLoadedOnce) {
         return <StockHubInitialSkeleton darkMode={darkMode} />;
+    }
+
+    if (catalogUnavailable) {
+        return (
+            <main className={`min-h-0 flex flex-1 flex-col ${themeBase}`}>
+                <OfflineUnavailableState
+                    darkMode={darkMode}
+                    title={isOnline ? 'Stock could not load' : 'Stock unavailable offline'}
+                    description={
+                        isOnline
+                            ? 'Inventory data did not load. Check your connection and try again.'
+                            : 'Open Billing or Stock once while online on this device to save your product list. After that, you can view stock offline.'
+                    }
+                    onRetry={() => {
+                        setCatalogUnavailable(false);
+                        fetchInventory();
+                    }}
+                />
+            </main>
+        );
     }
 
     return (

@@ -8,6 +8,9 @@ import { io } from 'socket.io-client';
 import API, { SOCKET_URL, SOCKET_IO_CLIENT_BASE } from './config/api';
 import apiClient from './lib/apiClient';
 import { ApiProvider } from './contexts/ApiContext';
+import { OfflineProvider } from './contexts/OfflineContext';
+import PageRouteFallback from './components/PageRouteFallback';
+import PageErrorBoundary from './components/PageErrorBoundary';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { onForegroundMessage, isPushSupported, ensureFcmServiceWorkerReady } from './lib/firebase';
 import { playMessageSound, playPushSoundCategory, unlockAudio } from './utils/notificationSound';
@@ -411,6 +414,7 @@ const App = () => {
   const [isViewingLogin, setIsViewingLogin] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [showLowStockFilter, setShowLowStockFilter] = useState(false);
   const [scrollToPricing, setScrollToPricing] = useState(false);
   const socketRef = useRef(null);
   const currentUserRef = useRef(currentUser);
@@ -435,16 +439,10 @@ const App = () => {
   /** Bumped from Header “Add New” branch hub so OutletManager opens create modal after navigation */
   const [openCreateBranchSignal, setOpenCreateBranchSignal] = useState(0);
   const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' for page swipe animation
-  const [showStaffPunchPrompt, setShowStaffPunchPrompt] = useState(false);
-  const [hasStaffPunchedIn, setHasStaffPunchedIn] = useState(false);
-  const [hasResolvedAttendanceStatus, setHasResolvedAttendanceStatus] = useState(false);
-  const [isPromptPunchingIn, setIsPromptPunchingIn] = useState(false);
-  const pendingActionRef = useRef(null);
-  const pendingAttendancePromptResolveRef = useRef(null);
-  const isStaffUserRef = useRef(false);
-  const hasStaffPunchedInRef = useRef(false);
-  const hasResolvedAttendanceStatusRef = useRef(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
+  const pageSwipeSuppressUntilRef = useRef(0);
+  const chatThreadOpenAtTouchStartRef = useRef(false);
+  const wasChatThreadOpenRef = useRef(false);
   const mainScrollRef = useRef(null);
   const backStackRef = useRef([]); // stack of page ids for swipe-back (e.g. Profile → back → Dashboard; Settings → Child → back → Settings)
 
@@ -482,7 +480,6 @@ const App = () => {
   }, []);
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
-  const isStaffUser = userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
   const planUpper = currentUser?.plan?.toUpperCase();
   const isPremium = planUpper === 'PREMIUM';
   const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
@@ -539,90 +536,7 @@ const App = () => {
     return count;
   }, [notifications]);
 
-  useEffect(() => {
-    isStaffUserRef.current = isStaffUser;
-    hasStaffPunchedInRef.current = hasStaffPunchedIn;
-    hasResolvedAttendanceStatusRef.current = hasResolvedAttendanceStatus;
-  }, [isStaffUser, hasStaffPunchedIn, hasResolvedAttendanceStatus]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const syncAttendanceStatus = async () => {
-      if (!isStaffUser || !currentUser || !apiClient || !API?.attendanceCurrent) {
-        if (!cancelled) {
-          setHasStaffPunchedIn(false);
-          setHasResolvedAttendanceStatus(true);
-        }
-        return;
-      }
-      let requestCancelled = false;
-      try {
-        const response = await apiClient.get(API.attendanceCurrent, {
-          headers: { 'x-skip-attendance-prompt': '1' }
-        });
-        const attendance = response?.data?.attendance;
-        const isActive = !!attendance && attendance.status === 'active' && !attendance.punchOut;
-        if (!cancelled) {
-          setHasStaffPunchedIn(isActive);
-          if (isActive) {
-            setShowStaffPunchPrompt(false);
-            if (pendingActionRef.current?.resolve) {
-              pendingActionRef.current.resolve(pendingActionRef.current.config);
-            }
-            pendingActionRef.current = null;
-            if (pendingAttendancePromptResolveRef.current) {
-              pendingAttendancePromptResolveRef.current(true);
-              pendingAttendancePromptResolveRef.current = null;
-            }
-          }
-        }
-      } catch (error) {
-        const isRequestCancelled = error?.cancelled || error?.message?.includes?.('cancelled');
-        if (isRequestCancelled) {
-          requestCancelled = true;
-          return;
-        }
-        if (!cancelled) {
-          // Preserve previous status on transient API failures; avoid false re-prompt conflicts.
-          console.warn('Attendance status sync failed, keeping previous punch-in state.');
-        }
-      } finally {
-        if (!cancelled && !requestCancelled) {
-          setHasResolvedAttendanceStatus(true);
-        }
-      }
-    };
-    syncAttendanceStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, [isStaffUser, currentUser?._id, currentOutletId, apiClient, API]);
-
-  useEffect(() => {
-    if (!apiClient?.interceptors?.request) return undefined;
-    const interceptorId = apiClient.interceptors.request.use((config) => {
-      const method = String(config?.method || 'get').toLowerCase();
-      const isMutation = ['post', 'put', 'patch', 'delete'].includes(method);
-      if (!isMutation) return config;
-
-      const url = String(config?.url || '').toLowerCase();
-      const isAttendanceApi = url.includes('/attendance/');
-      const isPushDeviceTokenApi = url.includes('/user/device-token');
-      const isBypass = config?.headers?.['x-skip-attendance-prompt'] === '1';
-      if (isAttendanceApi || isPushDeviceTokenApi || isBypass) return config;
-      if (!isStaffUserRef.current || hasStaffPunchedInRef.current) return config;
-      if (!hasResolvedAttendanceStatusRef.current) return config;
-
-      return new Promise((resolve, reject) => {
-        pendingActionRef.current = { resolve, reject, config };
-        setShowStaffPunchPrompt(true);
-      });
-    });
-
-    return () => {
-      apiClient.interceptors.request.eject(interceptorId);
-    };
-  }, [apiClient]);
+  const requestAttendanceDecision = useCallback(() => Promise.resolve(true), []);
 
   // Navigate and push current page to back stack (so swipe-back can return). Use opts.replace to clear stack (e.g. logout, back-to-origin).
   const navigateTo = useCallback((page, opts) => {
@@ -639,6 +553,9 @@ const App = () => {
       showToast('Access restricted by owner permissions.', 'info');
       return;
     }
+    if (page === 'inventory' && opts?.lowStockSort) {
+      setShowLowStockFilter(true);
+    }
     if (opts?.replace) backStackRef.current = [];
     if (page !== currentPage) {
       if (!opts?.replace) backStackRef.current = [...backStackRef.current, currentPage];
@@ -646,86 +563,10 @@ const App = () => {
     }
   }, [currentPage, currentUser, userRole, rolePagePermissions, canAccessPage, showToast]);
 
-  const handleStaffPromptSkip = useCallback(() => {
-    setShowStaffPunchPrompt(false);
-    if (pendingActionRef.current?.resolve) {
-      pendingActionRef.current.resolve(pendingActionRef.current.config);
-    }
-    pendingActionRef.current = null;
-    if (pendingAttendancePromptResolveRef.current) {
-      pendingAttendancePromptResolveRef.current(true);
-      pendingAttendancePromptResolveRef.current = null;
-    }
-  }, []);
-
-  const handleStaffPromptPunchIn = useCallback(async () => {
-    if (!apiClient || !API?.attendancePunchIn || isPromptPunchingIn) return;
-    try {
-      setIsPromptPunchingIn(true);
-      // Close immediately on tap for better UX.
-      setShowStaffPunchPrompt(false);
-      const now = new Date();
-      const localDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const timezoneOffset = now.getTimezoneOffset();
-      await apiClient.post(API.attendancePunchIn, {
-        localDate: localDateString,
-        timezoneOffset,
-        clientTime: now.toISOString(),
-      }, { headers: { 'x-skip-attendance-prompt': '1' } });
-      showToast('Punched in successfully!', 'success');
-      setHasStaffPunchedIn(true);
-      setHasResolvedAttendanceStatus(true);
-      setShowStaffPunchPrompt(false);
-      if (pendingActionRef.current?.resolve) {
-        pendingActionRef.current.resolve(pendingActionRef.current.config);
-      }
-      pendingActionRef.current = null;
-      if (pendingAttendancePromptResolveRef.current) {
-        pendingAttendancePromptResolveRef.current(true);
-        pendingAttendancePromptResolveRef.current = null;
-      }
-    } catch (error) {
-      const message = error.response?.data?.error || error.message || 'Unable to punch in now';
-      showToast(message, 'error');
-      setShowStaffPunchPrompt(true);
-    } finally {
-      setIsPromptPunchingIn(false);
-    }
-  }, [apiClient, API, isPromptPunchingIn, showToast]);
-
-  const requestAttendanceDecision = useCallback(() => {
-    const shouldPrompt = isStaffUserRef.current && !hasStaffPunchedInRef.current && hasResolvedAttendanceStatusRef.current;
-    if (!shouldPrompt) return Promise.resolve(true);
-
-    return new Promise((resolve) => {
-      pendingAttendancePromptResolveRef.current = resolve;
-      setShowStaffPunchPrompt(true);
-    });
-  }, []);
-
-  useEffect(() => {
-    setHasStaffPunchedIn(false);
-    setHasResolvedAttendanceStatus(false);
-    setShowStaffPunchPrompt(false);
-    setIsPromptPunchingIn(false);
-    if (pendingActionRef.current?.reject) {
-      const err = new Error('Attendance prompt reset');
-      err.cancelled = true;
-      pendingActionRef.current.reject(err);
-    }
-    pendingActionRef.current = null;
-    if (pendingAttendancePromptResolveRef.current) {
-      pendingAttendancePromptResolveRef.current(false);
-      pendingAttendancePromptResolveRef.current = null;
-    }
-  }, [currentUser?._id]);
-
   const handleViewAllSales = useCallback(() => navigateTo('salesActivity'), [navigateTo]);
   const handleViewAllCredit = useCallback(() => navigateTo('khata'), [navigateTo]);
-  const [showLowStockFilter, setShowLowStockFilter] = useState(false);
   const handleViewAllInventory = useCallback(() => {
-    setShowLowStockFilter(true);
-    navigateTo('inventory');
+    navigateTo('inventory', { lowStockSort: true });
   }, [navigateTo]);
 
   useEffect(() => {
@@ -743,7 +584,12 @@ const App = () => {
         return;
       }
       if (rawUrl.includes('/inventory')) {
-        navigateTo('inventory');
+        const notifType = String(data.notificationType || '').toLowerCase();
+        navigateTo('inventory', { lowStockSort: notifType === 'inventory_low' });
+        return;
+      }
+      if (String(data.notificationType || '').toLowerCase() === 'inventory_low') {
+        navigateTo('inventory', { lowStockSort: true });
         return;
       }
       if (rawUrl.includes('/reports')) {
@@ -1457,7 +1303,7 @@ useEffect(() => {
       return { primaryNavItems: filtered, secondaryNavItems: [] };
     }
 
-    // Basic plan manager: footer only Dashboard, Inventory, Ledger, Billing (settings/profile/notifications in header)
+    // Basic plan manager: footer only Dashboard, Inventory, Ledger, Billing (settings in mobile footer; profile/notifications in header)
     const rolePrimaryMenuIds = {
       [USER_ROLES.OWNER]: ['dashboard', 'khata', 'chat', 'reports'], // Dashboard, Ledger, Messages, Reports
       [USER_ROLES.MANAGER]: isBasicManager
@@ -1504,7 +1350,7 @@ useEffect(() => {
     });
   }, [userRole, canAccessPage]);
 
-  /** Notifications & Profile are in the header — omit from mobile footer / More menu for every role. */
+  /** Notifications & Profile are in the header — omit from mobile footer / More menu. Settings is mobile-footer only (not in header). */
   const MOBILE_FOOTER_EXCLUDED_PAGE_IDS = new Set(['notifications', 'profile']);
 
   // Footer More menu utility rows (no notifications/profile); Settings always last
@@ -1540,58 +1386,159 @@ useEffect(() => {
   /** Max icons on the mobile footer bar, including the More button when overflow exists. */
   const MOBILE_FOOTER_MAX_SLOTS = 5;
 
-  /** More sheet order: Team Management first when present; Settings last. */
-  const sortMobileMoreMenuItems = (items) => {
-    if (!items?.length) return items;
-    const team = items.find((item) => item.id === 'staffPermissions');
-    if (!team) return items;
-    const rest = items.filter((item) => item.id !== 'staffPermissions');
-    const settings = rest.find((item) => item.id === 'settings');
-    const middle = rest.filter((item) => item.id !== 'settings');
-    return settings ? [team, ...middle, settings] : [team, ...middle];
-  };
+  const FOOTER_LEFT_PINNED_TAB_ID = 'dashboard';
+  const FOOTER_CENTER_PINNED_TAB_ID = 'chat';
+  const hasFooterCenterChat = navItems.some((item) => item.id === FOOTER_CENTER_PINNED_TAB_ID);
 
-  // Mobile footer: ≤5 destinations = all on bar (no More); >5 = 4 on bar + More (5 slots total)
-  const mobileFooterPool = useMemo(() => {
+  /** Dashboard + slot-2 flank + Messages fixed in footer; slot 4 is dynamic. */
+  const FOOTER_RESERVED_TAB_ID_SET = useMemo(() => {
+    const ids = new Set([FOOTER_LEFT_PINNED_TAB_ID]);
+    if (hasFooterCenterChat) ids.add(FOOTER_CENTER_PINNED_TAB_ID);
+    return ids;
+  }, [hasFooterCenterChat]);
+
+  /** Swipe order: footer bar pages first, then More-menu pages (owner: Team → Offers → SCM → …). */
+  const swipeNavOrderedItems = useMemo(() => {
     const seen = new Set();
-    const pool = [];
+    const items = [];
     const add = (item) => {
       if (!item || seen.has(item.id) || MOBILE_FOOTER_EXCLUDED_PAGE_IDS.has(item.id)) return;
       seen.add(item.id);
-      pool.push(item);
+      items.push(item);
     };
     primaryNavItems.forEach(add);
-    secondaryNavItems.forEach(add);
-    if (userRole === USER_ROLES.OWNER && footerMoreMenuItems) {
+    if (userRole === USER_ROLES.OWNER && footerMoreMenuItems?.length) {
       footerMoreMenuItems.forEach(add);
     } else {
+      secondaryNavItems.forEach(add);
       moreMenuUtilityItems.forEach(add);
     }
-    return pool;
+    return items;
   }, [primaryNavItems, secondaryNavItems, footerMoreMenuItems, moreMenuUtilityItems, userRole]);
 
-  const { mobileFooterTabs, mobileMoreItems } = useMemo(() => {
-    const pool = mobileFooterPool;
-    if (pool.length <= MOBILE_FOOTER_MAX_SLOTS) {
-      return { mobileFooterTabs: pool, mobileMoreItems: [] };
+  /**
+   * Footer: [Dashboard][fixed #2][Messages][dynamic #4][More]
+   * Slots 1–3 stay fixed; only slot 4 updates while swiping (Reports → Team → …).
+   */
+  const {
+    footerLeftPinnedTab,
+    footerSlot2Fixed,
+    footerSlot3Messages,
+    footerSlot4Dynamic,
+    mobileFooterCompactRow,
+    mobileMoreItems,
+    showMobileMoreFooter,
+    useSuperadminMobileFooter,
+  } = useMemo(() => {
+    const ordered = swipeNavOrderedItems;
+
+    /** Superadmin: no chat slot — show each nav item in the bar (up to 5), More only if overflow */
+    if (userRole === USER_ROLES.SUPERADMIN) {
+      const showMore = ordered.length > MOBILE_FOOTER_MAX_SLOTS;
+      const barTabs = showMore ? ordered.slice(0, MOBILE_FOOTER_MAX_SLOTS - 1) : ordered;
+      const moreItems = showMore ? ordered.slice(MOBILE_FOOTER_MAX_SLOTS - 1) : [];
+      return {
+        footerLeftPinnedTab: null,
+        footerSlot2Fixed: null,
+        footerSlot3Messages: null,
+        footerSlot4Dynamic: null,
+        mobileFooterCompactRow: barTabs,
+        mobileMoreItems: moreItems,
+        showMobileMoreFooter: showMore,
+        useSuperadminMobileFooter: true,
+      };
     }
-    const barTabCount = MOBILE_FOOTER_MAX_SLOTS - 1; // reserve one slot for More
-    let bar = pool.slice(0, barTabCount);
-    let more = pool.slice(barTabCount);
-    const chatInMoreIdx = more.findIndex((item) => item.id === 'chat');
-    if (chatInMoreIdx !== -1) {
-      const chatItem = more[chatInMoreIdx];
-      more = more.filter((_, i) => i !== chatInMoreIdx);
-      const displaced = bar[bar.length - 1];
-      bar = [...bar.slice(0, -1), chatItem];
-      if (displaced) more = [displaced, ...more];
-    }
-    return { mobileFooterTabs: bar, mobileMoreItems: sortMobileMoreMenuItems(more) };
-  }, [mobileFooterPool]);
+
+    const isReserved = (id) => FOOTER_RESERVED_TAB_ID_SET.has(id);
+    const leftPinned =
+      ordered.find((item) => item.id === FOOTER_LEFT_PINNED_TAB_ID) || null;
+    const messagesTab = hasFooterCenterChat
+      ? ordered.find((item) => item.id === FOOTER_CENTER_PINNED_TAB_ID) || null
+      : null;
+
+    const primaryFlankItems = primaryNavItems.filter((item) => !isReserved(item.id));
+    const slot2Fixed = primaryFlankItems[0] || null;
+    const slot2Id = slot2Fixed?.id;
+
+    const slot4Candidates = ordered.filter((item) => {
+      if (item.id === FOOTER_LEFT_PINNED_TAB_ID) return false;
+      if (slot2Id && item.id === slot2Id) return false;
+      if (item.id === FOOTER_CENTER_PINNED_TAB_ID) return false;
+      return true;
+    });
+
+    const defaultSlot4 =
+      primaryFlankItems.length > 1
+        ? primaryFlankItems[primaryFlankItems.length - 1]
+        : slot4Candidates[0] || null;
+
+    const currentItem = ordered.find((item) => item.id === currentPage) || null;
+    const slot4Dynamic =
+      currentItem && slot4Candidates.some((c) => c.id === currentItem.id)
+        ? currentItem
+        : defaultSlot4;
+
+    const visibleIds = new Set([FOOTER_LEFT_PINNED_TAB_ID]);
+    if (slot2Id) visibleIds.add(slot2Id);
+    if (messagesTab) visibleIds.add(messagesTab.id);
+    if (slot4Dynamic) visibleIds.add(slot4Dynamic.id);
+
+    const moreItems = ordered.filter(
+      (item) => !visibleIds.has(item.id) && !isReserved(item.id)
+    );
+
+    const compactRow = [leftPinned, slot2Fixed, messagesTab, slot4Dynamic].filter(Boolean);
+
+    return {
+      footerLeftPinnedTab: leftPinned,
+      footerSlot2Fixed: slot2Fixed,
+      footerSlot3Messages: messagesTab,
+      footerSlot4Dynamic: slot4Dynamic,
+      mobileFooterCompactRow: compactRow,
+      mobileMoreItems: moreItems,
+      showMobileMoreFooter: ordered.length > MOBILE_FOOTER_MAX_SLOTS,
+      useSuperadminMobileFooter: false,
+    };
+  }, [
+    swipeNavOrderedItems,
+    primaryNavItems,
+    currentPage,
+    hasFooterCenterChat,
+    FOOTER_RESERVED_TAB_ID_SET,
+    userRole,
+  ]);
+
+  const mobileFooterSlotCount = useMemo(() => {
+    if (showMobileMoreFooter) return MOBILE_FOOTER_MAX_SLOTS;
+    return mobileFooterCompactRow.length || MOBILE_FOOTER_MAX_SLOTS;
+  }, [showMobileMoreFooter, mobileFooterCompactRow.length]);
+
+  const renderFooterTabButton = (item, { pinned = false, center = false, slotKey = 'tab' } = {}) => {
+    if (!item) return <span key={`footer-gap-${slotKey}`} className="block min-w-0" aria-hidden />;
+    const isActive = currentPage === item.id;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => navigateTo(item.id)}
+        className={`app-mobile-tab-btn${pinned ? ' app-mobile-footer-pinned' : ''}${center ? ' app-mobile-footer-center' : ''} touch-manipulation flex h-full w-full items-center justify-center transition-colors ${isActive ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+      >
+        {isActive && <span className="app-mobile-tab-active-indicator" aria-hidden />}
+        <div className={`relative rounded-lg p-1 ${isActive ? 'bg-indigo-500/10' : ''}`}>
+          <item.icon className={`h-6 w-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+          {item.id === 'chat' && chatUnreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-inherit">
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  };
 
   useEffect(() => {
-    if (mobileMoreItems.length === 0) setShowMoreMenu(false);
-  }, [mobileMoreItems.length]);
+    if (!showMobileMoreFooter) setShowMoreMenu(false);
+  }, [showMobileMoreFooter]);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
@@ -1605,7 +1552,10 @@ useEffect(() => {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const swipeablePageIds = useMemo(() => mobileFooterPool.map((item) => item.id), [mobileFooterPool]);
+  const swipeablePageIds = useMemo(
+    () => swipeNavOrderedItems.map((item) => item.id),
+    [swipeNavOrderedItems]
+  );
 
   const showAppUI = useMemo(
     () =>
@@ -1630,6 +1580,7 @@ useEffect(() => {
   );
 
   const handleSwipeNavigation = useCallback((direction) => {
+    setShowMoreMenu(false);
     // Swipe right = back: prefer back stack (Profile → Dashboard, Settings child → Settings), else previous tab
     if (direction === 'right') {
       if (backStackRef.current.length > 0) {
@@ -1662,16 +1613,28 @@ useEffect(() => {
 
   const handleTouchStart = useCallback((e) => {
     if (!isMobileViewport) return;
+    chatThreadOpenAtTouchStartRef.current = isChatSelected;
+    if (isChatSelected || (currentPage === 'chat' && Date.now() < pageSwipeSuppressUntilRef.current)) {
+      return;
+    }
     primeSwipeHaptic();
     const t = e.touches?.[0];
     if (t) {
       touchStartRef.current = { x: t.clientX, y: t.clientY };
     }
-  }, [isMobileViewport]);
+  }, [isMobileViewport, isChatSelected, currentPage]);
 
   const handleTouchEnd = useCallback(
     (e) => {
       if (!isMobileViewport) return;
+      if (
+        isChatSelected
+        || chatThreadOpenAtTouchStartRef.current
+        || Date.now() < pageSwipeSuppressUntilRef.current
+      ) {
+        chatThreadOpenAtTouchStartRef.current = false;
+        return;
+      }
       const t = e.changedTouches?.[0];
       if (!t) return;
       const dx = t.clientX - touchStartRef.current.x;
@@ -1683,9 +1646,15 @@ useEffect(() => {
         pulseSwipePageHaptic();
       }
       handleSwipeNavigation(direction);
+      chatThreadOpenAtTouchStartRef.current = false;
     },
-    [isMobileViewport, canSwipeNavigate, handleSwipeNavigation]
+    [isMobileViewport, isChatSelected, canSwipeNavigate, handleSwipeNavigation]
   );
+
+  const suppressPageSwipeAfterChatThread = useCallback(() => {
+    pageSwipeSuppressUntilRef.current = Date.now() + 480;
+    chatThreadOpenAtTouchStartRef.current = false;
+  }, []);
 
   /** Unlock swipe tick audio in installed PWA / iOS (first tap + after resume from background). */
   useEffect(() => {
@@ -1700,7 +1669,7 @@ useEffect(() => {
 
   /** Native passive listeners on main — reliable in installed PWA (full scroll area, iOS standalone). */
   useEffect(() => {
-    if (!showAppUI || !isMobileViewport || currentPage === 'chat') return;
+    if (!showAppUI || !isMobileViewport) return;
     const el = mainScrollRef.current;
     if (!el) return;
 
@@ -1709,15 +1678,15 @@ useEffect(() => {
 
     const onCancel = (e) => handleTouchEnd(e);
 
-    el.addEventListener('touchstart', onStart, { capture: true, passive: true });
-    el.addEventListener('touchend', onEnd, { capture: true, passive: true });
-    el.addEventListener('touchcancel', onCancel, { capture: true, passive: true });
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onCancel, { passive: true });
     return () => {
-      el.removeEventListener('touchstart', onStart, true);
-      el.removeEventListener('touchend', onEnd, true);
-      el.removeEventListener('touchcancel', onCancel, true);
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onCancel);
     };
-  }, [showAppUI, isMobileViewport, currentPage, handleTouchStart, handleTouchEnd]);
+  }, [showAppUI, isMobileViewport, currentPage, isChatSelected, handleTouchStart, handleTouchEnd]);
 
   useEffect(() => {
     const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
@@ -1841,7 +1810,8 @@ useEffect(() => {
     const componentKey = `${currentPage}-${currentOutletId}`;
 
     return (
-      <Suspense fallback={null}>
+      <PageErrorBoundary darkMode={darkMode} key={`err-${componentKey}`}>
+      <Suspense fallback={<PageRouteFallback page={currentPage} darkMode={darkMode} />}>
         {(() => {
           switch (currentPage) {
             case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
@@ -1858,11 +1828,12 @@ useEffect(() => {
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} openCreateBranchSignal={openCreateBranchSignal} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => navigateTo('dashboard', { replace: true })} />;
             case 'offers': return <OffersManager key={componentKey} {...commonProps} />;
-            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={canAccessPage('staffPermissions') ? () => navigateTo('staffPermissions') : undefined} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onThreadSwipeConsumed={suppressPageSwipeAfterChatThread} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={canAccessPage('staffPermissions') ? () => navigateTo('staffPermissions') : undefined} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
       </Suspense>
+      </PageErrorBoundary>
     );
   };
 
@@ -1872,6 +1843,13 @@ useEffect(() => {
       setIsChatSelected(false);
     }
   }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage === 'chat' && wasChatThreadOpenRef.current && !isChatSelected) {
+      pageSwipeSuppressUntilRef.current = Date.now() + 480;
+    }
+    wasChatThreadOpenRef.current = currentPage === 'chat' && isChatSelected;
+  }, [currentPage, isChatSelected]);
 
   // Typography mode: keep Dashboard styling as-is; normalize other pages.
   useEffect(() => {
@@ -1890,40 +1868,14 @@ useEffect(() => {
 
   return (
     <ApiProvider>
+      <OfflineProvider isAuthenticated={Boolean(currentUser)}>
       {/* Scrollbar styles are now handled globally in index.css */}
       <SEO title={`${currentPage.toUpperCase()} | Pocket POS`} />
       <div
+        data-theme={darkMode ? 'dark' : 'light'}
         className={`h-dvh min-h-dvh max-h-dvh w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden overscroll-none transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}
       >
         <UpdatePrompt />
-        {showAppUI && showStaffPunchPrompt && isStaffUser && (
-          <div className="fixed inset-0 z-[220] bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-4">
-            <div className={`w-full max-w-md rounded-2xl border p-5 ${darkMode ? 'bg-gray-950 border-gray-800' : 'bg-white border-slate-200 shadow-2xl'}`}>
-              <h3 className="text-base font-black tracking-tight">Punch in before continuing?</h3>
-              <p className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
-                You can punch in now, or skip and continue.
-              </p>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleStaffPromptSkip}
-                  className={`py-2.5 rounded-xl text-xs font-black tracking-wider border transition-all ${
-                    darkMode ? 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  Skip
-                </button>
-                <button
-                  onClick={handleStaffPromptPunchIn}
-                  disabled={isPromptPunchingIn}
-                  className="py-2.5 rounded-xl text-xs font-black tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isPromptPunchingIn ? <Loader className="w-4 h-4 animate-spin" /> : null}
-                  {isPromptPunchingIn ? 'Punching...' : 'Punch In'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {showAppUI && !isChatSelected && (
             <Header
                 companyName="Pocket POS"
@@ -2108,37 +2060,57 @@ useEffect(() => {
           <>
             <nav
               aria-label="Main navigation"
-              className={`app-mobile-tab-bar flex z-[50] border-t shadow-[0_-8px_20px_rgba(0,0,0,0.25)] overscroll-none ${darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200'}`}
+              className={`app-mobile-tab-bar flex z-[50] border-t shadow-[0_-8px_20px_rgba(0,0,0,0.25)] overscroll-none ${hasModalOpen ? 'pointer-events-none' : ''} ${darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200'}`}
             >
-              <div className="app-mobile-tab-bar-inner px-1">
-              {!showMoreMenu && mobileFooterTabs.map((item) => (
-                <button key={item.id} type="button" onClick={() => navigateTo(item.id)} className={`touch-manipulation relative flex h-full min-w-0 max-w-[5.5rem] flex-1 items-center justify-center transition-colors ${currentPage === item.id ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}>
-                  {currentPage === item.id && <span className="absolute top-0 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-indigo-500" aria-hidden />}
-                  <div className={`relative rounded-lg p-1 ${currentPage === item.id ? 'bg-indigo-500/10' : ''}`}>
-                    <item.icon className={`h-6 w-6 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-                    {item.id === 'chat' && chatUnreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-inherit">
-                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
-              {mobileMoreItems.length > 0 && (
-                <button 
+              {hasModalOpen && (
+                <div
+                  className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md"
+                  style={{ WebkitBackdropFilter: 'blur(12px)' }}
+                  aria-hidden
+                />
+              )}
+              <div
+                className={`app-mobile-tab-bar-inner px-2 relative ${hasModalOpen ? 'opacity-30' : ''}`}
+                style={{
+                  gridTemplateColumns: `repeat(${
+                    Math.max(
+                      !showMoreMenu ? mobileFooterSlotCount : mobileMoreItems.length > 0 ? 1 : 0,
+                      1
+                    )
+                  }, minmax(0, 1fr))`,
+                }}
+              >
+              {!showMoreMenu && mobileFooterSlotCount > 0 && (
+                useSuperadminMobileFooter ? (
+                  mobileFooterCompactRow.map((item) =>
+                    renderFooterTabButton(item, { slotKey: item.id })
+                  )
+                ) : (
+                  <>
+                    {renderFooterTabButton(footerLeftPinnedTab, { pinned: true, slotKey: 'dash' })}
+                    {renderFooterTabButton(footerSlot2Fixed, { pinned: true, slotKey: 's2' })}
+                    {hasFooterCenterChat &&
+                      renderFooterTabButton(footerSlot3Messages, {
+                        pinned: true,
+                        center: true,
+                        slotKey: 'chat',
+                      })}
+                    {renderFooterTabButton(footerSlot4Dynamic, { slotKey: 's4' })}
+                  </>
+                )
+              )}
+              {showMobileMoreFooter && (
+                <button
                   type="button"
-                  onClick={() => setShowMoreMenu(!showMoreMenu)} 
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
                   aria-label={showMoreMenu ? 'Close more menu' : 'More pages'}
-                  className={`touch-manipulation relative flex h-full min-w-0 max-w-[5.5rem] flex-1 items-center justify-center transition-colors ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
+                  className={`app-mobile-tab-btn touch-manipulation flex h-full w-full items-center justify-center transition-colors ${showMoreMenu ? 'text-indigo-500' : 'text-gray-600 hover:text-indigo-400'}`}
                 >
-                  {(showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id)) && <span className="absolute top-0 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-indigo-500" aria-hidden />}
-                  <div className={`relative rounded-lg p-1 ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'bg-indigo-500/10' : ''}`}>
-                    <MoreHorizontal className={`h-6 w-6 ${showMoreMenu || mobileMoreItems.some((item) => currentPage === item.id) ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-                    {chatUnreadCount > 0 && mobileMoreItems.some(item => item.id === 'chat') && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-inherit">
-                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                      </span>
-                    )}
+                  {showMoreMenu && (
+                    <span className="app-mobile-tab-active-indicator" aria-hidden />
+                  )}
+                  <div className={`relative rounded-lg p-1 ${showMoreMenu ? 'bg-indigo-500/10' : ''}`}>
+                    <MoreHorizontal className={`h-6 w-6 ${showMoreMenu ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                   </div>
                 </button>
               )}
@@ -2193,6 +2165,7 @@ useEffect(() => {
           </>
         )}
       </div>
+      </OfflineProvider>
     </ApiProvider>
   );
 };

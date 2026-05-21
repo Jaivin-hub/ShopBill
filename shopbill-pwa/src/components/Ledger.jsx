@@ -13,9 +13,17 @@ import {
   AddCustomerModal, 
   EditCustomerModal,
   HistoryModal, 
-  RemindModal 
+  RemindModal,
+  DeleteCustomerModal,
 } from './LedgerModals';
 import { validateName, validatePhoneNumber, validateCreditLimit, validatePositiveNumber } from '../utils/validation';
+import {
+  loadSentReminders,
+  saveSentReminders,
+  isReminderOnCooldown,
+  formatReminderCooldownTitle,
+  getReminderCooldownRemainingMs,
+} from '../utils/ledgerReminderCooldown';
 
 const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar { width: 4px; }
@@ -32,7 +40,7 @@ const scrollbarStyles = `
 
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
 
-const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, currentUser }) => {
+const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, currentUser, currentOutletId }) => {
   const showRemindOption = ['PRO', 'PREMIUM'].includes((currentUser?.plan || '').toUpperCase());
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +62,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     if (onModalStateChange) {
       onModalStateChange(!!activeModal);
     }
+    return () => {
+      if (onModalStateChange) {
+        onModalStateChange(false);
+      }
+    };
   }, [activeModal, onModalStateChange]);
   
   // State for specific error feedback in Add Customer Modal
@@ -62,8 +75,12 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
   // Validation errors state
   const [validationErrors, setValidationErrors] = useState({});
   
-  // Track sent reminders to provide visual feedback and cooldown
-  const [sentReminders, setSentReminders] = useState({});
+  // Track sent reminders — 1 week cooldown per customer (persisted per outlet)
+  const [sentReminders, setSentReminders] = useState(() => loadSentReminders(currentOutletId));
+
+  useEffect(() => {
+    setSentReminders(loadSentReminders(currentOutletId));
+  }, [currentOutletId]);
 
   // States for the Reminder feature
   const [reminderMessage, setReminderMessage] = useState('');
@@ -204,10 +221,11 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
       });
 
       if (response.data && response.data.success) {
-        setSentReminders(prev => ({
-          ...prev,
-          [selectedCustomer._id]: Date.now()
-        }));
+        const next = {
+          ...sentReminders,
+          [selectedCustomer._id]: Date.now(),
+        };
+        setSentReminders(saveSentReminders(currentOutletId, next));
         
         if(showToast) showToast(`Reminder sent via ${reminderType.toUpperCase()}`, 'success');
         setTimeout(() => setActiveModal(null), 600);
@@ -220,27 +238,37 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
     }
   };
 
-  const handleDeleteCustomer = useCallback(async (customer) => {
+  const openDeleteModal = useCallback((customer) => {
     if (!customer?._id) return;
-    if (!window.confirm(`Delete customer "${customer.name}"? This cannot be undone.`)) return;
+    if (Number(customer.outstandingCredit || 0) > 0) return;
+    setSelectedCustomer(customer);
+    setActiveModal('delete');
+  }, []);
+
+  const confirmDeleteCustomer = useCallback(async () => {
+    const customer = selectedCustomer;
+    if (!customer?._id) return;
     setIsProcessing(true);
     try {
       await apiClient.delete(`${API.customers}/${customer._id}`);
       if (showToast) showToast('Customer deleted', 'success');
+      setActiveModal(null);
+      setSelectedCustomer(null);
       await fetchCustomers();
-      if (selectedCustomer?._id === customer._id) {
-        setSelectedCustomer(null);
-        setActiveModal(null);
-      }
     } catch (error) {
       const msg = error?.response?.data?.error || 'Failed to delete customer';
       if (showToast) showToast(msg, 'error');
     } finally {
       setIsProcessing(false);
     }
-  }, [apiClient, API.customers, showToast, fetchCustomers, selectedCustomer?._id]);
+  }, [apiClient, API.customers, showToast, fetchCustomers, selectedCustomer]);
 
   const openRemindModal = (customer) => {
+    if (isReminderOnCooldown(customer._id, sentReminders)) {
+      const remaining = getReminderCooldownRemainingMs(customer._id, sentReminders);
+      if (showToast) showToast(formatReminderCooldownTitle(remaining), 'info');
+      return;
+    }
     setSelectedCustomer(customer);
     setReminderType('whatsapp'); 
     const defaultMsg = `Hi ${customer.name}, this is a friendly reminder from our store regarding your outstanding balance of ₹${(customer.outstandingCredit || 0).toLocaleString('en-IN')}. Please settle it at your earliest convenience. Thank you!`;
@@ -431,7 +459,7 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                 openPaymentModal={(c) => { setSelectedCustomer(c); setPaymentAmount(''); setActiveModal('payment'); }}
                 openHistoryModal={(c) => { setSelectedCustomer(c); setActiveModal('history'); }}
                 openEditModal={(c) => { setSelectedCustomer(c); setActiveModal('edit'); }}
-                openDeleteModal={handleDeleteCustomer}
+                openDeleteModal={openDeleteModal}
                 openRemindModal={openRemindModal}
                 showRemindOption={showRemindOption}
                 isProcessing={isProcessing}
@@ -446,10 +474,10 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
       {/* Add new customer – FAB visible on all breakpoints (mobile + desktop) */}
       <button
         onClick={() => { setAddCustomerError(null); setNewCustomerData(initialNewCustomerState); setActiveModal('add') }}
-        className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60"
+        className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/50"
         aria-label="Create new account"
       >
-        <UserPlus className="w-6 h-6" strokeWidth={2.5} />
+        <UserPlus className="w-5 h-5" strokeWidth={2.5} />
       </button>
 
       {/* Modals Rendering */}
@@ -515,6 +543,15 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
           onConfirm={handleSendReminder}
           isProcessing={isProcessing}
           darkMode={darkMode} 
+        />
+      )}
+      {activeModal === 'delete' && selectedCustomer && (
+        <DeleteCustomerModal
+          customer={selectedCustomer}
+          onClose={() => setActiveModal(null)}
+          onConfirm={confirmDeleteCustomer}
+          isProcessing={isProcessing}
+          darkMode={darkMode}
         />
       )}
     </div>

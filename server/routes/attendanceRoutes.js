@@ -4,6 +4,7 @@ const { protect } = require('../middleware/authMiddleware');
 const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
 const { emitAlert } = require('./notificationRoutes');
+const { applyAutoPunchOutForStore: runStoreAutoPunchOut } = require('../utils/attendanceAutoPunchOut');
 
 const router = express.Router();
 
@@ -91,46 +92,7 @@ async function findStaffForRequest(req) {
 }
 
 async function applyAutoPunchOutForStore(storeId) {
-    if (!storeId) return;
-    const now = new Date();
-    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const activeAttendance = await Attendance.find({
-        storeId,
-        status: 'active',
-        punchOut: null
-    });
-    if (!activeAttendance.length) return;
-    const staffIds = activeAttendance.map((a) => a.staffId).filter(Boolean);
-    const staffList = await Staff.find({ _id: { $in: staffIds } }).select('_id workSchedule').lean();
-    const staffById = new Map(staffList.map((s) => [String(s._id), s]));
-    for (const att of activeAttendance) {
-        const staff = staffById.get(String(att.staffId));
-        const effective = resolveEffectiveSchedule(staff?.workSchedule || {});
-        if (!effective.shiftEnabled) continue;
-        const cutoffMins = timeToMinutes(effective.punchInEnd);
-        if (cutoffMins == null) continue;
-        // Use attendance day as base, then move cutoff to next day when cutoff < punch-in clock
-        const baseDate = new Date(att.date || att.punchIn);
-        const cutoffAt = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), Math.floor(cutoffMins / 60), cutoffMins % 60, 0, 0);
-        const punchInMins = minutesFromDateLocal(att.punchIn || baseDate);
-        if (cutoffMins <= punchInMins) {
-            cutoffAt.setDate(cutoffAt.getDate() + 1);
-        }
-        if (now >= cutoffAt || (new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()) < todayDateOnly && now > cutoffAt)) {
-            if (att.onBreak) {
-                const activeBreak = att.breaks && att.breaks.find((b) => !b.breakEnd);
-                if (activeBreak) {
-                    activeBreak.breakEnd = now;
-                    const breakDiff = activeBreak.breakEnd - activeBreak.breakStart;
-                    activeBreak.breakDuration = Math.round(breakDiff / (1000 * 60));
-                }
-                att.onBreak = false;
-            }
-            att.punchOut = now;
-            att.status = 'completed';
-            await att.save();
-        }
-    }
+    await runStoreAutoPunchOut(storeId);
 }
 
 /**

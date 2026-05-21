@@ -1,10 +1,11 @@
 import React from 'react';
+import ModalPortal from './ModalPortal';
 import { 
   X, CreditCard, Loader, CheckCircle, UserPlus, 
   History, Info, AlertTriangle, ArrowUp, ArrowDown, 
   DollarSign, Repeat, XCircle, Phone, ShieldAlert, Calendar,
   MessageSquare, Send, Sparkles, RefreshCcw, MessageCircle,
-  BellRing, AlertCircle, Pencil
+  BellRing, AlertCircle, Pencil, Trash2
 } from 'lucide-react';
 
 // --- UPDATED: Added reminder_sent to styles ---
@@ -58,7 +59,8 @@ const InputField = ({ label, name, type, value, onChange, error, disabled, icon:
 );
 
 export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, isProcessing, darkMode }) => (
-  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+  <ModalPortal>
+  <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[120] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`} style={{ WebkitBackdropFilter: 'blur(12px)' }}>
     <section className={`w-full max-w-md max-h-[85vh] sm:max-h-[80vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
       {/* Header */}
       <header className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100 bg-slate-50/50'}`}>
@@ -147,7 +149,127 @@ export const PaymentModal = ({ customer, amount, setAmount, onClose, onConfirm, 
       </div>
     </section>
   </div>
+  </ModalPortal>
 );
+
+export const DeleteCustomerModal = ({ customer, onClose, onConfirm, isProcessing, darkMode }) => {
+  const outstanding = Number(customer?.outstandingCredit || 0);
+  const hasDue = outstanding > 0;
+
+  return (
+    <ModalPortal>
+      <div
+        className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[120] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}
+        style={{ WebkitBackdropFilter: 'blur(12px)' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-customer-title"
+      >
+        <section className={`w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <header className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100 bg-slate-50/50'}`}>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="p-1.5 sm:p-2 bg-rose-500/10 rounded-lg text-rose-500 shrink-0">
+                <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+              </div>
+              <div>
+                <h2 id="delete-customer-title" className={`text-xs sm:text-sm font-black tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Delete Account
+                </h2>
+                <p className={`text-[8px] sm:text-[9px] font-black tracking-widest mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Permanent Action
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isProcessing}
+              className={`p-2 rounded-xl transition-colors shrink-0 disabled:opacity-50 ${darkMode ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}
+              aria-label="Close"
+            >
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </header>
+
+          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+            <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100 shadow-sm'}`}>
+              <p className={`text-[8px] sm:text-[9px] font-black tracking-widest uppercase mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                Customer Account
+              </p>
+              <p className={`text-lg sm:text-xl font-black tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {customer?.name}
+              </p>
+              {customer?.phone && (
+                <p className={`mt-1 text-xs font-bold flex items-center gap-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <Phone size={12} className="shrink-0" />
+                  {customer.phone}
+                </p>
+              )}
+            </div>
+
+            {hasDue && (
+              <div className={`p-4 rounded-xl sm:rounded-2xl border flex items-start gap-3 ${darkMode ? 'bg-rose-500/10 border-rose-500/20' : 'bg-rose-50 border-rose-200'}`}>
+                <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className={`text-[9px] font-black tracking-widest uppercase ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                    Outstanding Balance
+                  </p>
+                  <p className={`text-lg font-black tabular-nums mt-0.5 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                    ₹{outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className={`text-[11px] font-bold mt-1 leading-snug ${darkMode ? 'text-rose-300/80' : 'text-rose-700/80'}`}>
+                    This customer still has an unpaid balance. Deleting will remove their ledger record permanently.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className={`p-4 rounded-xl sm:rounded-2xl border flex items-start gap-3 ${darkMode ? 'bg-amber-500/5 border-amber-500/15' : 'bg-amber-50 border-amber-100'}`}>
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className={`text-[9px] font-black tracking-widest uppercase ${darkMode ? 'text-amber-500' : 'text-amber-600'}`}>
+                  Cannot Be Undone
+                </p>
+                <p className={`text-xs sm:text-sm font-bold mt-1 leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  All transaction history, payment records, and account details for <span className="font-black">{customer?.name}</span> will be permanently removed from your ledger.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <footer className={`p-3 sm:p-4 border-t flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0 ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50/30'}`}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isProcessing}
+              className={`flex-1 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs font-black tracking-widest transition-all active:scale-95 disabled:opacity-50 ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
+            >
+              Keep Account
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isProcessing}
+              className="flex-1 py-3 sm:py-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-rose-600/20 text-xs"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Permanently
+                </>
+              )}
+            </button>
+          </footer>
+        </section>
+      </div>
+    </ModalPortal>
+  );
+};
 
 export const AddCustomerModal = ({ 
   data, 
@@ -163,8 +285,9 @@ export const AddCustomerModal = ({
   if (!data) return null;
 
   return (
+    <ModalPortal>
     <div 
-      className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
+      className={`fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
       style={{ WebkitBackdropFilter: 'blur(24px)' }}
       aria-modal="true"
       role="dialog"
@@ -254,7 +377,7 @@ export const AddCustomerModal = ({
           <div className={`shrink-0 p-3 sm:p-4 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
             <button 
               type="submit" 
-              className="w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-indigo-600/20 text-xs sm:text-sm" 
+              className="w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 text-xs sm:text-sm text-white bg-indigo-600 hover:bg-indigo-500 shadow-xl shadow-indigo-600/25 disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
               disabled={isProcessing || !isValid}
             >
               {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
@@ -267,6 +390,7 @@ export const AddCustomerModal = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
@@ -323,8 +447,10 @@ export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, s
   if (!customer) return null;
 
   return (
+    <ModalPortal>
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
+      className={`fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain ${darkMode ? 'bg-black/60' : 'bg-black/50'} backdrop-blur-xl`}
+      style={{ WebkitBackdropFilter: 'blur(24px)' }}
       aria-modal="true"
       role="dialog"
       aria-labelledby="edit-customer-title"
@@ -349,7 +475,7 @@ export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, s
             <InputField label="Credit Limit (₹)" name="creditLimit" type="number" icon={ShieldAlert} value={creditLimit} onChange={(e) => { setCreditLimit(e.target.value); setErrors(prev => ({ ...prev, creditLimit: undefined })); }} placeholder="5000" error={errors.creditLimit} darkMode={darkMode} required />
           </div>
           <div className={`shrink-0 p-3 sm:p-4 border-t ${darkMode ? 'border-gray-800' : 'border-slate-100'}`}>
-            <button type="submit" disabled={isProcessing} className="w-full py-3 sm:py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-amber-600/20 text-xs sm:text-sm">
+            <button type="submit" disabled={isProcessing} className="w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 text-xs sm:text-sm text-white bg-indigo-600 hover:bg-indigo-500 shadow-xl shadow-indigo-600/25 disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
               {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
               Update Account
             </button>
@@ -357,6 +483,7 @@ export const EditCustomerModal = ({ customer, onClose, onSave, apiClient, API, s
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
@@ -385,7 +512,8 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
     const tabBtnBase = "flex-1 py-3 text-[10px] font-black tracking-[0.2em] transition-all duration-300 rounded-xl flex items-center justify-center gap-2";
 
     return (
-        <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+        <ModalPortal>
+        <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[120] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`} style={{ WebkitBackdropFilter: 'blur(12px)' }}>
             <div className={`w-full max-w-lg h-[85vh] sm:h-[80vh] max-h-[600px] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'}`}>
                 
                 {/* Header: Title and Close */}
@@ -608,6 +736,7 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };
 
@@ -647,7 +776,8 @@ export const RemindModal = ({ customer, message, setMessage, onClose, onConfirm,
   };
 
   return (
-    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+    <ModalPortal>
+    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[120] p-3 sm:p-4 ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`} style={{ WebkitBackdropFilter: 'blur(12px)' }}>
       <div className={`w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[550px] rounded-xl sm:rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${cardBg} flex flex-col`}>
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <div className="flex justify-between items-center mb-6">
@@ -721,11 +851,13 @@ export const RemindModal = ({ customer, message, setMessage, onClose, onConfirm,
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
 export const RemindInfoModal = ({ onClose, darkMode }) => (
-    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-4 md:p-6 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`}>
+    <ModalPortal>
+    <div className={`fixed inset-0 backdrop-blur-md flex items-center justify-center z-[120] p-3 sm:p-4 md:p-6 overflow-y-auto ${darkMode ? 'bg-gray-950/80' : 'bg-slate-900/40'}`} style={{ WebkitBackdropFilter: 'blur(12px)' }}>
         <div className={`w-full max-w-sm rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-slate-200'} my-auto max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
             <div className={`p-4 sm:p-5 md:p-6 border-b flex justify-between items-center ${darkMode ? 'border-gray-800' : 'border-slate-100 bg-slate-50/50'} flex-shrink-0`}>
                 <h2 className={`text-sm font-black  tracking-widest flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -750,4 +882,5 @@ export const RemindInfoModal = ({ onClose, darkMode }) => (
             </div>
         </div>
     </div>
+    </ModalPortal>
 );

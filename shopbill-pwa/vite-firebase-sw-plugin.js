@@ -126,7 +126,7 @@ function showLocalPush(title, body, data) {
     else if (nt === 'inventory_low' || nt === 'credit_exceeded') soundCat = 'alert';
   }
   const soundCategory = String(soundCat || 'default').toLowerCase();
-  const rawPath = d.link || d.url || (d.chatId ? '/chat/' + d.chatId : '/notifications');
+  const rawPath = d.link || d.url || (d.chatId ? '/chat/' + d.chatId : (String(d.notificationType || d.type || '') === 'inventory_low' ? '/inventory' : '/notifications'));
   const targetUrl = resolveOpenUrl(rawPath);
   const uniqueTag = d.notificationId || d.chatId || ('pocketpos-' + Date.now());
   const options = {
@@ -210,7 +210,12 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) {
-          client.postMessage({ type: 'notification-click', url: targetUrl });
+          const nd = event.notification && event.notification.data ? event.notification.data : {};
+          client.postMessage({
+            type: 'notification-click',
+            url: targetUrl,
+            notificationType: nd.notificationType || nd.type || '',
+          });
           return client.focus();
         }
       }

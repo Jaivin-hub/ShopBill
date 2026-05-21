@@ -189,7 +189,7 @@ const ChatHeader = ({
                             </span>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
+                        <div className="flex-1 overflow-y-auto chat-scroll custom-scrollbar pb-10">
                             {/* Profile Hero Section */}
                             <div className={`flex flex-col items-center p-10 text-center border-b ${darkMode ? 'border-slate-800/40' : 'border-slate-200'}`}>
                                 <div className="relative group mb-6">

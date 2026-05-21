@@ -192,3 +192,10 @@ export const playPushSoundCategory = (category) => {
 export const playNotificationSound = () => {
   playPushSoundCategory('default');
 };
+
+/** Short click when voice recording locks via swipe-up (mic gesture). */
+export const playMicLockSound = () => {
+  unlockAudio();
+  playHtmlAudioFromUri(getBeepDataUri(520, 0.055, 14), 0.42);
+  setTimeout(() => playHtmlAudioFromUri(getBeepDataUri(780, 0.04, 16), 0.28), 55);
+};

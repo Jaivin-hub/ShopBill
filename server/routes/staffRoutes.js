@@ -143,26 +143,64 @@ async function resolveSettlementActorInfo(req) {
 /** Only explicit `true` counts as active — fixes legacy docs missing `active` and avoids UI showing the wrong state. */
 function enrichStaffMember(staff) {
     if (!staff) return null;
-    const hasInviteToken = !!(staff.userId && typeof staff.userId === 'object' && staff.userId.resetPasswordToken);
+    const linkedUser =
+        staff.userId && typeof staff.userId === 'object' ? staff.userId : null;
+    const hasInviteToken = !!linkedUser?.resetPasswordToken;
+    const active = staff.active === true;
+    const hasPassword = !!(linkedUser?.password && String(linkedUser.password).length > 0);
+    const userId = linkedUser?._id || staff.userId;
+    const { userId: _omit, ...staffFields } = staff;
     return {
-        ...staff,
-        active: staff.active === true,
+        ...staffFields,
+        userId,
+        active,
         passwordSetupStatus: hasInviteToken ? 'pending' : 'completed',
+        activationInvitePending: hasInviteToken && !active,
+        canReactivateAccount: hasPassword,
     };
 }
 
 async function enrichStaffById(staffId) {
     const staff = await Staff.findById(staffId)
         .select('name email role phone active storeId userId permissions workSchedule compensation payrollSettlements')
-        .populate('userId', 'resetPasswordToken')
+        .populate('userId', 'resetPasswordToken password')
         .lean();
     return enrichStaffMember(staff);
+}
+
+async function resendStaffActivationInvite({ linkedUser, staffMember, storeId }) {
+    const activationToken = crypto.randomBytes(32).toString('hex');
+    const activationTokenHash = crypto
+        .createHash('sha256')
+        .update(activationToken)
+        .digest('hex');
+
+    linkedUser.resetPasswordToken = activationTokenHash;
+    linkedUser.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000;
+    linkedUser.isActive = false;
+    await linkedUser.save({ validateBeforeSave: false });
+
+    await Staff.findByIdAndUpdate(staffMember._id, { active: false }, { new: true, runValidators: true });
+
+    let shopName = 'Your shop';
+    if (storeId) {
+        const store = await Store.findById(storeId).select('name').lean();
+        if (store?.name) shopName = store.name;
+    }
+
+    return sendEmail.sendStaffActivationEmailAndGetDispatch({
+        to: linkedUser.email,
+        name: staffMember.name,
+        role: staffMember.role,
+        shopName,
+        activationToken,
+    });
 }
 
 /**
  * Idempotent set Staff.active + User.isActive (or revoke pending invite). Avoids toggle double-requests flipping state back to active.
  */
-async function applyStaffActiveState(res, { staffMember, linkedUser, targetActive, staffName }) {
+async function applyStaffActiveState(res, { staffMember, linkedUser, targetActive, staffName, storeId }) {
     const staffId = staffMember._id;
     const currentlyActive = staffMember.active === true;
     const isPendingInvite = !!linkedUser.resetPasswordToken && !currentlyActive;
@@ -200,9 +238,17 @@ async function applyStaffActiveState(res, { staffMember, linkedUser, targetActiv
                 error: 'This member must finish the activation link and set a password before their account can be activated.',
             });
         }
-        console.log('[staffRoutes] applyStaffActive → 400 activate blocked (no password)', { staffId: String(staffId) });
-        return res.status(400).json({
-            error: 'This member never completed password setup and has no pending invite. Remove them from the team and add them again to send a new activation email.',
+        console.log('[staffRoutes] applyStaffActive → resend activation invite', { staffId: String(staffId) });
+        const emailDispatch = await resendStaffActivationInvite({ linkedUser, staffMember, storeId });
+        const enriched = await enrichStaffById(staffId);
+        const emailNote = emailDispatch.success
+            ? 'A new activation email has been sent.'
+            : 'Activation link was created, but the email failed to send. Check email settings.';
+        return res.json({
+            message: `${staffName}: ${emailNote} They must set a password before the account can be activated.`,
+            staff: enriched,
+            resentInvite: true,
+            emailDispatch,
         });
     }
 
@@ -243,7 +289,7 @@ router.get('/', protect, async (req, res) => {
 
         const staffList = await Staff.find({ storeId: req.user.storeId })
             .select('name email role phone active storeId userId permissions workSchedule compensation payrollSettlements')
-            .populate('userId', 'resetPasswordToken')
+            .populate('userId', 'resetPasswordToken password')
             .lean()
             .sort({ role: -1, name: 1 });
 
@@ -766,6 +812,7 @@ router.put('/:id/active', protect, async (req, res) => {
             linkedUser,
             targetActive,
             staffName: staffMember.name,
+            storeId: req.user.storeId,
         });
     } catch (error) {
         console.error('[staffRoutes] PUT /api/staff/:id/active → 500', error.message);
@@ -827,6 +874,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
                 linkedUser,
                 targetActive: false,
                 staffName: staffMember.name,
+                storeId: req.user.storeId,
             });
         }
 
@@ -836,6 +884,7 @@ router.put('/:id/toggle', protect, async (req, res) => {
             linkedUser,
             targetActive: !currentlyActive,
             staffName: staffMember.name,
+            storeId: req.user.storeId,
         });
     } catch (error) {
         console.error('[staffRoutes] PUT /api/staff/:id/toggle → 500', error.message);

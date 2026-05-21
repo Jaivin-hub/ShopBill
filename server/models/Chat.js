@@ -23,6 +23,17 @@ const MessageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }],
+    /** WhatsApp-style reply: snapshot of the message being replied to */
+    replyTo: {
+        messageId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        senderName: { type: String, default: '' },
+        senderRole: { type: String, default: '' },
+        messageType: { type: String, enum: ['text', 'audio', 'file'], default: 'text' },
+        content: { type: String, default: '' },
+        fileName: { type: String, default: null },
+        audioDuration: { type: Number, default: null },
+    },
     timestamp: { type: Date, default: Date.now }
 }, { _id: true });
 

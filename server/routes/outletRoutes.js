@@ -194,19 +194,18 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
             isActive: true
         });
 
-        // Automatically create a default group for this new outlet
         const storeGroupName = `${newOutlet.name} Group`;
         const requiredPlan = owner.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO';
-        
+
         await Chat.create({
             type: 'group',
             name: storeGroupName,
             isGroupChat: true,
-            participants: [owner._id], // Start with just the owner
+            participants: [owner._id],
             createdBy: owner._id,
             isDefault: true,
             outletId: newOutlet._id,
-            requiredPlan: requiredPlan
+            requiredPlan,
         });
 
         res.status(201).json({

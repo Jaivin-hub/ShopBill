@@ -35,7 +35,7 @@ const ChatListSidebar = ({
     const groupUnreadCount = useMemo(
         () =>
             safeChats
-                .filter((chat) => chat?.type === 'group' || chat?.isDefault)
+                .filter((chat) => chat?.type === 'group' || chat?.isDefault || chat?.isGroupChat)
                 .reduce((total, chat) => total + (Number(chat?.unreadCount) || 0), 0),
         [safeChats]
     );
@@ -62,7 +62,7 @@ const ChatListSidebar = ({
             className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full transition-all duration-300 ${sidebarBg} overflow-hidden`}
         >
             {/* Scrollable Container - Required for sticky to work */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 overflow-y-auto chat-scroll custom-scrollbar">
                 {showSidebarHeaderSkeleton ? (
                     <ChatSidebarHeaderSkeleton darkMode={darkMode} />
                 ) : (
@@ -309,7 +309,7 @@ const ChatListView = ({ chats, selectedChat, onSelectChat, searchTerm, isLoading
 
     // Sort chats by lastMessageAt (from backend) - most recent first
     const sortedChats = [...safeChats]
-        .filter(c => c.type === 'group' || c.isDefault)
+        .filter((c) => c.type === 'group' || c.isDefault || c.isGroupChat)
         .sort((a, b) => {
             // Use lastMessageAt from backend (most reliable)
             const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;

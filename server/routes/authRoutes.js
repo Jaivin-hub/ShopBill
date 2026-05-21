@@ -109,6 +109,20 @@ router.post('/login', async (req, res) => {
 
         if (user && (await user.matchPassword(password))) {
 
+            // Heal legacy rows: staff finished activation (Staff.active) but User.isActive stayed false after resend-invite flow
+            if (
+                user.isActive === false &&
+                user.role !== 'owner' &&
+                user.role !== 'superadmin' &&
+                !user.resetPasswordToken
+            ) {
+                const staffForLogin = await Staff.findOne({ userId: user._id, active: true }).select('_id').lean();
+                if (staffForLogin) {
+                    user.isActive = true;
+                    await user.save({ validateBeforeSave: false });
+                }
+            }
+
             // 1. Basic Active Check - Block login if account is deactivated
             // Only block if explicitly set to false (default is true, so null/undefined should allow login)
             if (user.isActive === false) {
@@ -326,7 +340,6 @@ router.post('/signup', async (req, res) => {
         newUser.activeStoreId = initialOutlet._id;
         await newUser.save();
 
-        // Create the default outlet group (same behavior as manual outlet creation).
         const requiredPlan = newUser.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO';
         await Chat.create({
             type: 'group',
@@ -336,7 +349,7 @@ router.post('/signup', async (req, res) => {
             createdBy: newUser._id,
             isDefault: true,
             outletId: initialOutlet._id,
-            requiredPlan
+            requiredPlan,
         });
 
         // Notify superadmins that a new shop registered (non-blocking)
@@ -826,10 +839,11 @@ router.put('/activate/:activationToken', async (req, res) => {
             return res.status(400).json({ error: 'Invalid or expired activation token. Please ask your manager to resend the link.' });
         }
 
-        // 4. Update the password and clear the reset/activation fields
+        // 4. Update the password, clear activation token, and enable login
         user.password = newPassword;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
+        user.isActive = true;
 
         // Mongoose pre-save hook will hash the new password before saving
         await user.save();
@@ -840,11 +854,10 @@ router.put('/activate/:activationToken', async (req, res) => {
             staff.active = true;
             await staff.save();
 
-            // 5.1. Add staff to outlet's default group after activation
             try {
                 if (staff.storeId) {
                     const store = await Store.findById(staff.storeId);
-                    if (store) {
+                    if (store?.ownerId) {
                         const owner = await User.findById(store.ownerId);
                         if (owner) {
                             const storeGroupName = `${store.name} Group`;
@@ -853,39 +866,39 @@ router.put('/activate/:activationToken', async (req, res) => {
                                 type: 'group',
                                 createdBy: owner._id,
                                 isDefault: true,
-                                outletId: staff.storeId
+                                outletId: staff.storeId,
                             });
 
-                            if (outletGroup) {
-                                // Add the staff member to the outlet group if not already a participant
-                                if (!outletGroup.participants.includes(user._id)) {
-                                    outletGroup.participants.push(user._id);
-                                    await outletGroup.save();
-                                }
-                            }
-
-                            // Also add to "All Outlet Staffs" group if it exists
-                            const allOutletsGroup = await Chat.findOne({
-                                name: 'All Outlet Staffs',
-                                type: 'group',
-                                createdBy: owner._id,
-                                isDefault: true,
-                                outletId: null
-                            });
-
-                            if (allOutletsGroup) {
-                                // Add the staff member to the all outlets group if not already a participant
-                                if (!allOutletsGroup.participants.includes(user._id)) {
-                                    allOutletsGroup.participants.push(user._id);
-                                    await allOutletsGroup.save();
-                                }
+                            if (
+                                outletGroup &&
+                                !outletGroup.participants.some(
+                                    (p) => p.toString() === user._id.toString()
+                                )
+                            ) {
+                                outletGroup.participants.push(user._id);
+                                await outletGroup.save();
                             }
                         }
                     }
                 }
             } catch (groupError) {
-                // Log error but don't fail activation if group update fails
                 console.error('Error adding staff to outlet group after activation:', groupError);
+            }
+
+            try {
+                const alertReq = {
+                    app: req.app,
+                    user: { _id: user._id, role: staff.role || 'Cashier' },
+                };
+                await emitAlert(alertReq, staff.storeId, 'staff_account_activated', {
+                    message: `${staff.name} (${staff.role}) has activated their account and can now sign in.`,
+                    staffId: staff._id,
+                    staffName: staff.name,
+                    staffRole: staff.role,
+                    actorUserId: user._id,
+                });
+            } catch (notifError) {
+                console.error('Error sending staff_account_activated notification:', notifError);
             }
         }
 

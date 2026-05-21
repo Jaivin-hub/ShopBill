@@ -43,6 +43,7 @@ const NotificationSchema = new mongoose.Schema({
             'staff_shift_assigned',
             'attendance_shift_reminder',
             'reports_access_enabled',
+            'staff_account_activated',
             'system', 
             'success', 
             'system_update',

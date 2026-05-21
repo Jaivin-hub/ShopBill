@@ -10,8 +10,35 @@ const Store = require('../models/Store');
 const Staff = require('../models/Staff');
 const { sendPushNotification } = require('../services/firebaseAdmin');
 const { collectPushTokens } = require('../utils/pushTokens');
-const { findDefaultOutletGroupChat } = require('../utils/defaultOutletChat');
 const router = express.Router();
+
+/** Inlined so GET /chats works even if utils/defaultOutletChat.js is missing on deploy. */
+async function findDefaultOutletGroupChat(ownerUserId, outletId) {
+    if (!outletId) return null;
+    let chat = await Chat.findOne({
+        type: 'group',
+        isDefault: true,
+        outletId,
+    });
+    if (chat) return chat;
+    if (!ownerUserId) return null;
+    chat = await Chat.findOne({
+        type: 'group',
+        outletId,
+        createdBy: ownerUserId,
+    })
+        .sort({ createdAt: 1 })
+        .exec();
+    return chat || null;
+}
+
+/** Legacy cross-outlet group — no longer created; hide from chat list. */
+function isAllOutletsStaffGroup(chat) {
+    if (!chat) return false;
+    const name = (chat.name || '').trim().toLowerCase();
+    if (name === 'all outlet staffs') return true;
+    return Boolean(chat.isDefault && !chat.outletId);
+}
 
 function parseMentionsFromBody(raw) {
     if (raw == null) return [];
@@ -120,6 +147,42 @@ function isGroupLikeChat(chat) {
     return chat && (chat.type === 'group' || chat.isDefault || chat.isGroupChat);
 }
 
+function findChatMessageById(chat, messageId) {
+    if (!chat?.messages?.length || !messageId) return null;
+    const idStr = String(messageId);
+    return chat.messages.find((m) => m._id && m._id.toString() === idStr) || null;
+}
+
+function buildReplySnapshotFromMessage(msg) {
+    if (!msg) return null;
+    const msgObj = msg.toObject ? msg.toObject() : msg;
+    return {
+        messageId: msgObj._id,
+        senderId: msgObj.senderId || null,
+        senderName: msgObj.senderName || 'User',
+        senderRole: msgObj.senderRole || '',
+        messageType: msgObj.messageType || 'text',
+        content: String(msgObj.content || '').slice(0, 500),
+        fileName: msgObj.fileName || null,
+        audioDuration: msgObj.audioDuration ?? null,
+    };
+}
+
+function serializeReplyTo(replyTo) {
+    if (!replyTo?.messageId) return null;
+    const senderId = replyTo.senderId;
+    return {
+        messageId: replyTo.messageId.toString ? replyTo.messageId.toString() : String(replyTo.messageId),
+        senderId: senderId?.toString ? senderId.toString() : (senderId ? String(senderId) : null),
+        senderName: replyTo.senderName || 'User',
+        senderRole: replyTo.senderRole || '',
+        messageType: replyTo.messageType || 'text',
+        content: replyTo.content || '',
+        fileName: replyTo.fileName || null,
+        audioDuration: replyTo.audioDuration ?? null,
+    };
+}
+
 // Configure multer for audio file uploads
 const audioStorage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -185,7 +248,8 @@ const fileUpload = multer({
 
 // Helper: Get the effective plan for a user (owner's plan for staff, user's plan for owners)
 const getEffectivePlan = async (user) => {
-    if (user.role === 'owner' || user.role === 'superadmin') {
+    const roleLower = String(user.role || '').toLowerCase();
+    if (roleLower === 'owner' || roleLower === 'superadmin') {
         return (user.plan || '').toUpperCase();
     }
     
@@ -246,13 +310,14 @@ router.get('/chats', protect, async (req, res) => {
             });
         }
 
-        // Auto-create default groups for owners if they don't exist
-        if (user.role === 'owner') {
+        const userRoleLower = String(user.role || '').toLowerCase();
+        const viewerId = req.user._id || req.user.id;
+
+        // Auto-create per-outlet default groups for owners if missing (not "All Outlet Staffs")
+        if (userRoleLower === 'owner') {
             const stores = await Store.find({ ownerId: user._id, isActive: true });
             const plan = (user.plan || '').toUpperCase();
 
-            // Per-outlet default groups: always resolve existing chat first (avoid duplicates when
-            // business name changes). Pro: still skip *creating* a new chat only while name is "Main Store".
             for (const store of stores) {
                 const storeGroupName = `${store.name} Group`;
                 const skipCreatingMainStorePro =
@@ -268,12 +333,12 @@ router.get('/chats', protect, async (req, res) => {
                     }
                     const storeStaff = await Staff.find({
                         storeId: store._id,
-                        active: true
+                        active: true,
                     }).populate('userId', '_id');
 
                     const storeStaffUserIds = storeStaff
-                        .map(s => s.userId?._id)
-                        .filter(id => id && id.toString() !== user._id.toString());
+                        .map((s) => s.userId?._id)
+                        .filter((id) => id && id.toString() !== user._id.toString());
 
                     storeGroup = await Chat.create({
                         type: 'group',
@@ -283,7 +348,7 @@ router.get('/chats', protect, async (req, res) => {
                         createdBy: user._id,
                         isDefault: true,
                         outletId: store._id,
-                        requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO'
+                        requiredPlan: user.plan?.toUpperCase() === 'PREMIUM' ? 'PREMIUM' : 'PRO',
                     });
                 } else {
                     let changed = false;
@@ -299,28 +364,31 @@ router.get('/chats', protect, async (req, res) => {
                         storeGroup.name = storeGroupName;
                         changed = true;
                     }
+                    const ownerIdStr = user._id.toString();
+                    if (!storeGroup.participants.some((p) => p.toString() === ownerIdStr)) {
+                        storeGroup.participants.push(user._id);
+                        changed = true;
+                    }
                     if (changed) await storeGroup.save();
                 }
             }
         }
 
-        // Auto-create default groups for managers and cashiers if they don't exist
-        if (user.role === 'manager' || user.role === 'cashier') {
-            // Find the owner for this staff member
+        // Ensure per-outlet default group exists for managers/cashiers (no cross-outlet group)
+        if (userRoleLower === 'manager' || userRoleLower === 'cashier') {
             let owner = null;
             let ownerStores = [];
-            
+
             if (user.activeStoreId) {
                 const store = await Store.findById(user.activeStoreId);
-                if (store && store.ownerId) {
+                if (store?.ownerId) {
                     owner = await User.findById(store.ownerId);
                     if (owner) {
                         ownerStores = await Store.find({ ownerId: owner._id, isActive: true });
                     }
                 }
             }
-            
-            // Fallback: try shopId
+
             if (!owner && user.shopId) {
                 owner = await User.findById(user.shopId);
                 if (owner) {
@@ -328,101 +396,76 @@ router.get('/chats', protect, async (req, res) => {
                 }
             }
 
-            if (owner && ownerStores.length > 0) {
-                const storeIds = ownerStores.map(s => s._id);
-                const allStaff = await Staff.find({ 
-                    storeId: { $in: storeIds }, 
-                    active: true 
-                }).populate('userId', '_id');
-                
-                const allStaffUserIds = allStaff
-                    .map(s => s.userId?._id)
-                    .filter(id => id && id.toString() !== owner._id.toString() && id.toString() !== user._id.toString());
+            if (owner && user.activeStoreId) {
+                const userStore = ownerStores.find(
+                    (s) => s._id.toString() === user.activeStoreId.toString()
+                );
+                if (userStore) {
+                    const storeGroupName = `${userStore.name} Group`;
+                    const ownerPlan = owner.plan?.toUpperCase() || 'PRO';
+                    const requiredPlan = ownerPlan === 'PREMIUM' ? 'PREMIUM' : 'PRO';
 
-                // Get owner's plan for requiredPlan
-                const ownerPlan = owner.plan?.toUpperCase() || 'PRO';
-                const requiredPlan = ownerPlan === 'PREMIUM' ? 'PREMIUM' : 'PRO';
+                    let storeGroup = await findDefaultOutletGroupChat(owner._id, userStore._id);
 
-                // 1. Create "All Outlet Staffs" group if it doesn't exist (with owner as creator)
-                const defaultGroupName = 'All Outlet Staffs';
-                let allOutletsGroup = await Chat.findOne({ 
-                    name: defaultGroupName, 
-                    type: 'group',
-                    createdBy: owner._id,
-                    isDefault: true,
-                    outletId: null
-                });
+                    if (!storeGroup) {
+                        const storeStaff = await Staff.find({
+                            storeId: userStore._id,
+                            active: true,
+                        }).populate('userId', '_id');
 
-                if (!allOutletsGroup) {
-                    allOutletsGroup = await Chat.create({
-                        type: 'group',
-                        name: defaultGroupName,
-                        isGroupChat: true,
-                        participants: [owner._id, user._id, ...allStaffUserIds],
-                        createdBy: owner._id,
-                        isDefault: true,
-                        outletId: null, // All outlets group
-                        requiredPlan: requiredPlan
-                    });
-                } else {
-                    // Ensure current user is a participant
-                    if (!allOutletsGroup.participants.includes(user._id)) {
-                        allOutletsGroup.participants.push(user._id);
-                        await allOutletsGroup.save();
-                    }
-                }
+                        const storeStaffUserIds = storeStaff
+                            .map((s) => s.userId?._id)
+                            .filter(
+                                (id) =>
+                                    id &&
+                                    id.toString() !== owner._id.toString() &&
+                                    id.toString() !== user._id.toString()
+                            );
 
-                // 2. Create group for the specific outlet the manager/cashier belongs to
-                if (user.activeStoreId) {
-                    const userStore = ownerStores.find(s => s._id.toString() === user.activeStoreId.toString());
-                    if (userStore) {
-                        const storeGroupName = `${userStore.name} Group`;
-                        let storeGroup = await findDefaultOutletGroupChat(owner._id, userStore._id);
-
-                        if (!storeGroup) {
-                            // Get staff for this specific outlet
-                            const storeStaff = await Staff.find({ 
-                                storeId: userStore._id, 
-                                active: true 
-                            }).populate('userId', '_id');
-                            
-                            const storeStaffUserIds = storeStaff
-                                .map(s => s.userId?._id)
-                                .filter(id => id && id.toString() !== owner._id.toString() && id.toString() !== user._id.toString());
-
-                            storeGroup = await Chat.create({
-                                type: 'group',
-                                name: storeGroupName,
-                                isGroupChat: true,
-                                participants: [owner._id, user._id, ...storeStaffUserIds],
-                                createdBy: owner._id,
-                                isDefault: true,
-                                outletId: userStore._id, // Specific outlet group
-                                requiredPlan: requiredPlan
-                            });
-                        } else {
-                            if (storeGroup.name !== storeGroupName) {
-                                storeGroup.name = storeGroupName;
-                            }
-                            if (!storeGroup.isDefault) {
-                                storeGroup.isDefault = true;
-                            }
-                            if (!storeGroup.createdBy) {
-                                storeGroup.createdBy = owner._id;
-                            }
-                            if (!storeGroup.participants.includes(user._id)) {
-                                storeGroup.participants.push(user._id);
-                            }
-                            await storeGroup.save();
+                        storeGroup = await Chat.create({
+                            type: 'group',
+                            name: storeGroupName,
+                            isGroupChat: true,
+                            participants: [owner._id, user._id, ...storeStaffUserIds],
+                            createdBy: owner._id,
+                            isDefault: true,
+                            outletId: userStore._id,
+                            requiredPlan,
+                        });
+                    } else {
+                        if (storeGroup.name !== storeGroupName) {
+                            storeGroup.name = storeGroupName;
                         }
+                        if (!storeGroup.isDefault) {
+                            storeGroup.isDefault = true;
+                        }
+                        if (!storeGroup.createdBy) {
+                            storeGroup.createdBy = owner._id;
+                        }
+                        if (!storeGroup.participants.some((p) => p.toString() === user._id.toString())) {
+                            storeGroup.participants.push(user._id);
+                        }
+                        await storeGroup.save();
                     }
                 }
             }
         }
 
+        // Repair: owner is creator but missing from participants
+        if (userRoleLower === 'owner') {
+            await Chat.updateMany(
+                {
+                    type: 'group',
+                    createdBy: viewerId,
+                    participants: { $ne: viewerId },
+                },
+                { $addToSet: { participants: viewerId } }
+            );
+        }
+
         // Find all chats where user is a participant - Optimized with lean and projections
-        const chats = await Chat.find({ participants: req.user.id })
-            .select('type name participants outletId createdBy messages lastMessageAt lastReadBy isDefault')
+        const chats = await Chat.find({ participants: viewerId })
+            .select('type name participants outletId createdBy messages lastMessageAt lastReadBy isDefault isGroupChat')
             .populate('participants', 'name email role profileImageUrl')
             .populate('outletId', 'name')
             .populate('createdBy', 'name')
@@ -433,28 +476,29 @@ router.get('/chats', protect, async (req, res) => {
         const enrichedChats = await Promise.all(chats.map(async (chat) => {
             // Note: .lean() returns plain objects, so no need for .toObject()
             const chatObj = chat;
-            const enrichedParticipants = await Promise.all((chatObj.participants || []).map(async (participant) => {
-                // Check if this participant is a staff member
-                const staffRecord = await Staff.findOne({ userId: participant._id, active: true })
-                    .populate('storeId', 'name');
-                
-                if (staffRecord) {
-                    // Use Staff name if available, fallback to User name
+            const enrichedParticipants = (
+                await Promise.all((chatObj.participants || []).map(async (participant) => {
+                    if (!participant || !participant._id) return null;
+                    // Check if this participant is a staff member
+                    const staffRecord = await Staff.findOne({ userId: participant._id, active: true })
+                        .populate('storeId', 'name');
+
+                    if (staffRecord) {
+                        return {
+                            ...participant,
+                            name: staffRecord.name || participant.name || participant.email,
+                            email: staffRecord.email || participant.email,
+                            role: staffRecord.role || participant.role,
+                            outletId: staffRecord.storeId?._id,
+                            outletName: staffRecord.storeId?.name,
+                        };
+                    }
                     return {
                         ...participant,
-                        name: staffRecord.name || participant.name || participant.email,
-                        email: staffRecord.email || participant.email,
-                        role: staffRecord.role || participant.role,
-                        outletId: staffRecord.storeId?._id,
-                        outletName: staffRecord.storeId?.name
+                        name: participant.name || participant.email,
                     };
-                }
-                // For owners or non-staff, return as is
-                return {
-                    ...participant,
-                    name: participant.name || participant.email
-                };
-            }));
+                }))
+            ).filter(Boolean);
 
             const messages = Array.isArray(chat.messages) ? chat.messages : [];
             const lastMessage = messages.length > 0 
@@ -490,18 +534,28 @@ router.get('/chats', protect, async (req, res) => {
 
             return {
                 ...chatObj,
+                ...chatMetaForClient(chatObj),
                 createdById,
                 participants: enrichedParticipants,
                 messages: lastMessage ? [lastMessage] : [],
-                unreadCount: unreadCount
+                unreadCount: unreadCount,
             };
         }));
 
-        // Pro plan: hide "Main Store Group" (single store – show only the shop-named group)
-        const effectivePlan = await getEffectivePlan(req.user);
-        const filteredChats = effectivePlan === 'PRO'
-            ? enrichedChats.filter(c => !(c.isDefault && c.name && c.name.trim().toLowerCase() === 'main store group'))
-            : enrichedChats;
+        // Hide legacy "All Outlet Staffs" cross-outlet group only (per-outlet groups stay)
+        const effectivePlan = await getEffectivePlan(user);
+        let filteredChats = enrichedChats.filter((c) => !isAllOutletsStaffGroup(c));
+        if (effectivePlan === 'PRO') {
+            filteredChats = filteredChats.filter(
+                (c) =>
+                    !(
+                        isGroupLikeChat(c) &&
+                        c.isDefault &&
+                        c.name &&
+                        c.name.trim().toLowerCase() === 'main store group'
+                    )
+            );
+        }
 
         res.json({ success: true, data: filteredChats });
     } catch (error) {
@@ -598,6 +652,7 @@ router.get('/:chatId/messages', protect, async (req, res) => {
                     fileType: msgObj.fileType || null,
                     fileSize: msgObj.fileSize || null,
                     mentions: (msgObj.mentions || []).map(m => (m.toString ? m.toString() : String(m))),
+                    replyTo: serializeReplyTo(msgObj.replyTo),
                 };
             });
 
@@ -845,7 +900,16 @@ router.post('/:chatId/message', (req, res, next) => {
         const { chatId } = req.params;
         console.log(`[Push] ${ts()} ===== MESSAGE API HANDLER START ===== chatId=${chatId} sender=${req.user?.id}`);
         // Parse body - multer should have parsed it by now
-        const { content, audioDuration, messageType, fileName, fileType, fileSize, mentions: mentionsBody } = req.body || {};
+        const {
+            content,
+            audioDuration,
+            messageType,
+            fileName,
+            fileType,
+            fileSize,
+            mentions: mentionsBody,
+            replyToMessageId,
+        } = req.body || {};
 
         // Validate: must have either content, audio file, or file
         if (!content?.trim() && !req.file) {
@@ -942,6 +1006,13 @@ router.post('/:chatId/message', (req, res, next) => {
             }
         }
 
+        if (replyToMessageId) {
+            const quoted = findChatMessageById(chat, replyToMessageId);
+            if (quoted) {
+                message.replyTo = buildReplySnapshotFromMessage(quoted);
+            }
+        }
+
         // Add message to chat
         chat.messages.push(message);
         chat.lastMessageAt = new Date();
@@ -982,7 +1053,8 @@ router.post('/:chatId/message', (req, res, next) => {
             fileType: savedMessageObj.fileType || null,
             fileSize: savedMessageObj.fileSize || null,
             mentions: (savedMessageObj.mentions || []).map(m => m.toString()),
-            mentionsDetail
+            mentionsDetail,
+            replyTo: serializeReplyTo(savedMessageObj.replyTo),
         };
 
         // Emit to Socket.IO for real-time updates
@@ -1331,7 +1403,7 @@ router.delete('/:chatId/participants/:userId', protect, async (req, res) => {
 
 /**
  * @route DELETE /api/chat/:chatId
- * @desc Delete a custom chat group (only non-default groups, only by creator)
+ * @desc Delete a custom chat group (only non-default groups, by creator or owner)
  * @access Private (PRO/PREMIUM)
  */
 router.delete('/:chatId', protect, async (req, res) => {
@@ -1355,14 +1427,12 @@ router.delete('/:chatId', protect, async (req, res) => {
             return res.status(404).json({ error: 'Chat not found' });
         }
 
-        // Only allow deletion of custom groups (not default groups)
         if (chat.isDefault) {
-            return res.status(403).json({ 
-                error: 'Default groups cannot be deleted' 
+            return res.status(403).json({
+                error: 'Default outlet groups cannot be deleted',
             });
         }
 
-        // Allow creator OR owner to delete custom groups
         const isCreator = chat.createdBy && chat.createdBy.toString() === req.user.id.toString();
         const isOwner = String(user.role || '').toLowerCase() === 'owner';
         if (!isCreator && !isOwner) {
