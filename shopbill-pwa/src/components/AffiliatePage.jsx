@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Printer, Gift, ArrowLeft, Users, Zap, Wallet, ChevronRight, Award } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
-const AffiliatePage = ({ onBack, origin, darkMode = true }) => {
+const AffiliatePage = ({ onBack, origin, darkMode = true, setDarkMode }) => {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
@@ -70,9 +71,12 @@ const AffiliatePage = ({ onBack, origin, darkMode = true }) => {
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> 
                         Back {origin === 'settings' ? 'to Settings' : ''}
                     </button>
-                    <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200'}`}>
-                        <Printer size={18} /> Print Details
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} size="sm" />
+                        <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200'}`}>
+                            <Printer size={18} /> Print Details
+                        </button>
+                    </div>
                 </div>
             </nav>
 

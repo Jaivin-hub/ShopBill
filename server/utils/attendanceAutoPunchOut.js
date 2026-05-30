@@ -108,7 +108,7 @@ async function applyAutoPunchOutForStore(storeId, options = {}) {
 
     const staffIds = activeAttendance.map((a) => a.staffId).filter(Boolean);
     const staffList = await Staff.find({ _id: { $in: staffIds } })
-        .select('_id userId name workSchedule')
+        .select('_id userId name role workSchedule')
         .lean();
     const staffById = new Map(staffList.map((s) => [String(s._id), s]));
 

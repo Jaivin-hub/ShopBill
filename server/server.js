@@ -9,6 +9,7 @@ dotenv.config();
 const connectDB = require('./db');
 const { getAdmin } = require('./services/firebaseAdmin');
 const { runAttendanceAutomation } = require('./services/attendanceAutomation');
+const { runSubscriptionBillingAutomation } = require('./services/subscriptionBillingAutomation');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -231,10 +232,17 @@ const startServer = async () => {
                 console.error('Attendance automation run failed:', err?.message || err);
             });
         };
+        const scheduleBillingAutomation = () => {
+            runSubscriptionBillingAutomation(io).catch((err) => {
+                console.error('Subscription billing automation failed:', err?.message || err);
+            });
+        };
         const msUntilNextMinute = 60000 - (Date.now() % 60000);
         setTimeout(() => {
             scheduleAttendanceAutomation();
+            scheduleBillingAutomation();
             setInterval(scheduleAttendanceAutomation, 60 * 1000);
+            setInterval(scheduleBillingAutomation, 60 * 60 * 1000);
         }, msUntilNextMinute);
     } catch (error) {
         console.error('Startup Error:', error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import {
-  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, RefreshCw, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2, MessageCircle, MoreHorizontal
+  ShoppingCart, CreditCard, Home, Package, Barcode, Loader, TrendingUp, User, Settings, LogOut, Bell, Smartphone, Users, X, FileText, Truck, Sun, Moon, LayoutGrid, Store, ChevronDown, PlusCircle, Settings2, MessageCircle, MoreHorizontal
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
@@ -23,6 +23,7 @@ import {
 } from './utils/swipeHaptic';
 import { USER_ROLES } from './utils/constants';
 import Header from './components/Header';
+import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import SEO from './components/SEO';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
@@ -44,6 +45,7 @@ const SalesActivityPage = lazy(() => import('./components/SalesActivityPage'));
 const OffersManager = lazy(() => import('./components/OffersManager'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const SuperAdminDashboard = lazy(() => import('./components/superAdminDashboard'));
+const SuperAdminSettings = lazy(() => import('./components/SuperAdminSettings'));
 const SystemConfig = lazy(() => import('./components/SystemConfig'));
 const GlobalReport = lazy(() => import('./components/GlobalReport'));
 const Checkout = lazy(() => import('./components/Checkout'));
@@ -51,289 +53,13 @@ const TermsAndConditions = lazy(() => import('./components/TermsAndConditions'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
 const SupportPage = lazy(() => import('./components/SupportPage'));
 const AffiliatePage = lazy(() => import('./components/AffiliatePage'));
+import MandateRestorePage from './components/MandateRestorePage';
+import RenewSubscriptionPage from './components/RenewSubscriptionPage';
 const SupplyChainManagement = lazy(() => import('./components/SupplyChainManagement'));
 const PlanUpgrade = lazy(() => import('./components/PlanUpgrade'));
 const StaffPermissionsManager = lazy(() => import('./components/StaffPermissionsManager'));
 const ChangePasswordForm = lazy(() => import('./components/ChangePasswordForm'));
 const Chat = lazy(() => import('./components/Chat'));
-
-/** Used to avoid reloading on first SW install: controllerchange also fires when the page gets its first controlling worker. */
-const SW_CONTROLLER_URL_KEY = 'pocketpos_sw_controller_url';
-const normalizeSwScriptUrl = (url) => (url || '').split('?')[0];
-
-const UpdatePrompt = () => {
-  const [show, setShow] = useState(false);
-  const [registration, setRegistration] = useState(null);
-  const updateHandlerRef = useRef(null);
-  const pendingVersionRef = useRef(null);
-  const checkIntervalRef = useRef(null);
-
-  // Generate a stable version ID from service worker script URL
-  const getVersionId = (sw) => {
-    if (!sw) return null;
-    // Use the script URL as version identifier (it includes hash in production)
-    // Extract hash from URL if present, otherwise use full URL
-    const url = sw.scriptURL || sw.scope || '';
-    // Remove query params and get the base URL with hash
-    const baseUrl = url.split('?')[0];
-    return baseUrl;
-  };
-
-  // Check for waiting service worker and show update prompt
-  const checkForUpdate = useCallback(async (forceCheck = false) => {
-    if (!('serviceWorker' in navigator)) return;
-
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) return;
-
-      // Get current active version
-      const currentVersion = reg.active ? getVersionId(reg.active) : null;
-      if (currentVersion) {
-        // Store current active version so we know what's already installed
-        localStorage.setItem('pwa_current_version', currentVersion);
-      }
-
-      // Force update check by calling update()
-      if (forceCheck) {
-        try {
-          await reg.update();
-        } catch (err) {
-          console.warn('Service worker update check failed:', err);
-        }
-      }
-
-      // Check if there's a waiting worker
-      if (reg.waiting) {
-        const waitingVersionId = getVersionId(reg.waiting);
-        if (!waitingVersionId) return;
-
-        // Get the current active version
-        const currentActiveVersion = getVersionId(reg.active);
-
-        // Show update prompt whenever there's a waiting worker that's different from active
-        // This ensures users are prompted for every new production build
-        if (waitingVersionId !== currentActiveVersion) {
-          pendingVersionRef.current = waitingVersionId;
-          setRegistration(reg);
-          setShow(true);
-          return true; // Update available
-        }
-      }
-
-      // Also check for installing worker (might become waiting soon)
-      if (reg.installing) {
-        reg.installing.addEventListener('statechange', () => {
-          if (reg.installing?.state === 'installed' && reg.waiting) {
-            checkForUpdate(false);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error checking for service worker update:', error);
-    }
-
-    return false;
-  }, []);
-
-  useEffect(() => {
-    const onUpdate = async (e) => {
-      const updateHandler = e.detail?.updateHandler;
-      if (updateHandler) {
-        updateHandlerRef.current = updateHandler;
-      }
-      // Check for waiting worker when update event fires
-      await checkForUpdate(false);
-    };
-
-    // Listen for the update event
-    window.addEventListener('pwa-update-available', onUpdate);
-
-    // Initial check after a delay to ensure service worker is registered
-    const initialCheck = setTimeout(() => {
-      checkForUpdate(true); // Force update check on mount
-    }, 2000);
-
-    // Periodic update checks every 5 minutes for lower overhead.
-    checkIntervalRef.current = setInterval(() => {
-      checkForUpdate(true);
-    }, 5 * 60 * 1000);
-
-    // Check for updates when page becomes visible (user returns to tab/app)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        checkForUpdate(true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Align stored URL with whoever is already controlling (e.g. after a reload or fast activation).
-    try {
-      const c = navigator.serviceWorker?.controller;
-      if (c?.scriptURL) {
-        sessionStorage.setItem(SW_CONTROLLER_URL_KEY, normalizeSwScriptUrl(c.scriptURL));
-      }
-    } catch {
-      /* private mode */
-    }
-
-    // Reload only when the controlling worker *replaces* a previous one (real update), not on first claim.
-    const handleControllerChange = () => {
-      const c = navigator.serviceWorker.controller;
-      if (!c?.scriptURL) return;
-      const url = normalizeSwScriptUrl(c.scriptURL);
-      let prev = null;
-      try {
-        prev = sessionStorage.getItem(SW_CONTROLLER_URL_KEY);
-      } catch {
-        /* private mode */
-      }
-      try {
-        sessionStorage.setItem(SW_CONTROLLER_URL_KEY, url);
-      } catch {
-        /* private mode */
-      }
-      if (prev && prev !== url) {
-        window.location.reload();
-      }
-    };
-
-    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-
-    return () => {
-      window.removeEventListener('pwa-update-available', onUpdate);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-      clearTimeout(initialCheck);
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-      }
-    };
-  }, [checkForUpdate]);
-
-  const handleUpdate = async () => {
-    try {
-      if (registration && registration.waiting) {
-        const versionId = pendingVersionRef.current || getVersionId(registration.waiting);
-        // Tell the waiting worker to skipWaiting
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        
-        // Hide the prompt immediately
-        setShow(false);
-        
-        // Wait for the new service worker to activate
-        let activated = false;
-        const stateChangeHandler = (e) => {
-          if (e.target.state === 'activated') {
-            activated = true;
-            registration.waiting.removeEventListener('statechange', stateChangeHandler);
-            // Update current version in localStorage for tracking
-            const newVersion = getVersionId(e.target);
-            if (newVersion) {
-              localStorage.setItem('pwa_current_version', newVersion);
-            }
-            // Clear all caches before reload
-            if ('caches' in window) {
-              caches.keys().then(names => {
-                names.forEach(name => caches.delete(name));
-              }).finally(() => {
-                window.location.reload(true); // Force reload from server
-              });
-            } else {
-              window.location.reload(true);
-            }
-          }
-        };
-        
-        registration.waiting.addEventListener('statechange', stateChangeHandler);
-        
-        // Fallback reload if statechange doesn't fire within 2 seconds
-        setTimeout(() => {
-          if (!activated) {
-            registration.waiting.removeEventListener('statechange', stateChangeHandler);
-            // Update current version
-            const newVersion = getVersionId(registration.waiting);
-            if (newVersion) {
-              localStorage.setItem('pwa_current_version', newVersion);
-            }
-            // Clear caches and reload
-            if ('caches' in window) {
-              caches.keys().then(names => {
-                names.forEach(name => caches.delete(name));
-              }).finally(() => {
-                window.location.reload(true);
-              });
-            } else {
-              window.location.reload(true);
-            }
-          }
-        }, 2000);
-      } else if (updateHandlerRef.current) {
-        // Use the update handler if available
-        updateHandlerRef.current();
-        setShow(false);
-        // Reload after a short delay
-        setTimeout(() => {
-          window.location.reload(true);
-        }, 500);
-      }
-    } catch (error) {
-      console.error('Error during update:', error);
-      // Fallback: just reload
-      window.location.reload(true);
-    }
-  };
-
-  if (!show) return null;
-
-  return (
-    <div 
-      className="fixed inset-0 bg-gray-950/95 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
-      // Prevent closing by clicking outside
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div 
-        className="max-w-sm w-full bg-indigo-600 text-white p-6 rounded-2xl shadow-2xl border border-indigo-400 animate-in fade-in zoom-in duration-300"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex flex-col items-center text-center">
-          <div className="bg-indigo-500 p-4 rounded-full mb-4 shadow-inner">
-            <RefreshCw className="w-8 h-8 animate-spin text-white" />
-          </div>
-          <h4 className="font-extrabold text-2xl leading-tight">System Update Required</h4>
-          <p className="text-indigo-100 mt-2 text-sm">A new version is available. You must update to continue using the application.</p>
-          <div className="w-full mt-6 space-y-3">
-            <button
-              onClick={handleUpdate}
-              className="w-full py-3 bg-white text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 shadow-xl"
-            >
-              Update Now
-            </button>
-            <button
-              onClick={async () => {
-                // Clear all caches and reload
-                if ('caches' in window) {
-                  try {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(cacheNames.map(name => caches.delete(name)));
-                  } catch (err) {
-                    console.error('Error clearing caches:', err);
-                  }
-                }
-                // Force reload from server
-                window.location.reload(true);
-              }}
-              className="w-full py-2 text-indigo-100 text-sm hover:text-white transition-colors underline"
-            >
-              Clear Cache & Reload
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const UTILITY_NAV_ITEMS_CONFIG = [
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER] },
@@ -347,8 +73,9 @@ const SUPERADMIN_NAV_ITEMS = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'superadmin_users', name: 'Manage Shops', icon: Users, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'notifications', name: 'Notifications', icon: Bell, roles: [USER_ROLES.SUPERADMIN] },
-    { id: 'superadmin_systems', name: 'System Config', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'superadmin_systems', name: 'System Config', icon: Settings2, roles: [USER_ROLES.SUPERADMIN] },
     { id: 'reports', name: 'Global Reports', icon: TrendingUp, roles: [USER_ROLES.SUPERADMIN] },
+    { id: 'settings', name: 'Settings', icon: Settings, roles: [USER_ROLES.SUPERADMIN] },
 ];
 
 /** Grantable keys — must match server `GRANTABLE_ROLE_PAGE_PERMISSION_KEYS`. */
@@ -396,7 +123,21 @@ const checkDeepLinkPath = () => {
     if (path === '/notifications' || path.startsWith('/notifications/')) {
         return 'notifications';
     }
-    return null; 
+    if (
+        params.get('page') === 'mandateRestore' ||
+        path === '/mandate-restore' ||
+        path.startsWith('/mandate-restore/')
+    ) {
+        return 'mandateRestore';
+    }
+    if (
+        params.get('page') === 'renewSubscription' ||
+        path === '/renew-subscription' ||
+        path.startsWith('/renew-subscription/')
+    ) {
+        return 'renewSubscription';
+    }
+    return null;
 };
 
 const App = () => {
@@ -412,6 +153,7 @@ const App = () => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [, setToast] = useState(null);
   const [isViewingLogin, setIsViewingLogin] = useState(false);
+  const [mandateRestoreRequired, setMandateRestoreRequired] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showLowStockFilter, setShowLowStockFilter] = useState(false);
@@ -540,7 +282,11 @@ const App = () => {
 
   // Navigate and push current page to back stack (so swipe-back can return). Use opts.replace to clear stack (e.g. logout, back-to-origin).
   const navigateTo = useCallback((page, opts) => {
-    const publicIds = new Set(['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate']);
+    if (mandateRestoreRequired) {
+      showToast('Complete payment mandate restore to access the app.', 'info');
+      return;
+    }
+    const publicIds = new Set(['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription']);
     if (
       !publicIds.has(page) &&
       currentUser &&
@@ -561,7 +307,7 @@ const App = () => {
       if (!opts?.replace) backStackRef.current = [...backStackRef.current, currentPage];
       setCurrentPage(page);
     }
-  }, [currentPage, currentUser, userRole, rolePagePermissions, canAccessPage, showToast]);
+  }, [currentPage, currentUser, userRole, rolePagePermissions, canAccessPage, showToast, mandateRestoreRequired]);
 
   const handleViewAllSales = useCallback(() => navigateTo('salesActivity'), [navigateTo]);
   const handleViewAllCredit = useCallback(() => navigateTo('khata'), [navigateTo]);
@@ -1035,6 +781,7 @@ useEffect(() => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('currentUser');
     localStorage.removeItem('push_token_registered');
+    setMandateRestoreRequired(false);
     setCurrentUser(null);
     setCurrentOutletId(null);
     setCurrentOutlet(null);
@@ -1129,14 +876,31 @@ useEffect(() => {
     }
   }, [currentUser]);
 
+  const PROFILE_USER_PATCH_KEYS = [
+    'name', 'email', 'phone', 'shopName', 'taxId', 'address',
+    'profileImageUrl', 'currency', 'timezone', 'businessType',
+    'plan', 'planEndDate', 'subscriptionStatus',
+  ];
+
   const handleProfileUpdated = useCallback((updatedData) => {
     if (!updatedData) return;
     const normalizedUpdate = updatedData?.user || updatedData?.data || updatedData;
+    const patch = {};
+    PROFILE_USER_PATCH_KEYS.forEach((key) => {
+      if (normalizedUpdate[key] !== undefined && normalizedUpdate[key] !== null) {
+        patch[key] = normalizedUpdate[key];
+      }
+    });
     setCurrentUser((prevUser) => {
-      const mergedUser = { ...(prevUser || {}), ...normalizedUpdate };
+      const mergedUser = { ...(prevUser || {}), ...patch };
       localStorage.setItem('currentUser', JSON.stringify(mergedUser));
       return mergedUser;
     });
+    try {
+      window.dispatchEvent(new CustomEvent('pocketpos:refresh-billing-alert'));
+    } catch {
+      /* ignore */
+    }
     // Keep active outlet label in sync after business-name edits from Profile.
     if (normalizedUpdate.shopName) {
       setCurrentOutlet((prevOutlet) => (
@@ -1160,9 +924,21 @@ useEffect(() => {
     showToast('Registration successful! Please sign in.', 'success');
   }, [showToast]);
 
+  const openPublicPage = useCallback((page, { fromLogin = false } = {}) => {
+    backStackRef.current = [];
+    setPageOrigin(fromLogin ? 'login' : 'landing');
+    setIsViewingLogin(false);
+    setCurrentPage(page);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', page);
+      window.history.replaceState({}, '', `${url.pathname}?${url.searchParams.toString()}`);
+    } catch (_) { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     // Check if we're on a public page that doesn't require auth
-    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
+    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription'];
     const isPublicPage = publicPages.includes(currentPage);
     
     // Don't check auth for public pages
@@ -1183,6 +959,83 @@ useEffect(() => {
     }
     setIsLoadingAuth(false);
   }, [logout, currentPage, currentUser]);
+
+  const refreshBillingGate = useCallback(async () => {
+    if (!currentUser || !apiClient || !API?.currentPlan) return;
+    const role = String(currentUser?.role || '').toLowerCase();
+    if (role === USER_ROLES.SUPERADMIN) return;
+    try {
+      const res = await apiClient.get(API.currentPlan);
+      if (res.data?.mandateRestoreRequired) {
+        setMandateRestoreRequired(true);
+        return;
+      }
+      setMandateRestoreRequired(false);
+      if (res.data?.success && res.data.accessAllowed === false) {
+        const msg =
+          res.data.billingAlert?.message ||
+          'Your paid access period has ended. Restart your subscription from the login page to use your existing store again.';
+        try {
+          sessionStorage.setItem('loginBanner', msg);
+          sessionStorage.setItem('loginBannerType', 'expired');
+        } catch (_) { /* ignore */ }
+        showToast(msg, 'error');
+        logout();
+      }
+    } catch (err) {
+      if (err.response?.data?.mandateRestoreRequired) {
+        setMandateRestoreRequired(true);
+      }
+    }
+  }, [currentUser, apiClient, logout, showToast]);
+
+  // Halted → stay logged in on mandate gate; expired → logout
+  useEffect(() => {
+    const role = String(currentUser?.role || '').toLowerCase();
+    if (!currentUser || role === USER_ROLES.SUPERADMIN || !apiClient || !API?.currentPlan) return undefined;
+
+    refreshBillingGate();
+    const intervalId = setInterval(refreshBillingGate, 15 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshBillingGate();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [currentUser, apiClient, refreshBillingGate]);
+
+  useEffect(() => {
+    if (currentUser && !mandateRestoreRequired) {
+      refreshBillingGate();
+    }
+  }, [currentPage, currentUser, mandateRestoreRequired, refreshBillingGate]);
+
+  const handleSubscriptionAccessEnded = useCallback(() => {
+    const msg =
+      'Your paid access period has ended. Restart your subscription from the login page to use your existing store again.';
+    try {
+      sessionStorage.setItem('loginBanner', msg);
+      sessionStorage.setItem('loginBannerType', 'expired');
+    } catch (_) { /* ignore */ }
+    showToast(msg, 'error');
+    logout();
+  }, [logout, showToast]);
+
+  const handleMandateAccessRestored = useCallback(async () => {
+    if (!apiClient || !API?.currentPlan) return;
+    try {
+      const res = await apiClient.get(API.currentPlan);
+      if (!res.data?.mandateRestoreRequired) {
+        setMandateRestoreRequired(false);
+        setCurrentPage('dashboard');
+        showToast('Store access restored.', 'success');
+      }
+    } catch (_) {
+      await refreshBillingGate();
+    }
+  }, [apiClient, refreshBillingGate, showToast]);
 
   // Sync current user from server (role, plan, page permissions) so staff pick up Team Management changes
   useEffect(() => {
@@ -1432,11 +1285,16 @@ useEffect(() => {
   } = useMemo(() => {
     const ordered = swipeNavOrderedItems;
 
-    /** Superadmin: no chat slot — show each nav item in the bar (up to 5), More only if overflow */
+    /** Superadmin: pin Dashboard + Settings in footer; overflow goes to More */
     if (userRole === USER_ROLES.SUPERADMIN) {
-      const showMore = ordered.length > MOBILE_FOOTER_MAX_SLOTS;
-      const barTabs = showMore ? ordered.slice(0, MOBILE_FOOTER_MAX_SLOTS - 1) : ordered;
-      const moreItems = showMore ? ordered.slice(MOBILE_FOOTER_MAX_SLOTS - 1) : [];
+      const pinnedStart = ordered.find((item) => item.id === 'dashboard') || null;
+      const pinnedEnd = ordered.find((item) => item.id === 'settings') || null;
+      const middle = ordered.filter((item) => item.id !== 'dashboard' && item.id !== 'settings');
+      const slotsForMiddle = MOBILE_FOOTER_MAX_SLOTS - 2 - 1;
+      const showMore = middle.length > slotsForMiddle;
+      const middleInBar = showMore ? middle.slice(0, slotsForMiddle) : middle;
+      const moreItems = showMore ? middle.slice(slotsForMiddle) : [];
+      const barTabs = [pinnedStart, ...middleInBar, pinnedEnd].filter(Boolean);
       return {
         footerLeftPinnedTab: null,
         footerSlot2Fixed: null,
@@ -1560,10 +1418,11 @@ useEffect(() => {
   const showAppUI = useMemo(
     () =>
       Boolean(currentUser) &&
-      !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'].includes(
+      !mandateRestoreRequired &&
+      !['resetPassword', 'staffSetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription'].includes(
         currentPage
       ),
-    [currentUser, currentPage]
+    [currentUser, currentPage, mandateRestoreRequired]
   );
 
   const canSwipeNavigate = useCallback(
@@ -1689,7 +1548,7 @@ useEffect(() => {
   }, [showAppUI, isMobileViewport, currentPage, isChatSelected, handleTouchStart, handleTouchEnd]);
 
   useEffect(() => {
-    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate'];
+    const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription'];
     if (publicPages.includes(currentPage)) return;
     if (!currentUser || userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return;
     if (!canAccessPage(currentPage)) {
@@ -1707,13 +1566,67 @@ useEffect(() => {
     // Render public pages immediately, even during auth loading
     if (currentPage === 'staffSetPassword') return <StaffSetPassword />;
     if (currentPage === 'resetPassword') return <ResetPassword />;
-    
+    if (currentPage === 'mandateRestore') {
+      const token = new URLSearchParams(window.location.search || '').get('token') || '';
+      return (
+        <MandateRestorePage
+          onBack={(dest) => {
+            if (dest === 'login') {
+              setIsViewingLogin(true);
+              navigateTo('dashboard', { replace: true });
+            } else {
+              setPageOrigin(dest === 'support' ? 'landing' : 'landing');
+              navigateTo(dest === 'support' ? 'support' : 'dashboard', { replace: true });
+            }
+          }}
+          origin={pageOrigin}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          checkoutToken={token}
+        />
+      );
+    }
+    if (currentPage === 'renewSubscription') {
+      const renewToken = new URLSearchParams(window.location.search || '').get('token') || '';
+      return (
+        <RenewSubscriptionPage
+          checkoutToken={renewToken}
+          onBack={(dest) => {
+            if (dest === 'login') {
+              setIsViewingLogin(true);
+              navigateTo('dashboard', { replace: true });
+            } else if (dest === 'mandateRestore') {
+              setPageOrigin('login');
+              navigateTo('mandateRestore', { replace: true });
+            } else {
+              setPageOrigin(dest === 'support' ? 'landing' : 'landing');
+              navigateTo(dest === 'support' ? 'support' : 'dashboard', { replace: true });
+            }
+          }}
+          origin={pageOrigin}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+      );
+    }
+
     if (isLoadingAuth) return <div className="h-screen flex items-center justify-center bg-gray-950"><Loader className="animate-spin text-indigo-500" /></div>;
-    if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
-    if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
-    if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
-    if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} />;
-    if (currentPage === 'planUpgrade') return <PlanUpgrade apiClient={apiClient} showToast={showToast} currentUser={currentUser} onBack={handleBackToOrigin} darkMode={darkMode} />;
+    if (currentPage === 'terms') return <TermsAndConditions onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    if (currentPage === 'policy') return <PrivacyPolicy onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    if (currentPage === 'support') return <SupportPage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    if (currentPage === 'affiliate') return <AffiliatePage onBack={handleBackToOrigin} origin={pageOrigin} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    if (currentPage === 'planUpgrade') {
+      return (
+        <PlanUpgrade
+          apiClient={apiClient}
+          showToast={showToast}
+          currentUser={currentUser}
+          onBack={handleBackToOrigin}
+          darkMode={darkMode}
+          onSubscriptionAccessEnded={handleSubscriptionAccessEnded}
+        />
+      );
+    }
     if (currentPage === 'staffPermissions') {
       if (userRole !== USER_ROLES.OWNER && !canAccessPage('staffPermissions')) {
         return (
@@ -1729,6 +1642,7 @@ useEffect(() => {
           currentUser={currentUser}
           darkMode={darkMode}
           canAccessTeamManagement={userRole === USER_ROLES.OWNER || canAccessPage('staffPermissions')}
+          onModalStateChange={setHasModalOpen}
           onUpgradePlan={() => { setPageOrigin('staffPermissions'); setCurrentPage('planUpgrade'); }}
           onOpenRolePermissions={() => { localStorage.setItem('settings_target_view', 'rolePermissions'); setPageOrigin('staffPermissions'); setCurrentPage('settings'); }}
         />
@@ -1750,6 +1664,22 @@ useEffect(() => {
           onBackToPlans={() => { setIsViewingLogin(false); backStackRef.current = []; setCurrentPage('dashboard'); }}
           setCurrentPage={setCurrentPage}
           darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+      );
+    }
+
+    if (currentUser && mandateRestoreRequired && !isLoadingAuth) {
+      return (
+        <MandateRestorePage
+          gateMode
+          apiClient={apiClient}
+          currentUser={currentUser}
+          userRole={userRole}
+          onAccessRestored={handleMandateAccessRestored}
+          onLogout={logout}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
         />
       );
     }
@@ -1759,7 +1689,11 @@ useEffect(() => {
         <Login 
                 onLogin={handleLoginSuccess} 
                 showToast={showToast} 
-          setCurrentPage={setCurrentPage} 
+          setCurrentPage={setCurrentPage}
+          setPageOrigin={setPageOrigin}
+          onOpenRenewSubscription={() => openPublicPage('renewSubscription', { fromLogin: true })}
+          onOpenMandateRestore={() => openPublicPage('mandateRestore', { fromLogin: true })}
+          onLeaveLogin={() => setIsViewingLogin(false)}
                 onBackToLanding={() => {
                     setSelectedPlan(null);
                     setCurrentPage('checkout');
@@ -1767,6 +1701,7 @@ useEffect(() => {
           }}
           onBackToLandingNormal={() => setIsViewingLogin(false)} 
           darkMode={darkMode}
+          setDarkMode={setDarkMode}
         /> :
             <LandingPage 
           onStartApp={() => {
@@ -1774,6 +1709,7 @@ useEffect(() => {
             setScrollToPricing(false);
           }}
           scrollToPricing={scrollToPricing}
+          onRenewSubscription={() => openPublicPage('renewSubscription')}
           onSelectPlan={(p) => {
             setSelectedPlan(p);
             setCurrentPage('checkout');
@@ -1783,6 +1719,7 @@ useEffect(() => {
           onViewSupport={() => { setPageOrigin('landing'); setCurrentPage('support'); }}
           onViewAffiliate={() => { setPageOrigin('landing'); setCurrentPage('affiliate'); }}
           darkMode={darkMode}
+          setDarkMode={setDarkMode}
         />
     }
     
@@ -1811,24 +1748,27 @@ useEffect(() => {
 
     return (
       <PageErrorBoundary darkMode={darkMode} key={`err-${componentKey}`}>
-      <Suspense fallback={<PageRouteFallback page={currentPage} darkMode={darkMode} />}>
+      <Suspense fallback={<PageRouteFallback page={currentPage} darkMode={darkMode} userRole={userRole} />}>
         {(() => {
           switch (currentPage) {
-            case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
+            case 'dashboard': return userRole === USER_ROLES.SUPERADMIN ? <SuperAdminDashboard key={componentKey} {...commonProps} /> : <Dashboard key={componentKey} {...commonProps} currentPage={currentPage} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
             case 'billing': return <BillingPOS key={componentKey} {...commonProps} refreshRecentSalesRef={billingRefreshRef} />;
             case 'khata': return <Ledger key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
-            case 'inventory': return <InventoryManager key={componentKey} {...commonProps} initialSortOption={showLowStockFilter ? 'low-stock' : null} onSortOptionSet={() => setShowLowStockFilter(false)} />;
-            case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} />;
+            case 'inventory': return <InventoryManager key={componentKey} {...commonProps} initialSortOption={showLowStockFilter ? 'low-stock' : null} onSortOptionSet={() => setShowLowStockFilter(false)} onModalStateChange={setHasModalOpen} />;
+            case 'scm': return <SupplyChainManagement key={componentKey} {...commonProps} onModalStateChange={setHasModalOpen} />;
             case 'reports': return userRole === USER_ROLES.SUPERADMIN ? <GlobalReport key={componentKey} {...commonProps} /> : <Reports key={componentKey} {...commonProps} onOpenSalesHistory={handleViewAllSales} />;
             case 'notifications': return <NotificationsPage key={componentKey} {...commonProps} />;
-            case 'settings': return <SettingsPage key={componentKey} {...commonProps} setDarkMode={setDarkMode} />;
+            case 'settings':
+              return userRole === USER_ROLES.SUPERADMIN
+                ? <SuperAdminSettings key={componentKey} {...commonProps} setDarkMode={setDarkMode} />
+                : <SettingsPage key={componentKey} {...commonProps} setDarkMode={setDarkMode} />;
             case 'profile': return <Profile key={componentKey} {...commonProps} currentOutletId={currentOutletId} onProfileUpdated={handleProfileUpdated} />;
             case 'superadmin_users': return <UserManagement key={componentKey} {...commonProps} />;
             case 'superadmin_systems': return <SystemConfig key={componentKey} {...commonProps} />;
             case 'outlets': return <OutletManager key={componentKey} {...commonProps} onOutletSwitch={handleOutletSwitch} currentOutletId={currentOutletId} onOutletsChange={fetchOutlets} openCreateBranchSignal={openCreateBranchSignal} />;
             case 'salesActivity': return <SalesActivityPage key={componentKey} {...commonProps} onBack={() => navigateTo('dashboard', { replace: true })} />;
             case 'offers': return <OffersManager key={componentKey} {...commonProps} />;
-            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onChatSelectionChange={setIsChatSelected} onThreadSwipeConsumed={suppressPageSwipeAfterChatThread} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={canAccessPage('staffPermissions') ? () => navigateTo('staffPermissions') : undefined} />;
+            case 'chat': return <Chat key={componentKey} {...commonProps} currentOutletId={currentOutletId} outlets={outlets} onModalStateChange={setHasModalOpen} onChatSelectionChange={setIsChatSelected} onThreadSwipeConsumed={suppressPageSwipeAfterChatThread} onUnreadCountChange={setChatUnreadCount} onNavigateToStaffPermissions={canAccessPage('staffPermissions') ? () => navigateTo('staffPermissions') : undefined} />;
             default: return <Dashboard key={componentKey} {...commonProps} onViewAllSales={handleViewAllSales} onViewAllCredit={handleViewAllCredit} onViewAllInventory={handleViewAllInventory} />;
           }
         })()}
@@ -1875,7 +1815,7 @@ useEffect(() => {
         data-theme={darkMode ? 'dark' : 'light'}
         className={`h-dvh min-h-dvh max-h-dvh w-full min-w-0 flex flex-col overflow-hidden overflow-x-hidden overscroll-none transition-colors duration-300 ${containerBg} ${darkMode ? 'text-gray-200' : 'text-slate-900'}`}
       >
-        <UpdatePrompt />
+        <PwaUpdatePrompt />
         {showAppUI && !isChatSelected && (
             <Header
                 companyName="Pocket POS"

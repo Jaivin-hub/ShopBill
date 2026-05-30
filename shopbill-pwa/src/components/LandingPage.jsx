@@ -6,6 +6,7 @@ import {
     WifiOff, RefreshCw, Wallet, Clock, Building2, UserCog
 } from 'lucide-react';
 import coverImage from '../../public/covermain.png';
+import ThemeToggle from './ThemeToggle';
 
 const content = {
     tagline: "#1 Shop Management Tool",
@@ -43,6 +44,8 @@ const content = {
     cloudSyncDesc: "Your data is backed up safely in the cloud. If you switch phones, your data is right there waiting for you. 100% secure.",
     teamManagement: "Team Management & Roles",
     teamManagementDesc: "Invite staff, assign Manager or Cashier roles, and control page access. Track pending setup, active accounts, and deactivated members in one place.",
+    offersFeature: "Offers & Promotions",
+    offersFeatureDesc: "Create discount offers in minutes, schedule start and end time, and attract more repeat customers with targeted deals.",
     realTimeChat: "Push Alerts & Notifications",
     realTimeChatDesc: "Low stock, credit sales, ledger payments, staff activation, and attendance updates—delivered instantly to the right people in your team.",
 
@@ -89,7 +92,8 @@ const content = {
     terms: "Terms of Service",
     support: "Help & Support",
     copyright: "2026 Pocket POS. All rights reserved.",
-    affiliate: "Earn with Us"
+    affiliate: "Earn with Us",
+    renewStore: "Restart existing store subscription",
 };
 
 const renderTitle = (fullTitle, gradientWord) => {
@@ -120,7 +124,7 @@ const renderTitle = (fullTitle, gradientWord) => {
     });
 };
 
-const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onViewSupport, onViewAffiliate, scrollToPricing, darkMode = true }) => {
+const LandingPage = ({ onStartApp, onSelectPlan, onRenewSubscription, onViewTerms, onViewPolicy, onViewSupport, onViewAffiliate, scrollToPricing, darkMode = true, setDarkMode }) => {
     const gradientWord = 'Pocket';
 
     useEffect(() => {
@@ -168,9 +172,10 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 }
                 .feature-card:hover {
-                    border-color: rgba(79, 70, 229, 0.4);
+                    border-color: ${darkMode ? 'rgba(79, 70, 229, 0.45)' : 'rgba(79, 70, 229, 0.35)'};
                     transform: translateY(-8px);
-                    background: rgba(31, 41, 55, 0.8);
+                    background: ${darkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(238, 242, 255, 0.95)'};
+                    box-shadow: ${darkMode ? '0 14px 30px rgba(17, 24, 39, 0.35)' : '0 14px 30px rgba(79, 70, 229, 0.14)'};
                 }
             `}} />
 
@@ -182,9 +187,12 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         </div>
                         <span className={`text-xl font-black ${titleColor} tracking-tighter transition-colors duration-300`}>Pocket <span className="text-indigo-500">POS</span></span>
                     </div>
-                    <button onClick={onStartApp} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black  tracking-widest py-2.5 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
-                        {content.getStarted}
-                    </button>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+                        <button onClick={onStartApp} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black  tracking-widest py-2.5 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
+                            {content.getStarted}
+                        </button>
+                    </div>
                 </div>
             </nav>
 
@@ -231,15 +239,13 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400 mb-2">{content.highlightsTitle}</p>
                                 <p className={`${subtitleColor} text-sm font-bold max-w-2xl mx-auto`}>{content.highlightsSubtitle}</p>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <FeatureItem
                                     icon={<WifiOff />}
                                     title={content.offlineBilling}
                                     desc={content.offlineBillingDesc}
                                     color="indigo"
                                     darkMode={darkMode}
-                                    highlighted
-                                    badge="Most important"
                                 />
                                 <FeatureItem icon={<Building2 />} title={content.multiOutletChat} desc={content.multiOutletChatDesc} color="cyan" darkMode={darkMode} />
                                 <FeatureItem icon={<Clock />} title={content.teamShifts} desc={content.teamShiftsDesc} color="rose" darkMode={darkMode} />
@@ -254,6 +260,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
                             <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
                             <FeatureItem icon={<UserCog />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
+                            <FeatureItem icon={<Bell />} title={content.offersFeature} desc={content.offersFeatureDesc} color="pink" darkMode={darkMode} />
                             <FeatureItem icon={<Bell />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="orange" darkMode={darkMode} />
                             <FeatureItem icon={<RefreshCw />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                         </div>
@@ -271,7 +278,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <PriceCard 
                                 plan={content.basicPlan} 
-                                price="999" 
+                                price="499" 
                                 desc={content.basicDesc} 
                                 items={[content.unlimitedTxn, content.user3, content.fullInv, content.khataFull, content.salesReports, content.employeeAuditLogs]} 
                                 excludedItems={[content.basicExcluded5, content.basicExcluded2, content.basicExcluded3, content.basicExcluded4]}
@@ -281,7 +288,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             />
                             <PriceCard 
                                 plan={content.proPlan} 
-                                price="2199" 
+                                price="999" 
                                 featured={true}
                                 desc={content.proDesc} 
                                 items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.offlineBillingFeature, content.teamShiftFeature, content.multiOutletChatFeature, content.employeeAuditLogs]} 
@@ -292,7 +299,7 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
                             />
                             <PriceCard 
                                 plan={content.premiumPlan} 
-                                price="4999" 
+                                price="2999" 
                                 desc={content.premiumDesc} 
                                 items={[content.unlimitedTxn, content.userUnlimited, content.fullInvBulk, content.khataSMS, "Supplier Management", content.salesReports, content.offlineBillingFeature, content.teamShiftFeature, content.multiOutletChatFeature, content.salarySettlementFeature, content.employeeAuditLogs, content.multishopManagement, content.upTo10Outlets]} 
                                 btn={content.choosePremium} 
@@ -307,6 +314,9 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
             <footer className={`${footerBg} border-t ${footerBorder} py-12 text-center transition-colors duration-300`}>
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="flex flex-wrap justify-center gap-6 mb-8 text-[10px] font-black  tracking-widest">
+                        {onRenewSubscription && (
+                            <FooterLink onClick={onRenewSubscription} label={content.renewStore} darkMode={darkMode} />
+                        )}
                         <FooterLink onClick={onViewPolicy} label={content.privacy} darkMode={darkMode} />
                         <FooterLink onClick={onViewTerms} label={content.terms} darkMode={darkMode} />
                         <FooterLink onClick={onViewSupport} label={content.support} darkMode={darkMode} />
@@ -319,17 +329,12 @@ const LandingPage = ({ onStartApp, onSelectPlan, onViewTerms, onViewPolicy, onVi
     );
 };
 
-const FeatureItem = ({ icon, title, desc, color, darkMode = true, highlighted = false, badge = null }) => {
+const FeatureItem = ({ icon, title, desc, color, darkMode = true }) => {
     const cardBg = darkMode ? 'bg-gray-900/50' : 'bg-white';
     const titleText = darkMode ? 'text-white' : 'text-slate-900';
     const descText = darkMode ? 'text-gray-500' : 'text-slate-600';
     return (
-    <div className={`feature-card ${cardBg} p-8 rounded-[2rem] transition-colors duration-300 ${highlighted ? 'ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/10 md:col-span-2' : ''}`}>
-        {badge ? (
-            <span className="inline-flex items-center gap-1.5 mb-4 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-400">
-                {badge}
-            </span>
-        ) : null}
+    <div className={`feature-card h-full ${cardBg} p-8 rounded-[2rem] transition-colors duration-300`}>
         <div className="flex items-center gap-4 mb-4">
             <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center bg-${color}-500/10 text-${color}-500`}>
                 {React.cloneElement(icon, { size: 24 })}

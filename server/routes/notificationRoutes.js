@@ -179,6 +179,19 @@ const emitAlert = async (req, storeId, type, data) => {
                 workingMinutes: data.workingMinutes ?? null
             };
             break;
+        case 'attendance_auto_punch_out':
+            title = data.title || 'Auto punch-out';
+            category = 'Info';
+            message = data.message || `${data.staffName || 'Staff'} was automatically punched out. Shift finished.`;
+            metadata = {
+                attendanceId: data.attendanceId || null,
+                staffId: data.staffId || null,
+                staffUserId: data.staffUserId || null,
+                workingMinutes: data.workingMinutes ?? null,
+                dedupeKey: data.dedupeKey || null,
+                forSelf: Boolean(data.forSelf),
+            };
+            break;
         case 'payroll_settlement_marked':
             title = 'Payroll Settlement';
             category = 'Info';
@@ -252,10 +265,15 @@ const emitAlert = async (req, storeId, type, data) => {
             finalMessage = `[${storeName}] ${message}`;
         }
         
+        const persistedActorId =
+            type === 'attendance_auto_punch_out' && !data?.forSelf
+                ? null
+                : actorId;
+
         const newNotification = await Notification.create({
             storeId: storeIdStr,
             ownerId: ownerId, // Use ownerId from store (always correct)
-            actorId: actorId, // Store who performed the action
+            actorId: persistedActorId,
             type,
             category,
             title,
@@ -284,8 +302,11 @@ const emitAlert = async (req, storeId, type, data) => {
                     'attendance_punch_in',
                     'attendance_break_start',
                     'attendance_break_end',
-                    'attendance_punch_out'
+                    'attendance_punch_out',
+                    'attendance_auto_punch_out',
                 ].includes(type);
+                const isAttendanceAutoPunchOutTeam =
+                    type === 'attendance_auto_punch_out' && !data?.forSelf && !data?.targetUserId;
                 const isStaffShiftAssigned = type === 'staff_shift_assigned';
                 const isStaffAccountActivated = type === 'staff_account_activated';
                 const hasDirectTarget = Boolean(data?.targetUserId);
@@ -438,6 +459,29 @@ const emitAlert = async (req, storeId, type, data) => {
                     targetUserIds.delete(actorIdStr);
                 }
 
+                // Auto punch-out (system): owner + managers only; punched-out employee gets forSelf alert separately.
+                if (isAttendanceAutoPunchOutTeam) {
+                    targetUserIds.clear();
+                    const punchedOutUserId = data?.staffUserId
+                        ? String(data.staffUserId)
+                        : actorIdStr;
+                    if (store?.ownerId) {
+                        const ownerIdStr = store.ownerId.toString();
+                        if (!punchedOutUserId || ownerIdStr !== punchedOutUserId) {
+                            targetUserIds.add(ownerIdStr);
+                        }
+                    }
+                    staffMembers.forEach((staff) => {
+                        if (staff.role !== 'Manager' || !staff.userId) return;
+                        const mgrId = staff.userId.toString();
+                        if (punchedOutUserId && mgrId === punchedOutUserId) return;
+                        targetUserIds.add(mgrId);
+                    });
+                    console.log(
+                        `📢 Auto punch-out: notifying owner + ${[...targetUserIds].length - (store?.ownerId ? 1 : 0)} manager(s).`
+                    );
+                }
+
                 if (isStaffShiftAssigned && data.targetUserId) {
                     targetUserIds.clear();
                     targetUserIds.add(String(data.targetUserId));
@@ -455,7 +499,8 @@ const emitAlert = async (req, storeId, type, data) => {
                         type === 'attendance_punch_in' ||
                         type === 'attendance_break_start' ||
                         type === 'attendance_break_end' ||
-                        type === 'attendance_punch_out'
+                        type === 'attendance_punch_out' ||
+                        type === 'attendance_auto_punch_out'
                     ) return 'attendance';
                     if (
                         type === 'ledger_payment' ||
@@ -531,9 +576,12 @@ const emitAlert = async (req, storeId, type, data) => {
                     }
                 }
 
-                // Also emit to store room for backward compatibility (but filter on client side)
-                // Skip store-wide broadcast for personal shift notices (only targeted user rooms above).
-                if (type !== 'staff_shift_assigned') {
+                // Store room broadcast: skip personal/direct targets and auto punch-out (owner + managers only via user rooms).
+                const skipStoreBroadcast =
+                    type === 'staff_shift_assigned' ||
+                    hasDirectTarget ||
+                    isAttendanceAutoPunchOutTeam;
+                if (!skipStoreBroadcast) {
                     io.to(storeIdStr).emit('new_notification', notificationData);
                 }
 

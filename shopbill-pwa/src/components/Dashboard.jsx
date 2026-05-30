@@ -7,13 +7,28 @@ import {
     Store, MapPin, BarChart3, Settings2, Truck, ChevronDown, ChevronUp, AlertCircle, X
 } from 'lucide-react';
 import AttendancePunch from './AttendancePunch';
+import BillingNoticeBanner from './BillingNoticeBanner';
 import { isProOrPremium } from '../utils/subscription';
+import { getPlanBillingStatusDisplay } from '../utils/subscriptionBillingUi';
 
 const USER_ROLES = { OWNER: 'owner', MANAGER: 'manager', CASHIER: 'cashier' };
 
+const BILLING_ALERT_STORAGE_KEY = 'pocketpos_owner_billing_alert';
+
 const canEditBusinessAddress = (role) => role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
 
-const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser, canAccessPage }) => {
+const readStoredBillingAlert = () => {
+    try {
+        const raw = sessionStorage.getItem(BILLING_ALERT_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed?.show ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSales, onViewAllInventory, onViewAllCredit, setCurrentPage, onViewSaleDetails, onLogout, currentUser, canAccessPage, currentPage = 'dashboard' }) => {
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER;
 
     // --- States ---
@@ -27,6 +42,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     const [currentAttendance, setCurrentAttendance] = useState(null); // Track attendance status for indicator
     const [isAddressMissing, setIsAddressMissing] = useState(false);
     const [showAddressReminder, setShowAddressReminder] = useState(true);
+    const [billingAlert, setBillingAlert] = useState(() => readStoredBillingAlert());
+    const [showBillingBanner, setShowBillingBanner] = useState(true);
 
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
@@ -46,9 +63,8 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
         } catch (error) {
             const errorData = error.response?.data;
-            if (error.response?.status === 403 && errorData?.status === 'halted') {
-                showToast(errorData.message || 'Subscription Issue. Logging out...', 'error');
-                onLogout();
+            if (error.response?.status === 403 && errorData?.mandateRestoreRequired) {
+                showToast(errorData.message || 'Complete payment mandate restore to continue.', 'error');
                 return;
             }
             showToast('Could not update data. Please check connection.', 'error');
@@ -100,6 +116,31 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         }
     }, [userRole, apiClient, API]);
 
+    const fetchBillingAlert = useCallback(async () => {
+        if (userRole !== USER_ROLES.OWNER || !apiClient || !API?.currentPlan) return;
+        try {
+            const response = await apiClient.get(API.currentPlan);
+            const alert = response.data?.billingAlert;
+            if (alert?.show) {
+                setBillingAlert(alert);
+                try {
+                    sessionStorage.setItem(BILLING_ALERT_STORAGE_KEY, JSON.stringify(alert));
+                } catch {
+                    /* ignore quota */
+                }
+            } else {
+                setBillingAlert(null);
+                try {
+                    sessionStorage.removeItem(BILLING_ALERT_STORAGE_KEY);
+                } catch {
+                    /* ignore */
+                }
+            }
+        } catch {
+            /* Keep cached alert (e.g. after profile save) if the refresh request fails */
+        }
+    }, [userRole, apiClient, API]);
+
     // Only fetch on mount or when access changes, not on every callback change
     const hasFetchedRef = useRef(false);
     useEffect(() => {
@@ -108,10 +149,23 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
             fetchDashboardData();
             fetchAttendanceStatus();
             checkAddressStatus();
+            fetchBillingAlert();
         } else if (!hasAccess) {
             hasFetchedRef.current = false;
         }
     }, [hasAccess]); // Removed callbacks from dependencies to prevent re-fetches
+
+    // Refetch billing banner when returning to dashboard (e.g. after Profile save)
+    useEffect(() => {
+        if (userRole !== USER_ROLES.OWNER || currentPage !== 'dashboard') return;
+        fetchBillingAlert();
+    }, [currentPage, userRole, fetchBillingAlert]);
+
+    useEffect(() => {
+        const onRefreshBilling = () => fetchBillingAlert();
+        window.addEventListener('pocketpos:refresh-billing-alert', onRefreshBilling);
+        return () => window.removeEventListener('pocketpos:refresh-billing-alert', onRefreshBilling);
+    }, [fetchBillingAlert]);
 
     // Refresh attendance status periodically
     useEffect(() => {
@@ -392,6 +446,33 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
 
             <div className={`w-full overflow-x-hidden overscroll-y-contain custom-scrollbar px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
             {/* Address Reminder Banner - opaque background so content behind does not show through */}
+            {billingAlert && showBillingBanner && userRole === USER_ROLES.OWNER && (() => {
+                const display = getPlanBillingStatusDisplay({ billingAlert });
+                const variant = display?.variant || (billingAlert.variant === 'upcoming_payment' ? 'info' : 'danger');
+                const title = display?.title || billingAlert.title || 'Billing notice';
+                const message = display?.message || billingAlert.message;
+                return (
+                    <BillingNoticeBanner
+                        className="mx-0 mb-4"
+                        variant={variant}
+                        title={title}
+                        message={message}
+                        darkMode={darkMode}
+                        onDismiss={() => setShowBillingBanner(false)}
+                        footer={
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage('planUpgrade')}
+                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95 ${darkMode ? 'bg-white/10 text-inherit hover:bg-white/15 border border-white/20' : 'bg-white/80 text-inherit hover:bg-white border border-black/10'}`}
+                            >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                Manage billing
+                            </button>
+                        }
+                    />
+                );
+            })()}
+
             {isAddressMissing && showAddressReminder && canEditBusinessAddress(userRole) && (
                 <div className={`mx-0 mb-4 border rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${darkMode ? 'bg-slate-900 border-amber-500/50' : 'bg-amber-50 border-amber-200'}`}>
                     <div className={`flex-shrink-0 p-2 rounded-lg ${darkMode ? 'bg-amber-900' : 'bg-amber-100'}`}>

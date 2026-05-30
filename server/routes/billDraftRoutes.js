@@ -163,7 +163,10 @@ router.delete('/:id', protect, async (req, res) => {
     }
     try {
         const result = await BillDraft.deleteOne({ _id: req.params.id, storeId: req.user.storeId });
-        if (result.deletedCount === 0) return res.status(404).json({ error: 'Draft not found.' });
+        // Idempotent: already deleted or never existed for this outlet
+        if (result.deletedCount === 0) {
+            return res.json({ success: true, alreadyDeleted: true });
+        }
         res.json({ success: true });
     } catch (e) {
         console.error('BillDraft delete error:', e);

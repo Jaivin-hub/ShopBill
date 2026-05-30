@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Printer, LifeBuoy, ArrowLeft, Mail, Phone, MessageCircle, Clock, ExternalLink, ChevronDown } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
-const SupportPage = ({ onBack, origin, darkMode = true }) => {
+const SupportPage = ({ onBack, origin, darkMode = true, setDarkMode }) => {
   const [openFaq, setOpenFaq] = useState(0);
 
   useEffect(() => {
@@ -100,9 +101,12 @@ const SupportPage = ({ onBack, origin, darkMode = true }) => {
             <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> 
             Back {origin === 'settings' ? 'to Settings' : ''}
           </button>
-          <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200'}`}>
-            <Printer size={18} /> Print Info
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} size="sm" />
+            <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-slate-200'}`}>
+              <Printer size={18} /> Print Info
+            </button>
+          </div>
         </div>
       </nav>
 

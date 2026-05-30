@@ -81,7 +81,13 @@ export default function WorkProfileModal({
       setShiftPickerOpen(false);
       setShiftSearchQuery(null);
       setProfileTab('shift');
+      return undefined;
     }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [isOpen]);
 
   const applyShiftTemplate = useCallback(
@@ -152,14 +158,15 @@ export default function WorkProfileModal({
 
   const modal = (
     <div
-      className="fixed inset-0 z-[260] flex items-center justify-center p-3 sm:p-4 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
+      className="fixed inset-0 z-[280] flex items-center justify-center p-3 max-md:pt-[calc(var(--app-mobile-header-offset,0px)+0.75rem)] max-md:pb-[calc(var(--app-mobile-footer-offset,0px)+0.75rem)] sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="work-profile-title"
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        style={{ WebkitBackdropFilter: 'blur(12px)' }}
         aria-label="Close work profile"
         onClick={onClose}
       />

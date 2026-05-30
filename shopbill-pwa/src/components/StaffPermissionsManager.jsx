@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import AppModalOverlay from './AppModalOverlay';
 import { 
     Plus, Trash2, Users, UserPlus, X, 
     Loader2, ShieldCheck, Mail, User, Crown, 
@@ -157,11 +158,11 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
         || (canEditRole ? (selectedRole === staffMember.role && nameUnchanged) : nameUnchanged);
 
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
-            <div className={`${modalBg} w-full max-w-md max-h-[85vh] sm:max-h-[80vh] rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} flex-shrink-0`}>
+        <AppModalOverlay onClose={onClose} busy={isSubmitting} ariaLabelledby="edit-staff-title" panelClassName="max-w-md">
+            <div className={`${modalBg} rounded-xl sm:rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'} shrink-0`}>
                     <div>
-                        <h2 className={`text-lg md:text-xl font-black tracking-tight flex items-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <h2 id="edit-staff-title" className={`text-lg md:text-xl font-black tracking-tight flex items-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             <Edit3 className="w-5 h-5 mr-3 text-indigo-500 shrink-0" />
                             Update Staff
                         </h2>
@@ -174,7 +175,7 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                     </button>
                 </div>
                 
-                <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto custom-scrollbar">
+                <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
                     <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-500 shrink-0`}>
                             <User className="w-5 h-5" />
@@ -255,12 +256,24 @@ const EditRoleModal = ({ isOpen, onClose, onUpdateRole, staffMember, isSubmittin
                     </button>
                 </div>
             </div>
-        </div>
+        </AppModalOverlay>
     );
 };
 
 const formatRs = (value) =>
     `Rs ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+/** Owner → "Owner" only (never email); manager → "Name (Manager)". */
+const formatPayrollSettledBy = (name, role) => {
+    const roleKey = String(role || '').trim().toLowerCase();
+    const displayName = String(name || '').trim();
+    if (roleKey === 'owner' || displayName.toLowerCase() === 'owner') return 'Owner';
+    if (roleKey === 'manager') {
+        return displayName ? `${displayName} (Manager)` : 'Manager';
+    }
+    if (displayName && role) return `${displayName} (${role})`;
+    return displayName || role || 'Unknown';
+};
 
 const getCurrentMonthKey = () => {
     const now = new Date();
@@ -388,12 +401,13 @@ const PayrollSettlementModal = ({
     const monthLabel = month
         ? new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
         : '-';
+
     return (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[220] flex items-end sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div className={`${modalBg} w-full max-w-lg max-h-[min(92dvh,calc(100vh-1rem))] sm:max-h-[min(88dvh,calc(100vh-2rem))] rounded-xl sm:rounded-2xl border overflow-hidden flex flex-col my-auto`}>
+        <AppModalOverlay onClose={onClose} busy={isSubmitting} ariaLabelledby="payroll-settlement-title" panelClassName="max-w-lg">
+            <div className={`${modalBg} rounded-xl sm:rounded-2xl border overflow-hidden flex flex-col shadow-2xl max-h-full`}>
                 <div className={`shrink-0 p-3 sm:p-4 border-b flex items-center justify-between ${darkMode ? 'border-slate-800 bg-gray-950' : 'border-slate-200 bg-white'}`}>
                     <div>
-                        <h3 className={`text-base sm:text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Mark Salary Settled</h3>
+                        <h3 id="payroll-settlement-title" className={`text-base sm:text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Mark Salary Settled</h3>
                         <p className={`text-[9px] font-black tracking-[0.2em] uppercase mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{staffMember.name}</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 text-slate-500 hover:text-rose-500" disabled={isSubmitting}>
@@ -525,16 +539,20 @@ const PayrollSettlementModal = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </AppModalOverlay>
     );
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser, onMemberOverlayChange }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
     const pendingInfoRef = useRef(null);
+
+    useEffect(() => {
+        onMemberOverlayChange?.(showDetails);
+    }, [showDetails, onMemberOverlayChange]);
     const [scheduleForm, setScheduleForm] = useState({
         enabled: false,
         shiftName: '',
@@ -915,11 +933,11 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
     const cardBase = darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200';
 
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[200] p-3 sm:p-4">
-            <div className={`${modalBg} w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] rounded-xl sm:rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
-                <div className={`p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0 ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
+        <AppModalOverlay onClose={onClose} busy={isSubmitting} ariaLabelledby="add-staff-title" panelClassName="max-w-lg">
+            <div className={`${modalBg} rounded-xl sm:rounded-[1.25rem] border overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full`}>
+                <div className={`p-3 sm:p-4 border-b flex justify-between items-center shrink-0 ${darkMode ? 'border-gray-800 bg-indigo-500/5' : 'border-slate-100 bg-slate-50'}`}>
                     <div>
-                        <h2 className={`text-lg sm:text-xl font-black tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
+                        <h2 id="add-staff-title" className={`text-lg sm:text-xl font-black tracking-tighter flex items-center ${darkMode ? 'text-white' : 'text-black'}`}>
                             <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3 text-indigo-500 shrink-0" />
                             Provision Staff
                         </h2>
@@ -930,7 +948,7 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </button>
                 </div>
                 
-                <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto custom-scrollbar">
+                <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-5 space-y-4 sm:space-y-5 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
                     {error && (
                         <div className={`flex flex-col gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
                             <div className="flex gap-2 sm:gap-3">
@@ -1057,12 +1075,12 @@ const AddStaffModal = ({ isOpen, onClose, onAddStaff, isSubmitting, darkMode, er
                     </button>
                 </form>
             </div>
-        </div>
+        </AppModalOverlay>
     );
 };
 
 // --- StaffPermissionsManager Main ---
-const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions, canAccessTeamManagement: canAccessTeamManagementProp }) => {
+const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: externalSetConfirmModal, currentUserRole, currentUser, darkMode, onUpgradePlan, onOpenRolePermissions, canAccessTeamManagement: canAccessTeamManagementProp, onModalStateChange }) => {
     const [staff, setStaff] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -1080,6 +1098,19 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     const [payrollUpdatingId, setPayrollUpdatingId] = useState(null);
     const [payrollConfirmingId, setPayrollConfirmingId] = useState(null);
     const [payrollSettlementModal, setPayrollSettlementModal] = useState(null);
+    const [memberOverlayOpen, setMemberOverlayOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof onModalStateChange !== 'function') return undefined;
+        const anyOverlayOpen =
+            Boolean(payrollSettlementModal) ||
+            isAddModalOpen ||
+            isEditModalOpen ||
+            Boolean(confirmModal) ||
+            memberOverlayOpen;
+        onModalStateChange(anyOverlayOpen);
+        return () => onModalStateChange(false);
+    }, [payrollSettlementModal, isAddModalOpen, isEditModalOpen, confirmModal, memberOverlayOpen, onModalStateChange]);
     const [payrollSettlementAmount, setPayrollSettlementAmount] = useState('');
     const [payrollSettlementPreset, setPayrollSettlementPreset] = useState('full');
     const [payrollSettlementNotes, setPayrollSettlementNotes] = useState('');
@@ -1286,6 +1317,9 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
             await fetchStaff(); 
             resetForm();
             setAddStaffError(null); // Clear error on success
+            // After adding staff, move owner focus to Pending / off bucket
+            setManagementTab('team');
+            setTeamFilterTab('inactive');
             setIsAddModalOpen(false); 
         } catch (error) {
             if (error?.cancelled) {
@@ -1772,6 +1806,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                     isUpdatingPayrollSettlement={payrollUpdatingId === String(s._id)}
                     existingShifts={existingShifts}
                     currentUser={currentUser}
+                    onMemberOverlayChange={setMemberOverlayOpen}
                 />
             );
         },
@@ -2015,6 +2050,15 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                                     Includes previous remaining: Rs {Number(member?.payrollSummary?.carryForwardIn || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                                                 </p>
                                             )}
+                                            {(member?.payrollSummary?.isPaid || member?.payrollSummary?.isSettled) &&
+                                                (member?.payrollSummary?.settledByName || member?.payrollSummary?.settledByRole) && (
+                                                <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                    Settled by: {formatPayrollSettledBy(member.payrollSummary.settledByName, member.payrollSummary.settledByRole)}
+                                                    {member?.payrollSummary?.settledAt
+                                                        ? ` · ${new Date(member.payrollSummary.settledAt).toLocaleDateString('en-IN')}`
+                                                        : ''}
+                                                </p>
+                                            )}
                                         <div className="flex items-center gap-2">
                                             {member?.payrollSummary?.attachmentUrl && (
                                                 <a
@@ -2187,7 +2231,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                                 </p>
                                             )}
                                             <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                Marked by: {row.settledByName || 'Unknown'}{row.settledByRole ? ` (${row.settledByRole})` : ''}
+                                                Settled by: {formatPayrollSettledBy(row.settledByName, row.settledByRole)}
                                             </p>
                                             {Number(row.carryForwardAmount || 0) > 0 && (
                                                 <p className={`text-[10px] font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
@@ -2338,10 +2382,10 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
                 disabled={isLoading}
-                className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 disabled:opacity-50"
+                className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/50 disabled:opacity-50"
                 aria-label="Add new staff member"
             >
-                <Plus className="w-6 h-6" strokeWidth={2.5} />
+                <Plus className="w-5 h-5" strokeWidth={2.5} />
             </button>
             )}
             

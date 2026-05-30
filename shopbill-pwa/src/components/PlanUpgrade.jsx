@@ -5,13 +5,34 @@ import {
 } from 'lucide-react';
 import API from '../config/api';
 import PlanCard from './PlanCard';
-import { PlanUpgradeInitialSkeleton } from './skeletons/PageSkeletons'; 
+import BillingNoticeBanner from './BillingNoticeBanner';
+import { PlanUpgradeInitialSkeleton } from './skeletons/PageSkeletons';
+import {
+    getPlanBillingStatusDisplay,
+    interpretCancelSubscriptionResponse,
+    CANCELLED_ACCESS_STATUSES,
+    hasInclusiveBillingAccess,
+    isTerminalCancelledSubscriptionStatus,
+    readStoredOwnerBillingAlert,
+    readStoredOwnerSubscriptionCancelled,
+    writeStoredOwnerSubscriptionCancelled,
+    clearOwnerSubscriptionCancelledState,
+    isActiveSubscriptionStatus,
+    planDetailsAfterCancelSuccess,
+} from '../utils/subscriptionBillingUi'; 
+
+const PLAN_TIER = { basic: 1, pro: 2, premium: 3 };
+
+const plansAtOrAboveCurrent = (plans, currentPlanName) => {
+    const currentTier = PLAN_TIER[String(currentPlanName || 'basic').toLowerCase()] || 0;
+    return plans.filter((plan) => (PLAN_TIER[plan.id] || 0) >= currentTier);
+};
 
 const DEMO_PLANS = [
     {
         id: 'basic',
         name: 'BASIC',
-        price: 999,
+        price: 499,
         features: ['3 Users (Owner + 2 Staff)', 'Full Inventory Management', 'Digital Khata', 'Basic Reports', 'Email Support'],
         maxUsers: 3,
         maxInventory: 1000,
@@ -19,7 +40,7 @@ const DEMO_PLANS = [
     {
         id: 'pro',
         name: 'PRO',
-        price: 2199,
+        price: 999,
         features: ['Unlimited Staff', 'Advanced Inventory', 'Bulk Tools', 'SMS Reminders', 'Priority Support', 'Advanced Reports'],
         maxUsers: -1,
         maxInventory: 10000,
@@ -27,7 +48,7 @@ const DEMO_PLANS = [
     {
         id: 'premium',
         name: 'PREMIUM',
-        price: 4999,
+        price: 2999,
         features: ['Unlimited Users', 'Supply Chain Management', 'Multi-Store (Up to 10)', 'Advanced Reports', '24/7 Priority Support', 'Dedicated Manager'],
         maxUsers: -1,
         maxInventory: -1,
@@ -97,7 +118,18 @@ const ConfirmationModal = ({ isUpgrading, selectedPlan, setShowConfirmModal, sta
     );
 };
 
-const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alreadyInTerminalState, isCurrentlyInTrial, handleConfirmCancellation, cancellationMessage, formatDate, darkMode }) => {
+const CancellationModal = ({
+    isCancelling,
+    planDetails,
+    setShowCancelModal,
+    alreadyInTerminalState,
+    isCurrentlyInTrial,
+    handleConfirmCancellation,
+    cancellationMessage,
+    cancelResult,
+    getAccessEndLabel,
+    darkMode,
+}) => {
     return (
         <div className={`fixed inset-0 flex items-center justify-center z-[200] p-3 sm:p-4 md:p-6 overflow-y-auto backdrop-blur-md ${darkMode ? 'bg-gray-950/80' : 'bg-black/50'}`} role="dialog" aria-modal="true">
             <div className={`w-full max-w-md rounded-xl sm:rounded-2xl shadow-2xl border overflow-hidden my-auto max-h-[95vh] flex flex-col ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
@@ -115,33 +147,58 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
                     </div>
                 </div>
                 <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-                    <p className={`text-sm font-bold leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-700'}`} dangerouslySetInnerHTML={{ __html: cancellationMessage }} />
-                    <div className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 border ${darkMode ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
-                        <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                        <p className={`text-[11px] font-bold leading-relaxed ${darkMode ? 'text-red-300' : 'text-red-700'}`}
-                            dangerouslySetInnerHTML={{
-                                __html: isCurrentlyInTrial()
-                                    ? `Mandate <strong>cancelled</strong>. Trial ends ${formatDate(planDetails.planEndDate)}.`
-                                    : `Active until <strong>${formatDate(planDetails.planEndDate)}</strong>. No further charges.`
-                            }}
+                    {cancelResult ? (
+                        <BillingNoticeBanner
+                            variant={cancelResult.ok ? (cancelResult.toastType === 'info' ? 'info' : 'success') : 'danger'}
+                            title={cancelResult.title}
+                            message={cancelResult.message}
+                            darkMode={darkMode}
                         />
-                    </div>
+                    ) : (
+                        <>
+                            <p
+                                className={`text-sm font-bold leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}
+                                dangerouslySetInnerHTML={{ __html: cancellationMessage }}
+                            />
+                            <div
+                                className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 border ${darkMode ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}
+                            >
+                                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                <p
+                                    className={`text-[11px] font-bold leading-relaxed ${darkMode ? 'text-red-300' : 'text-red-700'}`}
+                                    dangerouslySetInnerHTML={{
+                                        __html: alreadyInTerminalState
+                                            ? `You still have access until <strong>${getAccessEndLabel()}</strong>. No further charges will be made.`
+                                            : isCurrentlyInTrial()
+                                              ? `After you confirm: your trial mandate ends and you will <strong>not</strong> be charged for a monthly plan. Access until <strong>${getAccessEndLabel()}</strong>.`
+                                              : `After you confirm: future monthly billing stops. Access until <strong>${getAccessEndLabel()}</strong>.`,
+                                    }}
+                                />
+                            </div>
+                        </>
+                    )}
                 </div>
                 <div className={`p-3 sm:p-4 border-t flex flex-col gap-2 ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-shrink-0`}>
-                    {!alreadyInTerminalState && (
+                    {!alreadyInTerminalState && !cancelResult && (
                         <button
+                            type="button"
                             onClick={handleConfirmCancellation}
                             disabled={isCancelling}
                             className="w-full py-3 sm:py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs tracking-widest transition-all active:scale-[0.98] disabled:opacity-50"
                         >
-                            {isCancelling ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : 'Confirm cancellation'}
+                            {isCancelling ? (
+                                <Loader className="w-4 h-4 animate-spin mx-auto" />
+                            ) : (
+                                'Confirm cancellation'
+                            )}
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={() => setShowCancelModal(false)}
                         className={`w-full py-2.5 text-xs font-bold rounded-xl transition ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                        {alreadyInTerminalState ? 'Dismiss' : 'Keep plan'}
+                        {cancelResult || alreadyInTerminalState ? 'Close' : 'Keep plan'}
                     </button>
                 </div>
             </div>
@@ -151,22 +208,49 @@ const CancellationModal = ({ isCancelling, planDetails, setShowCancelModal, alre
 
 /** Optional plan patch for cached user, then hard-reload so UI (menus, premium, outlets) matches the server. */
 const reloadAppAfterSubscriptionChange = (planUpper = null) => {
+    clearOwnerSubscriptionCancelledState();
     if (planUpper) {
         try {
             const raw = localStorage.getItem('currentUser');
             if (raw) {
                 const u = JSON.parse(raw);
                 u.plan = String(planUpper).toUpperCase();
+                u.subscriptionStatus = 'active';
                 localStorage.setItem('currentUser', JSON.stringify(u));
             }
         } catch (_) { /* ignore */ }
     }
+    window.dispatchEvent(new Event('pocketpos:refresh-billing-alert'));
     window.setTimeout(() => {
         window.location.reload();
     }, 450);
 };
 
-const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) => {
+const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDetails, setBillingAlert, setOwnerMarkedCancelled) => {
+    clearOwnerSubscriptionCancelledState();
+    setOwnerMarkedCancelled(false);
+    setBillingAlert(null);
+    const plan = String(planUpper || '').toUpperCase();
+    if (plan) setCurrentPlan(plan);
+    setPlanDetails((prev) => ({
+        ...prev,
+        subscriptionCancelled: false,
+        subscriptionStatus: 'active',
+        isInTrial: prev.isInTrial,
+    }));
+    try {
+        const raw = localStorage.getItem('currentUser');
+        if (raw) {
+            const u = JSON.parse(raw);
+            if (plan) u.plan = plan;
+            u.subscriptionStatus = 'active';
+            localStorage.setItem('currentUser', JSON.stringify(u));
+        }
+    } catch (_) { /* ignore */ }
+    window.dispatchEvent(new Event('pocketpos:refresh-billing-alert'));
+};
+
+const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSubscriptionAccessEnded }) => {
     const [currentPlan, setCurrentPlan] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -177,10 +261,19 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [planDetails, setPlanDetails] = useState({
         planEndDate: null,
+        nextChargeAt: null,
         subscriptionStatus: null,
+        isInTrial: false,
+        subscriptionCancelled: false,
     });
     const [cancellationMessage, setCancellationMessage] = useState('');
-
+    const [billingAlert, setBillingAlert] = useState(() => readStoredOwnerBillingAlert());
+    const ownerUserId = currentUser?._id || currentUser?.id;
+    const [ownerMarkedCancelled, setOwnerMarkedCancelled] = useState(() =>
+        readStoredOwnerSubscriptionCancelled(ownerUserId)
+    );
+    const [cancelModalResult, setCancelModalResult] = useState(null);
+    const [pageNotice, setPageNotice] = useState(null);
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -190,70 +283,240 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     };
 
     const formatDate = (date) => {
-        if (!date) return 'N/A';
+        if (!date) return null;
         const dateObj = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(dateObj.getTime())) return null;
         return dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
+    const parseBillingDate = (raw) => {
+        if (!raw) return null;
+        const d = raw instanceof Date ? raw : new Date(raw);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const getNextPaymentDate = useCallback(() => {
+        const d = planDetails.nextChargeAt || planDetails.planEndDate;
+        return d instanceof Date && !Number.isNaN(d.getTime()) ? d : parseBillingDate(d);
+    }, [planDetails.nextChargeAt, planDetails.planEndDate]);
+
+    const getAccessEndLabel = useCallback(() => {
+        const formatted = formatDate(getNextPaymentDate());
+        if (formatted) return formatted;
+        return planDetails.isInTrial ? 'the end of your free trial' : 'the end of your access period';
+    }, [getNextPaymentDate, planDetails.isInTrial]);
+
+    const hasCancelledSubscriptionStatus = useCallback(() => {
+        return (
+            isTerminalCancelledSubscriptionStatus(planDetails.subscriptionStatus) ||
+            isTerminalCancelledSubscriptionStatus(currentUser?.subscriptionStatus)
+        );
+    }, [planDetails.subscriptionStatus, currentUser?.subscriptionStatus]);
+
     const isCurrentPlanNotExpiring = useCallback((plan) => {
-        const isExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() &&
+        if (
+            hasCancelledSubscriptionStatus() ||
+            planDetails.subscriptionCancelled ||
+            ownerMarkedCancelled ||
+            readStoredOwnerSubscriptionCancelled(ownerUserId)
+        ) {
+            return false;
+        }
+        const hasAccess = hasInclusiveBillingAccess(planDetails.planEndDate);
+        const isExpiring =
+            hasAccess &&
             !['active', 'authenticated'].includes(planDetails.subscriptionStatus);
         return currentPlan?.toLowerCase() === plan.id && !isExpiring;
-    }, [currentPlan, planDetails.planEndDate, planDetails.subscriptionStatus]);
+    }, [
+        currentPlan,
+        planDetails.planEndDate,
+        planDetails.subscriptionStatus,
+        planDetails.subscriptionCancelled,
+        hasCancelledSubscriptionStatus,
+        ownerMarkedCancelled,
+        ownerUserId,
+    ]);
 
     const isUpgrade = useCallback((plan) => {
-        const planOrder = { basic: 1, pro: 2, premium: 3 };
-        const currentOrder = planOrder[currentPlan?.toLowerCase()] || 0;
-        const planOrderValue = planOrder[plan.id] || 0;
+        const currentOrder = PLAN_TIER[currentPlan?.toLowerCase()] || 0;
+        const planOrderValue = PLAN_TIER[plan.id] || 0;
         return planOrderValue > currentOrder;
     }, [currentPlan]);
 
+    const isDowngrade = useCallback((plan) => {
+        const currentOrder = PLAN_TIER[currentPlan?.toLowerCase()] || 0;
+        const planOrderValue = PLAN_TIER[plan.id] || 0;
+        return planOrderValue < currentOrder;
+    }, [currentPlan]);
+
     const isAlreadyCancelledOrPending = useCallback(() => {
-        const finalStatusesWithFutureAccess = ['cancellation_pending', 'trial_cancellation_pending', 'cancellation_no_refund', 'cancelled'];
-        return finalStatusesWithFutureAccess.includes(planDetails.subscriptionStatus) && planDetails.planEndDate > new Date();
-    }, [planDetails.planEndDate, planDetails.subscriptionStatus]);
+        return (
+            hasCancelledSubscriptionStatus() &&
+            hasInclusiveBillingAccess(planDetails.planEndDate)
+        );
+    }, [hasCancelledSubscriptionStatus, planDetails.planEndDate]);
 
     const isSamePlanAndCancelled = useCallback((plan) => {
-        return currentPlan?.toLowerCase() === plan.id && isAlreadyCancelledOrPending();
-    }, [currentPlan, isAlreadyCancelledOrPending]);
+        return (
+            currentPlan?.toLowerCase() === plan.id &&
+            (hasCancelledSubscriptionStatus() ||
+                planDetails.subscriptionCancelled ||
+                ownerMarkedCancelled ||
+                readStoredOwnerSubscriptionCancelled(ownerUserId))
+        );
+    }, [
+        currentPlan,
+        hasCancelledSubscriptionStatus,
+        planDetails.subscriptionCancelled,
+        ownerMarkedCancelled,
+        ownerUserId,
+    ]);
 
     const isCurrentlyInTrial = useCallback(() => {
-        const isFutureDate = planDetails.planEndDate && planDetails.planEndDate > new Date();
-        const isNotFinal = !['cancelled', 'expired'].includes(planDetails.subscriptionStatus);
-        const isTrialStatus = planDetails.subscriptionStatus === 'authenticated' || planDetails.subscriptionStatus === 'trial_cancellation_pending';
-        return isFutureDate && isNotFinal && isTrialStatus;
-    }, [planDetails.planEndDate, planDetails.subscriptionStatus]);
+        if (planDetails.isInTrial) return true;
+        const status = String(planDetails.subscriptionStatus || '').toLowerCase();
+        if (status === 'trial_cancellation_pending') return false;
+        if (status === 'authenticated' || status === 'created') return true;
+        const paymentDate = planDetails.nextChargeAt || planDetails.planEndDate;
+        if (
+            status === 'active' &&
+            paymentDate &&
+            paymentDate > new Date()
+        ) {
+            return true;
+        }
+        return false;
+    }, [planDetails.isInTrial, planDetails.planEndDate, planDetails.nextChargeAt, planDetails.subscriptionStatus]);
 
     const fetchPlanData = useCallback(async () => {
         setIsLoading(true);
+        const localFallbackPlan = String(currentUser?.plan || 'BASIC').toUpperCase();
         try {
             const planResponse = await apiClient.get(API.currentPlan);
-            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || 'BASIC';
-            const fetchedPlanEndDate = planResponse?.data?.planEndDate ? new Date(planResponse.data.planEndDate) : null;
+            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || localFallbackPlan;
+            let fetchedPlanEndDate =
+                parseBillingDate(planResponse?.data?.nextChargeAt) ||
+                parseBillingDate(planResponse?.data?.planEndDate);
+            let fetchedNextCharge =
+                parseBillingDate(planResponse?.data?.nextChargeAt) || fetchedPlanEndDate;
+            if (!fetchedPlanEndDate) {
+                fetchedPlanEndDate = parseBillingDate(currentUser?.planEndDate);
+                fetchedNextCharge = fetchedPlanEndDate;
+            }
             const fetchedSubscriptionStatus = planResponse?.data?.subscriptionStatus || null;
+            const statusLower = String(fetchedSubscriptionStatus || '').toLowerCase();
+            const fromApiCancelled = Boolean(planResponse?.data?.subscriptionCancelled);
+            const fromStatusCancelled = isTerminalCancelledSubscriptionStatus(fetchedSubscriptionStatus);
+            const apiInTrial = Boolean(planResponse?.data?.isInTrial);
+            const paymentDate = fetchedNextCharge || fetchedPlanEndDate;
+            const hasFutureCharge = paymentDate && paymentDate > new Date();
+            const statusIsLive =
+                isActiveSubscriptionStatus(fetchedSubscriptionStatus) ||
+                statusLower === 'created';
+
+            let subscriptionCancelled;
+            if (
+                apiInTrial &&
+                hasFutureCharge &&
+                statusIsLive &&
+                statusLower !== 'trial_cancellation_pending'
+            ) {
+                clearOwnerSubscriptionCancelledState();
+                setOwnerMarkedCancelled(false);
+                subscriptionCancelled = false;
+            } else if (
+                isActiveSubscriptionStatus(fetchedSubscriptionStatus) &&
+                !fromApiCancelled &&
+                hasFutureCharge
+            ) {
+                clearOwnerSubscriptionCancelledState();
+                setOwnerMarkedCancelled(false);
+                subscriptionCancelled = false;
+            } else if (
+                (isActiveSubscriptionStatus(fetchedSubscriptionStatus) && !fromApiCancelled) ||
+                (apiInTrial && !fromStatusCancelled)
+            ) {
+                clearOwnerSubscriptionCancelledState();
+                setOwnerMarkedCancelled(false);
+                subscriptionCancelled = false;
+            } else {
+                const fromStorageCancelled = readStoredOwnerSubscriptionCancelled(ownerUserId);
+                subscriptionCancelled =
+                    fromApiCancelled || fromStatusCancelled || fromStorageCancelled;
+                if (subscriptionCancelled) {
+                    setOwnerMarkedCancelled(true);
+                }
+            }
+
+            const apiSaysActive =
+                !subscriptionCancelled &&
+                ((isActiveSubscriptionStatus(fetchedSubscriptionStatus) && !fromApiCancelled) ||
+                    apiInTrial);
+
             setCurrentPlan(fetchedPlanName);
+            const inferredInTrial =
+                !subscriptionCancelled &&
+                (apiInTrial ||
+                    statusLower === 'authenticated' ||
+                    statusLower === 'created' ||
+                    (hasFutureCharge && statusIsLive));
             setPlanDetails({
                 planEndDate: fetchedPlanEndDate,
+                nextChargeAt: fetchedNextCharge,
                 subscriptionStatus: fetchedSubscriptionStatus,
+                isInTrial: subscriptionCancelled ? false : inferredInTrial,
+                subscriptionCancelled,
             });
-            setAvailablePlans(DEMO_PLANS);
+            const alertFromApi = planResponse?.data?.billingAlert;
+            if (apiSaysActive) {
+                setBillingAlert(null);
+            } else if (alertFromApi?.show) {
+                setBillingAlert(alertFromApi);
+            } else if (subscriptionCancelled) {
+                setBillingAlert(readStoredOwnerBillingAlert());
+            } else {
+                setBillingAlert(null);
+            }
+            setAvailablePlans(plansAtOrAboveCurrent(DEMO_PLANS, fetchedPlanName));
+
+            if (
+                planResponse?.data?.success &&
+                planResponse.data.accessAllowed === false &&
+                !planResponse.data.mandateRestoreRequired
+            ) {
+                onSubscriptionAccessEnded?.();
+            }
         } catch (error) {
             console.error("Error fetching plan data:", error);
-            setCurrentPlan('BASIC');
-            setAvailablePlans(DEMO_PLANS);
+            setCurrentPlan(localFallbackPlan);
+            setAvailablePlans(plansAtOrAboveCurrent(DEMO_PLANS, localFallbackPlan));
             showToast('Failed to sync billing data.', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiClient, showToast]);
+    }, [apiClient, currentUser?.plan, currentUser?.planEndDate, ownerUserId, showToast, onSubscriptionAccessEnded]);
 
     useEffect(() => {
         fetchPlanData();
     }, [fetchPlanData]);
 
+    useEffect(() => {
+        const onRefresh = () => fetchPlanData();
+        window.addEventListener('pocketpos:refresh-billing-alert', onRefresh);
+        return () => window.removeEventListener('pocketpos:refresh-billing-alert', onRefresh);
+    }, [fetchPlanData]);
+
     const handleUpgradeClick = (plan) => {
         if (isCurrentPlanNotExpiring(plan) && plan.id === currentPlan?.toLowerCase()) {
             showToast('Already active on this plan.', 'info');
+            return;
+        }
+        if (isDowngrade(plan)) {
+            showToast('Downgrading is not allowed. Upgrade to a higher plan or cancel your subscription.', 'info');
+            return;
+        }
+        if (!isUpgrade(plan) && !isSamePlanAndCancelled(plan)) {
+            showToast('Plan changes are limited to upgrades only.', 'info');
             return;
         }
         setSelectedPlan(plan);
@@ -272,7 +535,15 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                 newPlan: newPlanId.toUpperCase(),
             });
             if (verificationResponse.data.success) {
-                showToast(`Plan updated to ${newPlanId.toUpperCase()}. Refreshing app…`, 'success');
+                const planUpper = newPlanId.toUpperCase();
+                applyActiveSubscriptionLocalState(
+                    planUpper,
+                    setCurrentPlan,
+                    setPlanDetails,
+                    setBillingAlert,
+                    setOwnerMarkedCancelled
+                );
+                showToast(`Plan updated to ${planUpper}. Refreshing…`, 'success');
                 reloadAfter = true;
             } else {
                 showToast(verificationResponse.data.error || 'Verification failed.', 'error');
@@ -320,15 +591,20 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
     };
 
     const handlePrepareCancellation = () => {
+        setCancelModalResult(null);
         const planName = currentPlan;
-        const endDateString = planDetails.planEndDate ? formatDate(planDetails.planEndDate) : 'cycle end';
+        const endDateString = getAccessEndLabel();
         let msg = '';
         if (isAlreadyCancelledOrPending()) {
-            msg = `Your subscription is already scheduled for termination. Access remains valid until <strong>${endDateString}</strong>.`;
+            msg = `Your subscription is <strong>already cancelled</strong>. Auto-debit is off. You can use Pocket POS until <strong>${endDateString}</strong>.`;
+        } else if (planDetails.subscriptionStatus === 'pending') {
+            msg = `Your last payment failed. Schedule cancellation for <strong>${planName}</strong>? Razorpay will retry collecting the due amount, then auto-debit stops. Access until <strong>${endDateString}</strong> where applicable. One tap — no need to cancel again.`;
+        } else if (planDetails.subscriptionStatus === 'cancellation_pending') {
+            msg = `Cancellation is already scheduled. Razorpay may retry your due payment, then billing stops. Access until <strong>${endDateString}</strong>.`;
         } else if (isCurrentlyInTrial()) {
-            msg = `Cancel <strong>${planName}</strong> trial? Future mandate will be voided. Access continues until <strong>${endDateString}</strong>.`;
+            msg = `End your <strong>${planName}</strong> free trial? Your payment mandate will be removed and you will <strong>not</strong> be charged for a monthly plan. You can keep using Pocket POS until <strong>${endDateString}</strong>.`;
         } else {
-            msg = `Terminate <strong>${planName}</strong>? Future billing stops immediately. Premium access persists until <strong>${endDateString}</strong>.`;
+            msg = `Cancel <strong>${planName}</strong>? Future monthly billing stops. You keep full access until <strong>${endDateString}</strong>.`;
         }
         setCancellationMessage(msg);
         setShowCancelModal(true);
@@ -336,24 +612,79 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
 
     const handleConfirmCancellation = async () => {
         setIsCancelling(true);
-        let reloadAfter = false;
+        setCancelModalResult(null);
         try {
             const response = await apiClient.post(API.cancelSubscription);
-            if (response.data.success) {
-                showToast('Subscription updated. Refreshing app…', 'success');
-                reloadAfter = true;
+            const result = interpretCancelSubscriptionResponse(response.data);
+
+            setCancelModalResult(result);
+
+            if (result.ok) {
+                writeStoredOwnerSubscriptionCancelled(ownerUserId);
+                setOwnerMarkedCancelled(true);
+                const nextEnd = result.planEndDate
+                    ? new Date(result.planEndDate)
+                    : planDetails.planEndDate;
+                setPlanDetails((prev) => ({
+                    ...planDetailsAfterCancelSuccess(prev, result),
+                    planEndDate: nextEnd || prev.planEndDate,
+                }));
+                window.dispatchEvent(new Event('pocketpos:refresh-billing-alert'));
+            }
+
+            setPageNotice({
+                variant:
+                    result.ok
+                        ? result.toastType === 'info'
+                            ? 'info'
+                            : 'success'
+                        : result.explainRazorpayPending
+                          ? 'warning'
+                          : 'danger',
+                title: result.title,
+                message: result.message,
+            });
+
+            showToast(result.message, result.toastType);
+
+            if (result.ok) {
+                await fetchPlanData();
             }
         } catch (error) {
-            showToast('Cancellation failed.', 'error');
+            const result = interpretCancelSubscriptionResponse({
+                success: false,
+                error:
+                    error.response?.data?.razorpayApiError ||
+                    error.response?.data?.error ||
+                    'Cancellation failed. Please try again or contact support.',
+            });
+            setCancelModalResult(result);
+            setPageNotice({
+                variant: 'danger',
+                title: result.title,
+                message: result.message,
+            });
+            showToast(result.message, 'error');
         } finally {
-            setShowCancelModal(false);
             setIsCancelling(false);
-            if (!reloadAfter) fetchPlanData();
-        }
-        if (reloadAfter) {
-            reloadAppAfterSubscriptionChange();
         }
     };
+
+    const subscriptionIsActive = isActiveSubscriptionStatus(planDetails.subscriptionStatus);
+    const ownerCancelledHint =
+        !subscriptionIsActive &&
+        (planDetails.subscriptionCancelled ||
+            ownerMarkedCancelled ||
+            readStoredOwnerSubscriptionCancelled(ownerUserId) ||
+            hasCancelledSubscriptionStatus());
+
+    const billingStatusDisplay = getPlanBillingStatusDisplay({
+        subscriptionStatus: planDetails.subscriptionStatus,
+        planEndDate: getNextPaymentDate(),
+        billingAlert,
+        isInTrial: ownerCancelledHint ? false : planDetails.isInTrial,
+        subscriptionCancelled: ownerCancelledHint,
+    });
 
     const getPlanIcon = (pId) => pId === 'premium' ? Crown : pId === 'pro' ? Zap : Building2;
     const getPlanColor = (_pId) => darkMode ? 'border-slate-700 bg-indigo-500/10' : 'border-slate-200 bg-indigo-500/10';
@@ -363,18 +694,67 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
         return <PlanUpgradeInitialSkeleton darkMode={darkMode} />;
     }
 
-    const isPlanExpiring = planDetails.planEndDate && planDetails.planEndDate > new Date() &&
-        !['active', 'authenticated'].includes(planDetails.subscriptionStatus);
+    const statusLower = String(planDetails.subscriptionStatus || '').toLowerCase();
+    const cancelledByStatus = hasCancelledSubscriptionStatus();
+    const isPlanExpiring = isAlreadyCancelledOrPending();
     const alreadyInTerminalState = isAlreadyCancelledOrPending();
+    const needsResubscribe =
+        !subscriptionIsActive &&
+        (ownerCancelledHint ||
+            cancelledByStatus ||
+            billingAlert?.variant === 'cancelled' ||
+            billingAlert?.title === 'Subscription cancelled' ||
+            billingStatusDisplay?.variant === 'cancelled' ||
+            billingStatusDisplay?.title === 'Subscription cancelled');
+    const isTrialCancelled =
+        statusLower === 'trial_cancellation_pending' ||
+        (needsResubscribe && planDetails.isInTrial);
+    const stillHasAccess = hasInclusiveBillingAccess(
+        planDetails.nextChargeAt || planDetails.planEndDate
+    );
+
+    const isCancelledLike =
+        cancelledByStatus ||
+        needsResubscribe ||
+        CANCELLED_ACCESS_STATUSES.has(statusLower) ||
+        ['cancelled', 'cancellation_no_refund', 'trial_cancellation_pending'].includes(statusLower);
+    const showTrialBadge =
+        !needsResubscribe &&
+        !isTrialCancelled &&
+        (planDetails.isInTrial ||
+            isCurrentlyInTrial() ||
+            billingStatusDisplay?.title === 'Free trial active');
+
+    const renewLabel = !stillHasAccess && !isCurrentlyInTrial() && !planDetails.isInTrial
+        ? 'Access period ended'
+        : isCancelledLike || billingStatusDisplay?.variant === 'cancelled' || isPlanExpiring
+          ? `Access until ${getAccessEndLabel()}`
+          : planDetails.subscriptionStatus === 'pending'
+            ? 'Payment retry — see notice below'
+            : isCurrentlyInTrial() || planDetails.isInTrial
+              ? `First charge ${getAccessEndLabel()}`
+              : `Renews ${getAccessEndLabel()}`;
 
     const getModalWarningMessage = (plan) => {
-        const action = isSamePlanAndCancelled(plan) ? 're-subscribe' : isUpgrade(plan) ? 'upgrade' : 'downgrade';
+        const action = isSamePlanAndCancelled(plan) ? 're-subscribe' : 'upgrade';
+        const chargeNote = needsResubscribe
+            ? stillHasAccess
+                ? `No new free trial. Your first monthly charge is scheduled for ${getAccessEndLabel()} (end of your current access).`
+                : 'No new free trial. Your first monthly charge will be within a few days after mandate setup.'
+            : 'First full plan charge follows your trial or billing schedule.';
         return {
             title: `Confirm <strong>${action}</strong> to <strong>${plan.name}</strong> for <strong>${formatCurrency(plan.price)}/mo</strong>.`,
-            detail: `Requires new payment mandate. Current tier features will be updated immediately. Verification fee of ₹1 applies.`,
-            icon: action === 'downgrade' ? 'yellow' : 'blue'
+            detail: `Requires new payment mandate. ${chargeNote} Verification fee of ₹1 applies.`,
+            icon: 'blue',
         };
     };
+
+    const planGridCols =
+        availablePlans.length <= 1
+            ? 'md:grid-cols-1 md:max-w-md md:mx-auto'
+            : availablePlans.length === 2
+              ? 'md:grid-cols-2'
+              : 'md:grid-cols-3';
 
     // Match other app pages (Settings, Profile)
     const headerBase = darkMode ? 'bg-gray-950/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm';
@@ -398,7 +778,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                             </div>
                             <div className="min-w-0">
                                 <h1 className={`truncate text-lg font-black tracking-tight sm:text-2xl ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    Billing <span className="text-indigo-500">&amp; plans</span>
+                                    Subscription <span className="text-indigo-500">&amp; Billing</span>
                                 </h1>
                                 <p className={`mt-0.5 truncate text-[9px] font-bold tracking-wide sm:text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
                                     Subscription &amp; renewals
@@ -411,7 +791,26 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="mx-auto max-w-7xl space-y-5 px-3 pb-28 pt-3 sm:space-y-8 sm:px-4 sm:pb-24 sm:pt-4 md:p-8 md:pb-20 lg:p-10">
-                {currentPlan && (
+                {pageNotice && (
+                    <BillingNoticeBanner
+                        variant={pageNotice.variant}
+                        title={pageNotice.title}
+                        message={pageNotice.message}
+                        darkMode={darkMode}
+                        onDismiss={() => setPageNotice(null)}
+                    />
+                )}
+
+                {billingStatusDisplay && (
+                    <BillingNoticeBanner
+                        variant={billingStatusDisplay.variant}
+                        title={billingStatusDisplay.title}
+                        message={billingStatusDisplay.message}
+                        darkMode={darkMode}
+                    />
+                )}
+
+                {currentPlan && !needsResubscribe && (
                     <section
                         className={`overflow-hidden rounded-2xl border shadow-sm ${darkMode ? 'border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'}`}
                     >
@@ -432,50 +831,92 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                                             {currentPlan}
                                         </h2>
                                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isPlanExpiring ? 'animate-pulse bg-red-500' : 'bg-emerald-500'}`} />
-                                            <span className={`text-xs font-bold ${isPlanExpiring ? 'text-red-500' : darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                                {isPlanExpiring ? `Ends ${formatDate(planDetails.planEndDate)}` : `Renews ${formatDate(planDetails.planEndDate)}`}
+                                            {showTrialBadge && (
+                                                <span
+                                                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                                                        darkMode
+                                                            ? 'bg-sky-500/15 text-sky-300 border border-sky-500/25'
+                                                            : 'bg-sky-50 text-sky-700 border border-sky-200'
+                                                    }`}
+                                                >
+                                                    Free trial
+                                                </span>
+                                            )}
+                                            <span
+                                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                                    needsResubscribe || isPlanExpiring
+                                                        ? 'animate-pulse bg-orange-500'
+                                                        : planDetails.subscriptionStatus === 'pending'
+                                                          ? 'animate-pulse bg-amber-500'
+                                                          : 'bg-emerald-500'
+                                                }`}
+                                            />
+                                            <span
+                                                className={`text-xs font-bold ${
+                                                    needsResubscribe || isPlanExpiring
+                                                        ? 'text-orange-500'
+                                                        : planDetails.subscriptionStatus === 'pending'
+                                                          ? 'text-amber-600'
+                                                          : darkMode
+                                                            ? 'text-slate-400'
+                                                            : 'text-slate-600'
+                                                }`}
+                                            >
+                                                {renewLabel}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                                 <button
-                                    type="button"
-                                    onClick={handlePrepareCancellation}
-                                    disabled={isCancelling}
-                                    className={`touch-manipulation w-full shrink-0 rounded-xl border px-4 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 sm:w-auto sm:py-3 ${darkMode ? 'border-slate-700 bg-slate-800/80 text-red-400 hover:border-red-500/40 hover:bg-red-500/10' : 'border-slate-200 bg-white text-red-600 hover:border-red-200 hover:bg-red-50'}`}
-                                >
-                                    {isCancelling ? 'Processing…' : isPlanExpiring ? 'Manage cancellation' : 'Cancel subscription'}
+                                        type="button"
+                                        onClick={handlePrepareCancellation}
+                                        disabled={isCancelling || planDetails.subscriptionStatus === 'cancellation_pending'}
+                                        className={`touch-manipulation w-full shrink-0 rounded-xl border px-4 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 sm:w-auto sm:py-3 ${darkMode ? 'border-slate-700 bg-slate-800/80 text-red-400 hover:border-red-500/40 hover:bg-red-500/10' : 'border-slate-200 bg-white text-red-600 hover:border-red-200 hover:bg-red-50'}`}
+                                    >
+                                        {isCancelling
+                                            ? 'Processing…'
+                                            : planDetails.subscriptionStatus === 'pending'
+                                              ? 'Schedule cancellation'
+                                              : planDetails.subscriptionStatus === 'cancellation_pending'
+                                                ? 'Cancellation scheduled'
+                                                : 'Cancel subscription'}
                                 </button>
                             </div>
                         </div>
                     </section>
                 )}
 
-                <section className="space-y-3 sm:space-y-4">
+                <section id="compare-plans" className="scroll-mt-24 space-y-3 sm:space-y-4">
                     <div className="px-0.5">
                         <h2 className={`text-lg font-black tracking-tight sm:text-xl ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Compare plans
+                            {needsResubscribe ? 'Re-subscribe' : 'Compare plans'}
                         </h2>
                         <p className={`mt-0.5 text-xs font-bold leading-snug sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Swipe on your phone to compare. Tap a plan to upgrade or change.
+                            {needsResubscribe
+                                ? isTrialCancelled
+                                    ? stillHasAccess
+                                        ? `Your free trial is cancelled. You can use Pocket POS until ${getAccessEndLabel()}. Pick a plan below to re-subscribe.`
+                                        : 'Your free trial has ended. Pick a plan below to re-subscribe and continue.'
+                                    : stillHasAccess
+                                      ? `Your subscription is cancelled. You can use Pocket POS until ${getAccessEndLabel()}. Pick a plan below to re-subscribe or upgrade.`
+                                      : 'Your subscription has ended. Pick a plan below to re-subscribe and continue.'
+                                : 'Tap a plan below to upgrade, or manage cancellation above.'}
                         </p>
                     </div>
-                    <div className="-mx-1 flex gap-3 overflow-x-auto overflow-y-visible px-1 pb-2 pt-1 no-scrollbar snap-x snap-mandatory md:mx-0 md:grid md:max-w-none md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0">
+                    <div className={`flex w-full flex-col gap-4 sm:gap-5 md:grid md:max-w-none md:gap-6 ${planGridCols}`}>
                         {availablePlans.map((plan) => (
                             <div
                                 key={plan.id}
-                                className="flex h-full w-[min(22rem,calc(100vw-2.5rem))] shrink-0 snap-center md:w-full md:min-w-0 md:snap-align-none"
+                                className="flex w-full min-w-0"
                             >
                                 <PlanCard
                                     plan={plan}
                                     currentPlanName={currentPlan}
                                     isCurrentPlanNotExpiring={isCurrentPlanNotExpiring}
                                     isSamePlanAndCancelled={isSamePlanAndCancelled}
-                                    isUpgrade={isUpgrade}
                                     isUpgrading={isUpgrading}
                                     isCancelling={isCancelling}
-                                    alreadyInTerminalState={alreadyInTerminalState}
+                                    alreadyInTerminalState={needsResubscribe}
                                     formatCurrency={formatCurrency}
                                     getPlanIcon={getPlanIcon}
                                     getPlanColor={getPlanColor}
@@ -504,12 +945,16 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode }) =>
                 <CancellationModal
                     isCancelling={isCancelling}
                     planDetails={planDetails}
-                    setShowCancelModal={setShowCancelModal}
+                    setShowCancelModal={() => {
+                        setShowCancelModal(false);
+                        setCancelModalResult(null);
+                    }}
                     alreadyInTerminalState={alreadyInTerminalState}
                     isCurrentlyInTrial={isCurrentlyInTrial}
                     handleConfirmCancellation={handleConfirmCancellation}
                     cancellationMessage={cancellationMessage}
-                    formatDate={formatDate}
+                    cancelResult={cancelModalResult}
+                    getAccessEndLabel={getAccessEndLabel}
                     darkMode={darkMode}
                 />
             )}

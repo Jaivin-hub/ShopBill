@@ -38,61 +38,49 @@ window.addEventListener('unhandledrejection', (event) => {
   })()
 })
 
-// Register the Service Worker with improved update detection
+const dispatchPwaUpdate = (updateHandler, registration = null) => {
+  const reg = registration || window.__swRegistration || null
+  window.dispatchEvent(
+    new CustomEvent('pwa-update-available', {
+      detail: { updateHandler, registration: reg },
+    })
+  )
+}
+
 const updateSW = registerSW({
-  immediate: true, // Check for updates immediately
+  immediate: true,
   onNeedRefresh() {
-    // Only dispatch event when there's actually a new version available
-    // This callback is only called when a new service worker is detected
-    window.dispatchEvent(new CustomEvent('pwa-update-available', { 
-      detail: { 
-        updateHandler: updateSW,
-        registration: null // Will be set in UpdatePrompt component
-      } 
-    }));
+    dispatchPwaUpdate(updateSW, window.__swRegistration)
   },
   onRegistered(registration) {
-    // Store registration globally for UpdatePrompt to access
-    window.__swRegistration = registration;
-    
-    // Set up periodic update checks.
-    if (registration) {
-      // Check for updates every 5 minutes to reduce network/battery overhead.
-      setInterval(() => {
-        registration.update().catch(err => {
-          console.warn('Periodic update check failed:', err);
-        });
-      }, 5 * 60 * 1000);
+    window.__swRegistration = registration
+    if (!registration) return
+
+    const poll = () => {
+      registration.update().catch((err) => {
+        console.warn('[PWA] periodic update check failed:', err)
+      })
     }
-  },
-  onRegisteredSW(swUrl, registration) {
-    // Called when a new service worker is registered
-    
-    // Listen for service worker updates
-    if (registration) {
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker is waiting
-              window.dispatchEvent(new CustomEvent('pwa-update-available', { 
-                detail: { 
-                  updateHandler: updateSW,
-                  registration: registration
-                } 
-              }));
-            }
-          });
+
+    poll()
+    setInterval(poll, 2 * 60 * 1000)
+
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing
+      if (!worker) return
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          dispatchPwaUpdate(updateSW, registration)
         }
-      });
-    }
+      })
+    })
   },
-  onError(error) {
-    console.error('❌ Service Worker registration failed:', error);
-  }
+  onOfflineReady() {
+    console.info('[PWA] App ready to work offline')
+  },
+  onRegisterError(error) {
+    console.error('[PWA] Service worker registration failed:', error)
+  },
 })
 
-createRoot(document.getElementById('root')).render(
-    <App />
-)
+createRoot(document.getElementById('root')).render(<App />)

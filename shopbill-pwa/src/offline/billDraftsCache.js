@@ -289,19 +289,28 @@ export async function deleteBillDraftOffline({ storeId, draftId }) {
 }
 
 export async function deleteBillDraftWithCache({ apiClient, draftById, storeId, draftId }) {
-  if (isBrowserOnline() && isMongoObjectId(draftId)) {
+  const id = String(draftId || '');
+  const removeLocally = async () => {
+    const list = (await loadBillDraftsCache(storeId)).filter((d) => String(d._id) !== id);
+    await saveBillDraftsCache(storeId, list);
+    const merged = await mergeBillDraftsForDisplay(storeId, list);
+    await saveBillDraftsCache(storeId, merged);
+    return { drafts: merged, source: 'network' };
+  };
+
+  if (isBrowserOnline() && isMongoObjectId(id)) {
     try {
-      await apiClient.delete(draftById(draftId), { headers: { 'x-skip-attendance-prompt': '1' } });
-      const list = (await loadBillDraftsCache(storeId)).filter((d) => String(d._id) !== String(draftId));
-      await saveBillDraftsCache(storeId, list);
-      const merged = await mergeBillDraftsForDisplay(storeId, list);
-      await saveBillDraftsCache(storeId, merged);
-      return { drafts: merged, source: 'network' };
+      await apiClient.delete(draftById(id), { headers: { 'x-skip-attendance-prompt': '1' } });
+      return removeLocally();
     } catch (error) {
       if (error?.cancelled) throw error;
+      // Already deleted on server, wrong outlet, or stale cache — drop locally
+      if (error?.response?.status === 404) {
+        return removeLocally();
+      }
     }
   }
-  return deleteBillDraftOffline({ storeId, draftId });
+  return deleteBillDraftOffline({ storeId, draftId: id });
 }
 
 export async function removeDraftFromCacheAfterSale(storeId, draftId) {

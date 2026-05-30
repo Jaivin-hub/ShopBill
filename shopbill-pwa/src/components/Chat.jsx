@@ -20,7 +20,7 @@ function isAppleTouchDevice() {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onThreadSwipeConsumed, onUnreadCountChange, onNavigateToStaffPermissions }) => {
+const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletId, outlets = [], onChatSelectionChange, onThreadSwipeConsumed, onUnreadCountChange, onNavigateToStaffPermissions, onModalStateChange }) => {
     // Styling Vars matching Dashboard architecture
     const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
     
@@ -47,6 +47,12 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [availableUsers, setAvailableUsers] = useState([]);
     const [showNewChatModal, setShowNewChatModal] = useState(false);
+
+    useEffect(() => {
+        if (typeof onModalStateChange !== 'function') return undefined;
+        onModalStateChange(showNewChatModal);
+        return () => onModalStateChange(false);
+    }, [showNewChatModal, onModalStateChange]);
     const [newChatType, setNewChatType] = useState('group');
     const [newChatName, setNewChatName] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
@@ -1992,13 +1998,13 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             </div>
 
             {/* Floating add (new group) — only on Groups tab, not Staff */}
-            {!selectedChat && chatListViewMode === 'chats' && (
+            {!selectedChat && chatListViewMode === 'chats' && !showNewChatModal && (
                 <button
                     onClick={() => { setShowNewChatModal(true); setNewChatType('group'); }}
-                    className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] right-4 md:bottom-6 md:right-6 z-50 p-4 rounded-full bg-indigo-600 text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
+                    className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] md:bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/50"
                     aria-label="New chat"
                 >
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-5 h-5" strokeWidth={2.5} />
                 </button>
             )}
 

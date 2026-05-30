@@ -5,6 +5,7 @@ import {
   Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download, Settings2, Trash2
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import AppModalOverlay from './AppModalOverlay';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
 import { exportRowsToExcel } from '../utils/exportExcel';
 import { SupplyChainInitialSkeleton, SupplyChainContentSkeleton } from './skeletons/PageSkeletons';
@@ -26,7 +27,7 @@ const EMPTY_PRODUCT_FORM = {
   variants: []
 };
 
-const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
+const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalStateChange }) => {
   const [activeTab, setActiveTab] = useState('purchase');
   const [dataLoading, setDataLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -72,6 +73,20 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
   const [editingProductVariantIndex, setEditingProductVariantIndex] = useState(null);
   const [supplierErrors, setSupplierErrors] = useState({});
   const [productErrors, setProductErrors] = useState({});
+
+  const handleCloseProductModal = useCallback(() => {
+    setIsProductModalOpen(false);
+    setProductForm(EMPTY_PRODUCT_FORM);
+    setHasProductVariants(false);
+    setEditingProductVariantIndex(null);
+  }, []);
+
+  useEffect(() => {
+    if (typeof onModalStateChange !== 'function') return undefined;
+    const anyOverlayOpen = isProductModalOpen || isSupplierModalOpen;
+    onModalStateChange(anyOverlayOpen);
+    return () => onModalStateChange(false);
+  }, [isProductModalOpen, isSupplierModalOpen, onModalStateChange]);
 
   useEffect(() => {
     if (selectedFilter === 'custom' && (!customStartDate || !customEndDate)) {
@@ -1035,16 +1050,15 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
 
       {/* --- MODALS --- */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => {
-            setIsProductModalOpen(false);
-            setProductForm(EMPTY_PRODUCT_FORM);
-            setHasProductVariants(false);
-            setEditingProductVariantIndex(null);
-          }} />
+        <AppModalOverlay
+          onClose={handleCloseProductModal}
+          busy={isActionLoading}
+          ariaLabelledby="quick-add-product-title"
+          panelClassName="max-w-lg"
+        >
           <form
             onSubmit={handleQuickAddProduct}
-            className={`relative w-full max-w-lg ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh] md:max-h-[88vh] flex flex-col`}
+            className={`w-full ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl border shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden max-h-full flex flex-col`}
           >
             {/* Header */}
             <div className={`p-5 border-b ${darkMode ? 'border-slate-800 bg-gray-950/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
@@ -1053,7 +1067,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
                   <Package className="w-5 h-5 text-indigo-500" />
                 </div>
                 <div>
-                  <h3 className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <h3 id="quick-add-product-title" className={`text-lg font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     Quick Add Product
                   </h3>
                   <p className={`text-[10px] font-bold tracking-wider mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -1063,12 +1077,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsProductModalOpen(false);
-                  setProductForm(EMPTY_PRODUCT_FORM);
-                  setHasProductVariants(false);
-                  setEditingProductVariantIndex(null);
-                }}
+                onClick={handleCloseProductModal}
                 className="p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -1259,12 +1268,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
             <div className={`p-5 border-t ${darkMode ? 'bg-gray-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} flex gap-3`}>
               <button
                 type="button"
-                onClick={() => {
-                  setIsProductModalOpen(false);
-                  setProductForm(EMPTY_PRODUCT_FORM);
-                  setHasProductVariants(false);
-                  setEditingProductVariantIndex(null);
-                }}
+                onClick={handleCloseProductModal}
                 className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
                   darkMode
                     ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -1289,7 +1293,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </button>
             </div>
           </form>
-        </div>
+        </AppModalOverlay>
       )}
 
       {(isProductPickerOpen || isSupplierPickerOpen) && (
@@ -1326,11 +1330,15 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
       )}
 
       {isSupplierModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseSupplierModal} />
-          <form onSubmit={handleAddSupplier} className={`relative w-full max-w-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl animate-in zoom-in duration-300`}>
+        <AppModalOverlay
+          onClose={handleCloseSupplierModal}
+          busy={isActionLoading}
+          ariaLabelledby="supplier-modal-title"
+          panelClassName="max-w-sm"
+        >
+          <form onSubmit={handleAddSupplier} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl animate-in zoom-in duration-300 max-h-full overflow-y-auto custom-scrollbar`}>
             <div className="flex justify-between items-center mb-5">
-              <h3 className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              <h3 id="supplier-modal-title" className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {editingSupplierId ? 'Edit Supplier' : 'Add New Supplier'}
               </h3>
               <button
@@ -1405,7 +1413,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode }) => {
               </button>
             </div>
           </form>
-        </div>
+        </AppModalOverlay>
       )}
 
       <div className="relative z-[150]">

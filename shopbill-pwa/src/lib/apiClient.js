@@ -61,7 +61,7 @@ apiClient.interceptors.request.use(
 
     // Skip duplicate-request cancellation for payment/auth endpoints (critical side effects)
     const url = config.url || '';
-    const isPaymentOrSignup = /\/payment\/(create-subscription|verify-subscription|verify-plan-change)/.test(url) ||
+    const isPaymentOrSignup = /\/payment\/(create-subscription|verify-subscription|verify-plan-change|subscription-renew\/)/.test(url) ||
       /\/auth\/signup/.test(url);
     const isChatMessage = /\/chat\/[^/]+\/message/.test(url);
     const isChatFetch = /\/chat\/(chats|users|[^/]+\/messages)/.test(url);
@@ -204,12 +204,41 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Handle 403 - Account deactivated: force logout so staff cannot continue using the app
+    // Handle 403 — account deactivated or subscription access ended
     if (error.response?.status === 403) {
       const data = error.response?.data || {};
-      const isDeactivated = data.code === 'ACCOUNT_DEACTIVATED' ||
+      const isDeactivated =
+        data.code === 'ACCOUNT_DEACTIVATED' ||
         (typeof data.error === 'string' && data.error.toLowerCase().includes('account deactivated'));
-      if (isDeactivated) {
+      const isSubscriptionHalted = data.code === 'SUBSCRIPTION_HALTED';
+      const isSubscriptionRenew = data.code === 'SUBSCRIPTION_RENEW_REQUIRED';
+      const isSubscriptionEnded =
+        isSubscriptionHalted ||
+        isSubscriptionRenew ||
+        data.code === 'SUBSCRIPTION_ACCESS_ENDED' ||
+        data.error === 'Subscription Issue' ||
+        data.error === 'Access Restricted';
+
+      if (isSubscriptionHalted && data.mandateRestoreRequired) {
+        return Promise.reject(error);
+      }
+
+      // Login page handles renew / mandate messaging — do not hard-redirect
+      const isLoginRequest = /\/auth\/login(\?|$|\/)/.test(error.config?.url || '');
+      if (isSubscriptionRenew && isLoginRequest) {
+        return Promise.reject(error);
+      }
+
+      if (isDeactivated || isSubscriptionEnded) {
+        if (isSubscriptionEnded && !isSubscriptionHalted && data.message) {
+          try {
+            sessionStorage.setItem('loginBanner', data.message);
+            sessionStorage.setItem(
+              'loginBannerType',
+              isSubscriptionRenew ? 'expired' : 'subscription'
+            );
+          } catch (_) { /* ignore */ }
+        }
         localStorage.removeItem('userToken');
         localStorage.removeItem('currentUser');
         window.location.href = '/';

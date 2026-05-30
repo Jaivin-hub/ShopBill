@@ -2,7 +2,14 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User'); 
 const Staff = require('../models/Staff'); // Added for multi-store staff lookup
 const Store = require('../models/Store'); // Added to link staff to owner
-const JWT_SECRET = process.env.JWT_SECRET; 
+const JWT_SECRET = process.env.JWT_SECRET;
+const {
+    isSubscriptionAccessBlocked,
+    requiresMandateRestoreGate,
+    getSubscriptionAccessMessage,
+    getSubscriptionAccessBlockCode,
+} = require('../utils/subscriptionAccess');
+const { isMandateRestoreAllowedPath } = require('../utils/mandateRestorePaths'); 
 
 // --- UPDATED AUTHENTICATION MIDDLEWARE ---
 const protect = async (req, res, next) => {
@@ -77,25 +84,38 @@ const protect = async (req, res, next) => {
                 return res.status(404).json({ error: 'Business owner account not found.' });
             }
 
-            // Subscription blocking logic
-            const blockedStatuses = ['halted', 'cancelled', 'expired'];
-            const currentStatus = ownerAccount.subscriptionStatus;
-
-            if (blockedStatuses.includes(currentStatus)) {
+            if (requiresMandateRestoreGate(ownerAccount)) {
+                if (!isMandateRestoreAllowedPath(req)) {
+                    const currentStatus = ownerAccount.subscriptionStatus;
+                    return res.status(403).json({
+                        error: 'Subscription halted',
+                        code: 'SUBSCRIPTION_HALTED',
+                        mandateRestoreRequired: true,
+                        message: getSubscriptionAccessMessage(ownerAccount),
+                        status: currentStatus,
+                        planEndDate: ownerAccount.planEndDate,
+                    });
+                }
+            } else if (isSubscriptionAccessBlocked(ownerAccount)) {
+                const currentStatus = ownerAccount.subscriptionStatus;
                 console.error(`DEBUG: [403] Access denied for ${user._id} due to owner status: ${currentStatus}`);
-                return res.status(403).json({ 
-                    error: 'Subscription Issue', 
-                    message: currentStatus === 'halted' 
-                        ? 'Access suspended due to payment failure. Please settle dues.' 
-                        : 'Your access period has ended. Please renew your subscription.',
+                return res.status(403).json({
+                    error: 'Subscription Issue',
+                    code: getSubscriptionAccessBlockCode(ownerAccount),
+                    message: getSubscriptionAccessMessage(ownerAccount),
                     status: currentStatus,
-                    expiredAt: ownerAccount.planEndDate
+                    planEndDate: ownerAccount.planEndDate,
+                    expiredAt: ownerAccount.planEndDate,
                 });
             }
 
-            if (ownerAccount.isActive === false) {
+            if (user.role !== 'owner' && ownerAccount.isActive === false) {
                 console.error(`DEBUG: [403] Access denied: Owner account ${ownerAccount._id} is inactive.`);
-                return res.status(403).json({ error: 'Account deactivated. Please contact support.' });
+                return res.status(403).json({
+                    error: 'Shop account inactive',
+                    message: 'This store is inactive. Please contact your shop owner.',
+                    code: 'OWNER_ACCOUNT_INACTIVE',
+                });
             }
         }
 

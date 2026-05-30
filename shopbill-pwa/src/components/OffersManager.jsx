@@ -40,6 +40,58 @@ function defaultReactivateDateTimes() {
   return { startDate, startTime, endDate, endTime };
 }
 
+/** Start/end date+time rows: two columns per row, constrained for mobile native pickers */
+function OfferDateTimeFields({
+  startDate,
+  startTime,
+  endDate,
+  endTime,
+  onFieldChange,
+  inputBase,
+  textMuted,
+  darkMode,
+  className = '',
+}) {
+  const fieldInputClass = `w-full min-w-0 max-w-full box-border mt-0.5 min-h-[44px] border rounded-xl px-2 sm:px-3 py-2 text-xs sm:text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`;
+  const colorScheme = darkMode ? 'dark' : 'light';
+  const rows = [
+    { label: 'Start', dateKey: 'startDate', timeKey: 'startTime', date: startDate, time: startTime },
+    { label: 'End', dateKey: 'endDate', timeKey: 'endTime', date: endDate, time: endTime },
+  ];
+
+  return (
+    <div className={`space-y-3 min-w-0 w-full max-w-full overflow-hidden ${className}`.trim()}>
+      {rows.map(({ label, dateKey, timeKey, date, time }) => (
+        <div key={label} className="min-w-0 w-full">
+          <p className={`text-[10px] font-bold tracking-wider uppercase mb-1.5 ${textMuted}`}>{label}</p>
+          <div className="grid grid-cols-2 gap-2 min-w-0 w-full">
+            <div className="min-w-0">
+              <label className={`text-[9px] font-bold tracking-wider ${textMuted}`}>Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => onFieldChange(dateKey, e.target.value)}
+                className={fieldInputClass}
+                style={{ colorScheme }}
+              />
+            </div>
+            <div className="min-w-0">
+              <label className={`text-[9px] font-bold tracking-wider ${textMuted}`}>Time</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => onFieldChange(timeKey, e.target.value)}
+                className={fieldInputClass}
+                style={{ colorScheme }}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
   const [offers, setOffers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -327,12 +379,12 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-20">
           {isFormOpen && (
-            <section className={`${cardBase} rounded-2xl md:rounded-xl border p-4 md:p-5`}>
+            <section className={`${cardBase} rounded-2xl md:rounded-xl border p-4 md:p-5 min-w-0 overflow-hidden`}>
               <h2 className="text-[10px] font-bold text-gray-500 tracking-widest mb-4 flex items-center gap-2">
                 <Plus className="w-4 h-4 text-indigo-500" />
                 CREATE OFFER
               </h2>
-              <form onSubmit={handleCreateOffer} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-3">
+              <form onSubmit={handleCreateOffer} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-3 min-w-0 max-w-full">
                 <input
                   value={form.title}
                   onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
@@ -381,44 +433,17 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
                   placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount amount'}
                   className={`w-full min-h-[44px] border rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
                 />
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start date</label>
-                    <input
-                      type="date"
-                      value={form.startDate}
-                      onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start time</label>
-                    <input
-                      type="time"
-                      value={form.startTime}
-                      onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
-                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End date</label>
-                    <input
-                      type="date"
-                      value={form.endDate}
-                      onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End time</label>
-                    <input
-                      type="time"
-                      value={form.endTime}
-                      onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
-                      className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                    />
-                  </div>
-                </div>
+                <OfferDateTimeFields
+                  className="md:col-span-2"
+                  darkMode={darkMode}
+                  inputBase={inputBase}
+                  textMuted={textMuted}
+                  startDate={form.startDate}
+                  startTime={form.startTime}
+                  endDate={form.endDate}
+                  endTime={form.endTime}
+                  onFieldChange={(key, value) => setForm((p) => ({ ...p, [key]: value }))}
+                />
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -563,44 +588,16 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
               <p className={`text-xs font-bold ${textMuted}`}>
                 Set a new window for <span className={darkMode ? 'text-white' : 'text-slate-800'}>{reactivateTarget.title}</span>.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start date</label>
-                  <input
-                    type="date"
-                    value={reactivateFields.startDate}
-                    onChange={(e) => setReactivateFields((f) => ({ ...f, startDate: e.target.value }))}
-                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                  />
-                </div>
-                <div>
-                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>Start time</label>
-                  <input
-                    type="time"
-                    value={reactivateFields.startTime}
-                    onChange={(e) => setReactivateFields((f) => ({ ...f, startTime: e.target.value }))}
-                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                  />
-                </div>
-                <div>
-                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End date</label>
-                  <input
-                    type="date"
-                    value={reactivateFields.endDate}
-                    onChange={(e) => setReactivateFields((f) => ({ ...f, endDate: e.target.value }))}
-                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                  />
-                </div>
-                <div>
-                  <label className={`text-[10px] font-bold tracking-wider ${textMuted}`}>End time</label>
-                  <input
-                    type="time"
-                    value={reactivateFields.endTime}
-                    onChange={(e) => setReactivateFields((f) => ({ ...f, endTime: e.target.value }))}
-                    className={`w-full mt-1 min-h-[44px] border rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-1 focus:ring-indigo-500 ${inputBase}`}
-                  />
-                </div>
-              </div>
+              <OfferDateTimeFields
+                darkMode={darkMode}
+                inputBase={inputBase}
+                textMuted={textMuted}
+                startDate={reactivateFields.startDate}
+                startTime={reactivateFields.startTime}
+                endDate={reactivateFields.endDate}
+                endTime={reactivateFields.endTime}
+                onFieldChange={(key, value) => setReactivateFields((f) => ({ ...f, [key]: value }))}
+              />
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"

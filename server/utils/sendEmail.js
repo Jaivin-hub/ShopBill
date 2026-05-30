@@ -569,4 +569,74 @@ sendEmail.sendStaffActivationEmailAndGetDispatch = sendStaffActivationEmailAndGe
 sendEmail.sendStaffReactivatedEmailAndGetDispatch = sendStaffReactivatedEmailAndGetDispatch;
 sendEmail.sendStaffExistingUserNewShopEmailAndGetDispatch = sendStaffExistingUserNewShopEmailAndGetDispatch;
 
+function formatPlanLabel(plan) {
+    const key = String(plan || 'BASIC').toUpperCase();
+    if (key === 'PREMIUM') return 'Premium';
+    if (key === 'PRO') return 'Pro';
+    return 'Basic';
+}
+
+function buildOwnerRegistrationWelcomeMail({ to, shopName, plan, trialEndDate }) {
+    const clientUrl = String(process.env.CLIENT_URL || '').trim().replace(/\/$/, '');
+    const loginUrl = clientUrl || '';
+    const planLabel = formatPlanLabel(plan);
+    const trialEnd = trialEndDate
+        ? new Date(trialEndDate).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+          })
+        : null;
+    const shopLabel = shopName ? String(shopName).trim() : 'your shop';
+
+    const loginButton = loginUrl
+        ? `
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 0 14px;">
+                    <tr>
+                        <td bgcolor="#4f46e5" style="border-radius: 8px; text-align: center;">
+                            <a
+                                href="${loginUrl}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style="display: inline-block; padding: 12px 24px; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;"
+                            >
+                                Log in to Pocket POS
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+                <p style="margin: 0; font-size: 13px; color: #4b5563;">
+                    Or copy this link: <a href="${loginUrl}" style="color: #4f46e5; word-break: break-all;">${loginUrl}</a>
+                </p>`
+        : `<p style="margin: 0 0 14px;">Open the Pocket POS app and sign in with the email and password you used during registration.</p>`;
+
+    return {
+        context: 'owner-registration-welcome',
+        to,
+        subject: "You're all set — welcome to Pocket POS",
+        html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #111827; max-width: 560px;">
+                <h1 style="margin: 0 0 12px; font-size: 22px;">You're all set!</h1>
+                <p style="margin: 0 0 10px;">Thank you for registering <strong>${shopLabel}</strong> on Pocket POS.</p>
+                <p style="margin: 0 0 10px;">Your <strong>${planLabel}</strong> plan is active${
+                    trialEnd ? ` with a trial period until <strong>${trialEnd}</strong>` : ''
+                }.</p>
+                <p style="margin: 0 0 14px;">You can log in anytime to manage billing, inventory, staff, and more.</p>
+                ${loginButton}
+                <p style="margin: 16px 0 0; font-size: 13px; color: #6b7280;">
+                    If you did not create this account, please contact support.
+                </p>
+                <p style="margin: 8px 0 0; font-size: 13px; color: #6b7280;">— Pocket POS</p>
+            </div>
+        `,
+    };
+}
+
+function queueOwnerRegistrationWelcomeEmail(payload) {
+    const mail = buildOwnerRegistrationWelcomeMail(payload);
+    queueSendEmail({ to: mail.to, subject: mail.subject, html: mail.html }, mail.context);
+}
+
+sendEmail.queueOwnerRegistrationWelcomeEmail = queueOwnerRegistrationWelcomeEmail;
+
 module.exports = sendEmail;

@@ -90,6 +90,8 @@ const API = {
     // 💥 NEW: SUPERADMIN MANAGEMENT ENDPOINTS 💥
     superadminShops: API_BASE_URL + '/superadmin/shops',           // GET (All Shops), POST (Create Shop/Owner)
     superadminShopDetails: (id) => `${API_BASE_URL}/superadmin/shops/${id}`, // GET (Single Shop), PUT (Update Shop), DELETE (Delete Shop)
+    superadminShopStaff: (id) => `${API_BASE_URL}/superadmin/shops/${id}/staff`, // GET managers & cashiers
+    superadminShopAccountStatus: (id) => `${API_BASE_URL}/superadmin/shops/${id}/account-status`, // PATCH { isActive: boolean }
     superadminConfig: API_BASE_URL + '/superadmin/config',         // GET (System Config), PUT (Update Config)
     superadminDashboard: API_BASE_URL + '/superadmin/dashboard',   // GET (Dashboard Stats)
     superadminReports: API_BASE_URL + '/superadmin/reports',        // GET (Global Reports)
@@ -109,6 +111,23 @@ const API = {
     cancelSubscription: API_BASE_URL + '/payment/cancel-subscription', // POST (Cancels the active subscription)
     upgradePlan: API_BASE_URL + '/payment/upgrade-plan', // POST (Cancels old, creates new mandate)
     verifyPlanChange: API_BASE_URL + '/payment/verify-plan-change', // POST (Verifies new mandate and updates user)
+    mandateRestoreRequest: API_BASE_URL + '/payment/mandate-restore/request',
+    mandateRestoreMe: API_BASE_URL + '/payment/mandate-restore/me',
+    mandateRestoreRequestMe: API_BASE_URL + '/payment/mandate-restore/request-me',
+    mandateRestoreMyCheckout: API_BASE_URL + '/payment/mandate-restore/my-checkout',
+    mandateRestoreCheckout: (token) => `${API_BASE_URL}/payment/mandate-restore/checkout/${encodeURIComponent(token)}`,
+    mandateRestoreVerify: API_BASE_URL + '/payment/mandate-restore/verify',
+    subscriptionRenewStatus: (email) =>
+        `${API_BASE_URL}/payment/subscription-renew/status?email=${encodeURIComponent(email)}`,
+    subscriptionRenewRequest: API_BASE_URL + '/payment/subscription-renew/request',
+    subscriptionRenewStart: API_BASE_URL + '/payment/subscription-renew/start',
+    subscriptionRenewVerify: API_BASE_URL + '/payment/subscription-renew/verify',
+    subscriptionRenewCheckout: (token) =>
+        `${API_BASE_URL}/payment/subscription-renew/checkout/${encodeURIComponent(token)}`,
+    subscriptionRenewCheckoutVerify: API_BASE_URL + '/payment/subscription-renew/checkout-verify',
+    superadminMandateRestoreRequests: API_BASE_URL + '/superadmin/mandate-restore-requests',
+    superadminMandateRestoreGenerateLink: (id) =>
+        `${API_BASE_URL}/superadmin/mandate-restore-requests/${id}/generate-link`,
     // ------------------------------------------
     
     // Outlet Management Routes (Premium users only)

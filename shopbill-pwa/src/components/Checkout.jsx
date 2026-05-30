@@ -7,12 +7,13 @@ import {
 import API from '../config/api';
 import apiClient from '../lib/apiClient';
 import axios from 'axios';
+import ThemeToggle from './ThemeToggle';
 
 // Feature lists aligned with landing page (included + excluded)
 const PLAN_DETAILS = {
     BASIC: {
         name: 'Small Shop',
-        price: 999,
+        price: 499,
         interval: 'monthly',
         color: 'from-gray-600 to-gray-800',
         featured: false,
@@ -22,19 +23,19 @@ const PLAN_DETAILS = {
     },
     PRO: {
         name: 'Growing Business',
-        price: 2199,
+        price: 999,
         interval: 'monthly',
         color: 'from-indigo-600 via-indigo-500 to-teal-600',
         featured: true,
         tagline: 'Best value for growth',
         badge: 'RECOMMENDED',
-        valueNote: '₹73/day · Most chosen',
+        valueNote: '₹33/day · Most chosen',
         items: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management', 'Sales reports', 'Realtime team chat system', 'Employee Audit Logs'],
         excludedItems: ['Multishop management'],
     },
     PREMIUM: {
         name: 'Big Enterprise',
-        price: 4999,
+        price: 2999,
         interval: 'monthly',
         color: 'from-slate-600 to-slate-800',
         featured: false,
@@ -86,7 +87,7 @@ const loadRazorpayScript = (src) => {
     });
 };
 
-const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans, showToast, darkMode = true, API }) => {
+const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans, showToast, darkMode = true, setDarkMode, API }) => {
     const fromCreateAccount = !planKey;
     const [detailsComplete, setDetailsComplete] = useState(!fromCreateAccount); // true when from landing (plan pre-selected)
     const [selectedPlanInCheckout, setSelectedPlanInCheckout] = useState(planKey || 'PRO'); // Default to Pro (best value)
@@ -226,7 +227,12 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
             const razorpayLoad = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
             if (!razorpayLoad) throw new Error('Razorpay failed to load.');
 
-            const subscriptionResponse = await apiClient.post(API.createSubscription, { plan: effectivePlanKey || 'BASIC' });
+            const subscriptionResponse = await apiClient.post(API.createSubscription, {
+                plan: effectivePlanKey || 'BASIC',
+                email: email.toLowerCase().trim(),
+                name: shopName,
+                phone,
+            });
             const { subscriptionId, currency, amount, keyId } = subscriptionResponse.data;
 
             const options = {
@@ -249,7 +255,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                             setPaymentSuccess(true);
                             setTimeout(() => {
                                 showToast('Account created successfully! Please login.', 'success');
-                                window.location.reload(); 
+                                onBackToLogin?.();
                             }, 3000);
                         }
                     } catch (err) { 
@@ -266,7 +272,7 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
             setPaymentError(error.response?.data?.error || "Connection failed.");
             setIsProcessing(false);
         }
-    }, [plan, effectivePlanKey, email, phone, password, shopName, businessType, showToast, localNumber]);
+    }, [plan, effectivePlanKey, email, phone, password, shopName, businessType, showToast, localNumber, onBackToLogin]);
 
     const bgColor = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const textColor = darkMode ? 'text-white' : 'text-slate-900';
@@ -301,7 +307,10 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     const phoneBorderFocus = darkMode ? 'focus-within:border-indigo-500' : 'focus-within:border-indigo-500';
 
     if (paymentSuccess) return (
-        <div className={`min-h-screen ${bgColor} flex items-center justify-center p-6 ${textColor} transition-colors duration-300`}>
+        <div className={`min-h-screen ${bgColor} flex items-center justify-center p-6 ${textColor} transition-colors duration-300 relative`}>
+            <div className="fixed top-[max(1rem,env(safe-area-inset-top,0px))] right-[max(1rem,env(safe-area-inset-right,0px))] z-50">
+                <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+            </div>
             <div className={`max-w-md w-full ${cardBg} p-8 rounded-3xl border ${cardBorder} text-center shadow-2xl transition-colors duration-300`}>
                 <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-8 h-8 text-emerald-500 animate-pulse" />
@@ -316,19 +325,67 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
         </div>
     );
 
+    const navBorder = darkMode ? 'border-gray-800' : 'border-slate-200';
+    const navMuted = darkMode ? 'text-gray-400 hover:text-indigo-400' : 'text-slate-600 hover:text-indigo-600';
+
+    const stickyHeaderBg = darkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-slate-50/95 border-slate-200';
+
+    const handleStickyBack = () => {
+        if (fromCreateAccount && detailsComplete) {
+            setDetailsComplete(false);
+            return;
+        }
+        if (planKey) {
+            onBackToPlans?.();
+            return;
+        }
+        onBackToLogin?.();
+    };
+
+    const stickyBackLabel =
+        fromCreateAccount && detailsComplete
+            ? 'Edit business info'
+            : planKey
+              ? 'Change plan'
+              : 'Back to login';
+
     return (
-        <main className={`min-h-screen ${bgColor} flex flex-col items-center p-0 sm:p-6 lg:p-12 font-sans transition-all duration-500`}>
-            <div className={`flex-1 w-full max-w-6xl flex flex-col items-center min-h-0 ${fromCreateAccount && !detailsComplete ? 'justify-center' : ''}`}>
-                
-                {/* Main Container Card */}
-                <section className={`w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-2xl sm:rounded-[2.5rem] sm:border sm:${sectionBorder} shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] overflow-hidden transition-all duration-300`}>
-                    <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[600px]">
+        <main className={`w-full ${bgColor} font-sans transition-all duration-500`}>
+            <div className="w-full max-w-6xl mx-auto flex flex-col sm:py-6 lg:py-12">
+                <header
+                    className={`sticky top-0 z-40 w-full flex items-center justify-between gap-3 px-4 py-3 border-b backdrop-blur-md shrink-0 ${stickyHeaderBg} sm:static sm:backdrop-blur-none sm:border-b-0 sm:py-0 sm:mb-6 sm:bg-transparent`}
+                >
+                    <button
+                        type="button"
+                        onClick={handleStickyBack}
+                        className={`inline-flex items-center gap-2 text-[10px] sm:text-[11px] font-black uppercase tracking-widest transition-colors ${navMuted}`}
+                    >
+                        <ArrowLeft className="w-4 h-4 shrink-0" />
+                        {stickyBackLabel}
+                    </button>
+                    <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+                </header>
+
+                {/* Main Container Card — natural height on mobile (no flex stretch → no gap below CTA) */}
+                <section className={`w-full ${sectionBg} sm:${sectionCardBg} sm:backdrop-blur-2xl sm:rounded-[2.5rem] sm:border sm:${sectionBorder} shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] overflow-hidden transition-all duration-300 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:pb-0`}>
+                    <div className="flex flex-col lg:grid lg:grid-cols-12 lg:min-h-[600px]">
                         
                         {/* LEFT SIDE: Plan Selection / Summary */}
                         {!(fromCreateAccount && !detailsComplete) && (
                             <div className={`${fromCreateAccount && detailsComplete ? 'lg:col-span-12' : 'lg:col-span-5'} ${darkMode ? 'bg-gray-900/40' : 'bg-slate-50/50'} p-6 lg:p-12 border-b lg:border-b-0 lg:border-r ${sectionBorder} transition-colors duration-300`}>
                                 {(fromCreateAccount && detailsComplete) || !plan ? (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                                        {fromCreateAccount && detailsComplete && (
+                                            <header className="text-center mb-4 sm:mb-8 pt-1">
+                                                <p className={`text-[11px] font-black tracking-widest uppercase mb-2 sm:mb-4 ${descColor}`}>
+                                                    Step 2 of 2: Choose Your Plan
+                                                </p>
+                                                <div className="inline-flex items-center justify-center space-x-2 bg-indigo-500/10 px-4 py-1.5 rounded-full">
+                                                    <Zap className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                                    <span className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase">30-Days Free Trial</span>
+                                                </div>
+                                            </header>
+                                        )}
                                         <div className="flex items-center gap-2 mb-6">
                                             <div className="h-1 w-12 bg-indigo-500 rounded-full"></div>
                                             <p className={`text-[11px] ${descColor} font-black uppercase tracking-widest`}>Choose Your Growth Engine</p>
@@ -393,9 +450,6 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                                         {isProcessing ? <Loader className="w-5 h-5 animate-spin" /> : <><Lock className="w-4 h-4 mr-2" /> Activate My Account</>}
                                                     </button>
                                                     <p className={`text-[10px] ${infoText} text-center font-bold opacity-60 italic`}>Secure 256-bit SSL encrypted payment</p>
-                                                    <button type="button" onClick={() => setDetailsComplete(false)} className={`w-full text-[10px] font-black ${labelColor} hover:text-indigo-500 flex items-center justify-center py-2 transition-all uppercase tracking-widest`}>
-                                                        <ArrowLeft size={14} className="mr-2" /> Edit Business Info
-                                                    </button>
                                                 </form>
                                             </div>
                                         )}
@@ -441,22 +495,27 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
     
                         {/* RIGHT SIDE: Account Details Form */}
                         {!(fromCreateAccount && detailsComplete) && (
-                            <div className={`px-6 py-10 lg:p-16 ${fromCreateAccount && !detailsComplete ? 'lg:col-span-12 max-w-3xl mx-auto' : 'lg:col-span-7'} flex flex-col justify-center`}>
-                                <header className="mb-1">
-                                    <div className="inline-flex items-center space-x-2 bg-indigo-500/10 px-4 py-1.5 rounded-full mb-4">
-                                        <Zap className="w-3.5 h-3.5 text-indigo-500" />
-                                        <span className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase">30-Days Free Trail</span>
+                            <div className={`px-4 py-5 sm:px-6 sm:py-8 lg:p-16 ${fromCreateAccount && !detailsComplete ? 'lg:col-span-12 max-w-3xl mx-auto w-full' : 'lg:col-span-7'} flex flex-col shrink-0`}>
+                                <header className="mb-5 sm:mb-6 text-center shrink-0">
+                                    {fromCreateAccount && !detailsComplete && (
+                                        <p className={`text-[11px] font-black tracking-widest uppercase mb-3 ${labelColor}`}>
+                                            Step 1 of 2: Account Creation
+                                        </p>
+                                    )}
+                                    <div className="inline-flex items-center justify-center space-x-2 bg-indigo-500/10 px-4 py-1.5 rounded-full">
+                                        <Zap className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                        <span className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase">30-Days Free Trial</span>
                                     </div>
                                 </header>
     
-                                <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-8">
+                                <form onSubmit={fromCreateAccount && !detailsComplete ? handleProceedToPlanSelection : handlePaymentSubmit} noValidate className="space-y-6 sm:space-y-8 shrink-0">
                                     {paymentError && (
                                         <div className="p-4 bg-red-500/10 border-l-4 border-red-500 rounded-r-xl text-red-500 text-[11px] font-bold animate-pulse">
                                             {paymentError}
                                         </div>
                                     )}
                                     
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 sm:gap-y-6">
                                         <div className="md:col-span-2">
                                             <label className={`text-[11px] font-black ${labelColor} tracking-widest mb-3 block uppercase`}>Business Type</label>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -528,18 +587,15 @@ const Checkout = ({ plan: planKey, setCurrentPage, onBackToLogin, onBackToPlans,
                                         </div>
                                     </div>
     
-                                    <div className="pt-8 border-t border-dashed border-gray-500/20">
-                                        <button type="submit" disabled={isProcessing || (detailsComplete && !plan)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-[0.25em] py-5 rounded-[1.25rem] transition-all hover:shadow-[0_20px_40px_-12px_rgba(79,70,229,0.4)] active:scale-[0.97] flex items-center justify-center disabled:opacity-50 text-xs uppercase">
+                                    <div className="pt-6 sm:pt-8 border-t border-dashed border-gray-500/20 shrink-0">
+                                        <button type="submit" disabled={isProcessing || (detailsComplete && !plan)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black tracking-[0.25em] py-4 sm:py-5 rounded-[1.25rem] transition-all hover:shadow-[0_20px_40px_-12px_rgba(79,70,229,0.4)] active:scale-[0.97] flex items-center justify-center disabled:opacity-50 text-xs uppercase">
                                             {isProcessing ? <Loader className="w-6 h-6 animate-spin" /> : (fromCreateAccount && !detailsComplete) ? <><CreditCard className="w-5 h-5 mr-3" /> Select Plan & Continue</> : <><Lock className="w-5 h-5 mr-3" /> Start Free Trial</>}
                                         </button>
-                                        <div className="flex flex-col items-center gap-4 mt-6">
-                                            <p className={`text-[10px] ${infoText} text-center font-black tracking-widest uppercase opacity-60`}>
-                                                {(fromCreateAccount && !detailsComplete) ? 'Step 1 of 2: Account Creation' : 'Authorization of ₹1 required for security'}
+                                        {!fromCreateAccount && (
+                                            <p className={`text-[10px] ${infoText} text-center font-black tracking-widest uppercase opacity-60 mt-6`}>
+                                                Authorization of ₹1 required for security
                                             </p>
-                                            <button type="button" onClick={(e) => { e.preventDefault(); (planKey ? onBackToPlans : onBackToLogin)?.(); }} className={`text-[11px] font-black ${labelColor} hover:text-indigo-500 flex items-center transition-all uppercase tracking-widest group`}>
-                                                <ArrowLeft size={14} className="mr-2 group-hover:-translate-x-1 transition-transform" /> {planKey ? 'Change Plan' : 'Return to Login'}
-                                            </button>
-                                        </div>
+                                        )}
                                     </div>
                                 </form>
                             </div>

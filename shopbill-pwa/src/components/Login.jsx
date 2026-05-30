@@ -7,6 +7,7 @@ import {
 import axios from 'axios';
 import API from '../config/api';
 import { primeNotificationPermissionFromGesture } from '../utils/pushOnGesture';
+import ThemeToggle from './ThemeToggle';
 
 // --- AXIOS INSTANCE WITH AUTH INTERCEPTOR ---
 const apiClient = axios.create();
@@ -22,7 +23,22 @@ apiClient.interceptors.request.use(
 );
 
 // --- Sub-Component: Login Form ---
-const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPassword, loading, setView, authError, onBackToLanding, setCurrentPage, darkMode = true }) => {
+const LoginForm = ({
+    handleAuth,
+    identifier,
+    setIdentifier,
+    password,
+    setPassword,
+    loading,
+    setView,
+    authError,
+    authBannerType,
+    onBackToLanding,
+    setCurrentPage,
+    onOpenMandateRestore,
+    onOpenRenewSubscription,
+    darkMode = true,
+}) => {
     const [showPassword, setShowPassword] = useState(false);
 
     // Color variables for LoginForm
@@ -46,21 +62,52 @@ const LoginForm = ({ handleAuth, identifier, setIdentifier, password, setPasswor
     return (
         <section aria-labelledby="login-form" className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {authError && (
-                <div className={`${errorBg} border ${errorBorder} rounded-xl p-3 flex gap-2 items-center ${authError.includes('shop owner') ? 'justify-start' : 'justify-between'} transition-colors duration-300`} role="alert">
-                    <div className="flex gap-2 items-center min-w-0">
-                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                        <p className={`text-[10px] font-bold ${errorText}  tracking-wide`}>
+                <div
+                    className={`${errorBg} border ${errorBorder} rounded-xl p-3 flex flex-col gap-2 transition-colors duration-300`}
+                    role="alert"
+                >
+                    <div className="flex gap-2 items-start min-w-0">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        <p className={`text-[10px] font-bold ${errorText} tracking-wide leading-relaxed`}>
                             {authError}
                         </p>
                     </div>
-                    {!authError.includes('shop owner') && (
+                    {authBannerType === 'halted' ? (
                         <button
                             type="button"
-                            onClick={() => setCurrentPage('support')}
-                            className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline shrink-0 tracking-tighter transition-colors"
+                            onClick={onOpenMandateRestore}
+                            className="text-[10px] font-extrabold text-indigo-400 hover:text-indigo-300 underline text-left tracking-tighter transition-colors"
                         >
-                            Contact Support
+                            Request payment mandate to restore your store
                         </button>
+                    ) : authBannerType === 'expired' ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                try {
+                                    if (identifier) {
+                                        sessionStorage.setItem(
+                                            'renewEmail',
+                                            identifier.trim().toLowerCase()
+                                        );
+                                    }
+                                } catch (_) { /* ignore */ }
+                                onOpenRenewSubscription?.();
+                            }}
+                            className="text-[10px] font-extrabold text-emerald-400 hover:text-emerald-300 underline text-left tracking-tighter transition-colors"
+                        >
+                            Restart subscription for your existing store
+                        </button>
+                    ) : (
+                        !authError.includes('shop owner') && (
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage('support')}
+                                className="text-[10px] font-extrabold text-red-400 hover:text-red-300 underline text-left tracking-tighter transition-colors"
+                            >
+                                Contact Support
+                            </button>
+                        )
                     )}
                 </div>
             )}
@@ -213,12 +260,24 @@ const ForgotPasswordForm = ({ handleForgotPasswordRequest, email, handleEmailCha
     );
 };
 
-const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage, darkMode = true }) => {
+const Login = ({
+    onLogin,
+    onBackToLanding,
+    onBackToLandingNormal,
+    setCurrentPage,
+    setPageOrigin,
+    onLeaveLogin,
+    onOpenRenewSubscription,
+    onOpenMandateRestore,
+    darkMode = true,
+    setDarkMode,
+}) => {
     const [view, setView] = useState('login');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [authError, setAuthError] = useState(null);
+    const [authBannerType, setAuthBannerType] = useState(null);
     const [resetMessage, setResetMessage] = useState(null);
     const [emailError, setEmailError] = useState(null);
 
@@ -246,6 +305,19 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
         if (view !== 'login') setPassword('');
     }, [view]);
 
+    useEffect(() => {
+        try {
+            const banner = sessionStorage.getItem('loginBanner');
+            const bannerType = sessionStorage.getItem('loginBannerType');
+            if (banner) {
+                setAuthError(banner);
+                setAuthBannerType(bannerType || null);
+                sessionStorage.removeItem('loginBanner');
+                sessionStorage.removeItem('loginBannerType');
+            }
+        } catch (_) { /* ignore */ }
+    }, []);
+
     const handleForgotPasswordRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -270,7 +342,38 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                 onLogin(response.data.user, response.data.token);
             }
         } catch (error) {
-            setAuthError(error.response?.data?.error || 'Auth failed.');
+            const data = error.response?.data || {};
+            if (data.code === 'SUBSCRIPTION_HALTED') {
+                setAuthBannerType(null);
+                setAuthError(
+                    data.message ||
+                        'Your subscription is paused after failed payments. Sign in to complete mandate restore — your account details will be kept.'
+                );
+            } else if (data.code === 'SUBSCRIPTION_RENEW_REQUIRED') {
+                setAuthBannerType('expired');
+                setAuthError(
+                    data.message ||
+                        'Your paid access period has ended. Restart your subscription to use your existing store again.'
+                );
+                try {
+                    if (identifier) {
+                        sessionStorage.setItem('renewEmail', identifier.trim().toLowerCase());
+                    }
+                    sessionStorage.setItem('loginBannerType', 'expired');
+                } catch (_) { /* ignore */ }
+            } else if (data.code === 'ACCOUNT_DEACTIVATED') {
+                setAuthBannerType(null);
+                setAuthError(
+                    data.error || 'Account is inactive. Please contact your shop owner.'
+                );
+            } else {
+                setAuthBannerType(null);
+                setAuthError(
+                    data.message ||
+                        data.error ||
+                        'Sign-in failed. Check your email and password.'
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -301,7 +404,10 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
     const successText = darkMode ? 'text-emerald-200/80' : 'text-emerald-700';
 
     return (
-        <main className={`h-screen w-full flex items-center justify-center ${bgColor} p-4 sm:p-6 overflow-hidden transition-colors duration-300`}>
+        <main className={`h-screen w-full flex items-center justify-center ${bgColor} p-4 sm:p-6 overflow-hidden transition-colors duration-300 relative`}>
+            <div className="fixed top-[max(1rem,env(safe-area-inset-top,0px))] right-[max(1rem,env(safe-area-inset-right,0px))] z-50">
+                <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+            </div>
             <div className="w-full max-w-[380px] flex flex-col relative">
 
                 <div className={`absolute -inset-10 ${darkMode ? 'bg-indigo-500/5' : 'bg-indigo-100/30'} blur-[80px] -z-10 rounded-full`} />
@@ -336,10 +442,13 @@ const Login = ({ onLogin, onBackToLanding, onBackToLandingNormal, setCurrentPage
                                 password={password}
                                 setPassword={setPassword}
                                 authError={authError}
+                                authBannerType={authBannerType}
                                 loading={loading}
                                 setView={setView}
                                 onBackToLanding={onBackToLanding}
                                 setCurrentPage={setCurrentPage}
+                                onOpenMandateRestore={onOpenMandateRestore}
+                                onOpenRenewSubscription={onOpenRenewSubscription}
                                 darkMode={darkMode}
                             />
                         )}

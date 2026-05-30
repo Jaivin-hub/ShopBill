@@ -10,6 +10,7 @@ const {
     getClockMinutesInTz,
     applyAutoPunchOutForStore,
 } = require('../utils/attendanceAutoPunchOut');
+const { notifyAutoPunchOut } = require('../utils/attendanceAutoPunchOutNotify');
 
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const REMINDER_GRACE_MINUTES = 3;
@@ -158,51 +159,15 @@ const processShiftNotifications = async ({ io, store, staffList, now }) => {
     }
 };
 
-const sendShiftReminderToStaff = async ({ io, userId, title, message, soundCategory = 'attendance' }) => {
-    if (!userId) return;
-    const userIdStr = String(userId);
-    const payload = {
-        _id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        type: 'system',
-        category: 'Info',
-        title,
-        message,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        metadata: {},
-    };
-
-    if (io) {
-        io.to(`user_${userIdStr}`).emit('new_notification', payload);
-    }
-
-    const user = await User.findById(userId).select('deviceTokens pushNotificationsEnabled').lean();
-    if (user?.pushNotificationsEnabled === false) return;
-    const tokens = collectPushTokens([user]);
-    if (tokens.length > 0) {
-        await sendPushNotification(tokens, {
-            title,
-            body: message,
-            soundCategory,
-            data: {
-                type: 'notification',
-                link: '/notifications',
-                notificationType: 'attendance_shift_reminder',
-                soundCategory,
-            },
-        });
-    }
-};
-
 const processAutoPunchOut = async ({ io, store }) => {
     await applyAutoPunchOutForStore(store._id, {
-        onPunchedOut: async ({ staff }) => {
-            const staffUserId = staff?.userId?._id || staff?.userId;
-            await sendShiftReminderToStaff({
+        onPunchedOut: async ({ staff, attendance, now }) => {
+            await notifyAutoPunchOut({
                 io,
-                userId: staffUserId,
-                title: 'Auto Punch-Out Completed',
-                message: `${staff?.name || 'Staff'}: you were auto punched out at your scheduled punch-out time.`,
+                storeId: store._id,
+                staff,
+                attendance,
+                now,
             });
         },
     });

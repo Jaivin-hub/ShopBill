@@ -109,6 +109,72 @@ const getNotificationTypeDetails = (type) => {
                 glow: 'shadow-teal-500/5',
                 label: 'New shop'
             };
+        case 'shop_subscription_cancelled':
+            return {
+                icon: X,
+                color: 'text-orange-500',
+                bgColor: 'bg-orange-500/10',
+                borderColor: 'border-orange-500/20',
+                glow: 'shadow-orange-500/5',
+                label: 'Subscription cancelled'
+            };
+        case 'shop_subscription_billing_activated':
+            return {
+                icon: CreditCard,
+                color: 'text-emerald-500',
+                bgColor: 'bg-emerald-500/10',
+                borderColor: 'border-emerald-500/20',
+                glow: 'shadow-emerald-500/5',
+                label: 'Billing activated'
+            };
+        case 'shop_subscription_mandate_activated':
+            return {
+                icon: CheckCircle,
+                color: 'text-sky-500',
+                bgColor: 'bg-sky-500/10',
+                borderColor: 'border-sky-500/20',
+                glow: 'shadow-sky-500/5',
+                label: 'Mandate activated'
+            };
+        case 'shop_subscription_upgraded':
+            return {
+                icon: ArrowUp,
+                color: 'text-indigo-500',
+                bgColor: 'bg-indigo-500/10',
+                borderColor: 'border-indigo-500/20',
+                glow: 'shadow-indigo-500/5',
+                label: 'Plan upgraded'
+            };
+        case 'shop_subscription_resubscribed':
+            return {
+                icon: Sparkles,
+                color: 'text-violet-500',
+                bgColor: 'bg-violet-500/10',
+                borderColor: 'border-violet-500/20',
+                glow: 'shadow-violet-500/5',
+                label: 'Re-subscribed'
+            };
+        case 'shop_subscription_mandate_revoked':
+        case 'shop_subscription_halted':
+        case 'shop_subscription_lapsed':
+            return {
+                icon: ShieldAlert,
+                color: 'text-rose-500',
+                bgColor: 'bg-rose-500/10',
+                borderColor: 'border-rose-500/20',
+                glow: 'shadow-rose-500/5',
+                label: type === 'shop_subscription_halted' ? 'Subscription halted' : type === 'shop_subscription_lapsed' ? 'Access ended' : 'Mandate revoked'
+            };
+        case 'mandate_restore_requested':
+        case 'subscription_renew_requested':
+            return {
+                icon: CreditCard,
+                color: 'text-amber-500',
+                bgColor: 'bg-amber-500/10',
+                borderColor: 'border-amber-500/20',
+                glow: 'shadow-amber-500/5',
+                label: type === 'subscription_renew_requested' ? 'Renewal requested' : 'Mandate restore'
+            };
         default:
             return { 
                 icon: Info, 
@@ -205,6 +271,13 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
         if (type === 'purchase_recorded') return 'scm';
         if (type === 'ledger_payment' || type === 'ledger_credit' || type === 'credit_sale' || type === 'customer_added' || type === 'credit_limit_updated') return 'khata';
         if (type === 'new_shop_registered') return 'superadmin_users';
+        if (
+            type.startsWith('shop_subscription_') ||
+            type === 'mandate_restore_requested' ||
+            type === 'subscription_renew_requested'
+        ) {
+            return 'superadmin_users';
+        }
         if (type === 'profile_updated') return 'profile';
         if (type === 'staff_account_activated') return 'staffPermissions';
         return null;

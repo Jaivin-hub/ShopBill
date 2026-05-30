@@ -36,7 +36,7 @@ const initialItemState = {
 
 
 // Added darkMode to props
-const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet, currentUser }) => {
+const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initialSortOption, onSortOptionSet, currentUser, onModalStateChange }) => {
     const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
     // Permission: Owner and Manager only; Cashiers do not have access
     const hasAccess = userRole === USER_ROLES.OWNER || userRole === USER_ROLES.MANAGER;
@@ -486,6 +486,7 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             isDeleting={isDeleting}
             isBulkUploading={isBulkUploading}
             darkMode={darkMode}
+            onModalStateChange={onModalStateChange}
         />
     );
 };

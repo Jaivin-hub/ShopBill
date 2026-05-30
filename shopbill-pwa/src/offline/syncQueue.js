@@ -206,11 +206,16 @@ async function processSyncJob(apiClient, job) {
         error: 'Waiting for draft to sync first',
       };
     }
-    await apiClient.request({
-      method: 'DELETE',
-      url,
-      headers: syncHeaders(job),
-    });
+    try {
+      await apiClient.request({
+        method: 'DELETE',
+        url,
+        headers: syncHeaders(job),
+      });
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status !== 404) throw err;
+    }
     await offlineDb.syncQueue.update(job.id, {
       status: 'synced',
       syncedAt: Date.now(),

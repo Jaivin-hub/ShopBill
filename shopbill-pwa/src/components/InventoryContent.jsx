@@ -5,6 +5,7 @@ import {
     ChevronDown, ChevronUp, Settings2, ChevronRight, Download
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import AppModalOverlay from './AppModalOverlay';
 import { StockHubListSkeleton } from './skeletons/PageSkeletons';
 
 const ScrollbarStyles = ({ darkMode }) => (
@@ -92,17 +93,17 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTexti
     const innerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
 
     return (
-        <section className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-            <form onSubmit={(e) => { e.preventDefault(); const items = parseCSV(csvData); if (items) onSubmit(items); }} className={`${modalBg} w-full max-w-xl rounded-2xl border overflow-hidden shadow-2xl`}>
-                <div className={`p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
+        <AppModalOverlay onClose={onClose} busy={loading} ariaLabelledby="bulk-upload-title" panelClassName="max-w-xl">
+            <form onSubmit={(e) => { e.preventDefault(); const items = parseCSV(csvData); if (items) onSubmit(items); }} className={`${modalBg} w-full rounded-2xl border overflow-hidden shadow-2xl max-h-full flex flex-col`}>
+                <div className={`p-6 border-b shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center`}>
                     <div>
-                        <h2 className={`text-sm font-black tracking-widest  ${darkMode ? 'text-white' : 'text-slate-900'}`}>Bulk Data Procurement</h2>
+                        <h2 id="bulk-upload-title" className={`text-sm font-black tracking-widest  ${darkMode ? 'text-white' : 'text-slate-900'}`}>Bulk Data Procurement</h2>
                         <p className="text-[9px] text-indigo-500 font-bold tracking-widest mt-1">IMPORT SYSTEM ACTIVE</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 hover:bg-red-500/10 rounded-xl text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
                 
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 overflow-y-auto min-h-0 flex-1 custom-scrollbar">
                     <div className={`p-4 rounded-xl border ${darkMode ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                         <div className="flex items-center gap-2 mb-2">
                             <Info className="w-3.5 h-3.5 text-indigo-500" />
@@ -127,13 +128,13 @@ const BulkUploadModal = ({ isOpen, onClose, onSubmit, loading, darkMode, isTexti
                     {error && <div className="flex items-center gap-2 text-red-500 bg-red-500/5 p-3 rounded-lg border border-red-500/20"><AlertTriangle className="w-4 h-4" /><span className="text-[10px] font-bold tracking-widest">{error}</span></div>}
                 </div>
 
-                <div className={`p-6 ${innerBg} border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                <div className={`p-6 shrink-0 ${innerBg} border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                     <button type="submit" disabled={loading || !csvData} className="w-full py-4 bg-indigo-600 text-white text-[10px] font-black tracking-[0.2em]  rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg active:scale-[0.98]">
                         {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Importing…</> : 'Import products'}
                     </button>
                 </div>
             </form>
-        </section>
+        </AppModalOverlay>
     );
 };
 
@@ -490,7 +491,7 @@ const EMPTY_TEXTILE_META = { brand: '', fabric: '', season: '', collection: '' }
 
 const InventoryContent = ({
     inventory, loading, listSyncing = false, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
-    isTextileShop = false, isReportDownloading = false,
+    isTextileShop = false, isReportDownloading = false, onModalStateChange,
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
     const [isHsnScannerOpen, setIsHsnScannerOpen] = useState(false);
@@ -506,6 +507,25 @@ const InventoryContent = ({
 
     const openScannerModal = () => setIsScannerModalOpen(true);
     const closeScannerModal = () => setIsScannerModalOpen(false);
+
+    useEffect(() => {
+        if (typeof onModalStateChange !== 'function') return undefined;
+        const anyOverlayOpen =
+            isFormModalOpen ||
+            isConfirmModalOpen ||
+            isBulkUploadModalOpen ||
+            isScannerModalOpen ||
+            isHsnScannerOpen;
+        onModalStateChange(anyOverlayOpen);
+        return () => onModalStateChange(false);
+    }, [
+        isFormModalOpen,
+        isConfirmModalOpen,
+        isBulkUploadModalOpen,
+        isScannerModalOpen,
+        isHsnScannerOpen,
+        onModalStateChange,
+    ]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -773,11 +793,16 @@ const InventoryContent = ({
 
             {/* --- MODALS --- */}
             {isFormModalOpen && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9998] p-3 sm:p-4 overflow-hidden max-h-[100dvh]" onClick={(e) => e.target === e.currentTarget && closeFormModal()}>
-                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} w-full max-w-md min-w-0 max-h-[100dvh] border overflow-hidden shadow-2xl flex flex-col rounded-2xl pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] transform transition-all`} onClick={(e) => e.stopPropagation()}>
+                <AppModalOverlay
+                    onClose={closeFormModal}
+                    busy={loading}
+                    ariaLabelledby="stock-product-form-title"
+                    panelClassName="max-w-md"
+                >
+                    <form onSubmit={handleFormSubmit} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} w-full min-w-0 max-h-full border overflow-hidden shadow-2xl flex flex-col rounded-2xl transform transition-all`}>
                         {/* Header */}
                         <div className={`p-4 sm:p-6 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0 overflow-x-hidden`}>
-                            <h3 className={`text-lg font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            <h3 id="stock-product-form-title" className={`text-lg font-black truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {isEditing ? 'Edit Product' : 'Add New Product'}
                             </h3>
                             <button
@@ -1158,12 +1183,17 @@ const InventoryContent = ({
                             </button>
                         </div>
                     </form>
-                </div>
+                </AppModalOverlay>
             )}
 
             {isConfirmModalOpen && (
-                <section className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[210] p-4">
-                    <div className={`${darkMode ? 'bg-slate-900 border-red-500/20' : 'bg-white border-slate-200'} w-full max-w-sm rounded-2xl border p-8 text-center space-y-6 shadow-2xl`}>
+                <AppModalOverlay
+                    onClose={() => setIsConfirmModalOpen(false)}
+                    busy={isDeleting}
+                    ariaLabelledby="stock-delete-confirm-title"
+                    panelClassName="max-w-sm"
+                >
+                    <div className={`${darkMode ? 'bg-slate-900 border-red-500/20' : 'bg-white border-slate-200'} w-full rounded-2xl border p-8 text-center space-y-6 shadow-2xl`}>
                         {isDeleting ? (
                             <div className="flex flex-col items-center gap-4 py-4">
                                 <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
@@ -1172,7 +1202,7 @@ const InventoryContent = ({
                         ) : (
                             <>
                                 <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-                                <div><h2 className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>Confirm Delete</h2><p className="text-[10px] font-bold text-slate-500  tracking-widest mt-3 leading-relaxed">Permanently delete <span className={darkMode ? 'text-white' : 'text-indigo-600'}>{itemToDelete?.name}</span>? This cannot be undone.</p></div>
+                                <div><h2 id="stock-delete-confirm-title" className={`text-sm font-black  tracking-widest ${darkMode ? 'text-white' : 'text-slate-900'}`}>Confirm Delete</h2><p className="text-[10px] font-bold text-slate-500  tracking-widest mt-3 leading-relaxed">Permanently delete <span className={darkMode ? 'text-white' : 'text-indigo-600'}>{itemToDelete?.name}</span>? This cannot be undone.</p></div>
                                 <div className="flex gap-3 pt-2">
                                     <button type="button" onClick={() => setIsConfirmModalOpen(false)} className={`flex-1 py-3.5 ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'} text-[9px] font-black  tracking-widest rounded-xl`}>Cancel</button>
                                     <button type="button" onClick={confirmDeleteItem} className="flex-1 py-3.5 bg-red-600 text-white text-[9px] font-black  tracking-widest rounded-xl shadow-lg shadow-red-500/20">Delete</button>
@@ -1180,7 +1210,7 @@ const InventoryContent = ({
                             </>
                         )}
                     </div>
-                </section>
+                </AppModalOverlay>
             )}
 
             {loading && !listSyncing && !isFormModalOpen && !isBulkUploadModalOpen && (

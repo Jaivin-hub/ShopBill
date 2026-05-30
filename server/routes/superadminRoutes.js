@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const User = require('../models/User'); // Reusing the User model for shop data (as shopId is linked)
+const Staff = require('../models/Staff');
 const Store = require('../models/Store');
 const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
@@ -8,6 +9,15 @@ const Inventory = require('../models/Inventory');
 const Payment = require('../models/Payment');
 const Chat = require('../models/Chat');
 const { deleteStoreCascade } = require('../utils/deleteStoreCascade');
+const { classifyOwnerPaymentBucket } = require('../utils/ownerPaymentBucket');
+const MandateRestoreRequest = require('../models/MandateRestoreRequest');
+const {
+    createRecoverySubscriptionForOwner,
+    getPublicMandateRestoreUrl,
+    getPublicRenewCheckoutUrl,
+} = require('../utils/mandateRestore');
+const { tryReuseMandateRequestSubscription } = require('../utils/razorpaySubscriptionFactory');
+const { buildPlanHistoryDisplay } = require('../utils/planHistory');
 const router = express.Router();
 const Razorpay = require('razorpay');
 const rzp = new Razorpay({
@@ -260,6 +270,12 @@ router.get('/shops', superadminProtect, async (req, res) => {
                     inventoryCount: perf.inventoryCount
                 },
                 plan: shop.plan || 'BASIC',
+                planHistory: shopObject.planHistory || [],
+                planHistoryDisplay: buildPlanHistoryDisplay(
+                    shopObject.planHistory,
+                    shop.plan,
+                    shop.createdAt
+                ),
                 managerCount: staffCount.managerCount,
                 cashierCount: staffCount.cashierCount,
                 location: shop.location || 'N/A',
@@ -343,6 +359,84 @@ router.get('/performance', superadminProtect, async (req, res) => {
 });
 
 /**
+ * @route GET /api/superadmin/shops/:id/staff
+ * @desc Managers and cashiers for a shop (for superadmin staff popup)
+ */
+router.get('/shops/:id/staff', superadminProtect, async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const owner = await User.findOne({ _id: shopId, role: 'owner' }).select('_id shopName');
+        if (!owner) {
+            return res.status(404).json({ success: false, message: 'Shop not found.' });
+        }
+
+        const stores = await Store.find({ ownerId: owner._id }).select('_id');
+        const storeIds = stores.map((s) => s._id);
+
+        let managers = [];
+        let cashiers = [];
+
+        if (storeIds.length > 0) {
+            const staffRows = await Staff.find({ storeId: { $in: storeIds } })
+                .select('name email role active')
+                .sort({ role: -1, name: 1 })
+                .lean();
+
+            const byEmail = new Map();
+            for (const row of staffRows) {
+                const email = String(row.email || '').trim().toLowerCase();
+                if (!email) continue;
+                const roleKey = row.role === 'Manager' ? 'manager' : row.role === 'Cashier' ? 'cashier' : null;
+                if (!roleKey) continue;
+                const existing = byEmail.get(email);
+                if (existing && existing.role === 'manager') continue;
+                byEmail.set(email, {
+                    name: (row.name || email.split('@')[0] || 'Staff').trim(),
+                    email: row.email,
+                    role: roleKey,
+                    active: row.active !== false,
+                });
+            }
+
+            for (const member of byEmail.values()) {
+                const item = { name: member.name, email: member.email, active: member.active };
+                if (member.role === 'manager') managers.push(item);
+                else cashiers.push(item);
+            }
+            managers.sort((a, b) => a.name.localeCompare(b.name));
+            cashiers.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        if (managers.length === 0 && cashiers.length === 0) {
+            const users = await User.find({
+                shopId: owner._id,
+                role: { $in: ['Manager', 'Cashier'] },
+            })
+                .select('email role isActive')
+                .lean();
+            for (const u of users) {
+                const email = u.email || '';
+                const item = {
+                    name: email.split('@')[0] || 'Staff',
+                    email,
+                    active: u.isActive !== false,
+                };
+                if (u.role === 'Manager') managers.push(item);
+                else if (u.role === 'Cashier') cashiers.push(item);
+            }
+        }
+
+        res.json({ success: true, data: { managers, cashiers } });
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return res.status(400).json({ success: false, message: 'Invalid shop ID format.' });
+        }
+        console.error('Superadmin shop staff list error:', error);
+        res.status(500).json({ success: false, error: 'Server error retrieving staff list.' });
+    }
+});
+
+/**
  * @route GET /api/superadmin/shops/:id
  * @desc Get details for a single shop/owner
  * @access Private (Superadmin only)
@@ -421,6 +515,44 @@ router.get('/shops/:id', superadminProtect, async (req, res) => {
 });
 
 
+
+/**
+ * @route PATCH /api/superadmin/shops/:id/account-status
+ * @desc Activate or deactivate a shop owner account (superadmin only)
+ */
+router.patch('/shops/:id/account-status', superadminProtect, async (req, res) => {
+    try {
+        const shopId = req.params.id;
+        const { isActive } = req.body;
+        if (typeof isActive !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'isActive (boolean) is required.' });
+        }
+
+        const owner = await User.findOne({ _id: shopId, role: 'owner' });
+        if (!owner) {
+            return res.status(404).json({ success: false, message: 'Shop owner not found.' });
+        }
+
+        const updates = { isActive, lastStatusUpdate: new Date() };
+        if (isActive) {
+            updates.paymentFailedAt = null;
+            if (['expired', 'halted'].includes(owner.subscriptionStatus)) {
+                updates.subscriptionStatus = 'active';
+            }
+        }
+
+        await User.updateOne({ _id: owner._id }, { $set: updates });
+
+        res.json({
+            success: true,
+            message: isActive ? 'Shop account activated.' : 'Shop account deactivated.',
+            data: { id: owner._id, isActive },
+        });
+    } catch (error) {
+        console.error('Superadmin account-status error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update account status.' });
+    }
+});
 
 /**
  * @route DELETE /api/superadmin/shops/:id
@@ -516,7 +648,7 @@ router.get('/config', superadminProtect, async (req, res) => {
                 },
                 pro: {
                     name: 'Pro',
-                    price: 799,
+                    price: 999,
                     features: ['Advanced Inventory', 'Up to 20 Users', 'Priority Support', 'Advanced Reports'],
                     maxUsers: 20,
                     maxInventory: 10000,
@@ -524,7 +656,7 @@ router.get('/config', superadminProtect, async (req, res) => {
                 },
                 enterprise: {
                     name: 'Enterprise',
-                    price: 999,
+                    price: 2999,
                     features: ['Unlimited Everything', 'Custom Integrations', '24/7 Support', 'Dedicated Manager'],
                     maxUsers: -1,
                     maxInventory: -1,
@@ -622,6 +754,10 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
     try {
         // --- Date Helpers ---
         const now = new Date();
+        const trendYear = Math.min(
+            now.getFullYear(),
+            Math.max(2020, parseInt(req.query.year, 10) || now.getFullYear())
+        );
         const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         // ... (rest of date helpers)
         
@@ -707,26 +843,39 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         const monthlyPlanRevenue = calculatedMonthlyPlanRevenue;
         const totalPlanRevenue = allTimeSubscriptionRevenue[0]?.totalLifetime || 0;
         
-        // --- Revenue Trend (Last 6 months - Plan Revenue) ---
-        const monthlyTrendData = await Payment.aggregate([
-            { 
-                $match: { 
-                    paymentDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
-                    status: 'paid'
-                } 
+        const yearStart = new Date(trendYear, 0, 1);
+        const yearEnd = new Date(trendYear + 1, 0, 1);
+
+        // --- POS sales revenue trend (calendar year, all shops) ---
+        const monthlyTrendData = await Sale.aggregate([
+            {
+                $match: {
+                    timestamp: { $gte: yearStart, $lt: yearEnd },
+                },
             },
             {
-                // FIX IS HERE: The $group _id must be an object with fields pointing to expressions.
                 $group: {
-                    _id: { 
-                        month: { $month: '$paymentDate' }, // Group by month
-                        year: { $year: '$paymentDate' }   // And year
+                    _id: {
+                        month: { $month: '$timestamp' },
+                        year: { $year: '$timestamp' },
                     },
-                    revenue: { $sum: '$amount' }
-                }
+                    revenue: { $sum: '$totalAmount' },
+                },
             },
-            { $sort: { '_id.year': 1, '_id.month': 1 } } // Sort by the grouped fields
+            { $sort: { '_id.year': 1, '_id.month': 1 } },
         ]);
+
+        const earliestOwner = await User.findOne({ role: 'owner' })
+            .sort({ createdAt: 1 })
+            .select('createdAt')
+            .lean();
+        const trendStartYear = earliestOwner
+            ? earliestOwner.createdAt.getFullYear()
+            : now.getFullYear();
+        const availableYears = [];
+        for (let y = now.getFullYear(); y >= trendStartYear; y--) {
+            availableYears.push(y);
+        }
         
         // --- Process Aggregation Results ---
         
@@ -764,28 +913,26 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             ? (newShopsThisMonth / (totalShops - newShopsThisMonth)) * 100
             : 0;
 
-        const paymentStatus = {
-            paid: Math.floor(totalShops * 0.75),
-            pending: Math.floor(totalShops * 0.20),
-            failed: Math.floor(totalShops * 0.03),
-            overdue: Math.max(0, totalShops - Math.floor(totalShops * 0.75) - Math.floor(totalShops * 0.20) - Math.floor(totalShops * 0.03))
-        };
-        
-        // Map trend data
-        const monthlyTrend = [];
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        // Create a map key based on the correct grouping structure: { month: M, year: Y }
-        const trendMap = new Map(monthlyTrendData.map(d => [`${d._id.year}-${d._id.month}`, d]));
-        
-        for (let i = 5; i >= 0; i--) {
-            const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthIndex = date.getMonth() + 1; // 1-indexed month
-            const year = date.getFullYear();
-            const key = `${year}-${monthIndex}`;
+        const ownersBilling = await User.find({ role: 'owner' })
+            .select('subscriptionStatus planEndDate plan paymentFailedAt')
+            .lean();
 
+        const paymentStatus = { paid: 0, pending: 0, failed: 0, overdue: 0 };
+
+        ownersBilling.forEach((owner) => {
+            const bucket = classifyOwnerPaymentBucket(owner, now);
+            paymentStatus[bucket] += 1;
+        });
+
+        const monthlyTrend = [];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const trendMap = new Map(monthlyTrendData.map((d) => [`${d._id.year}-${d._id.month}`, d]));
+
+        for (let m = 0; m < 12; m++) {
+            const key = `${trendYear}-${m + 1}`;
             monthlyTrend.push({
-                month: monthNames[date.getMonth()],
-                revenue: trendMap.get(key) ? trendMap.get(key).revenue : 0
+                month: monthNames[m],
+                revenue: trendMap.get(key)?.revenue || 0,
             });
         }
         
@@ -804,7 +951,9 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 newUsersThisMonth, 
                 planDistribution, 
                 paymentStatus,
-                monthlyTrend 
+                monthlyTrend,
+                trendYear,
+                availableYears,
             }
         });
     } catch (error) {
@@ -986,7 +1135,7 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         if (subscriptionId) {
             try {
                 // Fetch the live subscription object
-                const subscription = await razorpay.subscriptions.fetch(subscriptionId);
+                const subscription = await rzp.subscriptions.fetch(subscriptionId);
                 
                 /**
                  * ⭐ FIXED LOGIC:
@@ -1012,7 +1161,7 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
         }
 
         // 5. Response Formatting
-        const planPrices = { 'BASIC': 499, 'PRO': 799, 'PREMIUM': 999 };
+        const planPrices = { 'BASIC': 499, 'PRO': 999, 'PREMIUM': 2999 };
         const price = planPrices[plan] || planPrices['BASIC'];
 
         const now = new Date();
@@ -1024,11 +1173,14 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
             data: {
                 paymentHistory: paymentHistory.map(p => ({
                     id: p._id,
-                    date: p.paymentDate.toISOString(),
-                    amount: p.amount, 
-                    status: p.status, 
-                    transactionId: p.paymentId || p.subscriptionId, 
-                    method: 'Razorpay Auto-Debit', 
+                    date: p.paymentDate ? p.paymentDate.toISOString() : null,
+                    amount: p.amount ?? 0,
+                    status: p.status,
+                    transactionId: p.paymentId || p.subscriptionId,
+                    method: 'Razorpay Auto-Debit',
+                    eventType: p.eventType || null,
+                    failureReason: p.failureReason || null,
+                    failureDetail: p.failureDetail || null,
                 })),
                 upcomingPayment: {
                     date: nextPaymentDate.toISOString(),
@@ -1224,5 +1376,122 @@ router.get('/shops/:id/payment-status', superadminProtect, async (req, res) => {
 });
 
 
+
+// ====================================================
+// --- MANDATE RESTORE REQUESTS (halted subscriptions) ---
+// ====================================================
+
+router.get('/mandate-restore-requests', superadminProtect, async (req, res) => {
+    try {
+        const status = req.query.status;
+        const filter = {};
+        if (status && status !== 'all') {
+            filter.status = status;
+        } else {
+            filter.status = { $in: ['requested', 'link_ready'] };
+        }
+
+        const requests = await MandateRestoreRequest.find(filter)
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .lean();
+
+        const ownerIds = [...new Set(requests.map((r) => String(r.ownerId)))];
+        const owners = await User.find({ _id: { $in: ownerIds } })
+            .select('shopName email plan subscriptionStatus planEndDate paymentFailedAt lastPaymentFailureReason')
+            .lean();
+        const ownerMap = Object.fromEntries(owners.map((o) => [String(o._id), o]));
+
+        const data = requests.map((r) => ({
+            ...r,
+            owner: ownerMap[String(r.ownerId)] || null,
+            publicCheckoutUrl: r.checkoutToken
+                ? r.requestType === 'renew'
+                    ? getPublicRenewCheckoutUrl(r.checkoutToken)
+                    : getPublicMandateRestoreUrl(r.checkoutToken)
+                : null,
+        }));
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Mandate restore list error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load mandate restore requests.' });
+    }
+});
+
+router.post('/mandate-restore-requests/:id/generate-link', superadminProtect, async (req, res) => {
+    try {
+        const request = await MandateRestoreRequest.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ success: false, error: 'Request not found.' });
+        }
+
+        const owner = await User.findById(request.ownerId).select(
+            'plan shopName email subscriptionStatus transactionId'
+        );
+        if (!owner) {
+            return res.status(404).json({ success: false, error: 'Owner account not found.' });
+        }
+
+        const { createRenewalSubscriptionForOwner } = require('../utils/subscriptionRenew');
+        const isRenew = request.requestType === 'renew';
+        let subscription = await tryReuseMandateRequestSubscription(rzp, request);
+        if (!subscription) {
+            subscription = isRenew
+                ? await createRenewalSubscriptionForOwner(owner)
+                : await createRecoverySubscriptionForOwner(owner);
+        }
+        const publicCheckoutUrl = isRenew
+            ? getPublicRenewCheckoutUrl(request.checkoutToken)
+            : getPublicMandateRestoreUrl(request.checkoutToken);
+        const paymentLinkUrl = subscription.short_url || publicCheckoutUrl;
+
+        request.razorpaySubscriptionId = subscription.id;
+        request.paymentLinkUrl = paymentLinkUrl;
+        request.status = 'link_ready';
+        request.linkSentAt = new Date();
+        request.handledBy = req.user._id;
+        if (req.body?.adminNote) {
+            request.adminNote = String(req.body.adminNote).slice(0, 2000);
+        }
+        await request.save();
+
+        res.json({
+            success: true,
+            message: isRenew
+                ? 'Subscription restart link generated. Email this URL to the shop owner.'
+                : 'Payment mandate link generated. Share this URL with the shop owner.',
+            subscriptionId: subscription.id,
+            paymentLinkUrl,
+            publicCheckoutUrl,
+            razorpayShortUrl: subscription.short_url || null,
+        });
+    } catch (error) {
+        console.error('Generate mandate link error:', error);
+        res.status(error.statusCode || 500).json({
+            success: false,
+            error: error.message || 'Failed to generate mandate payment link.',
+        });
+    }
+});
+
+router.patch('/mandate-restore-requests/:id', superadminProtect, async (req, res) => {
+    try {
+        const { status, adminNote } = req.body;
+        const request = await MandateRestoreRequest.findById(req.params.id);
+        if (!request) {
+            return res.status(404).json({ success: false, error: 'Request not found.' });
+        }
+        if (status) request.status = status;
+        if (adminNote !== undefined) request.adminNote = String(adminNote).slice(0, 2000);
+        if (status === 'completed') request.completedAt = new Date();
+        request.handledBy = req.user._id;
+        await request.save();
+        res.json({ success: true, data: request });
+    } catch (error) {
+        console.error('Patch mandate restore error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update request.' });
+    }
+});
 
 module.exports = router;

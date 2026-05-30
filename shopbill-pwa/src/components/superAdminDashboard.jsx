@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Building, Store, Users, IndianRupee, TrendingUp, TrendingDown,
     CreditCard, AlertCircle, CheckCircle, Clock, XCircle,
     Activity, BarChart3, PieChart, ArrowUpRight, ArrowDownRight,
-    Loader, Calendar, MapPin, Shield, Zap, Database, Server
+    Calendar, MapPin, Shield, Zap, Database, Server, ChevronDown
 } from 'lucide-react';
 import API from '../config/api';
+import { SuperAdminDashboardInitialSkeleton } from './skeletons/PageSkeletons';
 
 // Stat Card Component (compact = smaller card for key metrics row)
 const StatCard = ({ title, value, unit, icon: Icon, trend, trendValue, color, subtitle, darkMode = true, compact = false }) => {
@@ -83,18 +84,19 @@ const formatTimeAgo = (date) => {
 const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode = true }) => {
     // 1. useState
     const [dashboardData, setDashboardData] = useState(null);
-    // 2. useState
     const [isLoading, setIsLoading] = useState(true);
+    const [trendYear, setTrendYear] = useState(() => new Date().getFullYear());
+    const [isTrendLoading, setIsTrendLoading] = useState(false);
+    const hasLoadedOnceRef = useRef(false);
 
-    // Fetch dashboard data
-    // 3. useCallback
-    const fetchDashboardData = useCallback(async () => {
-        setIsLoading(true);
+    const fetchDashboardData = useCallback(async (year = trendYear, { initial = false } = {}) => {
+        if (initial) setIsLoading(true);
+        else setIsTrendLoading(true);
         try {
-            // Fetch dashboard stats and recent activity in parallel. Recent activity failure is non-fatal.
+            const dashUrl = `${API.superadminDashboard}?year=${year}`;
             const [dashResp, activityResp] = await Promise.all([
-                apiClient.get(API.superadminDashboard),
-                apiClient.get(API.superadminRecentActivity).catch(() => null)
+                apiClient.get(dashUrl),
+                initial ? apiClient.get(API.superadminRecentActivity).catch(() => null) : Promise.resolve(null),
             ]);
 
             if (!dashResp || !dashResp.data || !dashResp.data.success) {
@@ -111,35 +113,49 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                 { type: 'payment_received', shop: 'Shop Payment', amount: 6999, time: new Date(now.getTime() - 5 * 60 * 60 * 1000), status: 'success' },
             ];
 
-            setDashboardData({
-                // MAPPING: Ensure client keys match backend keys
-                // We assume backend provides totalSalesRevenue and monthlySalesRevenue
+            setDashboardData((prev) => ({
                 totalRevenue: apiData.totalSalesRevenue || 0,
                 monthlyRevenue: apiData.monthlySalesRevenue || 0,
-                totalPlanRevenue: apiData.totalPlanRevenue || 0, // Monthly Subscription revenue
-                totalLifetimePlanRevenue: apiData.totalLifetimePlanRevenue || 0, // Total Subscription revenue
+                totalPlanRevenue: apiData.totalPlanRevenue || 0,
+                totalLifetimePlanRevenue: apiData.totalLifetimePlanRevenue || 0,
                 ...apiData,
                 recentActivity: Array.isArray(apiData.recentActivity)
                     ? apiData.recentActivity
                     : Array.isArray(activityData)
                         ? activityData
-                        : fallbackActivity,
-            });
+                        : prev?.recentActivity || fallbackActivity,
+            }));
+            if (apiData.trendYear) setTrendYear(apiData.trendYear);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
-            // Fallback to dummy data on error
-            if (typeof showToast === 'function') showToast('Using dummy data. API connection failed.', 'warning');
+            if (typeof showToast === 'function') showToast('Failed to load dashboard data.', 'error');
         } finally {
+            hasLoadedOnceRef.current = true;
             setIsLoading(false);
+            setIsTrendLoading(false);
         }
-    }, [apiClient, API, showToast]);
+    }, [apiClient, API, showToast, trendYear]);
 
     // 4. useEffect
     useEffect(() => {
         if (currentUser && currentUser.role === 'superadmin') {
-            fetchDashboardData();
+            fetchDashboardData(trendYear, { initial: true });
         }
-    }, [fetchDashboardData, currentUser]);
+    }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps -- initial load only
+
+    const handleTrendYearChange = (year) => {
+        const nextYear = Number(year);
+        if (!Number.isFinite(nextYear) || nextYear === trendYear) return;
+        setTrendYear(nextYear);
+        fetchDashboardData(nextYear, { initial: false });
+    };
+
+    const availableTrendYears = useMemo(() => {
+        const fromApi = dashboardData?.availableYears;
+        if (Array.isArray(fromApi) && fromApi.length > 0) return fromApi;
+        const y = new Date().getFullYear();
+        return [y, y - 1, y - 2];
+    }, [dashboardData?.availableYears]);
 
     // 5. useMemo 
     // Dynamic Calculations
@@ -153,8 +169,20 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
 
     const shopsGrowth = dashboardData?.shopsGrowth || 0;
 
-    // Determine the total revenue for the trend chart scale
-    const maxMonthlyRevenue = Math.max(...(dashboardData?.monthlyTrend || []).map(t => t.revenue || 0));
+    const visibleMonthlyTrend = useMemo(() => {
+        const trend = Array.isArray(dashboardData?.monthlyTrend) ? dashboardData.monthlyTrend : [];
+        if (trend.length === 0) return [];
+
+        const now = new Date();
+        const isCurrentYearSelected = Number(trendYear) === now.getFullYear();
+        if (!isCurrentYearSelected) return trend;
+
+        const currentMonthIndex = now.getMonth();
+        return trend.slice(0, currentMonthIndex + 1);
+    }, [dashboardData?.monthlyTrend, trendYear]);
+
+    // Determine the total revenue for the trend chart scale (only visible months)
+    const maxMonthlyRevenue = Math.max(...visibleMonthlyTrend.map((t) => t.revenue || 0), 0);
 
     const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
     const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
@@ -163,13 +191,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
     const textMuted = darkMode ? 'text-gray-600' : 'text-slate-400';
     const textSubtitle = darkMode ? 'text-gray-500' : 'text-slate-500';
 
-    if (isLoading) {
-        return (
-            <div className={`flex flex-col items-center justify-center h-full min-h-screen p-8 ${textSecondary} ${mainBg} transition-colors duration-300`} aria-busy="true" aria-live="polite">
-                <Loader className="w-10 h-10 animate-spin text-indigo-400" aria-hidden="true" />
-                <span className="sr-only">Loading dashboard data...</span>
-            </div>
-        );
+    if (isLoading && !hasLoadedOnceRef.current) {
+        return <SuperAdminDashboardInitialSkeleton darkMode={darkMode} />;
     }
 
     if (!dashboardData) {
@@ -301,10 +324,13 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
 
                 {/* Payment Status Overview */}
                 <section className={`${cardBg} rounded-xl p-6 border`} aria-labelledby="payment-status-heading">
-                    <h2 id="payment-status-heading" className={`text-lg font-semibold ${textPrimary} flex items-center gap-2 mb-4`}>
+                    <h2 id="payment-status-heading" className={`text-lg font-semibold ${textPrimary} flex items-center gap-2 mb-1`}>
                         <CreditCard className="w-5 h-5 text-indigo-400" />
                         Payment Status
                     </h2>
+                    <p className={`text-[11px] font-medium mb-4 ${textSubtitle}`}>
+                        Paid = active subscription after a real charge. Pending includes free trial and mandate verification (₹1). Overdue = missed payment after access ended.
+                    </p>
                     <div className="space-y-3">
                         {dashboardData.paymentStatus && (
                             <>
@@ -347,13 +373,39 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
 
                 {/* 1. Monthly Revenue Trend (Updated for "Progress Bar" look) */}
                 <div className={`${cardBg} rounded-xl p-6 border`}>
-                    <h2 className={`text-lg font-semibold ${textPrimary} flex items-center gap-2 mb-4`}>
-                        <BarChart3 className="w-5 h-5 text-indigo-400" />
-                        Monthly Revenue Trend (POS Sales)
-                    </h2>
-                    <div className="space-y-3">
-                        {dashboardData.monthlyTrend && dashboardData.monthlyTrend.length > 0 ? (
-                            dashboardData.monthlyTrend.map((item, index) => {
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                        <h2 className={`text-sm sm:text-lg font-semibold ${textPrimary} flex items-center gap-2 min-w-0`}>
+                            <BarChart3 className="w-5 h-5 text-indigo-400" />
+                            <span className="truncate">Monthly Revenue Trend</span>
+                        </h2>
+                        <label className={`flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest ${textSecondary} shrink-0`}>
+                            <span className="shrink-0">Year</span>
+                            <div className="relative">
+                                <select
+                                    value={trendYear}
+                                    onChange={(e) => handleTrendYearChange(e.target.value)}
+                                    disabled={isTrendLoading}
+                                    className={`appearance-none rounded-lg border py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 text-xs sm:text-sm font-semibold normal-case tracking-normal transition ${darkMode ? 'border-gray-600 bg-gray-800 text-white' : 'border-slate-300 bg-white text-slate-900'} disabled:opacity-50`}
+                                    aria-label="Select year for revenue trend"
+                                >
+                                    {availableTrendYears.map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className={`pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 ${textSecondary}`} aria-hidden="true" />
+                            </div>
+                        </label>
+                    </div>
+                    <div className={`space-y-3 ${isTrendLoading ? 'pointer-events-none' : ''}`}>
+                        {isTrendLoading ? (
+                            Array.from({ length: 6 }, (_, i) => (
+                                <div key={`trend-skel-${i}`} className="flex items-center gap-3">
+                                    <div className={`h-4 w-10 shrink-0 rounded ${darkMode ? 'bg-gray-700/60' : 'bg-slate-200'} animate-pulse`} />
+                                    <div className={`h-6 flex-1 rounded-full ${darkMode ? 'bg-gray-700/60' : 'bg-slate-200'} animate-pulse`} />
+                                </div>
+                            ))
+                        ) : visibleMonthlyTrend.length > 0 ? (
+                            visibleMonthlyTrend.map((item, index) => {
                                 // Calculate raw percentage based on the max revenue for scale
                                 const rawPercentage = maxMonthlyRevenue > 0 ? ((item.revenue || 0) / maxMonthlyRevenue) * 100 : 0;
 
@@ -455,8 +507,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
             </div>
 
             {/* System Health & Quick Stats (Static/Mocked Data) */}
-            <header className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className={`${cardBg} rounded-xl p-5 border`}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`${cardBg} rounded-xl p-5 border transition-colors duration-300`}>
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center justify-center">
                             <Server className="w-5 h-5 text-green-400" />
@@ -472,38 +524,38 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                     </div>
                 </div>
 
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
+                <div className={`${cardBg} rounded-xl p-5 border transition-colors duration-300`}>
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
                             <Database className="w-5 h-5 text-blue-400" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-400">Database</p>
-                            <p className="text-lg font-semibold text-gray-900 dark:text-white">Healthy</p>
+                            <p className={`text-sm ${textSecondary}`}>Database</p>
+                            <p className={`text-lg font-semibold ${textPrimary}`}>Healthy</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className={`flex items-center gap-2 text-xs ${textSubtitle}`}>
                         <div className="w-2 h-2 rounded-full bg-blue-400" />
                         <span>99.9% uptime</span>
                     </div>
                 </div>
 
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-5 border border-gray-200 dark:border-gray-700/50">
+                <div className={`${cardBg} rounded-xl p-5 border transition-colors duration-300`}>
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
                             <Zap className="w-5 h-5 text-purple-400" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-400">API Response</p>
-                            <p className="text-lg font-semibold text-gray-900 dark:text-white">Fast</p>
+                            <p className={`text-sm ${textSecondary}`}>API Response</p>
+                            <p className={`text-lg font-semibold ${textPrimary}`}>Fast</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className={`flex items-center gap-2 text-xs ${textSubtitle}`}>
                         <div className="w-2 h-2 rounded-full bg-purple-400" />
                         <span>Avg: 120ms</span>
                     </div>
                 </div>
-            </header>
+            </div>
             </div>
         </div>
     );

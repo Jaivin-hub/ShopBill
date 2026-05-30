@@ -46,7 +46,7 @@ const getStoreRolePermissions = (storeDoc) => {
 // Helper to check if the user is the owner
 // FIX: Changed helper function name and logic to use PascalCase 'owner'
 // to match the convention established in authRoutes.js and StaffSchema.
-const isowner = (userRole) => userRole === 'owner';
+const isowner = (userRole) => String(userRole || '').toLowerCase() === 'owner';
 
 /** Managers need outlet grant for Team Management; owners always pass. */
 const ensureManagerTeamManagementAccess = async (req, res) => {
@@ -119,7 +119,27 @@ const computePayrollAmounts = ({ salaryMode, rate, payableMinutes, payableOverti
     };
 };
 
+/** Owner settlements always display as "Owner" (never email). */
+function normalizeSettledByFields(name, role) {
+    const roleKey = String(role || '').trim().toLowerCase();
+    if (roleKey === 'owner') {
+        return { settledByName: 'Owner', settledByRole: 'Owner' };
+    }
+    const displayName = String(name || '').trim();
+    if (roleKey === 'manager') {
+        return { settledByName: displayName, settledByRole: 'Manager' };
+    }
+    return { settledByName: displayName, settledByRole: String(role || '').trim() };
+}
+
 async function resolveSettlementActorInfo(req) {
+    if (isowner(req.user.role)) {
+        return {
+            settledByUserId: req.user?._id || null,
+            settledByName: 'Owner',
+            settledByRole: 'Owner'
+        };
+    }
     let actorName = req.user?.name || req.user?.email || 'User';
     let actorRole = req.user?.role || 'User';
     if (actorRole === 'Manager' || actorRole === 'Cashier') {
@@ -129,9 +149,8 @@ async function resolveSettlementActorInfo(req) {
             actorRole = staffRecord.role || actorRole;
         }
     }
-    if (actorRole === 'owner') {
-        actorName = actorName || 'Owner';
-        actorRole = 'Owner';
+    if (String(actorRole).toLowerCase() === 'manager') {
+        actorRole = 'Manager';
     }
     return {
         settledByUserId: req.user?._id || null,
@@ -422,12 +441,15 @@ router.get('/', protect, async (req, res) => {
                     otSalary: payrollAmounts.otSalary,
                     totalSalary,
                     isSettled: currentSettlement?.paid === true && totalSalary <= 0,
+                    isPaid: currentSettlement?.paid === true,
                     settledAt: currentSettlement?.paidAt || null,
                     attachmentUrl: currentSettlement?.attachmentUrl || '',
                     attachmentName: currentSettlement?.attachmentName || '',
                     attachmentType: currentSettlement?.attachmentType || '',
-                    settledByName: currentSettlement?.settledByName || '',
-                    settledByRole: currentSettlement?.settledByRole || '',
+                    ...normalizeSettledByFields(
+                        currentSettlement?.settledByName || '',
+                        currentSettlement?.settledByRole || ''
+                    ),
                     carryForwardIn: Math.round(Number(carryForwardIn || 0) * 100) / 100
                 }
             };
@@ -1379,8 +1401,10 @@ router.get('/payroll-statement', protect, async (req, res) => {
                     attachmentUrl: String(entry?.attachmentUrl || ''),
                     attachmentName: String(entry?.attachmentName || ''),
                     attachmentType: String(entry?.attachmentType || ''),
-                    settledByName: String(entry?.settledByName || ''),
-                    settledByRole: String(entry?.settledByRole || '')
+                    ...normalizeSettledByFields(
+                        entry?.settledByName || '',
+                        entry?.settledByRole || ''
+                    )
                 });
             });
         });

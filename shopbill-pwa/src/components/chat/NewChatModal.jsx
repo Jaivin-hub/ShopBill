@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Search, User, Store, Loader2 } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Search, User, Loader2 } from 'lucide-react';
 import { participantLabelForViewer, participantRoleLabelForViewer, isParticipantOwner, isStaffViewer } from '../../utils/ownerDisplay';
 
 const NewChatModal = ({
@@ -21,6 +22,15 @@ const NewChatModal = ({
     showOutletInfo = false,
     currentUser
 }) => {
+    useEffect(() => {
+        if (!show) return undefined;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [show]);
+
     if (!show) return null;
 
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
@@ -40,24 +50,36 @@ const NewChatModal = ({
                u.outletName?.toLowerCase().includes(term);
     });
 
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-3 sm:p-4">
-            <div className={`${cardBase} w-full max-w-md h-[85vh] sm:h-[80vh] max-h-[600px] rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl flex flex-col`}>
-                <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center flex-shrink-0`}>
-                    <h3 className={`text-base sm:text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+    const overlay = (
+        <div
+            className="fixed inset-0 z-[280] flex items-center justify-center bg-black/60 backdrop-blur-md p-3 max-md:pt-[calc(var(--app-mobile-header-offset,0px)+0.75rem)] max-md:pb-[calc(var(--app-mobile-footer-offset,0px)+0.75rem)] sm:p-4"
+            style={{ WebkitBackdropFilter: 'blur(12px)' }}
+            role="presentation"
+            onClick={isCreatingChat ? undefined : onClose}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="new-chat-modal-title"
+                className={`${cardBase} w-full max-w-md max-h-full min-h-0 rounded-xl sm:rounded-2xl border overflow-hidden shadow-2xl flex flex-col`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className={`p-3 sm:p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex justify-between items-center shrink-0`}>
+                    <h3 id="new-chat-modal-title" className={`text-base sm:text-lg font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {newChatType === 'group' ? 'Create Custom Group' : 'New Direct Chat'}
                     </h3>
                     <button
+                        type="button"
                         onClick={onClose}
-                        className="p-1.5 sm:p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors"
+                        disabled={isCreatingChat}
+                        className="p-1.5 sm:p-2 hover:bg-red-500/10 rounded-xl text-slate-500 hover:text-red-500 transition-colors disabled:opacity-50"
                         aria-label="Close modal"
                     >
                         <X className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 chat-scroll custom-scrollbar">
-                    {/* Group Name */}
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain chat-scroll custom-scrollbar">
                     {newChatType === 'group' && (
                         <div>
                             <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -74,7 +96,6 @@ const NewChatModal = ({
                         </div>
                     )}
 
-                    {/* Quick Selection Buttons (Groups only) */}
                     {newChatType === 'group' && (
                         <div>
                             <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -100,8 +121,8 @@ const NewChatModal = ({
                                             const allSelected = allManagers.length > 0 && allManagers.every(id => safeSelectedUsers.includes(id));
                                             return allSelected
                                                 ? 'bg-indigo-600 text-white border border-indigo-500'
-                                                : darkMode 
-                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500' 
+                                                : darkMode
+                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500'
                                                     : 'bg-slate-100 border border-slate-200 text-slate-700 hover:border-indigo-500';
                                         })()
                                     }`}
@@ -127,8 +148,8 @@ const NewChatModal = ({
                                             const allSelected = allCashiers.length > 0 && allCashiers.every(id => safeSelectedUsers.includes(id));
                                             return allSelected
                                                 ? 'bg-indigo-600 text-white border border-indigo-500'
-                                                : darkMode 
-                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500' 
+                                                : darkMode
+                                                    ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500'
                                                     : 'bg-slate-100 border border-slate-200 text-slate-700 hover:border-indigo-500';
                                         })()
                                     }`}
@@ -139,78 +160,78 @@ const NewChatModal = ({
                         </div>
                     )}
 
-                    {/* User Selection */}
                     <div>
                         <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                             {newChatType === 'direct' ? 'Select Person' : 'Select Staff Members *'}
                         </label>
-                            <div className="relative mb-2">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Search users..."
-                                    value={searchTerm}
-                                    onChange={(e) => onSearchChange(e.target.value)}
-                                    className={`w-full pl-10 pr-4 py-2 ${inputBase} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
-                                />
-                            </div>
-                            <div className="max-h-40 sm:max-h-48 md:max-h-56 overflow-y-auto custom-scrollbar space-y-2">
-                                {filteredUsers.length === 0 ? (
-                                    <div className={`p-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        <p className="text-sm">No staff members found</p>
-                                    </div>
-                                ) : (
-                                    filteredUsers.map(user => {
-                                        const isSelected = safeSelectedUsers.includes(user._id);
-                                        return (
-                                            <button
-                                                key={user._id}
-                                                type="button"
-                                                onClick={() => onUserToggle(user._id, newChatType === 'direct')}
-                                                className={`w-full p-3 rounded-xl text-left transition-all border ${
-                                                    isSelected
-                                                        ? 'bg-indigo-500/10 border-indigo-500'
-                                                        : darkMode ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                                        isSelected ? 'bg-indigo-600' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
-                                                    }`}>
-                                                        <User className={`w-4 h-4 ${isSelected ? 'text-white' : darkMode ? 'text-slate-400' : 'text-slate-600'}`} />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                                            {participantLabelForViewer(user, currentUser)}
-                                                        </p>
-                                                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                            {participantRoleLabelForViewer(user, currentUser)}{showOutletInfo && user.outletName && ` • ${user.outletName}`}
-                                                        </p>
-                                                    </div>
-                                                    {isSelected && (
-                                                        <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center">
-                                                            <X className="w-3 h-3 text-white" />
-                                                        </div>
-                                                    )}
+                        <div className="relative mb-2">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            <input
+                                type="text"
+                                placeholder="Search users..."
+                                value={searchTerm}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                className={`w-full pl-10 pr-4 py-2 ${inputBase} border rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                            />
+                        </div>
+                        <div className="max-h-40 sm:max-h-48 md:max-h-56 overflow-y-auto custom-scrollbar space-y-2">
+                            {filteredUsers.length === 0 ? (
+                                <div className={`p-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <p className="text-sm">No staff members found</p>
+                                </div>
+                            ) : (
+                                filteredUsers.map(user => {
+                                    const isSelected = safeSelectedUsers.includes(user._id);
+                                    return (
+                                        <button
+                                            key={user._id}
+                                            type="button"
+                                            onClick={() => onUserToggle(user._id, newChatType === 'direct')}
+                                            className={`w-full p-3 rounded-xl text-left transition-all border ${
+                                                isSelected
+                                                    ? 'bg-indigo-500/10 border-indigo-500'
+                                                    : darkMode ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                    isSelected ? 'bg-indigo-600' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                                                }`}>
+                                                    <User className={`w-4 h-4 ${isSelected ? 'text-white' : darkMode ? 'text-slate-400' : 'text-slate-600'}`} />
                                                 </div>
-                                            </button>
-                                        );
-                                    })
-                                )}
-                            </div>
-                            {newChatType === 'group' && selectedUsers.length > 0 && (
-                                <p className="text-[10px] text-indigo-500 mt-2">
-                                    {selectedUsers.length} selected
-                                </p>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                                        {participantLabelForViewer(user, currentUser)}
+                                                    </p>
+                                                    <p className={`text-xs truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                        {participantRoleLabelForViewer(user, currentUser)}{showOutletInfo && user.outletName && ` • ${user.outletName}`}
+                                                    </p>
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+                                                        <X className="w-3 h-3 text-white" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })
                             )}
                         </div>
+                        {newChatType === 'group' && selectedUsers.length > 0 && (
+                            <p className="text-[10px] text-indigo-500 mt-2">
+                                {selectedUsers.length} selected
+                            </p>
+                        )}
+                    </div>
                 </div>
 
-                <div className={`p-3 sm:p-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0`}>
+                <div className={`p-3 sm:p-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'} flex flex-col sm:flex-row gap-2 sm:gap-3 shrink-0`}>
                     <button
                         type="button"
                         onClick={onClose}
-                        className={`flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        disabled={isCreatingChat}
+                        className={`flex-1 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all disabled:opacity-50 ${
                             darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
@@ -243,8 +264,8 @@ const NewChatModal = ({
             </div>
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay;
 };
 
 export default NewChatModal;
-
-

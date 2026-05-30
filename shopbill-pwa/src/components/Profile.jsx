@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     User, Mail, Phone, MapPin, IndianRupee, Clock, Check, Building, 
-    Edit, Shield, Save, X, Activity, Globe
+    Edit, Shield, Save, X, Activity, Globe, Loader
 } from 'lucide-react';
 import API from '../config/api';
 import { ProfileInitialSkeleton } from './skeletons/PageSkeletons';
@@ -72,6 +72,7 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
 
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
     const [validationErrors, setValidationErrors] = useState({});
 
     const fetchProfileData = useCallback(async () => {
@@ -145,8 +146,8 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
             return;
         }
         
+        setIsSaving(true);
         try {
-            showToast('Syncing changes...', 'info');
             const response = await apiClient.put(API.profile, profile);
             const updatedData = response.data.user || response.data.data || response.data;
             const normalizedUpdate = {
@@ -156,8 +157,6 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
             };
             setProfile((prev) => ({ ...prev, ...normalizedUpdate }));
             
-            const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-            localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, ...normalizedUpdate }));
             if (typeof onProfileUpdated === 'function') {
                 onProfileUpdated(normalizedUpdate);
             }
@@ -168,6 +167,8 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
         } catch (error) {
             const errMsg = error.response?.data?.error || 'Update failed.';
             showToast(errMsg, 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -210,17 +211,26 @@ function Profile({ apiClient, showToast, darkMode, currentOutletId, userRole, on
                     <div className="flex items-center gap-3">
                         {isEditing ? (
                             <>
-                                <button 
+                                <button
+                                    type="button"
                                     onClick={() => setIsEditing(false)}
-                                    className={`p-2.5 rounded-xl transition-all active:scale-95 border ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'}`}
+                                    disabled={isSaving}
+                                    className={`p-2.5 rounded-xl transition-all active:scale-95 border disabled:opacity-50 ${darkMode ? 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'}`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
-                                <button 
+                                <button
+                                    type="button"
                                     onClick={handleSave}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all"
+                                    disabled={isSaving}
+                                    className="flex items-center justify-center gap-2 min-w-[83px] px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all disabled:opacity-70 disabled:pointer-events-none"
                                 >
-                                    <Save className="w-3.5 h-3.5" /> Save
+                                    {isSaving ? (
+                                        <Loader className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                                    ) : (
+                                        <Save className="w-3.5 h-3.5" aria-hidden />
+                                    )}
+                                    {isSaving ? 'Saving…' : 'Save'}
                                 </button>
                             </>
                         ) : (

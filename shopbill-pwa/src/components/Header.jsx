@@ -236,8 +236,8 @@ const Header = ({
     return (
         <>
             <header 
-                className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] flex justify-between items-center backdrop-blur-md overscroll-none [transform:translate3d(0,0,0)] ${headerBg} transition-all duration-300 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-4 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] ${hasModalOpen ? 'opacity-0 pointer-events-none invisible' : ''}`}
-                aria-hidden={hasModalOpen}
+                className={`fixed top-0 left-0 right-0 border-b md:hidden z-[110] flex justify-between items-center backdrop-blur-md overscroll-none [transform:translate3d(0,0,0)] ${headerBg} transition-all duration-300 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-4 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] ${hasModalOpen ? 'pointer-events-none opacity-40 blur-[3px] saturate-75' : ''}`}
+                aria-hidden={hasModalOpen ? true : undefined}
             >
                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { if (staffCan('dashboard')) { setCurrentPage('dashboard'); setShowStoreHub(false); } }}>
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">

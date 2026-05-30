@@ -35,6 +35,8 @@ const PaymentSchema = new mongoose.Schema({
         enum: ['paid', 'failed', 'pending', 'overdue'],
         default: 'pending',
     },
+    failureReason: { type: String, default: null },
+    failureDetail: { type: String, default: null },
     // Date/time of the payment event (e.g., when the charge was successful)
     paymentDate: {
         type: Date,

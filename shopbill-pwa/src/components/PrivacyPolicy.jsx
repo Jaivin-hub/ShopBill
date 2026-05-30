@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Printer, Lock, ArrowLeft, EyeOff, Server, Smartphone, ShieldCheck } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
-const PrivacyPolicy = ({ onBack, origin, darkMode = true }) => {
+const PrivacyPolicy = ({ onBack, origin, darkMode = true, setDarkMode }) => {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
@@ -55,9 +56,12 @@ const PrivacyPolicy = ({ onBack, origin, darkMode = true }) => {
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
                         Back {origin === 'settings' ? 'to Settings' : ''}
                     </button>
-                    <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${navBtnHover}`}>
-                        <Printer size={18} /> Print Policy
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} size="sm" />
+                        <button onClick={handlePrint} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all text-sm ${navBtnBg} border ${navBtnBorder} ${navBtnText} ${navBtnHover}`}>
+                            <Printer size={18} /> Print Policy
+                        </button>
+                    </div>
                 </div>
             </nav>
 

@@ -5,6 +5,7 @@ const Attendance = require('../models/Attendance');
 const Staff = require('../models/Staff');
 const { emitAlert } = require('./notificationRoutes');
 const { applyAutoPunchOutForStore: runStoreAutoPunchOut } = require('../utils/attendanceAutoPunchOut');
+const { notifyAutoPunchOut } = require('../utils/attendanceAutoPunchOutNotify');
 
 const router = express.Router();
 
@@ -91,8 +92,13 @@ async function findStaffForRequest(req) {
     return fallback;
 }
 
-async function applyAutoPunchOutForStore(storeId) {
-    await runStoreAutoPunchOut(storeId);
+async function applyAutoPunchOutForStore(storeId, req = null) {
+    const io = req?.app?.get?.('socketio') ?? null;
+    await runStoreAutoPunchOut(storeId, {
+        onPunchedOut: async ({ staff, attendance, now }) => {
+            await notifyAutoPunchOut({ io, storeId, staff, attendance, now });
+        },
+    });
 }
 
 /**

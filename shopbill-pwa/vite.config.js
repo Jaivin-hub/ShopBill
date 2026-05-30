@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import firebaseSwPlugin from './vite-firebase-sw-plugin.js'
+import buildVersionPlugin from './vite-build-version-plugin.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,14 +11,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Use stable asset names to avoid stale HTML -> missing hashed chunk 404s
-        // on deep links like /staff-setup/:token during rolling deployments.
-        entryFileNames: 'assets/index.js',
-        chunkFileNames: 'assets/[name].js',
+        // Content-hashed filenames so Workbox precache revisions update each deploy.
+        // (Stable names + revision:null left installed PWAs on old JS after "Update".)
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           const name = assetInfo?.name || '';
-          if (name.endsWith('.css')) return 'assets/index.css';
-          return 'assets/[name][extname]';
+          if (name.endsWith('.css')) return 'assets/[name]-[hash][extname]';
+          return 'assets/[name]-[hash][extname]';
         },
         manualChunks(id) {
           if (id.includes('node_modules/lucide-react')) return 'vendor-lucide';
@@ -26,6 +27,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    buildVersionPlugin(),
     firebaseSwPlugin(),
     react(),
     
@@ -38,11 +40,12 @@ export default defineConfig({
     // ----------------------------------------------------------------------
     
     VitePWA({
-      // Auto-apply new SW so precached index + hashed chunks stay one consistent build (avoids lazy-chunk 404s after deploy).
-      registerType: 'autoUpdate',
+      // Prompt user via PwaUpdatePrompt; do not auto-skipWaiting (same /sw.js URL breaks URL-only version checks).
+      registerType: 'prompt',
       devOptions: {
-        enabled: true,
-        type: 'module', 
+        // Off in dev so HMR works without a stale Workbox cache; enable with VITE_PWA_DEV=1 to test SW locally.
+        enabled: process.env.VITE_PWA_DEV === '1',
+        type: 'module',
       },
       manifest: {
         name: 'Pocket Pos',
@@ -75,7 +78,7 @@ export default defineConfig({
       },
       
       workbox: {
-        skipWaiting: true,
+        skipWaiting: false,
         clientsClaim: true,
         
         // Use network-first strategy for HTML to ensure fresh content
@@ -94,7 +97,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}', 'index.html'],
         
         // Bump when you need to invalidate all Workbox caches in the field (deploy mismatch recovery).
-        cacheId: 'pocket-pos-v3',
+        cacheId: 'pocket-pos-v5',
         
         // Clean up old caches on update
         cleanupOutdatedCaches: true,
@@ -104,12 +107,26 @@ export default defineConfig({
         
         runtimeCaching: [
           {
-            // Same-origin built assets: prefer network so a new deploy’s chunks load even if an old precache entry lingers briefly
+            urlPattern: ({ url }) => url.pathname === '/version.json',
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-nav-network-first',
+              expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 },
+              networkTimeoutSeconds: 5,
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'assets-network-first',
-              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 7 },
               networkTimeoutSeconds: 5,
               cacheableResponse: { statuses: [0, 200] },
             },

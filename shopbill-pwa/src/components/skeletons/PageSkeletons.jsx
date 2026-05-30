@@ -687,6 +687,238 @@ export function SettingsHomeSkeleton({ darkMode }) {
   );
 }
 
+/** Super Admin system config — header, tab grid, plan cards */
+export function SystemConfigInitialSkeleton({ darkMode }) {
+  const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const cardBase = darkMode ? 'border-gray-700/50 bg-gray-800/50' : 'border-slate-200 bg-white shadow-sm';
+  return (
+    <main
+      className={`min-h-0 h-full flex flex-col px-3 py-4 sm:px-6 sm:py-6 md:px-8 ${mainBg} overflow-hidden`}
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <header className="mb-4 sm:mb-6 shrink-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className={`h-7 sm:h-8 w-44 sm:w-52 ${skel(darkMode)}`} />
+            <div className={`h-3 w-full max-w-[280px] ${skel(darkMode)}`} />
+          </div>
+          <div className={`h-11 w-full sm:w-36 shrink-0 ${skel(darkMode, 'rounded-xl')}`} />
+        </div>
+      </header>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4 sm:mb-6 shrink-0">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className={`h-[52px] sm:h-10 ${skel(darkMode, 'rounded-xl')}`} />
+        ))}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`rounded-xl border p-4 sm:p-6 ${cardBase}`}>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className={`h-8 w-28 ${skel(darkMode, 'rounded-lg')}`} />
+                <div className={`h-8 w-8 shrink-0 ${skel(darkMode, 'rounded-lg')}`} />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between gap-2">
+                  <div className={`h-3.5 w-24 ${skel(darkMode)}`} />
+                  <div className={`h-3.5 w-16 ${skel(darkMode)}`} />
+                </div>
+                <div className="flex justify-between gap-2">
+                  <div className={`h-3.5 w-20 ${skel(darkMode)}`} />
+                  <div className={`h-3.5 w-12 ${skel(darkMode)}`} />
+                </div>
+                <div className={`h-3.5 w-full ${skel(darkMode)}`} />
+                <div className={`h-3.5 w-4/5 ${skel(darkMode)}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/** Super Admin dashboard — header, stat cards, plan/payment panels, trend + activity */
+export function SuperAdminDashboardInitialSkeleton({ darkMode }) {
+  const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const headerBg = darkMode ? 'bg-gray-950/95' : 'bg-white/95';
+  const cardBase = darkMode ? 'border-gray-700/50 bg-gray-800/50' : 'border-slate-200 bg-white shadow-sm';
+  return (
+    <div className={`flex h-full min-h-0 flex-col transition-colors duration-300 ${mainBg}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 border-b px-4 pb-0 pt-4 backdrop-blur-md md:px-8 md:pt-8 ${headerBg} ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+        <div className="mb-6 flex items-center justify-between">
+          <div className={`h-8 w-40 ${skel(darkMode)}`} />
+          <div className={`h-4 w-28 ${skel(darkMode)}`} />
+        </div>
+      </header>
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">
+        <div className="mb-6 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`rounded-xl border p-3 ${cardBase}`}>
+              <div className={`mb-2 h-9 w-9 ${skel(darkMode, 'rounded-lg')}`} />
+              <div className={`mb-1 h-3 w-20 ${skel(darkMode)}`} />
+              <div className={`h-5 w-24 ${skel(darkMode)}`} />
+            </div>
+          ))}
+        </div>
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className={`lg:col-span-2 rounded-xl border p-6 ${cardBase}`}>
+            <div className={`mb-4 h-5 w-40 ${skel(darkMode)}`} />
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between">
+                    <div className={`h-6 w-24 ${skel(darkMode, 'rounded-lg')}`} />
+                    <div className={`h-4 w-16 ${skel(darkMode)}`} />
+                  </div>
+                  <div className={`h-2 w-full ${skel(darkMode, 'rounded-full')}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className={`rounded-xl border p-6 ${cardBase}`}>
+            <div className={`mb-4 h-5 w-32 ${skel(darkMode)}`} />
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className={`h-12 w-full ${skel(darkMode, 'rounded-lg')}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className={`rounded-xl border p-6 ${cardBase}`}>
+            <div className="mb-4 flex justify-between gap-3">
+              <div className={`h-5 w-56 max-w-[70%] ${skel(darkMode)}`} />
+              <div className={`h-9 w-24 shrink-0 ${skel(darkMode, 'rounded-lg')}`} />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className={`h-4 w-10 shrink-0 ${skel(darkMode)}`} />
+                  <div className={`h-6 flex-1 ${skel(darkMode, 'rounded-full')}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className={`rounded-xl border p-6 ${cardBase}`}>
+            <div className={`mb-4 h-5 w-36 ${skel(darkMode)}`} />
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className={`h-14 w-full ${skel(darkMode, 'rounded-lg')}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`rounded-xl border p-5 ${cardBase}`}>
+              <div className="mb-3 flex items-center gap-3">
+                <div className={`h-10 w-10 shrink-0 ${skel(darkMode, 'rounded-lg')}`} />
+                <div className="flex-1 space-y-2">
+                  <div className={`h-3 w-20 ${skel(darkMode)}`} />
+                  <div className={`h-5 w-28 ${skel(darkMode)}`} />
+                </div>
+              </div>
+              <div className={`h-3 w-32 ${skel(darkMode)}`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Super Admin — Manage Shops list */
+export function SuperAdminShopsInitialSkeleton({ darkMode }) {
+  const mainBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
+  const headerBg = darkMode ? 'bg-gray-950' : 'bg-white';
+  const borderColor = darkMode ? 'border-gray-800' : 'border-slate-200';
+  const cardBase = darkMode ? 'border-gray-800 bg-gray-900' : 'border-slate-200 bg-white shadow-sm';
+  return (
+    <main className={`flex h-screen flex-col overflow-hidden ${mainBg}`}>
+      <header className={`flex shrink-0 items-center justify-between border-b p-4 md:p-6 ${borderColor} ${headerBg}`}>
+        <div className={`h-8 w-48 ${skel(darkMode)}`} />
+        <div className={`hidden h-10 w-72 sm:block ${skel(darkMode, 'rounded-xl')}`} />
+      </header>
+      <div className={`border-b p-4 sm:hidden ${borderColor} ${headerBg}`}>
+        <div className={`h-12 w-full ${skel(darkMode, 'rounded-xl')}`} />
+      </div>
+      <div className="custom-scrollbar flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:hidden">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`rounded-2xl border p-4 ${cardBase}`}>
+              <div className="mb-4 flex justify-between">
+                <div className="flex gap-3">
+                  <div className={`h-10 w-10 ${skel(darkMode, 'rounded-xl')}`} />
+                  <div className="space-y-2">
+                    <div className={`h-4 w-32 ${skel(darkMode)}`} />
+                    <div className={`h-3 w-20 ${skel(darkMode)}`} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className={`h-9 w-9 ${skel(darkMode, 'rounded-lg')}`} />
+                  <div className={`h-9 w-9 ${skel(darkMode, 'rounded-lg')}`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={`h-14 ${skel(darkMode, 'rounded-lg')}`} />
+                <div className={`h-14 ${skel(darkMode, 'rounded-lg')}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-0 hidden space-y-3 lg:block">
+          <div className={`h-12 w-full ${skel(darkMode, 'rounded-2xl')}`} />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className={`h-16 w-full ${skel(darkMode, 'rounded-xl')}`} />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/** Super Admin — Payment History modal body */
+export function PaymentHistoryModalSkeleton({ darkMode }) {
+  const cardInner = darkMode ? 'border-gray-700/50 bg-gray-800/50' : 'border-slate-200 bg-slate-50';
+  const historyCard = darkMode ? 'border-gray-700/30 bg-gray-800/30' : 'border-slate-200 bg-slate-50';
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-4">
+        <div className={`rounded-xl border p-3 md:p-5 ${cardInner}`}>
+          <div className={`mb-3 h-4 w-16 ${skel(darkMode)}`} />
+          <div className={`mb-2 h-7 w-24 ${skel(darkMode)}`} />
+          <div className={`h-3 w-14 ${skel(darkMode)}`} />
+        </div>
+        <div className={`rounded-xl border p-3 md:p-5 ${cardInner}`}>
+          <div className={`mb-3 h-4 w-20 ${skel(darkMode)}`} />
+          <div className={`mb-2 h-7 w-20 ${skel(darkMode)}`} />
+          <div className={`h-3 w-28 ${skel(darkMode)}`} />
+        </div>
+      </div>
+      <div>
+        <div className={`mb-4 h-5 w-40 ${skel(darkMode)}`} />
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`rounded-lg border p-3 md:p-4 ${historyCard}`}>
+              <div className="mb-2 flex items-center gap-3">
+                <div className={`h-4 w-16 ${skel(darkMode)}`} />
+                <div className={`h-6 w-14 ${skel(darkMode, 'rounded-lg')}`} />
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className={`h-3 w-24 ${skel(darkMode)}`} />
+                <div className={`h-3 w-28 ${skel(darkMode)}`} />
+                <div className={`h-3 w-36 ${skel(darkMode)}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Sales history rows (inside existing page header) */
 export function SalesHistoryListSkeleton({ darkMode }) {
   const cardBase = darkMode ? 'bg-gray-900/30 border-gray-800/40' : 'bg-white border-slate-200 shadow-sm';

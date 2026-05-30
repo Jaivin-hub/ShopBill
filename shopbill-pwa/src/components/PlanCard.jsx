@@ -6,7 +6,6 @@ const PlanCard = ({
     currentPlanName,
     isCurrentPlanNotExpiring,
     isSamePlanAndCancelled,
-    isUpgrade,
     isUpgrading,
     isCancelling,
     alreadyInTerminalState,
@@ -18,20 +17,21 @@ const PlanCard = ({
     darkMode
 }) => {
     const IconComponent = getPlanIcon(plan.id);
-    const isCurrent = isCurrentPlanNotExpiring(plan);
-    const isUpgradePlan = isUpgrade(plan);
+    const isCurrentTier =
+        String(currentPlanName || '').toLowerCase() === plan.id;
+    const isCancelledCurrent =
+        isSamePlanAndCancelled(plan) || (alreadyInTerminalState && isCurrentTier);
+    const isCurrent = isCurrentPlanNotExpiring(plan) && !isCancelledCurrent;
 
-    // Determine button text
-    const buttonText = isCurrent
-        ? 'Current Plan'
-        : isSamePlanAndCancelled(plan)
-            ? 'Re-subscribe'
-            : isUpgradePlan
-                ? 'Upgrade Now'
-                : 'Downgrade Now';
+    const buttonText = isCancelledCurrent
+        ? 'Re-subscribe'
+        : isCurrent
+          ? 'Current Plan'
+          : 'Upgrade Now';
 
     const showRecommended = plan.id === 'premium';
-    const buttonDisabled = (isCurrent && !alreadyInTerminalState) || isUpgrading || isCancelling;
+    const buttonDisabled =
+        (isCurrent && !isCancelledCurrent) || isUpgrading || isCancelling;
 
     const titleColor = darkMode ? 'text-white' : 'text-slate-900';
     const priceColor = darkMode ? 'text-white' : 'text-slate-900';
@@ -40,16 +40,25 @@ const PlanCard = ({
 
     const cardBg = isCurrent
         ? (darkMode ? 'bg-slate-900 border-slate-700 ring-1 ring-indigo-500/30' : 'bg-white border-indigo-200 ring-1 ring-indigo-500/20')
-        : (darkMode ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm');
+        : isCancelledCurrent
+          ? (darkMode ? 'bg-slate-900 border-orange-500/30 ring-1 ring-orange-500/25' : 'bg-white border-orange-200 ring-1 ring-orange-500/20')
+          : (darkMode ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm');
 
     return (
         <article
-            className={`relative flex h-full min-h-0 flex-col overflow-visible rounded-xl border transition-all sm:rounded-2xl p-4 sm:p-6 ${cardBg}`}
+            className={`relative flex w-full min-h-0 flex-col overflow-visible rounded-xl border transition-all sm:rounded-2xl p-4 sm:p-6 ${cardBg}`}
             itemScope
             itemType="https://schema.org/Offer"
         >
-            {/* Current plan badge */}
-            {isCurrent && (
+            {/* Current / cancelled tier badge */}
+            {isCancelledCurrent && (
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
+                    <span className="bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                        Your plan
+                    </span>
+                </div>
+            )}
+            {isCurrent && !isCancelledCurrent && (
                 <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
                     <span className="bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
                         Current
@@ -58,7 +67,7 @@ const PlanCard = ({
             )}
 
             {/* Recommended for Premium */}
-            {showRecommended && !isCurrent && (
+            {showRecommended && !isCurrent && !isCancelledCurrent && (
                 <div className="absolute top-3 right-3 z-10">
                     <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
                         Best value

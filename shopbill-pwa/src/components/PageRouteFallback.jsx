@@ -12,10 +12,34 @@ import {
   SettingsHomeSkeleton,
   ProfileInitialSkeleton,
   OutletManagerInitialSkeleton,
+  SuperAdminDashboardInitialSkeleton,
+  SuperAdminShopsInitialSkeleton,
+  SystemConfigInitialSkeleton,
 } from './skeletons/PageSkeletons';
+import { USER_ROLES } from '../utils/constants';
 
-export default function PageRouteFallback({ page, darkMode = true }) {
+export default function PageRouteFallback({ page, darkMode = true, userRole }) {
   switch (page) {
+    case 'dashboard':
+      if (userRole === USER_ROLES.SUPERADMIN) {
+        return <SuperAdminDashboardInitialSkeleton darkMode={darkMode} />;
+      }
+      break;
+    case 'settings':
+      if (userRole === USER_ROLES.SUPERADMIN) {
+        return <SettingsHomeSkeleton darkMode={darkMode} />;
+      }
+      break;
+    case 'superadmin_users':
+      if (userRole === USER_ROLES.SUPERADMIN) {
+        return <SuperAdminShopsInitialSkeleton darkMode={darkMode} />;
+      }
+      break;
+    case 'superadmin_systems':
+      if (userRole === USER_ROLES.SUPERADMIN) {
+        return <SystemConfigInitialSkeleton darkMode={darkMode} />;
+      }
+      break;
     case 'billing':
       return <BillingTerminalInitialSkeleton darkMode={darkMode} />;
     case 'inventory':

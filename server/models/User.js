@@ -75,11 +75,31 @@ const UserSchema = new mongoose.Schema({
     resetPasswordExpire: Date,
 
     plan: { type: String, enum: ['BASIC', 'PRO', 'PREMIUM'], default: null },
+    /** Plan tier timeline for superadmin (e.g. PRO until date, then PREMIUM). */
+    planHistory: [
+        {
+            plan: { type: String, enum: ['BASIC', 'PRO', 'PREMIUM'], required: true },
+            startedAt: { type: Date, required: true },
+            endedAt: { type: Date, default: null },
+            source: { type: String, trim: true, default: 'system' },
+        },
+    ],
 
     transactionId: String,
+    /** Razorpay Customer — subscriptions show owner email in Razorpay dashboard */
+    razorpayCustomerId: { type: String, default: null },
+    /** Latest unpaid mandate (`created`) — reused instead of creating duplicates */
+    pendingRazorpaySubscriptionId: { type: String, default: null },
 
     planEndDate: { type: Date, default: null },
     subscriptionStatus: { type: String, default: null },
+    /** Set when auto-debit fails (Razorpay retry period); access still until planEndDate */
+    paymentFailedAt: { type: Date, default: null },
+    /** Latest Razorpay failure category (card_expired, insufficient_funds, mandate_cancelled, etc.) */
+    lastPaymentFailureReason: { type: String, default: null },
+    lastPaymentFailureDetail: { type: String, default: null },
+    /** Map of planEndDate (YYYY-MM-DD) → ['5','3','1'] reminder tags sent */
+    billingRemindersSent: { type: Map, of: [String], default: () => new Map() },
 
     // FCM device tokens for push notifications
     deviceTokens: [{

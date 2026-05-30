@@ -15,6 +15,7 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const { resolveRolePagePermissions, denyAllStaffPages } = require('../utils/rolePagePermissions');
+const { buildBillingAlertForOwner } = require('../services/subscriptionBillingAutomation');
 
 /** Resolve outlet store settings for role-page permissions (staff User may lack shopId on some records). */
 const findStaffOutletStoreForPermissions = async (user, staffStoreId) => {
@@ -123,10 +124,12 @@ router.post('/login', async (req, res) => {
                 }
             }
 
-            // 1. Basic Active Check - Block login if account is deactivated
-            // Only block if explicitly set to false (default is true, so null/undefined should allow login)
-            if (user.isActive === false) {
-                return res.status(401).json({ error: 'Account is inactive. Please contact your shop owner.' });
+            // 1. Staff-only inactive check (owner inactive after plan end → subscription flow below)
+            if (user.isActive === false && user.role !== 'owner' && user.role !== 'superadmin') {
+                return res.status(401).json({
+                    error: 'Account is inactive. Please contact your shop owner.',
+                    code: 'ACCOUNT_DEACTIVATED',
+                });
             }
 
             // --- SUBSCRIPTION VALIDATION ---
@@ -152,23 +155,22 @@ router.post('/login', async (req, res) => {
                     return res.status(404).json({ error: 'Shop owner account not found.' });
                 }
 
-                /**
-                 * ⭐ UPDATED LOGIC:
-                 * We ONLY block if the status is 'halted', 'cancelled', or 'expired'.
-                 * Statuses like 'active', 'authenticated', 'created', or 'pending' 
-                 * should ALWAYS be allowed, regardless of the 'planEndDate'.
-                 */
-                const blockedStatuses = ['halted', 'cancelled', 'expired'];
-                const currentStatus = ownerAccount.subscriptionStatus;
-
-                if (blockedStatuses.includes(currentStatus)) {
+                const {
+                    isSubscriptionAccessBlocked,
+                    getSubscriptionAccessMessage,
+                    getSubscriptionAccessBlockCode,
+                } = require('../utils/subscriptionAccess');
+                if (isSubscriptionAccessBlocked(ownerAccount)) {
+                    const currentStatus = ownerAccount.subscriptionStatus;
+                    const blockCode = getSubscriptionAccessBlockCode(ownerAccount);
                     return res.status(403).json({
                         error: 'Access Restricted',
-                        message: currentStatus === 'halted' 
-                            ? 'Your subscription is halted due to a payment failure. Please settle the dues.' 
-                            : 'Your subscription has expired or was cancelled.',
+                        code: blockCode,
+                        message: getSubscriptionAccessMessage(ownerAccount),
                         status: currentStatus,
-                        planEndDate: ownerAccount.planEndDate
+                        planEndDate: ownerAccount.planEndDate,
+                        mandateRestorePage: 'mandateRestore',
+                        renewSubscriptionPage: 'renewSubscription',
                     });
                 }
             }
@@ -315,6 +317,14 @@ router.post('/signup', async (req, res) => {
             // Temporary shopId, will be replaced by _id immediately after creation
             shopId: new mongoose.Types.ObjectId(),
             plan: plan.toUpperCase(), // Save the plan (e.g., 'PREMIUM')
+            planHistory: [
+                {
+                    plan: plan.toUpperCase(),
+                    startedAt: new Date(),
+                    endedAt: null,
+                    source: 'signup',
+                },
+            ],
             transactionId: transactionId, // Save the subscription ID
             shopName: shopName,
             businessType: normalizedBusinessType,
@@ -354,6 +364,18 @@ router.post('/signup', async (req, res) => {
 
         // Notify superadmins that a new shop registered (non-blocking)
         notifySuperadminsNewShop(req, newUser).catch(err => console.error('Notify superadmins new shop:', err));
+
+        // Welcome email after successful registration (non-blocking; does not fail signup if SMTP is down)
+        try {
+            sendEmail.queueOwnerRegistrationWelcomeEmail({
+                to: newUser.email,
+                shopName: newUser.shopName,
+                plan: newUser.plan,
+                trialEndDate: newUser.planEndDate,
+            });
+        } catch (mailQueueErr) {
+            console.error('[authRoutes] signup welcome email queue failed:', mailQueueErr?.message || mailQueueErr);
+        }
 
         const token = generateToken(newUser._id, newUser.shopId, newUser.role);
 
@@ -497,6 +519,7 @@ router.get('/profile', protect, async (req, res) => {
                 timezone: user.timezone,
                 plan: user.plan,
                 planEndDate: user.planEndDate,
+                subscriptionStatus: user.subscriptionStatus,
                 businessType: businessType,
                 permissions: effectivePermissions,
                 pushNotificationsEnabled: user.pushNotificationsEnabled !== false
@@ -564,6 +587,9 @@ router.put('/profile', protect, async (req, res) => {
                         role: user.role,
                         currency: user.currency,
                         timezone: user.timezone,
+                        plan: user.plan,
+                        planEndDate: user.planEndDate,
+                        subscriptionStatus: user.subscriptionStatus,
                     }
                 });
             }
@@ -636,6 +662,9 @@ router.put('/profile', protect, async (req, res) => {
                 role: updatedUser.role,
                 currency: updatedUser.currency,
                 timezone: updatedUser.timezone,
+                plan: updatedUser.plan,
+                planEndDate: updatedUser.planEndDate,
+                subscriptionStatus: updatedUser.subscriptionStatus,
             }
         });
 
@@ -999,14 +1028,31 @@ router.get('/current-plan', protect, async (req, res) => {
         const userId = req.user.id;
 
         // 1. Find the user by ID and SELECT the new fields
-        const user = await User.findById(userId).select('plan planEndDate subscriptionStatus role activeStoreId shopId');
+        const user = await User.findById(userId).select(
+            'plan transactionId planEndDate subscriptionStatus role activeStoreId shopId paymentFailedAt isActive shopName lastPaymentFailureReason timezone'
+        );
 
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
 
+        const normalizePlan = (value) => {
+            const plan = String(value || '').trim().toUpperCase();
+            return ['BASIC', 'PRO', 'PREMIUM'].includes(plan) ? plan : null;
+        };
+        const resolvePlanFromRazorpay = async (subscriptionId) => {
+            if (!subscriptionId) return null;
+            try {
+                const { razorpay } = require('../utils/subscriptionRenew');
+                const sub = await razorpay.subscriptions.fetch(subscriptionId);
+                return normalizePlan(sub?.notes?.plan_name);
+            } catch (_) {
+                return null;
+            }
+        };
+
         // Get effective plan (owner's plan for staff, user's plan for owners)
-        let effectivePlan = user.plan || 'BASIC';
+        let effectivePlan = normalizePlan(user.plan);
         let planEndDate = user.planEndDate;
         let subscriptionStatus = user.subscriptionStatus;
 
@@ -1016,25 +1062,172 @@ router.get('/current-plan', protect, async (req, res) => {
             if (user.activeStoreId) {
                 const store = await Store.findById(user.activeStoreId);
                 if (store && store.ownerId) {
-                    owner = await User.findById(store.ownerId).select('plan planEndDate subscriptionStatus');
+                    owner = await User.findById(store.ownerId).select(
+                        'plan planEndDate subscriptionStatus timezone isActive'
+                    );
                 }
             } else if (user.shopId) {
-                owner = await User.findById(user.shopId).select('plan planEndDate subscriptionStatus');
+                owner = await User.findById(user.shopId).select(
+                    'plan planEndDate subscriptionStatus timezone isActive'
+                );
             }
             
             if (owner) {
-                effectivePlan = owner.plan || 'BASIC';
+                effectivePlan = normalizePlan(owner.plan);
                 planEndDate = owner.planEndDate;
                 subscriptionStatus = owner.subscriptionStatus;
             }
         }
 
-        // 2. Return the plan and end date
+        // Self-heal legacy/missing plan values from Razorpay subscription notes.
+        if (!effectivePlan) {
+            const fallbackPlan = await resolvePlanFromRazorpay(user.transactionId);
+            effectivePlan = fallbackPlan || 'BASIC';
+            if (fallbackPlan && fallbackPlan !== user.plan) {
+                await User.updateOne({ _id: user._id }, { $set: { plan: fallbackPlan } });
+            }
+        }
+
+        const {
+            hasFullAppAccess,
+            requiresMandateRestoreGate,
+        } = require('../utils/subscriptionAccess');
+
+        let billingAlert = null;
+        let accessAllowed = true;
+        let mandateRestoreRequired = false;
+        let subscriptionCancelled = false;
+        if (user.role === 'owner') {
+            mandateRestoreRequired = requiresMandateRestoreGate(user);
+            accessAllowed = hasFullAppAccess(user);
+        } else if (user.role !== 'superadmin') {
+            let ownerId = user.shopId;
+            if (user.activeStoreId) {
+                const store = await Store.findById(user.activeStoreId).select('ownerId').lean();
+                if (store?.ownerId) ownerId = store.ownerId;
+            }
+            if (ownerId) {
+                const ownerDoc = await User.findById(ownerId)
+                    .select(
+                        'role planEndDate subscriptionStatus paymentFailedAt isActive shopName lastPaymentFailureReason timezone'
+                    )
+                    .lean();
+                if (ownerDoc) {
+                    billingAlert = buildBillingAlertForOwner(ownerDoc);
+                    mandateRestoreRequired = requiresMandateRestoreGate(ownerDoc);
+                    accessAllowed = hasFullAppAccess(ownerDoc);
+                }
+            }
+        }
+
+        let isInTrial = false;
+        let nextChargeAt = planEndDate;
+
+        const { USER_CANCELLED_ACCESS_STATUSES } = require('../utils/subscriptionAccess');
+
+        if (user.role === 'owner' && user.transactionId) {
+            try {
+                const { razorpay } = require('../utils/subscriptionRenew');
+                const {
+                    isSubscriptionInTrial,
+                    getSubscriptionChargeDate,
+                    mergeBillingDate,
+                } = require('../utils/subscriptionTrial');
+                const rzpSub = await razorpay.subscriptions.fetch(user.transactionId);
+                const rzpStatus = String(rzpSub?.status || '').toLowerCase();
+                const localSt = String(subscriptionStatus || '').toLowerCase();
+
+                isInTrial = isSubscriptionInTrial(rzpSub);
+
+                // Heal DB if a past /current-plan bug wrongly marked an active Razorpay trial as cancelled
+                if (
+                    isInTrial &&
+                    USER_CANCELLED_ACCESS_STATUSES.has(localSt) &&
+                    ['active', 'authenticated', 'created', 'pending'].includes(rzpStatus)
+                ) {
+                    subscriptionStatus = rzpStatus === 'active' ? 'active' : 'authenticated';
+                    await User.updateOne(
+                        { _id: user._id },
+                        { $set: { subscriptionStatus } }
+                    );
+                }
+
+                if (USER_CANCELLED_ACCESS_STATUSES.has(String(subscriptionStatus || '').toLowerCase())) {
+                    isInTrial = false;
+                }
+
+                const rzpChargeDate = getSubscriptionChargeDate(rzpSub);
+                const mergedDate = mergeBillingDate(planEndDate, rzpChargeDate, { preferLater: true });
+                if (mergedDate) {
+                    nextChargeAt = mergedDate;
+                    planEndDate = mergedDate;
+                    const dbEnd = user.planEndDate ? new Date(user.planEndDate) : null;
+                    const dbMissing = !dbEnd || Number.isNaN(dbEnd.getTime());
+                    const shouldPersist =
+                        dbMissing ||
+                        (isInTrial && mergedDate >= dbEnd) ||
+                        (!isInTrial && rzpChargeDate && rzpChargeDate >= dbEnd);
+                    if (shouldPersist) {
+                        await User.updateOne(
+                            { _id: user._id },
+                            { $set: { planEndDate: mergedDate } }
+                        );
+                    }
+                }
+            } catch (rzpErr) {
+                console.warn('[current-plan] Razorpay fetch:', rzpErr.message);
+            }
+        }
+
+        if (user.role === 'owner' && !isInTrial) {
+            const st = String(subscriptionStatus || '').toLowerCase();
+            if (
+                (st === 'authenticated' || st === 'created') &&
+                !USER_CANCELLED_ACCESS_STATUSES.has(st)
+            ) {
+                isInTrial = true;
+            }
+        }
+
+        if (user.role === 'owner' && isInTrial && !nextChargeAt && planEndDate) {
+            nextChargeAt = planEndDate;
+        } else if (user.role === 'owner' && !nextChargeAt && planEndDate) {
+            nextChargeAt = planEndDate;
+        }
+
+        if (user.role === 'owner') {
+            const ownerBase =
+                typeof user.toObject === 'function' ? user.toObject() : { ...user };
+            billingAlert = buildBillingAlertForOwner({
+                ...ownerBase,
+                planEndDate,
+                subscriptionStatus,
+            });
+            const st = String(subscriptionStatus || '').toLowerCase();
+            subscriptionCancelled =
+                USER_CANCELLED_ACCESS_STATUSES.has(st) ||
+                ['cancelled', 'cancellation_no_refund'].includes(st) ||
+                billingAlert?.variant === 'cancelled';
+            if (
+                isInTrial &&
+                ['active', 'authenticated', 'created'].includes(st) &&
+                !USER_CANCELLED_ACCESS_STATUSES.has(st)
+            ) {
+                subscriptionCancelled = false;
+            }
+        }
+
         res.json({
             success: true,
-            plan: effectivePlan, // Effective plan (owner's plan for staff)
-            planEndDate: planEndDate, // 🔥 Include the end date
-            subscriptionStatus: subscriptionStatus, // Include status
+            plan: effectivePlan,
+            planEndDate: planEndDate,
+            subscriptionStatus: subscriptionStatus,
+            isInTrial,
+            nextChargeAt: nextChargeAt || planEndDate,
+            billingAlert,
+            accessAllowed,
+            mandateRestoreRequired,
+            subscriptionCancelled,
         });
 
     } catch (error) {
