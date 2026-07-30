@@ -6,6 +6,11 @@ const Chat = require('../models/Chat');
 const Staff = require('../models/Staff');
 const { deleteStoreCascade } = require('../utils/deleteStoreCascade');
 const { syncDefaultOutletGroupName } = require('../utils/defaultOutletChat');
+const {
+    PREMIUM_MAX_OUTLETS,
+    canCreatePremiumOutlet,
+    premiumOutletLimitMessage,
+} = require('../utils/planLimits');
 const router = express.Router();
 
 /**
@@ -74,7 +79,9 @@ router.get('/', protect, authorize('owner'), async (req, res) => {
         res.json({
             success: true,
             data: outletsWithStaffCount,
-            count: outletsWithStaffCount.length
+            count: outletsWithStaffCount.length,
+            maxOutlets: PREMIUM_MAX_OUTLETS,
+            canCreateMore: canCreatePremiumOutlet(outletsWithStaffCount.length),
         });
     } catch (error) {
         console.error('Get Outlets Error:', error);
@@ -143,16 +150,16 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
             });
         }
 
-        // Check store limit for PREMIUM accounts (max 10 stores)
+        // Check store limit for PREMIUM accounts
         const currentStoreCount = await Store.countDocuments({ 
             ownerId: req.user.id, 
             isActive: true 
         });
 
-        if (currentStoreCount >= 10) {
+        if (!canCreatePremiumOutlet(currentStoreCount)) {
             return res.status(403).json({
                 success: false,
-                error: 'Store limit reached. You can create up to 10 stores. Please delete an existing store to create a new one.'
+                error: premiumOutletLimitMessage(),
             });
         }
 

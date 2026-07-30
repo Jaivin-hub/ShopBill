@@ -50,9 +50,16 @@ function buildPlanHistoryDisplay(planHistory, currentPlan, createdAt) {
     const previous = closed.length ? closed[closed.length - 1] : null;
     const open = segments.find((s) => !s.endedAt) || null;
 
+    const planChain = segments
+        .map((s) => s.plan)
+        .filter((plan, i, arr) => i === 0 || plan !== arr[i - 1]);
+    const timelineShort = planChain.length > 1 ? planChain.join(' → ') : null;
+
     let summaryLine = null;
-    if (previous && previous.plan !== current) {
-        summaryLine = `Was ${previous.plan} until ${formatPlanDate(previous.endedAt)}`;
+    if (timelineShort) {
+        summaryLine = timelineShort;
+    } else if (previous && previous.plan !== current) {
+        summaryLine = `${previous.plan} → ${current}`;
     } else if (segments.length > 1) {
         summaryLine = segments
             .map((s) => {
@@ -67,6 +74,7 @@ function buildPlanHistoryDisplay(planHistory, currentPlan, createdAt) {
         previousPlan: previous && previous.plan !== current ? previous.plan : null,
         previousPlanUntil: previous?.endedAt || null,
         currentSince: open?.startedAt || null,
+        timelineShort,
         summaryLine,
         segments: segments.map((s) => ({
             plan: s.plan,

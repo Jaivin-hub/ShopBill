@@ -6,14 +6,16 @@ const User = require('../models/User');
 const Payment = require('../models/Payment');
 const MandateRestoreRequest = require('../models/MandateRestoreRequest');
 const { razorpay: rzpClient } = require('../utils/mandateRestore');
-const { daysBetweenCalendar } = require('../utils/billingDates');
+const { daysBetweenCalendar, formatDateInEnIn } = require('../utils/billingDates');
 const {
     notifyOwnerPaymentFailedGrace,
     notifyOwnerMandateCancelled,
     notifySuperadminsBillingActivated,
     notifySuperadminsMandateActivated,
     notifySuperadminsMandateRevoked,
+    notifySuperadminsSubscriptionCancelled,
     notifySuperadminsSubscriptionHalted,
+    notifySuperadminsPaymentFailed,
 } = require('../services/notifySubscriptionBilling');
 const { classifyRazorpayFailure } = require('../utils/razorpayPaymentFailure');
 const { USER_CANCELLED_ACCESS_STATUSES } = require('../utils/subscriptionAccess');
@@ -61,6 +63,8 @@ router.post('/razorpay', async (req, res) => {
     const SUBSCRIPTION_EVENTS = [
         'subscription.charged',
         'payment.failed',
+        'invoice.payment_failed',
+        'subscription.pending',
         'subscription.activated', 
         'subscription.cancelled', 
         'subscription.halted',    
@@ -199,6 +203,24 @@ router.post('/razorpay', async (req, res) => {
                 console.log(
                     `[WEBHOOK LOG] subscription.cancelled for ${owner.shopName} — keeping local status "${owner.subscriptionStatus}" (user-initiated cancel).`
                 );
+                const io = req.app && req.app.get ? req.app.get('socketio') : null;
+                const ownerForSa = await User.findById(owner._id)
+                    .select('_id shopName email plan planEndDate')
+                    .lean();
+                if (ownerForSa) {
+                    const accessEndLabel = ownerForSa.planEndDate
+                        ? formatDateInEnIn(new Date(ownerForSa.planEndDate))
+                        : null;
+                    await notifySuperadminsSubscriptionCancelled(io, ownerForSa, {
+                        subscriptionStatus: localStatus,
+                        cancellationAction: 'webhook_confirmed',
+                        subscriptionId,
+                        accessEndLabel,
+                        dedupeKey: `cancel_${owner._id}_${subscriptionId}_${localStatus}`,
+                    }).catch((err) =>
+                        console.error('[Notify] superadmin cancel (webhook):', err?.message || err)
+                    );
+                }
             }
 
             return res.json({ success: true, message: 'Subscription cancelled event handled.' });
@@ -229,20 +251,34 @@ router.post('/razorpay', async (req, res) => {
 
         // --- 5. Handle Payment Attempt Events (Creates a Payment history record) ---
         
-        if (event === 'subscription.charged' || event === 'payment.failed' || event === 'subscription.halted') {
+        if (
+            event === 'subscription.charged' ||
+            event === 'payment.failed' ||
+            event === 'invoice.payment_failed' ||
+            event === 'subscription.pending' ||
+            event === 'subscription.halted'
+        ) {
             const paymentEntity = payload.payment?.entity;
             const subscriptionEntity = payload.subscription?.entity; // Get subscription details
             
             let paymentStatus = 'pending';
             let paymentId = paymentEntity?.id;
-            let amountInPaise = paymentEntity?.amount;
-            let amountInCurrency = amountInPaise / 100;
+            const amountInPaise = paymentEntity?.amount;
+            let amountInCurrency =
+                amountInPaise != null && !Number.isNaN(Number(amountInPaise))
+                    ? Number(amountInPaise) / 100
+                    : 0;
             let failureForPayment = null;
 
             const fallbackPrices = { 'BASIC': 499, 'PRO': 999, 'PREMIUM': 2999 };
             const finalAmount = amountInCurrency || fallbackPrices[owner.plan] || 0; 
 
             const updateFields = { lastStatusUpdate: new Date() };
+            const isFailureEvent =
+                event === 'payment.failed' ||
+                event === 'invoice.payment_failed' ||
+                event === 'subscription.pending' ||
+                event === 'subscription.halted';
 
             if (event === 'subscription.charged' && paymentEntity?.status === 'captured') {
                 paymentStatus = 'paid';
@@ -297,13 +333,19 @@ router.post('/razorpay', async (req, res) => {
                     });
                 }
 
-            } else if (event === 'payment.failed' || event === 'subscription.halted') {
-                paymentStatus = 'failed';
+            } else if (isFailureEvent) {
+                const paymentFailed =
+                    event === 'payment.failed' ||
+                    event === 'invoice.payment_failed' ||
+                    event === 'subscription.halted' ||
+                    (event === 'subscription.pending' &&
+                        String(paymentEntity?.status || '').toLowerCase() === 'failed');
+                paymentStatus = paymentFailed ? 'failed' : 'pending';
                 if (!paymentId) {
                     paymentId = `ATTEMPT_${Date.now()}_${subscriptionId}`;
                 }
 
-                failureForPayment = classifyRazorpayFailure(req.body, event);
+                failureForPayment = classifyRazorpayFailure(req.body, event === 'invoice.payment_failed' ? 'payment.failed' : event);
                 console.warn(
                     `[WEBHOOK FAILED] Payment attempt failed for ${owner.shopName}. Payment ID: ${paymentId}. Reason: ${failureForPayment.code}`
                 );
@@ -320,7 +362,12 @@ router.post('/razorpay', async (req, res) => {
                     {
                         $set: {
                             paymentFailedAt: failedAt,
-                            subscriptionStatus: event === 'subscription.halted' ? 'halted' : owner.subscriptionStatus,
+                            subscriptionStatus:
+                                event === 'subscription.halted'
+                                    ? 'halted'
+                                    : event === 'subscription.pending'
+                                      ? 'pending'
+                                      : owner.subscriptionStatus,
                             lastStatusUpdate: new Date(),
                             lastPaymentFailureReason: failureForPayment.code,
                             lastPaymentFailureDetail:
@@ -343,23 +390,46 @@ router.post('/razorpay', async (req, res) => {
                         failureForPayment.code
                     );
                 }
+
+                if (paymentFailed && event !== 'subscription.halted') {
+                    const ownerForSa = await User.findById(owner._id)
+                        .select('_id shopName email plan')
+                        .lean();
+                    if (ownerForSa) {
+                        await notifySuperadminsPaymentFailed(io, ownerForSa, {
+                            amount: finalAmount,
+                            paymentId,
+                            subscriptionId,
+                            failureCode: failureForPayment?.code,
+                            failureDetail:
+                                failureForPayment?.razorpayDescription ||
+                                failureForPayment?.razorpayReason ||
+                                null,
+                            eventType: event,
+                        });
+                    }
+                }
             }
 
-            // Save the Payment Record
-            const paymentRecord = await Payment.create({
-                shopId: owner._id, 
-                subscriptionId: subscriptionId,
-                paymentId: paymentId,
-                eventType: event,
-                amount: finalAmount,
-                status: paymentStatus,
-                paymentDate: new Date(),
-                razorpayPayload: req.body,
-                failureReason: failureForPayment?.code || null,
-                failureDetail: failureForPayment
-                    ? failureForPayment.razorpayDescription || failureForPayment.razorpayReason
-                    : null,
-            });
+            // Save the Payment Record (upsert so retries / duplicate webhooks still appear once)
+            const paymentRecord = await Payment.findOneAndUpdate(
+                { paymentId },
+                {
+                    shopId: owner._id,
+                    subscriptionId: subscriptionId,
+                    paymentId: paymentId,
+                    eventType: event,
+                    amount: finalAmount,
+                    status: paymentStatus,
+                    paymentDate: new Date(),
+                    razorpayPayload: req.body,
+                    failureReason: failureForPayment?.code || null,
+                    failureDetail: failureForPayment
+                        ? failureForPayment.razorpayDescription || failureForPayment.razorpayReason
+                        : null,
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
 
             console.log(`[WEBHOOK SUCCESS] Payment recorded in DB. ID: ${paymentRecord._id}. Status: ${paymentStatus}.`);
         }

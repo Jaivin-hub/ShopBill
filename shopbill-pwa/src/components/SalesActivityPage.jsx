@@ -12,6 +12,115 @@ const getLocalDateString = (date) => {
     return `${year}-${month}-${day}`;
 };
 
+const DATE_PRESETS = [
+    { id: 'today', label: 'Today' },
+    { id: 'week', label: 'Last week' },
+    { id: 'this_month', label: 'This month' },
+    { id: 'month', label: 'Last month' },
+];
+
+function getPresetDateRange(presetId) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch (presetId) {
+        case 'today':
+            return { startDate: getLocalDateString(today), endDate: getLocalDateString(today) };
+        case 'week': {
+            const start = new Date(today);
+            start.setDate(start.getDate() - 6);
+            return { startDate: getLocalDateString(start), endDate: getLocalDateString(today) };
+        }
+        case 'this_month': {
+            const start = new Date(today.getFullYear(), today.getMonth(), 1);
+            return { startDate: getLocalDateString(start), endDate: getLocalDateString(today) };
+        }
+        case 'month': {
+            const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const end = new Date(today.getFullYear(), today.getMonth(), 0);
+            return { startDate: getLocalDateString(start), endDate: getLocalDateString(end) };
+        }
+        default:
+            return null;
+    }
+}
+
+const SalesPeriodChips = ({ activePreset, onPresetChange, darkMode }) => {
+    const chipBase =
+        'shrink-0 px-3 py-2 rounded-xl text-[10px] font-black tracking-wider transition-all active:scale-[0.98]';
+    const chipIdle = darkMode
+        ? 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+        : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600';
+    const chipActive = 'bg-indigo-600 border border-indigo-600 text-white shadow-sm shadow-indigo-500/20';
+
+    return (
+        <div className="flex gap-2 overflow-x-auto pb-0.5 custom-scrollbar">
+            {DATE_PRESETS.map((preset) => (
+                <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => onPresetChange(preset.id)}
+                    className={`${chipBase} ${activePreset === preset.id ? chipActive : chipIdle}`}
+                >
+                    {preset.label}
+                </button>
+            ))}
+            {activePreset === 'custom' && (
+                <span
+                    className={`${chipBase} ${chipActive}`}
+                >
+                    Custom
+                </span>
+            )}
+        </div>
+    );
+};
+
+const SalesSummaryBar = ({ summary, darkMode, isLoading }) => {
+    const cardBg = darkMode ? 'bg-gray-900/60 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
+    const textMuted = darkMode ? 'text-gray-500' : 'text-slate-500';
+    const textPrimary = darkMode ? 'text-white' : 'text-slate-900';
+
+    if (isLoading) {
+        return (
+            <div className={`rounded-2xl border p-4 animate-pulse ${cardBg}`}>
+                <div className={`h-4 w-32 rounded ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`} />
+            </div>
+        );
+    }
+
+    return (
+        <div className={`rounded-2xl border p-4 ${cardBg}`}>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <p className={`text-[9px] font-black tracking-widest uppercase mb-1 ${textMuted}`}>
+                        Total sales ({summary.count})
+                    </p>
+                    <p className={`text-2xl md:text-3xl font-black tabular-nums tracking-tight text-indigo-500`}>
+                        ₹{summary.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-4 text-[10px] font-bold">
+                    <div>
+                        <p className={`uppercase tracking-wider mb-0.5 ${textMuted}`}>Collected</p>
+                        <p className={`tabular-nums ${textPrimary}`}>
+                            ₹{summary.collected.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                    {summary.credit > 0 && (
+                        <div>
+                            <p className={`uppercase tracking-wider mb-0.5 text-rose-500/80`}>On credit</p>
+                            <p className="tabular-nums text-rose-500">
+                                ₹{summary.credit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 function getSaleLineOfferCaption(item) {
     const qty = Number(item.quantity) || 1;
     const unitDisc = Number(item.discountAmount) || 0;
@@ -295,6 +404,12 @@ const BillModal = ({ sale, onClose, isLoading, darkMode, shopInfo }) => {
                             <span className="text-sm font-black tabular-nums">₹{sumSaleOfferSavings(sale.items).toLocaleString('en-IN')}</span>
                         </div>
                     )}
+                    {Number(sale.billDiscount) > 0 && (
+                        <div className={`flex justify-between items-center px-1 print-text ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                            <span className="text-[10px] font-black tracking-widest">Bill discount</span>
+                            <span className="text-sm font-black tabular-nums">−₹{Number(sale.billDiscount).toLocaleString('en-IN')}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center">
                         <div className="space-y-0.5">
                             <p className={`text-[10px] font-bold tracking-widest print-text ${secondaryText}`}>Grand Total</p>
@@ -357,13 +472,25 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
     const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
 
-    const defaultStartDate = getLocalDateString(new Date(new Date().setDate(new Date().getDate() - 7)));
-    const defaultEndDate = getLocalDateString(new Date());
+    const [datePreset, setDatePreset] = useState('week');
+    const [dateRange, setDateRange] = useState(() => getPresetDateRange('week'));
 
-    const [dateRange, setDateRange] = useState({
-        startDate: defaultStartDate,
-        endDate: defaultEndDate,
-    });
+    const handlePresetChange = (presetId) => {
+        setDatePreset(presetId);
+        const range = getPresetDateRange(presetId);
+        if (range) setDateRange(range);
+    };
+
+    const handleDateRangeChange = (range) => {
+        setDateRange(range);
+        setDatePreset('custom');
+    };
+
+    const resetFilters = () => {
+        setDatePreset('week');
+        setDateRange(getPresetDateRange('week'));
+        setBillStatusFilter(BILL_STATUS_FILTERS.ALL);
+    };
 
     // Fetch Profile Data
     useEffect(() => {
@@ -440,9 +567,21 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
         return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }, [sales, searchQuery, billStatusFilter]);
 
+    const salesSummary = useMemo(() => {
+        const count = filteredSales.length;
+        const total = filteredSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
+        const collected = filteredSales.reduce((sum, s) => sum + (Number(s.amountPaid) || 0), 0);
+        const credit = filteredSales.reduce((sum, s) => sum + (Number(s.amountCredited) || 0), 0);
+        return { count, total, collected, credit };
+    }, [filteredSales]);
+
     const mainBg = darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-50 text-black';
     const cardBg = darkMode ? 'bg-gray-900/30 border-gray-800/40 hover:bg-gray-900/60' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm';
     const btnClass = (active) => `p-2.5 border rounded-xl transition-all flex items-center justify-center ${active ? 'bg-indigo-600 border-indigo-600 text-white' : (darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')}`;
+
+    const hasActiveFilters =
+        datePreset !== 'week' ||
+        billStatusFilter !== BILL_STATUS_FILTERS.ALL;
 
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${mainBg}`}>
@@ -475,17 +614,21 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                             <button 
                                 onClick={() => {
                                     setShowFilter(!showFilter);
-                                    if(showFilter) {
-                                        setDateRange({ startDate: defaultStartDate, endDate: defaultEndDate });
-                                        setBillStatusFilter(BILL_STATUS_FILTERS.ALL);
-                                    }
+                                    if (showFilter) resetFilters();
                                 }} 
-                                className={btnClass(showFilter)}
+                                className={btnClass(showFilter || hasActiveFilters)}
+                                aria-label="Filter sales"
                             >
                                 {showFilter ? <X className="w-5 h-5" /> : <Filter className="w-5 h-5" />}
                             </button>
                         </div>
                     </div>
+
+                    <SalesSummaryBar
+                        summary={salesSummary}
+                        darkMode={darkMode}
+                        isLoading={isLoadingSales}
+                    />
 
                     {/* --- Expandable Search --- */}
                     {showSearch && (
@@ -502,11 +645,19 @@ const SalesActivityPage = ({ salesData, apiClient, showToast, onBack, darkMode }
                         </div>
                     )}
 
-                    {/* --- Expandable Date Filter --- */}
+                    {/* --- Expandable filters (period, dates, payment status) --- */}
                     {showFilter && (
-                        <div className="animate-in slide-in-from-top-2 duration-200">
-                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} darkMode={darkMode} />
-                            <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
+                            <SalesPeriodChips
+                                activePreset={datePreset}
+                                onPresetChange={handlePresetChange}
+                                darkMode={darkMode}
+                            />
+                            <p className={`text-[9px] font-black tracking-widest uppercase ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                                Custom date range
+                            </p>
+                            <DateRangeFilter dateRange={dateRange} onDateRangeChange={handleDateRangeChange} darkMode={darkMode} />
+                            <div className="grid grid-cols-3 gap-2">
                                 <button
                                     onClick={() => setBillStatusFilter(BILL_STATUS_FILTERS.ALL)}
                                     className={btnClass(billStatusFilter === BILL_STATUS_FILTERS.ALL)}

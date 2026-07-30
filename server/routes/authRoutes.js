@@ -1080,7 +1080,7 @@ router.get('/current-plan', protect, async (req, res) => {
         }
 
         // Self-heal legacy/missing plan values from Razorpay subscription notes.
-        if (!effectivePlan) {
+        if (!effectivePlan && user.role === 'owner') {
             const fallbackPlan = await resolvePlanFromRazorpay(user.transactionId);
             effectivePlan = fallbackPlan || 'BASIC';
             if (fallbackPlan && fallbackPlan !== user.plan) {
@@ -1132,12 +1132,43 @@ router.get('/current-plan', protect, async (req, res) => {
                     isSubscriptionInTrial,
                     getSubscriptionChargeDate,
                     mergeBillingDate,
+                    ownerHasFullPlanPayment,
+                    ownerHasAnyFullPlanPayment,
                 } = require('../utils/subscriptionTrial');
+                const Payment = require('../models/Payment');
                 const rzpSub = await razorpay.subscriptions.fetch(user.transactionId);
                 const rzpStatus = String(rzpSub?.status || '').toLowerCase();
                 const localSt = String(subscriptionStatus || '').toLowerCase();
 
+                const rzpPlan = normalizePlan(rzpSub?.notes?.plan_name);
+                if (rzpPlan && rzpPlan !== effectivePlan) {
+                    effectivePlan = rzpPlan;
+                    await User.updateOne({ _id: user._id }, { $set: { plan: rzpPlan } });
+                }
+
                 isInTrial = isSubscriptionInTrial(rzpSub);
+
+                const planForPaymentCheck = effectivePlan || user.plan;
+                const hasFullPlanPayment = await ownerHasFullPlanPayment(
+                    Payment,
+                    user._id,
+                    planForPaymentCheck
+                );
+                const hasAnyFullPlanPayment = await ownerHasAnyFullPlanPayment(
+                    Payment,
+                    user._id
+                );
+
+                if (hasFullPlanPayment || hasAnyFullPlanPayment) {
+                    isInTrial = false;
+                    if (rzpStatus === 'active' || Number(rzpSub?.paid_count) >= 2) {
+                        subscriptionStatus = 'active';
+                        await User.updateOne(
+                            { _id: user._id },
+                            { $set: { subscriptionStatus: 'active' } }
+                        );
+                    }
+                }
 
                 // Heal DB if a past /current-plan bug wrongly marked an active Razorpay trial as cancelled
                 if (
@@ -1181,7 +1212,21 @@ router.get('/current-plan', protect, async (req, res) => {
 
         if (user.role === 'owner' && !isInTrial) {
             const st = String(subscriptionStatus || '').toLowerCase();
-            if (
+            const Payment = require('../models/Payment');
+            const { ownerHasFullPlanPayment, ownerHasAnyFullPlanPayment } = require('../utils/subscriptionTrial');
+            const planForPaymentCheck = effectivePlan || user.plan;
+            const hasFullPlanPayment = await ownerHasFullPlanPayment(
+                Payment,
+                user._id,
+                planForPaymentCheck
+            );
+            const hasAnyFullPlanPayment = await ownerHasAnyFullPlanPayment(
+                Payment,
+                user._id
+            );
+            if (hasFullPlanPayment || hasAnyFullPlanPayment) {
+                isInTrial = false;
+            } else if (
                 (st === 'authenticated' || st === 'created') &&
                 !USER_CANCELLED_ACCESS_STATUSES.has(st)
             ) {

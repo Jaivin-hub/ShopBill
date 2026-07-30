@@ -9,6 +9,7 @@ import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import { StoreControlInitialSkeleton } from './skeletons/PageSkeletons';
 import { isPremiumPlan } from '../utils/subscription';
+import { PREMIUM_MAX_OUTLETS, canCreateMoreOutlets } from '../utils/planLimits';
 
 const StoreControl = ({ 
     darkMode, 
@@ -20,6 +21,7 @@ const StoreControl = ({
 }) => {
     // --- STATE MANAGEMENT ---
     const [stores, setStores] = useState([]);
+    const [maxOutlets, setMaxOutlets] = useState(PREMIUM_MAX_OUTLETS);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,6 +65,9 @@ const StoreControl = ({
             const response = await apiClient.get(API.outlets);
             if (response.data.success) {
                 setStores(response.data.data || []);
+                if (response.data.maxOutlets != null) {
+                    setMaxOutlets(Number(response.data.maxOutlets) || PREMIUM_MAX_OUTLETS);
+                }
             }
         } catch (error) {
             console.error('Fetch Stores Error:', error);
@@ -157,7 +162,16 @@ const StoreControl = ({
     };
 
     // --- MODAL LOGIC ---
+    const atOutletLimit = !canCreateMoreOutlets(stores.length, maxOutlets);
+
     const handleOpenModal = (store = null) => {
+        if (!store && atOutletLimit) {
+            showToast(
+                `Premium plan allows up to ${maxOutlets} outlets. Delete an existing branch to add another.`,
+                'info'
+            );
+            return;
+        }
         if (store) {
             setEditingStore(store);
             setFormData({
@@ -188,7 +202,7 @@ const StoreControl = ({
                 <Building2 className="w-16 h-16 text-indigo-500 mb-4 opacity-50" />
                 <h2 className="text-xl font-black mb-2 uppercase tracking-tight">Enterprise Hub Locked</h2>
                 <p className={`max-w-md mb-6 text-sm ${subText}`}>
-                    Manage up to 10 locations, sync inventory, and track global sales with our Premium Plan.
+                    Manage up to {PREMIUM_MAX_OUTLETS} locations, sync inventory, and track global sales with our Premium Plan.
                 </p>
                 <button 
                     onClick={() => window.location.href = '/settings/billing'} 
@@ -207,13 +221,17 @@ const StoreControl = ({
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                {/* <h2 className="font-black text-lg tracking-tight uppercase">Store Network</h2> */}
+                <p className={`text-[10px] font-black uppercase tracking-widest ${subText}`}>
+                    {stores.length} / {maxOutlets} outlets
+                </p>
+                {!atOutletLimit && (
                 <button 
                     onClick={() => handleOpenModal()}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-black text-xs tracking-widest transition-all shadow-lg shadow-indigo-600/20"
                 >
                     <Plus size={16} /> ADD BRANCH
                 </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -267,10 +285,12 @@ const StoreControl = ({
                     );
                 })}
 
+                {!atOutletLimit && (
                 <button onClick={() => handleOpenModal()} className="p-8 rounded-3xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center gap-3 opacity-40 hover:opacity-100 transition-all min-h-[160px]">
                     <Plus className="text-slate-500" size={24} />
                     <p className="text-[10px] font-black tracking-[0.2em] uppercase">Add New Branch</p>
                 </button>
+                )}
             </div>
 
             {/* CREATE/EDIT MODAL */}
@@ -393,7 +413,7 @@ const StoreControl = ({
                 <ShieldCheck className="text-indigo-500" size={24} />
                 <div>
                     <p className="text-[10px] font-black text-indigo-500 tracking-[0.2em] uppercase">Enterprise Plan Active</p>
-                    <p className={`text-[10px] leading-relaxed ${subText}`}>Your account is enabled for multi-store management. You can add up to 10 active branches.</p>
+                    <p className={`text-[10px] leading-relaxed ${subText}`}>Your account is enabled for multi-store management. You can add up to 5 active branches.</p>
                 </div>
             </div>
         </div>

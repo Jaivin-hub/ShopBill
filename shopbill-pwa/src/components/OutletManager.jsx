@@ -11,11 +11,13 @@ import API from '../config/api';
 import { validateShopName, validatePhoneNumber, validateEmail, validateTaxId, validateAddress } from '../utils/validation';
 import ConfirmationModal from './ConfirmationModal';
 import { isPremiumPlan } from '../utils/subscription';
+import { PREMIUM_MAX_OUTLETS, canCreateMoreOutlets } from '../utils/planLimits';
 import { OutletManagerInitialSkeleton } from './skeletons/PageSkeletons';
 import { participantLabelForViewer } from '../utils/ownerDisplay';
 
 const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, currentOutletId, darkMode, setCurrentPage, onOutletsChange, openCreateBranchSignal = 0 }) => {
     const [outlets, setOutlets] = useState([]);
+    const [maxOutlets, setMaxOutlets] = useState(PREMIUM_MAX_OUTLETS);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,6 +58,8 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
     const inputBase = darkMode ? 'bg-gray-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
     const subText = darkMode ? 'text-slate-400' : 'text-slate-500';
+
+    const atOutletLimit = !canCreateMoreOutlets(outlets.length, maxOutlets);
 
     // Filter outlets based on search term
     const filteredOutlets = useMemo(() => {
@@ -213,6 +217,9 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 });
                 
                 setOutlets(response.data.data);
+                if (response.data.maxOutlets != null) {
+                    setMaxOutlets(Number(response.data.maxOutlets) || PREMIUM_MAX_OUTLETS);
+                }
                 
                 // Load staff + live punch status for every branch (no need to switch active outlet)
                 const outletsToDetail = response.data.data.filter(
@@ -298,6 +305,13 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     // Staff/presence for all outlets is loaded in fetchOutlets — no per-outlet refetch here.
 
     const handleOpenModal = useCallback((outlet = null) => {
+        if (!outlet && atOutletLimit) {
+            showToast(
+                `Premium plan allows up to ${maxOutlets} outlets. Delete an existing branch to add another.`,
+                'info'
+            );
+            return;
+        }
         if (outlet) {
             setEditingOutlet(outlet);
             setFormData({
@@ -319,7 +333,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
         setValidationErrors({});
         setApiError(null);
         setIsModalOpen(true);
-    }, []);
+    }, [atOutletLimit, maxOutlets, showToast]);
 
     const openModalRef = useRef(handleOpenModal);
     openModalRef.current = handleOpenModal;
@@ -515,7 +529,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
                 </div>
                 <h2 className={`text-2xl font-black mb-3 uppercase tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Enterprise Multi-Store Access</h2>
                 <p className={`max-w-md mb-8 text-sm leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Manage up to 10 locations, sync inventory, and track global sales with our Premium Plan.
+                    Manage up to {PREMIUM_MAX_OUTLETS} locations, sync inventory, and track global sales with our Premium Plan.
                 </p>
                 <button onClick={() => window.location.href = '/plan-upgrade'} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-2xl font-black text-xs tracking-widest text-white shadow-xl shadow-indigo-600/20 transition-all active:scale-95">
                     UPGRADE TO PREMIUM
@@ -531,14 +545,14 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
-                <div className="max-w-7xl mx-auto flex flex-col gap-4">
+                <div className="w-full flex flex-col gap-4">
                     <div className="flex justify-between items-center gap-4">
                         <div className="min-w-0">
                             <h1 className={`text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                 Store <span className="text-indigo-500">Network</span>
                             </h1>
                             <p className="text-[9px] text-slate-500 font-black tracking-[0.2em] mt-0.5">
-                                Managing {outlets.length} active {outlets.length === 1 ? 'branch' : 'branches'} · Premium multi-store
+                                {outlets.length} / {maxOutlets} outlets · Premium multi-store
                             </p>
                         </div>
                         <button
@@ -585,7 +599,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto w-full">
+            <div className="px-4 md:px-8 py-6 w-full">
                 <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredOutlets.length === 0 && !isLoading ? (
                         <div className="col-span-full flex flex-col items-center justify-center py-20">
@@ -777,7 +791,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             </div>
             </div>
 
-            {/* FAB: Add New Branch Button - Floating Icon */}
+            {!atOutletLimit && (
             <button 
                 onClick={() => handleOpenModal()} 
                 className="fixed bottom-[calc(var(--app-mobile-footer-offset)+0.75rem)] right-4 md:bottom-6 md:right-6 z-[60] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-500/50 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center hover:shadow-indigo-600/60 group"
@@ -785,6 +799,7 @@ const OutletManager = ({ apiClient, showToast, currentUser, onOutletSwitch, curr
             >
                 <Plus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
             </button>
+            )}
 
             {/* UPGRADED MODAL */}
             {isModalOpen && (

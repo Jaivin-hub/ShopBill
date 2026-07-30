@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { protect } = require('../middleware/authMiddleware');
 const Sale = require('../models/Sale');
+const Purchase = require('../models/Purchase');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Store = require('../models/Store');
@@ -48,6 +49,48 @@ const getSalesDateFilter = (req) => {
     }
 
     return (startDate || endDate) ? { timestamp: filter } : {};
+};
+
+const getInventoryStock = (item) => {
+    if (item?.variants && item.variants.length > 0) {
+        return item.variants.reduce((sum, variant) => sum + (Number(variant.quantity) || 0), 0);
+    }
+    return Number(item?.quantity) || 0;
+};
+
+const toValidDate = (value) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+/** Pick the best "in stock since" date from SCM purchases and Stock Hub creation. */
+const resolveStockReference = (item, purchaseMeta) => {
+    const lastPurchaseDate = toValidDate(purchaseMeta?.lastPurchaseDate);
+    const stockHubAddedDate = toValidDate(item?.createdAt);
+
+    const candidates = [];
+    if (lastPurchaseDate) candidates.push({ date: lastPurchaseDate, source: 'supply_chain' });
+    if (stockHubAddedDate) candidates.push({ date: stockHubAddedDate, source: 'stock_hub' });
+
+    if (candidates.length === 0) {
+        return {
+            stockReferenceDate: null,
+            stockSource: null,
+            lastPurchaseDate: purchaseMeta?.lastPurchaseDate || null,
+            stockHubAddedDate: item?.createdAt || null,
+        };
+    }
+
+    candidates.sort((a, b) => b.date - a.date);
+    const best = candidates[0];
+
+    return {
+        stockReferenceDate: best.date,
+        stockSource: best.source,
+        lastPurchaseDate: purchaseMeta?.lastPurchaseDate || null,
+        stockHubAddedDate: item?.createdAt || null,
+    };
 };
 
 // --- HELPER 2: Chart Aggregation Logic (NEW/UPDATED) ---
@@ -97,11 +140,27 @@ router.get('/summary', protect, async (req, res) => {
         const salesFilter = { ...dateFilter, storeId: req.user.storeId };
         
         // Step 1: Fetch filtered sales, customers, AND ALL INVENTORY ITEMS (all scoped) - Optimized with lean and projections
-        const [filteredSales, customers, inventoryItems, allTimeSales] = await Promise.all([
+        const purchaseFilter = { storeId: req.user.storeId };
+        if (dateFilter?.timestamp?.$lt) {
+            purchaseFilter.date = { $lt: dateFilter.timestamp.$lt };
+        }
+
+        const [filteredSales, customers, inventoryItems, allTimeSales, purchases, purchaseDatesByProduct] = await Promise.all([
             Sale.find(salesFilter).select('totalAmount timestamp items paymentMethod paidVia amountPaid amountCredited').lean(),
             Customer.find({ storeId: req.user.storeId }).select('name outstandingCredit').lean(), // Scoped
-            Inventory.find({ storeId: req.user.storeId }).select('name price _id textileMeta').lean(), // Scoped — textileMeta for fabric/brand sold
+            Inventory.find({ storeId: req.user.storeId }).select('name price _id textileMeta quantity variants createdAt updatedAt').lean(),
             Sale.find({ storeId: req.user.storeId }).select('totalAmount timestamp').lean(), // Scoped for all-time stats
+            Purchase.find(purchaseFilter).select('productId quantity purchasePrice').lean(),
+            Purchase.aggregate([
+                { $match: { storeId: new mongoose.Types.ObjectId(req.user.storeId) } },
+                {
+                    $group: {
+                        _id: '$productId',
+                        lastPurchaseDate: { $max: '$date' },
+                        firstPurchaseDate: { $min: '$date' },
+                    },
+                },
+            ]),
         ]);
         
         // Lookup map: inventory line + textile meta (for fabric/brand attribution on sold qty)
@@ -110,13 +169,25 @@ router.get('/summary', protect, async (req, res) => {
             inventoryMap.set(item._id.toString(), { 
                 name: item.name, 
                 price: item.price,
-                textileMeta: item.textileMeta || {}
+                textileMeta: item.textileMeta || {},
+                stock: getInventoryStock(item),
+            });
+        });
+
+        const purchaseDateMap = new Map();
+        (purchaseDatesByProduct || []).forEach((row) => {
+            const key = row?._id ? String(row._id) : '';
+            if (!key) return;
+            purchaseDateMap.set(key, {
+                lastPurchaseDate: row.lastPurchaseDate || null,
+                firstPurchaseDate: row.firstPurchaseDate || null,
             });
         });
 
 
         // Step 2: Calculate Metrics 
         let revenue = 0;
+        let estimatedCogs = 0;
         let billsRaised = filteredSales.length; 
         let itemVolumeMap = new Map();
         let totalVolume = 0;
@@ -128,6 +199,18 @@ router.get('/summary', protect, async (req, res) => {
         let upiTotal = 0;
         let cardTotal = 0;
         let creditTotal = 0;
+
+        const purchaseCostMap = new Map();
+        purchases.forEach((purchase) => {
+            const key = purchase?.productId ? String(purchase.productId) : '';
+            if (!key) return;
+            const qty = Math.max(0, Number(purchase.quantity) || 0);
+            const unitCost = Math.max(0, Number(purchase.purchasePrice) || 0);
+            const current = purchaseCostMap.get(key) || { totalQty: 0, totalCost: 0 };
+            current.totalQty += qty;
+            current.totalCost += (qty * unitCost);
+            purchaseCostMap.set(key, current);
+        });
 
         filteredSales.forEach(sale => {
             revenue += sale.totalAmount;
@@ -164,6 +247,13 @@ router.get('/summary', protect, async (req, res) => {
                 itemVolumeMap.set(key, current);
                 totalVolume += item.quantity;
 
+                const soldQty = Math.max(0, Number(item.quantity) || 0);
+                const purchaseCost = purchaseCostMap.get(key);
+                const avgCost = purchaseCost && purchaseCost.totalQty > 0
+                    ? (purchaseCost.totalCost / purchaseCost.totalQty)
+                    : 0;
+                estimatedCogs += (soldQty * avgCost);
+
                 if (item.variantSize) {
                     const sizeKey = String(item.variantSize).trim().toLowerCase();
                     if (sizeKey) {
@@ -195,6 +285,7 @@ router.get('/summary', protect, async (req, res) => {
         });
 
         const averageBillValue = billsRaised > 0 ? revenue / billsRaised : 0;
+        const profit = Number((revenue - estimatedCogs).toFixed(2));
         
         // Get limit from query params, default to 5 for backward compatibility
         const limit = parseInt(req.query.topItemsLimit) || 5;
@@ -202,6 +293,37 @@ router.get('/summary', protect, async (req, res) => {
         const topItems = Array.from(itemVolumeMap.values())
             .sort((a, b) => b.quantity - a.quantity)
             .slice(0, limit);
+
+        const notSellingLimit = parseInt(req.query.notSellingLimit, 10) || 100;
+        const notSellingItems = inventoryItems
+            .map((item) => {
+                const key = item._id.toString();
+                const stock = getInventoryStock(item);
+                const soldQty = itemVolumeMap.get(key)?.quantity || 0;
+                const purchaseMeta = purchaseDateMap.get(key);
+                const stockRef = resolveStockReference(item, purchaseMeta);
+                return {
+                    productId: key,
+                    name: item.name,
+                    stock,
+                    soldInPeriod: soldQty,
+                    stockReferenceDate: stockRef.stockReferenceDate,
+                    stockSource: stockRef.stockSource,
+                    lastPurchaseDate: stockRef.lastPurchaseDate,
+                    stockHubAddedDate: stockRef.stockHubAddedDate,
+                    firstPurchaseDate: purchaseMeta?.firstPurchaseDate || null,
+                };
+            })
+            .filter((item) => item.stock > 0 && item.soldInPeriod === 0)
+            .sort((a, b) => {
+                const dateA = toValidDate(a.stockReferenceDate);
+                const dateB = toValidDate(b.stockReferenceDate);
+                if (!dateA && !dateB) return a.name.localeCompare(b.name);
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return dateA - dateB;
+            })
+            .slice(0, notSellingLimit);
             
         const totalCreditOutstanding = customers.reduce((sum, cust) => sum + (cust.outstandingCredit || 0), 0);
         
@@ -232,10 +354,12 @@ router.get('/summary', protect, async (req, res) => {
 
         res.json({
             revenue,
+            profit,
             billsRaised,
             averageBillValue,
             volume: totalVolume,
             topItems,
+            notSellingItems,
             totalCreditOutstanding,
             totalAllTimeRevenue, 
             totalAllTimeBills,

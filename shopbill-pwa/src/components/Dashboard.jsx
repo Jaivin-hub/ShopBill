@@ -355,7 +355,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
         return (
             <div className={`flex w-full flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
                 <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <div className="w-full flex justify-between items-center">
                         <div className="space-y-2.5">
                             <div className={`h-8 w-52 md:w-64 ${skelBlock()}`} />
                             <div className={`h-2.5 w-40 ${skelBlock()}`} />
@@ -367,7 +367,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                     </div>
                 </header>
                 <div className={`w-full overflow-x-hidden overscroll-y-contain px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-                    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+                    <div className="w-full space-y-8 pb-12">
                         {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (
                             <div className={`h-[72px] rounded-2xl border ${darkMode ? 'border-slate-800' : 'border-slate-200'} ${skelBlock('rounded-2xl')}`} />
                         )}
@@ -417,7 +417,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
     return (
         <div className={`flex w-full flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
-                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                <div className="w-full flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-black tracking-tight">
                             {welcome.title} <span className="text-indigo-500">Dashboard</span>
@@ -503,7 +503,7 @@ const Dashboard = ({ darkMode, userRole, apiClient, API, showToast, onViewAllSal
                 </div>
             )}
 
-                <div className="max-w-7xl mx-auto space-y-8 pb-12">
+                <div className="w-full space-y-8 pb-12">
 
                     {/* ATTENDANCE PUNCH (For Staff Only) - Before Today's Sales */}
                     {(userRole === USER_ROLES.MANAGER || userRole === USER_ROLES.CASHIER) && (

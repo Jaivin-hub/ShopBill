@@ -26,19 +26,61 @@ function isSubscriptionInTrial(subscription) {
     if (['cancelled', 'completed', 'expired', 'halted'].includes(status)) return false;
     if (!['active', 'authenticated', 'created', 'pending'].includes(status)) return false;
 
+    const paidCount = Number(subscription.paid_count) || 0;
+
+    // Mandate (₹1) + at least one full plan charge — trial is over
+    if (paidCount >= 2) {
+        return false;
+    }
+
+    // Active subscription with a captured charge and first billing date passed
+    if (status === 'active' && paidCount >= 1) {
+        const firstCharge = timestampToDate(getFirstFullChargeTimestamp(subscription));
+        if (firstCharge && firstCharge <= new Date()) {
+            return false;
+        }
+    }
+
     const firstCharge = timestampToDate(getFirstFullChargeTimestamp(subscription));
     if (firstCharge && firstCharge > new Date()) {
         return true;
     }
 
-    const paidCount = Number(subscription.paid_count) || 0;
-    // ₹1 mandate verification often sets paid_count=1 before the first monthly charge
     if (paidCount <= 1) {
         const startAt = timestampToDate(subscription.start_at);
         if (startAt && startAt > new Date()) return true;
     }
 
     return paidCount === 0;
+}
+
+const PLAN_MIN_AMOUNT = { BASIC: 499, PRO: 999, PREMIUM: 2999 };
+
+function minAmountForPlan(plan) {
+    return PLAN_MIN_AMOUNT[String(plan || 'BASIC').toUpperCase()] || 499;
+}
+
+/** DB proof of at least one full plan charge (not ₹1 mandate). */
+async function ownerHasFullPlanPayment(Payment, shopId, plan) {
+    if (!Payment || !shopId) return false;
+    const minAmount = minAmountForPlan(plan);
+    const count = await Payment.countDocuments({
+        shopId,
+        status: 'paid',
+        amount: { $gte: minAmount },
+    });
+    return count > 0;
+}
+
+/** Any paid plan-tier charge (BASIC+) — used after tier upgrades when DB plan may lag. */
+async function ownerHasAnyFullPlanPayment(Payment, shopId) {
+    if (!Payment || !shopId) return false;
+    const count = await Payment.countDocuments({
+        shopId,
+        status: 'paid',
+        amount: { $gte: minAmountForPlan('BASIC') },
+    });
+    return count > 0;
 }
 
 /**
@@ -73,4 +115,7 @@ module.exports = {
     getSubscriptionChargeDate,
     getFirstFullChargeTimestamp,
     mergeBillingDate,
+    minAmountForPlan,
+    ownerHasFullPlanPayment,
+    ownerHasAnyFullPlanPayment,
 };

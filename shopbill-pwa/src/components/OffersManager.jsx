@@ -319,7 +319,7 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       <header
         className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-3 sm:px-4 md:px-8 pt-3 pb-3 md:py-4 border-b backdrop-blur-md ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}
       >
-        <div className="max-w-7xl mx-auto space-y-3">
+        <div className="w-full space-y-3">
           {/* Mobile: tight title row + full-width primary CTA; md+: inline actions */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 pr-2">
@@ -377,7 +377,7 @@ const OffersManager = ({ darkMode, apiClient, API, showToast, userRole }) => {
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-20">
+        <div className="w-full px-3 sm:px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-20">
           {isFormOpen && (
             <section className={`${cardBase} rounded-2xl md:rounded-xl border p-4 md:p-5 min-w-0 overflow-hidden`}>
               <h2 className="text-[10px] font-bold text-gray-500 tracking-widest mb-4 flex items-center gap-2">

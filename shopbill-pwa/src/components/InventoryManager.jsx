@@ -310,6 +310,66 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
         isEditing ? handleUpdateItem() : handleAddItem();
     };
 
+    const buildInventoryPayload = useCallback((item) => {
+        const data = JSON.parse(JSON.stringify(item));
+        delete data._id;
+        delete data.id;
+        if (!isTextileShop) {
+            delete data.textileMeta;
+        }
+        if (data.variants && data.variants.length > 0) {
+            data.variants = data.variants.map((v) => {
+                const cleaned = { ...v };
+                delete cleaned._id;
+                if (!isTextileShop) {
+                    delete cleaned.size;
+                    delete cleaned.color;
+                }
+                cleaned.price = Number(cleaned.price) || 0;
+                cleaned.quantity = Number(cleaned.quantity) || 0;
+                cleaned.reorderLevel =
+                    cleaned.reorderLevel !== null && cleaned.reorderLevel !== undefined
+                        ? Number(cleaned.reorderLevel)
+                        : null;
+                return cleaned;
+            });
+            data.price = data.price === '' || data.price == null ? null : Number(data.price) || null;
+            data.quantity = data.quantity === '' || data.quantity == null ? null : Number(data.quantity) || null;
+        } else {
+            data.price = Number(data.price) || 0;
+            data.quantity = Number(data.quantity) || 0;
+        }
+        return data;
+    }, [isTextileShop]);
+
+    const handleSaveBarcode = useCallback(async ({ item, variant, barcode }) => {
+        const itemId = item._id || item.id;
+        const fresh = inventory.find((i) => String(i._id || i.id) === String(itemId)) || item;
+        const payload = buildInventoryPayload(fresh);
+        const code = String(barcode || '').trim();
+
+        if (variant && Array.isArray(payload.variants) && payload.variants.length > 0) {
+            const variantKey = variant._id || variant.id;
+            const sourceVariants = fresh.variants || [];
+            payload.variants = sourceVariants.map((v, idx) => {
+                const cleaned = payload.variants[idx] || payload.variants.find((pv) => pv.label === v.label) || { ...v };
+                const vid = v._id || v.id;
+                if (variantKey && vid && String(vid) === String(variantKey)) {
+                    return { ...cleaned, hsn: code, sku: code };
+                }
+                if (!variantKey && v.label === variant.label) {
+                    return { ...cleaned, hsn: code, sku: code };
+                }
+                return cleaned;
+            });
+        } else {
+            payload.hsn = code;
+        }
+
+        await apiClient.put(`${API.inventory}/${itemId}`, payload);
+        await fetchInventory();
+    }, [apiClient, API.inventory, inventory, buildInventoryPayload, fetchInventory]);
+
     const confirmDeleteItem = async () => {
         if (!itemToDelete) return;
         const { id: itemId, name: itemName } = itemToDelete;
@@ -478,6 +538,8 @@ const InventoryManager = ({ apiClient, API, userRole, showToast, darkMode, initi
             handleBulkUpload={handleBulkUpload}
             handleEditClick={handleEditClick}
             handleDeleteClick={handleDeleteClick}
+            onSaveBarcode={handleSaveBarcode}
+            showToast={showToast}
             closeFormModal={closeFormModal}
             handleInputChange={handleInputChange}
             handleFormSubmit={handleFormSubmit}

@@ -63,6 +63,7 @@ const NotificationSchema = new mongoose.Schema({
             'shop_subscription_resubscribed',
             'shop_subscription_mandate_revoked',
             'shop_subscription_halted',
+            'shop_subscription_payment_failed',
             'mandate_restore_requested',
             'subscription_renew_requested'
         ], 

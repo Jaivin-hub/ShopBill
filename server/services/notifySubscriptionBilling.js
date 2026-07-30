@@ -263,17 +263,24 @@ const notifySuperadminsSubscriptionCancelled = async (io, owner, details = {}) =
     const plan = String(owner.plan || details.plan || 'BASIC').toUpperCase();
     const status = String(details.subscriptionStatus || '').toLowerCase();
     const inTrial = status === 'trial_cancellation_pending';
-    const title = inTrial ? 'Trial subscription cancelled' : 'Shop cancelled subscription';
+    const pendingDue = status === 'cancellation_pending';
+    const title = inTrial
+        ? 'Trial subscription cancelled'
+        : pendingDue
+          ? 'Cancellation scheduled'
+          : 'Shop cancelled subscription';
     const accessNote = details.accessEndLabel ? ` Access until ${details.accessEndLabel}.` : '';
     const message = inTrial
         ? `${shop} cancelled their free trial on ${plan}.${accessNote}`
-        : `${shop} cancelled their ${plan} subscription.${accessNote}`;
+        : pendingDue
+          ? `${shop} scheduled cancellation on ${plan} (due payment may retry first).${accessNote}`
+          : `${shop} cancelled their ${plan} subscription.${accessNote}`;
 
     await notifySuperadminsShopSubscriptionEvent(io, owner, {
         type: 'shop_subscription_cancelled',
         title,
         message,
-        category: 'Info',
+        category: pendingDue ? 'Urgent' : 'Info',
         metadata: {
             subscriptionStatus: details.subscriptionStatus,
             cancellationAction: details.cancellationAction,
@@ -384,6 +391,47 @@ const notifySuperadminsSubscriptionHalted = async (io, owner, details = {}) => {
     });
 };
 
+const FAILURE_CODE_LABELS = {
+    card_expired: 'Card expired',
+    card_blocked: 'Card blocked',
+    insufficient_funds: 'Insufficient funds',
+    mandate_cancelled: 'Mandate cancelled',
+    recurring_halted: 'Recurring halted',
+    payment_failed: 'Payment failed',
+    unknown: 'Payment failed',
+};
+
+const notifySuperadminsPaymentFailed = async (io, owner, details = {}) => {
+    const shop = formatShopLabel(owner);
+    const plan = String(owner.plan || details.plan || 'BASIC').toUpperCase();
+    const amount =
+        details.amount != null && !Number.isNaN(Number(details.amount))
+            ? `₹${Number(details.amount)}`
+            : 'subscription';
+    const reasonLabel =
+        details.failureDetail ||
+        FAILURE_CODE_LABELS[details.failureCode] ||
+        FAILURE_CODE_LABELS.payment_failed;
+    const message = `${shop} — ${amount} ${plan} charge failed: ${reasonLabel}. Razorpay may retry automatically.`;
+
+    await notifySuperadminsShopSubscriptionEvent(io, owner, {
+        type: 'shop_subscription_payment_failed',
+        title: 'Subscription payment failed',
+        message,
+        category: 'Urgent',
+        metadata: {
+            plan,
+            amount: details.amount,
+            paymentId: details.paymentId,
+            subscriptionId: details.subscriptionId,
+            failureCode: details.failureCode,
+            failureDetail: details.failureDetail,
+            eventType: details.eventType,
+        },
+        dedupeKey: details.dedupeKey || (details.paymentId ? `pay_failed_${details.paymentId}` : null),
+    });
+};
+
 module.exports = {
     notifyOwnerUpcomingPayment,
     notifyOwnerPaymentFailedGrace,
@@ -397,4 +445,5 @@ module.exports = {
     notifySuperadminsResubscribed,
     notifySuperadminsMandateRevoked,
     notifySuperadminsSubscriptionHalted,
+    notifySuperadminsPaymentFailed,
 };

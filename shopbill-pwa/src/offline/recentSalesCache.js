@@ -14,6 +14,8 @@ export function saleRecordFromOfflineBody(body, clientMutationId, createdAtMs) {
   return {
     _id: id,
     offlinePending: true,
+    subtotalAmount: Number(body?.subtotalAmount) || Number(body?.totalAmount) || 0,
+    billDiscount: Number(body?.billDiscount) || 0,
     totalAmount: Number(body?.totalAmount) || 0,
     paymentMethod: body?.paymentMethod || 'Cash',
     paidVia: body?.paidVia || null,

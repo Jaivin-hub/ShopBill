@@ -2,6 +2,10 @@
 const mongoose = require('mongoose');
 
 const SaleSchema = new mongoose.Schema({
+    /** Sum of line items before bill-level discount */
+    subtotalAmount: { type: Number, default: null, min: 0 },
+    /** Optional flat discount in ₹ applied at checkout (not per-item offers) */
+    billDiscount: { type: Number, default: 0, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     // paymentMethod: 'Mixed' allows splitting between Cash, Card, UPI, and Credit
     paymentMethod: { type: String, enum: ['Cash', 'Card', 'Credit', 'UPI', 'Mixed'], required: true }, 

@@ -140,7 +140,19 @@ router.get('/:id', protect, async (req, res) => {
 // POST a new sale
 router.post('/', protect, async (req, res) => {
     // Accept forceProceed or forceOverride (frontend may send either)
-    const { totalAmount, paymentMethod, paidVia, customerId, items, amountCredited, amountPaid, forceProceed: fp, forceOverride: fo } = req.body;
+    const {
+        totalAmount,
+        subtotalAmount,
+        billDiscount: billDiscountRaw,
+        paymentMethod,
+        paidVia,
+        customerId,
+        items,
+        amountCredited,
+        amountPaid,
+        forceProceed: fp,
+        forceOverride: fo,
+    } = req.body;
     const forceProceed = !!(fp || fo);
     const saleAmountCredited = parseFloat(amountCredited) || 0;
     const saleCustomerId = (customerId && isValidObjectId(customerId)) ? customerId : null;
@@ -213,7 +225,30 @@ router.post('/', protect, async (req, res) => {
             }
         }
         
-        // --- 3. Create Sale Record ---
+        // --- 3. Bill-level discount validation ---
+        const itemsSubtotal = (items || []).reduce((sum, item) => {
+            const price = Number(item.price) || 0;
+            const qty = Number(item.quantity) || 0;
+            return sum + price * qty;
+        }, 0);
+        const billDiscount = Math.max(0, Number(billDiscountRaw) || 0);
+        if (billDiscount > itemsSubtotal + 0.01) {
+            return res.status(400).json({ error: 'Discount cannot exceed cart subtotal.' });
+        }
+        const expectedTotal = Number(Math.max(0, itemsSubtotal - billDiscount).toFixed(2));
+        const parsedTotal = Number(totalAmount);
+        if (!Number.isFinite(parsedTotal) || Math.abs(parsedTotal - expectedTotal) > 0.02) {
+            return res.status(400).json({
+                error: 'Total amount does not match items and discount.',
+                expectedTotal,
+            });
+        }
+        const resolvedSubtotal =
+            subtotalAmount != null && Number.isFinite(Number(subtotalAmount))
+                ? Number(subtotalAmount)
+                : itemsSubtotal;
+
+        // --- 4. Create Sale Record ---
         const normalizedItems = (items || []).map((item) => {
             const price = Number(item.price) || 0;
             const originalRaw = item.originalPrice != null ? Number(item.originalPrice) : null;
@@ -239,7 +274,9 @@ router.post('/', protect, async (req, res) => {
         });
 
         const newSale = await Sale.create({
-            totalAmount,
+            subtotalAmount: resolvedSubtotal,
+            billDiscount,
+            totalAmount: expectedTotal,
             paymentMethod,
             paidVia: paymentMethod === 'Mixed' && ['Cash', 'Card', 'UPI'].includes(paidVia) ? paidVia : null,
             customerId: saleCustomerId, 
@@ -249,7 +286,7 @@ router.post('/', protect, async (req, res) => {
             storeId,
         });
 
-        // --- 4. Update Inventory ---
+        // --- 5. Update Inventory ---
         let updatedInventoryDocs = [];
         if (items && items.length > 0) {
              const inventoryUpdates = items.map(async (item) => {

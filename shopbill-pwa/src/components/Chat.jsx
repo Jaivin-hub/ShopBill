@@ -7,7 +7,6 @@ import ChatHeader from './chat/ChatHeader';
 import ChatMessages from './chat/ChatMessages';
 import ChatInput from './chat/ChatInput';
 import NewChatModal from './chat/NewChatModal';
-import EmptyChatView from './chat/EmptyChatView';
 import { ChatInitialSkeleton } from './skeletons/PageSkeletons';
 import { participantLabelForViewer } from '../utils/ownerDisplay';
 import { isChatGroupCreator, normalizeChatRecord } from '../utils/chatGroup';
@@ -1876,8 +1875,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
             />
 
             {/* Main Chat Interface */}
-            <div className={`${selectedChat ? 'flex flex-1' : 'hidden md:flex flex-1'} flex-col w-full h-full min-h-0 overflow-hidden relative`}>
-                {selectedChat ? (
+            {selectedChat ? (
+            <div className="flex flex-1 flex-col w-full h-full min-h-0 overflow-hidden relative">
                     <div
                         className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden md:touch-auto"
                         onTouchStart={onThreadPanelTouchStart}
@@ -1987,15 +1986,8 @@ const Chat = ({ apiClient, API, showToast, darkMode, currentUser, currentOutletI
                             </div>
                         )}
                     </div>
-                ) : (
-                    <EmptyChatView
-                        chats={chats}
-                        onNewChat={() => { setShowNewChatModal(true); setNewChatType('group'); }}
-                        darkMode={darkMode}
-                        showStartChatButton={chatListViewMode === 'chats'}
-                    />
-                )}
-            </div>
+                </div>
+            ) : null}
 
             {/* Floating add (new group) — only on Groups tab, not Staff */}
             {!selectedChat && chatListViewMode === 'chats' && !showNewChatModal && (

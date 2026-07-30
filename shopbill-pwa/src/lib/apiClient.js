@@ -71,6 +71,8 @@ apiClient.interceptors.request.use(
     const isStaffApi = /\/staff(\/|$|\?)/.test(url);
     // Bill drafts: duplicate GET/POST can cancel in-flight saves or list loads and break POS drafts UX
     const isBillDraftApi = /\/bill-drafts(\/|$|\?)/.test(url);
+    // Superadmin payment history: slow Razorpay sync + modal re-open must not cancel in-flight load
+    const isSuperadminShopPayments = /\/superadmin\/shops\/[^/]+\/payments(\/|$|\?)/.test(url);
     // Offline queue flush: never cancel in-flight POSTs (auto-sync + Sync now share the same payloads)
     const isOfflineQueueSync = Boolean(config.headers?.['x-offline-client-id']);
     const skipDuplicateCancel =
@@ -80,6 +82,7 @@ apiClient.interceptors.request.use(
       isStaffApi ||
       isDeviceTokenApi ||
       isBillDraftApi ||
+      isSuperadminShopPayments ||
       isOfflineQueueSync;
 
     // Cancel previous identical request if still pending (skip for payment/signup)

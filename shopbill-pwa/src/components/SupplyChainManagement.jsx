@@ -5,6 +5,7 @@ import {
   Calculator, Calendar, Store, Info, Hash, ExternalLink, RefreshCcw, Bell, Edit, Download, Settings2, Trash2
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import BarcodePrintModal from './BarcodePrintModal';
 import AppModalOverlay from './AppModalOverlay';
 import { validateName, validatePhoneNumber, validateEmail, validateGSTIN, validatePrice, validateQuantity } from '../utils/validation';
 import { exportRowsToExcel } from '../utils/exportExcel';
@@ -57,6 +58,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [scannerContext, setScannerContext] = useState('arrival');
   const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [deletingSupplierId, setDeletingSupplierId] = useState(null);
@@ -76,6 +78,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
 
   const handleCloseProductModal = useCallback(() => {
     setIsProductModalOpen(false);
+    setIsBarcodeModalOpen(false);
     setProductForm(EMPTY_PRODUCT_FORM);
     setHasProductVariants(false);
     setEditingProductVariantIndex(null);
@@ -87,6 +90,24 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
     onModalStateChange(anyOverlayOpen);
     return () => onModalStateChange(false);
   }, [isProductModalOpen, isSupplierModalOpen, onModalStateChange]);
+
+  const barcodeDraftItem = useMemo(() => ({
+    _id: `scm-draft-${Date.now()}`,
+    name: String(productForm.name || '').trim() || 'Product',
+    price: Number(productForm.price || 0),
+    hsn: String(productForm.hsn || '').trim()
+  }), [productForm.hsn, productForm.name, productForm.price]);
+
+  const handleAttachBarcodeToDraft = useCallback(async ({ barcode }) => {
+    const nextCode = String(barcode || '').trim().toUpperCase();
+    if (!nextCode) {
+      showToast?.('Enter or generate a barcode first.', 'warning');
+      return;
+    }
+    setProductForm((prev) => ({ ...prev, hsn: nextCode }));
+    setIsBarcodeModalOpen(false);
+    showToast?.('Barcode attached to product draft', 'success');
+  }, [showToast]);
 
   useEffect(() => {
     if (selectedFilter === 'custom' && (!customStartDate || !customEndDate)) {
@@ -510,7 +531,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
       <div className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl transition-colors ${headerBg} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
         <header className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="w-full flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-black tracking-tight">
                 Supply <span className="text-indigo-500">Chain</span>
@@ -535,7 +556,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
         </header>
         {showSupplyNavSection && (
           <div className={`border-b px-4 md:px-8 py-3 ${darkMode ? 'bg-gray-950 border-slate-800/60' : 'bg-slate-50 border-slate-200'}`}>
-            <div className="max-w-7xl mx-auto space-y-2">
+            <div className="w-full space-y-2">
               <div className="flex items-center gap-2 min-w-0">
               {activeTab === 'history' && (
                 <button
@@ -643,7 +664,7 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
         {dataLoading && hasLoadedOnce ? (
           <SupplyChainContentSkeleton darkMode={darkMode} />
         ) : (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12">
+        <div className="w-full space-y-8 pb-12">
         {activeTab === 'purchase' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
@@ -1260,6 +1281,14 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
                   >
                     <ScanLine className="w-5 h-5" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsBarcodeModalOpen(true)}
+                    className={`p-3 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} rounded-xl border hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500 transition-all`}
+                    title="Generate barcode label"
+                  >
+                    <Hash className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -1430,6 +1459,17 @@ const SupplyChainManagement = ({ apiClient, API, showToast, darkMode, onModalSta
             darkMode={darkMode} 
         />
       </div>
+
+      <BarcodePrintModal
+        isOpen={isBarcodeModalOpen}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        item={barcodeDraftItem}
+        variant={null}
+        darkMode={darkMode}
+        showToast={showToast}
+        onSaveBarcode={handleAttachBarcodeToDraft}
+        saving={false}
+      />
 
       <style dangerouslySetInnerHTML={{__html: `
         input, select, textarea {

@@ -237,7 +237,7 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                 <StatCard
                     compact
                     title="Monthly Revenue"
-                    value={formatNumber(dashboardData.totalPlanRevenue || 0)}
+                    value={formatNumber(dashboardData.monthlyPlanRevenue || 0)}
                     unit="₹"
                     icon={CreditCard}
                     trend="up"
@@ -304,8 +304,8 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                                             </span>
                                             <span className={`text-sm ${textSecondary}`}>{data.count || 0} shops</span>
                                         </div>
-                                        {/* Display revenue in clean format here */}
-                                        <span className={`text-sm font-semibold ${textPrimary}`}>₹{formatNumber(data.revenue || 0)}/mo</span>
+                                        {/* Revenue collected this month for this tier (by charge amount) */}
+                                        <span className={`text-sm font-semibold ${textPrimary}`}>₹{formatNumber(data.revenue || 0)} this mo</span>
                                     </div>
                                     <div className={`w-full ${progressBg} rounded-full h-2`}>
                                         <div
@@ -324,13 +324,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
 
                 {/* Payment Status Overview */}
                 <section className={`${cardBg} rounded-xl p-6 border`} aria-labelledby="payment-status-heading">
-                    <h2 id="payment-status-heading" className={`text-lg font-semibold ${textPrimary} flex items-center gap-2 mb-1`}>
+                    <h2 id="payment-status-heading" className={`text-lg font-semibold ${textPrimary} flex items-center gap-2 mb-4`}>
                         <CreditCard className="w-5 h-5 text-indigo-400" />
                         Payment Status
                     </h2>
-                    <p className={`text-[11px] font-medium mb-4 ${textSubtitle}`}>
-                        Paid = active subscription after a real charge. Pending includes free trial and mandate verification (₹1). Overdue = missed payment after access ended.
-                    </p>
                     <div className="space-y-3">
                         {dashboardData.paymentStatus && (
                             <>
@@ -459,6 +456,10 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                                     case 'shop_suspended':
                                         return <AlertCircle className={`w-4 h-4 ${statusColor}`} />;
                                     case 'payment_failed':
+                                    case 'subscription_halted':
+                                    case 'mandate_revoked':
+                                        return <XCircle className={`w-4 h-4 ${statusColor}`} />;
+                                    case 'subscription_cancelled':
                                         return <XCircle className={`w-4 h-4 ${statusColor}`} />;
                                     case 'plan_upgraded':
                                         return <TrendingUp className={`w-4 h-4 ${statusColor}`} />;
@@ -472,16 +473,27 @@ const SuperAdminDashboard = ({ apiClient, API, showToast, currentUser, darkMode 
                                     case 'shop_created':
                                         return `New shop "${activity.shop}" created`;
                                     case 'payment_received':
-                                        return `Payment received from "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
+                                        return activity.amount != null
+                                            ? `Payment received from "${activity.shop}" — ₹${formatCurrency(activity.amount)}`
+                                            : `Billing activated for "${activity.shop}"`;
                                     case 'shop_suspended':
                                         return `Shop "${activity.shop}" suspended`;
                                     case 'payment_failed':
-                                        return `Payment failed for "${activity.shop}" - ₹${formatCurrency(activity.amount)}`;
+                                        return activity.amount != null
+                                            ? `Payment failed for "${activity.shop}" — ₹${formatCurrency(activity.amount)}`
+                                            : `Payment failed for "${activity.shop}"`;
+                                    case 'subscription_cancelled':
+                                        return activity.meta?.message || `"${activity.shop}" cancelled their subscription`;
+                                    case 'subscription_halted':
+                                        return `"${activity.shop}" subscription halted after failed payments`;
+                                    case 'mandate_revoked':
+                                        return `"${activity.shop}" payment mandate revoked from bank/UPI`;
                                     case 'plan_upgraded':
-                                        // Ensure 'from' and 'to' fields are available in the activity payload
                                         return `"${activity.shop}" upgraded from ${activity.from || 'a plan'} to ${activity.to || 'a new plan'}`;
+                                    case 'subscription_resubscribed':
+                                        return `"${activity.shop}" re-subscribed to ${activity.to || 'a plan'}`;
                                     default:
-                                        return 'System Activity';
+                                        return activity.meta?.message || activity.meta?.title || 'System activity';
                                 }
                             };
 

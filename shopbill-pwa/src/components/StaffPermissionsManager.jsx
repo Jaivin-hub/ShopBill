@@ -12,6 +12,7 @@ import ConfirmationModal from './ConfirmationModal';
 import WorkProfileModal from './WorkProfileModal';
 import { TeamDirectorySkeleton, TeamManagementInitialSkeleton } from './skeletons/PageSkeletons';
 import { participantLabelForViewer, participantEmailForViewer, participantRoleLabelForViewer, isStaffViewer, isParticipantOwner } from '../utils/ownerDisplay';
+import { hasProTeamFeatures, isPageAllowedForPlan } from '../utils/subscription';
 
 // --- Feature Access Definitions for Display ---
 const ROLE_PERMISSIONS = {
@@ -125,6 +126,20 @@ const canShowReactivateButton = (s) => {
     if (isStaffInviteRevoked(s)) return true;
     if (s?.canReactivateAccount == null && s?.passwordSetupStatus === 'completed') return true;
     return false;
+};
+
+/** True when this staff row is the currently logged-in user (managers must not deactivate themselves). */
+const isStaffSelfAccount = (staff, currentUser) => {
+    if (!staff || !currentUser) return false;
+    const currentId = String(currentUser._id || currentUser.id || '');
+    const rawUserId = staff.userId;
+    const staffUserId = rawUserId != null
+        ? String(typeof rawUserId === 'object' ? (rawUserId._id || rawUserId.id || '') : rawUserId)
+        : '';
+    if (currentId && staffUserId && currentId === staffUserId) return true;
+    const currentEmail = String(currentUser.email || '').trim().toLowerCase();
+    const staffEmail = String(staff.email || '').trim().toLowerCase();
+    return Boolean(currentEmail && staffEmail && currentEmail === staffEmail);
 };
 
 const TEAM_FILTER_TABS = [
@@ -544,7 +559,7 @@ const PayrollSettlementModal = ({
 };
 
 // --- StaffStatusButton Component ---
-const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser, onMemberOverlayChange }) => {
+const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onToggleActive, onEdit, onRemove, darkMode, borderStyle, cardBase, apiClient, API, showToast, isCurrentlyActive, punchInTime, isOnBreak, breakStart, breakDurationMinutes, canManageWorkHours, onSaveWorkSchedule, isSavingWorkSchedule, onUpdatePayrollSettlement, isUpdatingPayrollSettlement, existingShifts = [], currentUser, onMemberOverlayChange, enableWorkProfileFeatures = true }) => {
     const [showAttendance, setShowAttendance] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
     const [showPendingInfo, setShowPendingInfo] = useState(false);
@@ -655,11 +670,12 @@ const StaffStatusButton = ({ staff, isActionDisabled, isPendingActivation, onTog
     const roleBadgeNormalCase = isStaffViewer(currentUser) && isParticipantOwner(staff);
     const isPendingInvite = isStaffPendingInvite(staff);
     const needsResendInvite = isStaffInviteRevoked(staff);
+    const isSelfAccount = isStaffSelfAccount(staff, currentUser);
     const showReactivateButton = canShowReactivateButton(staff);
-    const showDeactivateButton = isPendingInvite || staff.active || showReactivateButton;
-    const showDeleteButton = !staff.active && !isPendingInvite;
+    const showDeactivateButton = !isSelfAccount && (isPendingInvite || staff.active || showReactivateButton);
+    const showDeleteButton = !isSelfAccount && !staff.active && !isPendingInvite;
     const showWorkProfileAndAttendance =
-        staff.role !== 'owner' && staff.active && !isPendingInvite;
+        enableWorkProfileFeatures && staff.role !== 'owner' && staff.active && !isPendingInvite;
 
     useEffect(() => {
         if (!showWorkProfileAndAttendance) {
@@ -1140,8 +1156,19 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         return false;
     }, [canAccessTeamManagementProp, effectiveRole, currentUser?.permissions?.pages?.staffPermissions]);
     const hasOwnerAccess = effectiveRole === 'owner';
+    const hasProTeamPlan = hasProTeamFeatures(currentUser);
+    const grantablePermissionPages = useMemo(
+        () => GRANTABLE_PERMISSION_PAGE_LABELS.filter((page) => isPageAllowedForPlan(currentUser, page.id)),
+        [currentUser?.plan]
+    );
     const hasReadAccess = canAccessTeamManagement;
     const hasWriteAccess = canAccessTeamManagement && (effectiveRole === 'owner' || effectiveRole === 'manager');
+
+    useEffect(() => {
+        if (!hasProTeamPlan && managementTab === 'salary') {
+            setManagementTab('team');
+        }
+    }, [hasProTeamPlan, managementTab]);
 
     const fetchStaff = useCallback(async () => {
         if (!hasReadAccess || !apiClient) {
@@ -1555,6 +1582,10 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
 
     const handleToggleActive = async (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
+        if (isStaffSelfAccount(staffMember, currentUser)) {
+            if (showToast) showToast('You cannot deactivate your own account.', 'error');
+            return;
+        }
 
         // Pending invite: same endpoint revokes token (does not activate without password)
         if (isStaffPendingInvite(staffMember)) {
@@ -1636,6 +1667,10 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
     
     const handleRemoveStaff = (staffMember) => {
         if (!hasWriteAccess || staffMember.role === 'owner') return;
+        if (isStaffSelfAccount(staffMember, currentUser)) {
+            if (showToast) showToast('You cannot remove your own account.', 'error');
+            return;
+        }
 
         const showModal = externalSetConfirmModal || setConfirmModal;
         const isPendingActivation =
@@ -1799,7 +1834,8 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                     isOnBreak={att?.onBreak || false}
                     breakStart={att?.breakStart || null}
                     breakDurationMinutes={att?.breakDurationMinutes ?? 0}
-                    canManageWorkHours={hasWriteAccess}
+                    canManageWorkHours={hasWriteAccess && hasProTeamPlan}
+                    enableWorkProfileFeatures={hasProTeamPlan}
                     onSaveWorkSchedule={handleSaveStaffWorkSchedule}
                     isSavingWorkSchedule={scheduleUpdatingId === String(s._id)}
                     onUpdatePayrollSettlement={handleUpdatePayrollSettlement}
@@ -1812,6 +1848,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         },
         [
             hasWriteAccess,
+            hasProTeamPlan,
             handleToggleActive,
             handleRemoveStaff,
             darkMode,
@@ -1839,7 +1876,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
             {/* --- RESPONSIVE STICKY HEADER --- */}
             <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 transition-colors ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto space-y-3">
+                <div className="w-full space-y-3">
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                             <h1 className={`text-xl md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -1870,6 +1907,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                 >
                                     Team
                                 </button>
+                                {hasProTeamPlan && (
                                 <button
                                     type="button"
                                     onClick={() => setManagementTab('salary')}
@@ -1877,6 +1915,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                 >
                                     Salary Reports
                                 </button>
+                                )}
                                 {hasOwnerAccess && (
                                     <button
                                         type="button"
@@ -1893,7 +1932,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
+            <div className="w-full p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
                 {hasOwnerAccess && ENABLE_ROLE_PERMISSIONS_SHORTCUT && (
                     <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
                         <div>
@@ -1932,7 +1971,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                                     <div className="col-span-3 text-center">Cashier</div>
                                 </div>
                                 <div className="mt-2 rounded-lg border overflow-hidden">
-                                    {GRANTABLE_PERMISSION_PAGE_LABELS.map((page) => (
+                                    {grantablePermissionPages.map((page) => (
                                         <div key={page.id} className={`grid grid-cols-12 items-center px-3 py-2.5 border-b last:border-b-0 ${darkMode ? 'border-slate-800 bg-slate-900/30' : 'border-slate-100 bg-white'}`}>
                                             <div className={`col-span-6 text-[12px] font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{page.label}</div>
                                             <div className="col-span-3 flex justify-center">
@@ -1986,7 +2025,7 @@ const StaffPermissionsManager = ({ apiClient, showToast, setConfirmModal: extern
                         </p>
                     </div>
                 )}
-                {managementTab === 'salary' && (
+                {hasProTeamPlan && managementTab === 'salary' && (
                     <div className={`rounded-xl md:rounded-2xl border ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'} p-3 md:p-4 space-y-3`}>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className={`inline-flex p-1 rounded-lg ${darkMode ? 'bg-slate-950 border border-slate-800' : 'bg-slate-100 border border-slate-200'}`}>

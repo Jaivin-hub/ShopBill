@@ -50,7 +50,7 @@ function ownerHasRemainingAccess(owner, now = new Date()) {
 
 /**
  * @param {object|null} owner
- * @param {'signup'|'resubscribe'|'renew'|'recovery'} context
+ * @param {'signup'|'resubscribe'|'upgrade'|'renew'|'recovery'} context
  */
 function resolveSubscriptionStartAtUnix(owner, context = 'resubscribe') {
     if (context === 'signup') {

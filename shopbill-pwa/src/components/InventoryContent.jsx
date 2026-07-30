@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
     Package, Plus, AlertTriangle, Edit, Trash2, X, Search, 
     ListOrdered, Loader2, ScanLine, Upload, Hash, Bell, Info, 
-    ChevronDown, ChevronUp, Settings2, ChevronRight, Download
+    ChevronDown, ChevronUp, Settings2, ChevronRight, Download, Barcode
 } from 'lucide-react';
 import ScannerModal from './ScannerModal';
+import BarcodePrintModal from './BarcodePrintModal';
 import AppModalOverlay from './AppModalOverlay';
+import { productNeedsBarcode } from '../utils/barcode';
 import { StockHubListSkeleton } from './skeletons/PageSkeletons';
 
 const ScrollbarStyles = ({ darkMode }) => (
@@ -145,7 +147,7 @@ const InputField = ({ label, darkMode, ...props }) => (
     </div>
 );
 
-const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, loading, darkMode, readOnly = false, isTextileShop = false }) => {
+const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick, onBarcodeClick, loading, darkMode, readOnly = false, isTextileShop = false }) => {
     const [showVariants, setShowVariants] = useState(false);
     const hasVariants = item.variants && item.variants.length > 0;
     
@@ -221,6 +223,16 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                             )}
                             {!readOnly && (
                             <>
+                            {!hasVariants && productNeedsBarcode(item, null) && (
+                            <button
+                                type="button"
+                                onClick={() => onBarcodeClick?.(item, null)}
+                                title="Generate barcode"
+                                className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg text-violet-500 transition-all active:scale-90`}
+                            >
+                                <Barcode className="w-3.5 h-3.5" />
+                            </button>
+                            )}
                             <button 
                                 onClick={() => handleEditClick(item)} 
                                 className={`p-1.5 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg text-indigo-500 transition-all active:scale-90`}
@@ -359,6 +371,16 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                         )}
                         {!readOnly && (
                         <>
+                        {!hasVariants && productNeedsBarcode(item, null) && (
+                        <button
+                            type="button"
+                            onClick={() => onBarcodeClick?.(item, null)}
+                            className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-violet-600' : 'bg-slate-100 hover:bg-violet-600'} rounded-lg text-violet-500 hover:text-white transition-all active:scale-90`}
+                            title="Generate barcode"
+                        >
+                            <Barcode className="w-4 h-4" />
+                        </button>
+                        )}
                         <button 
                             onClick={() => handleEditClick(item)} 
                             className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-indigo-600' : 'bg-slate-100 hover:bg-indigo-600'} rounded-lg text-indigo-500 hover:text-white transition-all active:scale-90`}
@@ -461,6 +483,16 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
                                                     ₹{Number(variant.price || 0).toLocaleString('en-IN')}
                                                 </p>
                                             </div>
+                                            {!readOnly && productNeedsBarcode(item, variant) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onBarcodeClick?.(item, variant)}
+                                                    title="Generate barcode"
+                                                    className={`p-2 ${darkMode ? 'bg-slate-800 hover:bg-violet-600' : 'bg-slate-100 hover:bg-violet-600'} rounded-lg text-violet-500 hover:text-white transition-all active:scale-90`}
+                                                >
+                                                    <Barcode className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -490,11 +522,14 @@ const InventoryListCard = React.memo(({ item, handleEditClick, handleDeleteClick
 const EMPTY_TEXTILE_META = { brand: '', fabric: '', season: '', collection: '' };
 
 const InventoryContent = ({
-    inventory, loading, listSyncing = false, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
-    isTextileShop = false, isReportDownloading = false, onModalStateChange,
+    inventory, loading, listSyncing = false, isFormModalOpen, isConfirmModalOpen, isBulkUploadModalOpen, formData, isEditing, itemToDelete, searchTerm, sortOption, setSearchTerm, setSortOption, handleEditClick, handleDeleteClick, onSaveBarcode, closeFormModal, handleInputChange, handleFormSubmit, confirmDeleteItem, setIsConfirmModalOpen, openAddModal, openBulkUploadModal, closeBulkUploadModal, handleBulkUpload, handleDownloadReport, setFormData, isDeleting = false, isBulkUploading = false, darkMode, readOnly = false,
+    isTextileShop = false, isReportDownloading = false, onModalStateChange, showToast,
 }) => {
     const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+    const [barcodeTarget, setBarcodeTarget] = useState(null);
+    const [barcodeSaving, setBarcodeSaving] = useState(false);
     const [isHsnScannerOpen, setIsHsnScannerOpen] = useState(false);
+    const [isFormBarcodeModalOpen, setIsFormBarcodeModalOpen] = useState(false);
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [showControlSection, setShowControlSection] = useState(true);
@@ -515,7 +550,9 @@ const InventoryContent = ({
             isConfirmModalOpen ||
             isBulkUploadModalOpen ||
             isScannerModalOpen ||
-            isHsnScannerOpen;
+            isHsnScannerOpen ||
+            isFormBarcodeModalOpen ||
+            Boolean(barcodeTarget);
         onModalStateChange(anyOverlayOpen);
         return () => onModalStateChange(false);
     }, [
@@ -524,8 +561,59 @@ const InventoryContent = ({
         isBulkUploadModalOpen,
         isScannerModalOpen,
         isHsnScannerOpen,
+        isFormBarcodeModalOpen,
+        barcodeTarget,
         onModalStateChange,
     ]);
+
+    const handleOpenBarcode = (item, variant = null) => {
+        if (!productNeedsBarcode(item, variant)) return;
+        setBarcodeTarget({ item, variant });
+    };
+
+    const handleSaveBarcodeFromModal = async ({ item, variant, barcode }) => {
+        if (!onSaveBarcode) return;
+        setBarcodeSaving(true);
+        try {
+            await onSaveBarcode({ item, variant, barcode });
+            showToast?.('Barcode saved to product', 'success');
+            setBarcodeTarget(null);
+        } catch (error) {
+            showToast?.(error.response?.data?.error || error.message || 'Could not save barcode', 'error');
+            throw error;
+        } finally {
+            setBarcodeSaving(false);
+        }
+    };
+
+    const formBarcodeDraftItem = useMemo(() => {
+        const name = String(formData.name || '').trim() || 'Product';
+        const price = hasVariants && formData.variants?.length
+            ? Number(formData.variants[0]?.price || 0)
+            : Number(formData.price || 0);
+        return {
+            _id: formData._id || formData.id || `stock-draft-${Date.now()}`,
+            name,
+            price,
+            hsn: String(formData.hsn || '').trim(),
+            variants: formData.variants,
+        };
+    }, [formData._id, formData.id, formData.name, formData.price, formData.hsn, formData.variants, hasVariants]);
+
+    const handleAttachBarcodeToFormDraft = useCallback(async ({ barcode }) => {
+        const nextCode = String(barcode || '').trim().toUpperCase();
+        if (!nextCode) {
+            showToast?.('Enter or generate a barcode first.', 'warning');
+            return;
+        }
+        setFormData((prev) => ({ ...prev, hsn: nextCode }));
+        setIsFormBarcodeModalOpen(false);
+        showToast?.('Barcode attached to product', 'success');
+    }, [setFormData, showToast]);
+
+    useEffect(() => {
+        if (!isFormModalOpen) setIsFormBarcodeModalOpen(false);
+    }, [isFormModalOpen]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -631,33 +719,33 @@ const InventoryContent = ({
             <div className="sticky top-0 z-[100] shadow-sm shrink-0 ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}" style={{ backdropFilter: 'blur(12px)' }}>
                 {/* Header */}
                 <header className={`border-b px-4 md:px-8 py-5 ${darkMode ? 'border-slate-800/60' : 'border-slate-200'}`}>
-                    <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex justify-between items-center">
+                    <div className="w-full flex items-center justify-between gap-4">
+                        <div className="min-w-0">
                             <div>
                                 <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Stock <span className="text-indigo-500">Hub</span></h1>
                                 <p className="text-[9px] text-slate-500 font-black tracking-[0.2em]  mt-1">Manage your products and stock levels</p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowControlSection((prev) => !prev)}
-                                className={`p-3 rounded-xl border transition-all ${
-                                    darkMode
-                                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-indigo-500'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-500'
-                                }`}
-                                title={showControlSection ? 'Hide controls' : 'Show controls'}
-                                aria-label={showControlSection ? 'Hide controls' : 'Show controls'}
-                            >
-                                <Settings2 className="w-5 h-5" />
-                            </button>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowControlSection((prev) => !prev)}
+                            className={`p-3 rounded-xl border transition-all shrink-0 ${
+                                darkMode
+                                    ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-indigo-500'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-500'
+                            }`}
+                            title={showControlSection ? 'Hide controls' : 'Show controls'}
+                            aria-label={showControlSection ? 'Hide controls' : 'Show controls'}
+                        >
+                            <Settings2 className="w-5 h-5" />
+                        </button>
                     </div>
                 </header>
 
                 {/* Search & Sort Bar */}
                 {showControlSection && (
                     <div className={`border-b px-4 md:px-8 py-4 ${darkMode ? 'bg-gray-950 border-slate-900/60' : 'bg-slate-50 border-slate-200'}`}>
-                        <div className="max-w-7xl mx-auto space-y-3">
+                        <div className="w-full space-y-3">
                             {isSearchOpen ? (
                                 <div className="flex items-center gap-2 w-full">
                                     <div className="relative min-w-0 flex-1">
@@ -733,14 +821,14 @@ const InventoryContent = ({
             {/* --- CONTENT --- */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <main className="flex-1">
-                <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6">
+                <div className="w-full px-4 md:px-8 py-6">
                     {/* Desktop & Tablet: Enhanced Card Grid Layout */}
                     <section className="hidden md:block pb-6">
                         {listSyncing ? (
                             <StockHubListSkeleton darkMode={darkMode} />
                         ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} onBarcodeClick={handleOpenBarcode} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
                                 <div className={`col-span-full text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
@@ -767,7 +855,7 @@ const InventoryContent = ({
                             <StockHubListSkeleton darkMode={darkMode} />
                         ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
+                            {inventory.map(item => <InventoryListCard key={item._id || item.id} item={item} handleEditClick={handleEditClick} handleDeleteClick={handleDeleteClick} onBarcodeClick={handleOpenBarcode} loading={loading} darkMode={darkMode} readOnly={readOnly} isTextileShop={isTextileShop} />)}
                             {inventory.length === 0 && (
                                 <div className={`text-center py-20 border-2 border-dashed ${darkMode ? 'border-slate-800' : 'border-slate-200'} rounded-2xl`}>
                                     <Package className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
@@ -1106,22 +1194,30 @@ const InventoryContent = ({
                                         <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                             HSN Code / Barcode
                                         </label>
-                                        <div className="relative">
+                                        <div className="flex gap-2">
                                             <input
                                                 name="hsn"
                                                 type="text"
                                                 value={formData.hsn}
                                                 onChange={handleInputChange}
                                                 placeholder="Optional - Enter or scan"
-                                                className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                                className={`no-zoom-input flex-1 min-w-0 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setIsHsnScannerOpen(true)}
                                                 title="Scan barcode"
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 transition-colors"
+                                                className={`p-3 shrink-0 rounded-xl border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500' : 'bg-slate-100 border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500'}`}
                                             >
                                                 <ScanLine className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsFormBarcodeModalOpen(true)}
+                                                title="Generate barcode label"
+                                                className={`p-3 shrink-0 rounded-xl border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500' : 'bg-slate-100 border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500'}`}
+                                            >
+                                                <Barcode className="w-5 h-5" />
                                             </button>
                                         </div>
                                     </div>
@@ -1134,22 +1230,30 @@ const InventoryContent = ({
                                     <label className={`text-xs font-bold mb-2 block ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                         HSN Code / Barcode <span className="text-[10px] text-slate-500 font-normal">(Optional default for all variants)</span>
                                     </label>
-                                    <div className="relative">
+                                    <div className="flex gap-2">
                                         <input
                                             name="hsn"
                                             type="text"
                                             value={formData.hsn}
                                             onChange={handleInputChange}
                                             placeholder="Optional - Enter or scan"
-                                            className={`no-zoom-input w-full pr-12 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
+                                            className={`no-zoom-input flex-1 min-w-0 ${darkMode ? 'bg-gray-950 border-slate-800 text-white placeholder:text-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-500'} px-4 py-3 rounded-xl text-sm font-mono border focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20`}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setIsHsnScannerOpen(true)}
                                             title="Scan barcode"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 transition-colors"
+                                            className={`p-3 shrink-0 rounded-xl border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500' : 'bg-slate-100 border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500'}`}
                                         >
                                             <ScanLine className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsFormBarcodeModalOpen(true)}
+                                            title="Generate barcode label"
+                                            className={`p-3 shrink-0 rounded-xl border transition-all ${darkMode ? 'bg-slate-800 border-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500' : 'bg-slate-100 border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-500'}`}
+                                        >
+                                            <Barcode className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>
@@ -1237,6 +1341,28 @@ const InventoryContent = ({
                 darkMode={darkMode} 
             />
             <BulkUploadModal isOpen={isBulkUploadModalOpen} onClose={closeBulkUploadModal} onSubmit={handleBulkUpload} loading={isBulkUploading} darkMode={darkMode} isTextileShop={isTextileShop} />
+
+            <BarcodePrintModal
+                isOpen={Boolean(barcodeTarget)}
+                item={barcodeTarget?.item}
+                variant={barcodeTarget?.variant}
+                onClose={() => setBarcodeTarget(null)}
+                darkMode={darkMode}
+                showToast={showToast}
+                onSaveBarcode={onSaveBarcode ? handleSaveBarcodeFromModal : undefined}
+                saving={barcodeSaving}
+            />
+
+            <BarcodePrintModal
+                isOpen={isFormBarcodeModalOpen}
+                onClose={() => setIsFormBarcodeModalOpen(false)}
+                item={formBarcodeDraftItem}
+                variant={null}
+                darkMode={darkMode}
+                showToast={showToast}
+                onSaveBarcode={handleAttachBarcodeToFormDraft}
+                saving={false}
+            />
         </div>
     );
 };

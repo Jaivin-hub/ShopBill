@@ -459,7 +459,7 @@ router.post('/cancel-subscription', protect, async (req, res) => {
                 .select('_id shopName email plan')
                 .lean();
             if (ownerForSa) {
-                notifySuperadminsSubscriptionCancelled(io, ownerForSa, {
+                await notifySuperadminsSubscriptionCancelled(io, ownerForSa, {
                     subscriptionStatus: updateStatus,
                     cancellationAction,
                     subscriptionId,
@@ -551,8 +551,8 @@ router.post('/upgrade-plan', protect, async (req, res) => {
             });
         }
 
-        const startAtTimestamp = resolveSubscriptionStartAtUnix(user, 'resubscribe');
-        const chargeHint = describeFirstChargeForOwner(user, startAtTimestamp, 'resubscribe');
+        const startAtTimestamp = resolveSubscriptionStartAtUnix(user, 'upgrade');
+        const chargeHint = describeFirstChargeForOwner(user, startAtTimestamp, 'upgrade');
 
         const newSubscription = await createOwnerSubscription(razorpay, {
             owner: user,
@@ -720,7 +720,18 @@ router.post('/verify-plan-change', async (req, res) => {
         }
         await recordPlanChange(userToUpdate._id, newPlan, { source: 'upgrade' });
 
+        const normalizedNewPlan = normalizePlan(newPlan);
+        const isPlanChange = subscriptionDetails.notes?.plan_change === 'true';
+        if (isPlanChange && userToUpdate.planEndDate) {
+            const prevEnd = new Date(userToUpdate.planEndDate);
+            const now = new Date();
+            if (!Number.isNaN(prevEnd.getTime()) && prevEnd > now) {
+                officialBillingDate = prevEnd;
+            }
+        }
+
         const updateFields = {
+            plan: normalizedNewPlan,
             planEndDate: officialBillingDate,
             subscriptionStatus: 'active',
             transactionId: razorpay_subscription_id,

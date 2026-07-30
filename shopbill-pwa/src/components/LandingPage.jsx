@@ -74,11 +74,11 @@ const content = {
     khataFull: "Full Digital Khata",
     salesReports: "Sales reports",
     khataSMS: "Auto SMS Payment Reminders",
-    multiStore: "Up to 10 Store Locations",
+    multiStore: "Up to 5 Store Locations",
     prioritySupport: "24/7 Priority Support",
     employeeAuditLogs: "Employee Audit Logs",
     multishopManagement: "Multishop management",
-    upTo10Outlets: "Up to 10 outlets management",
+    upTo10Outlets: "Up to 5 outlets management",
     allIncluded: "All features included",
     basicExcluded2: "Multi-outlet real-time chat",
     basicExcluded3: "Auto SMS Payment Reminders",
@@ -250,19 +250,16 @@ const LandingPage = ({ onStartApp, onSelectPlan, onRenewSubscription, onViewTerm
                                 <FeatureItem icon={<Building2 />} title={content.multiOutletChat} desc={content.multiOutletChatDesc} color="cyan" darkMode={darkMode} />
                                 <FeatureItem icon={<Clock />} title={content.teamShifts} desc={content.teamShiftsDesc} color="rose" darkMode={darkMode} />
                                 <FeatureItem icon={<Wallet />} title={content.salaryPayroll} desc={content.salaryPayrollDesc} color="emerald" darkMode={darkMode} />
+                                <FeatureItem icon={<Receipt />} title={content.fastPOS} desc={content.fastPOSDesc} color="indigo" darkMode={darkMode} />
+                                <FeatureItem icon={<Package />} title={content.stockControl} desc={content.stockControlDesc} color="teal" darkMode={darkMode} />
+                                <FeatureItem icon={<Truck />} title={content.supplyChain} desc={content.supplyChainDesc} color="amber" darkMode={darkMode} />
+                                <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
+                                <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
+                                <FeatureItem icon={<UserCog />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
+                                <FeatureItem icon={<Bell />} title={content.offersFeature} desc={content.offersFeatureDesc} color="pink" darkMode={darkMode} />
+                                <FeatureItem icon={<Bell />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="orange" darkMode={darkMode} />
+                                <FeatureItem icon={<RefreshCw />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                             </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <FeatureItem icon={<Receipt />} title={content.fastPOS} desc={content.fastPOSDesc} color="indigo" darkMode={darkMode} />
-                            <FeatureItem icon={<Package />} title={content.stockControl} desc={content.stockControlDesc} color="teal" darkMode={darkMode} />
-                            <FeatureItem icon={<Truck />} title={content.supplyChain} desc={content.supplyChainDesc} color="amber" darkMode={darkMode} />
-                            <FeatureItem icon={<Users />} title={content.khata} desc={content.khataDesc} color="emerald" darkMode={darkMode} />
-                            <FeatureItem icon={<LineChart />} title={content.reports} desc={content.reportsDesc} color="purple" darkMode={darkMode} />
-                            <FeatureItem icon={<UserCog />} title={content.teamManagement} desc={content.teamManagementDesc} color="rose" darkMode={darkMode} />
-                            <FeatureItem icon={<Bell />} title={content.offersFeature} desc={content.offersFeatureDesc} color="pink" darkMode={darkMode} />
-                            <FeatureItem icon={<Bell />} title={content.realTimeChat} desc={content.realTimeChatDesc} color="orange" darkMode={darkMode} />
-                            <FeatureItem icon={<RefreshCw />} title={content.cloudSync} desc={content.cloudSyncDesc} color="blue" darkMode={darkMode} />
                         </div>
                     </div>
                 </section>

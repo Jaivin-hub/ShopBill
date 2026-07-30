@@ -19,6 +19,13 @@ import {
     clearOwnerSubscriptionCancelledState,
     isActiveSubscriptionStatus,
     planDetailsAfterCancelSuccess,
+    resolveOwnerTrialBillingState,
+    extractCurrentPlanApiPayload,
+    parseBillingDate,
+    readCachedCurrentPlanSnapshot,
+    writeCachedCurrentPlanSnapshot,
+    clearCachedCurrentPlanSnapshot,
+    syncCurrentUserPlanFields,
 } from '../utils/subscriptionBillingUi'; 
 
 const PLAN_TIER = { basic: 1, pro: 2, premium: 3 };
@@ -49,7 +56,7 @@ const DEMO_PLANS = [
         id: 'premium',
         name: 'PREMIUM',
         price: 2999,
-        features: ['Unlimited Users', 'Supply Chain Management', 'Multi-Store (Up to 10)', 'Advanced Reports', '24/7 Priority Support', 'Dedicated Manager'],
+        features: ['Unlimited Users', 'Supply Chain Management', 'Multi-Store (Up to 5)', 'Advanced Reports', '24/7 Priority Support', 'Dedicated Manager'],
         maxUsers: -1,
         maxInventory: -1,
     }
@@ -196,7 +203,11 @@ const CancellationModal = ({
                     <button
                         type="button"
                         onClick={() => setShowCancelModal(false)}
-                        className={`w-full py-2.5 text-xs font-bold rounded-xl transition ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                        className={`w-full py-2.5 text-xs font-bold rounded-xl border transition active:scale-[0.98] ${
+                            darkMode
+                                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900'
+                        }`}
                     >
                         {cancelResult || alreadyInTerminalState ? 'Close' : 'Keep plan'}
                     </button>
@@ -209,13 +220,16 @@ const CancellationModal = ({
 /** Optional plan patch for cached user, then hard-reload so UI (menus, premium, outlets) matches the server. */
 const reloadAppAfterSubscriptionChange = (planUpper = null) => {
     clearOwnerSubscriptionCancelledState();
-    if (planUpper) {
+    clearCachedCurrentPlanSnapshot();
+    const plan = planUpper ? String(planUpper).toUpperCase() : null;
+    if (plan) {
         try {
             const raw = localStorage.getItem('currentUser');
             if (raw) {
                 const u = JSON.parse(raw);
-                u.plan = String(planUpper).toUpperCase();
+                u.plan = plan;
                 u.subscriptionStatus = 'active';
+                u.isInTrial = false;
                 localStorage.setItem('currentUser', JSON.stringify(u));
             }
         } catch (_) { /* ignore */ }
@@ -226,8 +240,9 @@ const reloadAppAfterSubscriptionChange = (planUpper = null) => {
     }, 450);
 };
 
-const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDetails, setBillingAlert, setOwnerMarkedCancelled) => {
+const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDetails, setBillingAlert, setOwnerMarkedCancelled, setPlanApiSnapshot) => {
     clearOwnerSubscriptionCancelledState();
+    clearCachedCurrentPlanSnapshot();
     setOwnerMarkedCancelled(false);
     setBillingAlert(null);
     const plan = String(planUpper || '').toUpperCase();
@@ -236,7 +251,13 @@ const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDet
         ...prev,
         subscriptionCancelled: false,
         subscriptionStatus: 'active',
-        isInTrial: prev.isInTrial,
+        isInTrial: false,
+    }));
+    setPlanApiSnapshot?.((prev) => ({
+        ...(prev && typeof prev === 'object' ? prev : {}),
+        plan,
+        subscriptionStatus: 'active',
+        isInTrial: false,
     }));
     try {
         const raw = localStorage.getItem('currentUser');
@@ -244,6 +265,7 @@ const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDet
             const u = JSON.parse(raw);
             if (plan) u.plan = plan;
             u.subscriptionStatus = 'active';
+            u.isInTrial = false;
             localStorage.setItem('currentUser', JSON.stringify(u));
         }
     } catch (_) { /* ignore */ }
@@ -251,7 +273,12 @@ const applyActiveSubscriptionLocalState = (planUpper, setCurrentPlan, setPlanDet
 };
 
 const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSubscriptionAccessEnded }) => {
-    const [currentPlan, setCurrentPlan] = useState(null);
+    const [currentPlan, setCurrentPlan] = useState(() => {
+        const cached = readCachedCurrentPlanSnapshot();
+        const fromCache = cached?.plan ? String(cached.plan).toUpperCase() : '';
+        const fromUser = String(currentUser?.plan || '').toUpperCase();
+        return fromCache || fromUser || null;
+    });
     const [availablePlans, setAvailablePlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpgrading, setIsUpgrading] = useState(false);
@@ -259,12 +286,26 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
-    const [planDetails, setPlanDetails] = useState({
-        planEndDate: null,
-        nextChargeAt: null,
-        subscriptionStatus: null,
-        isInTrial: false,
-        subscriptionCancelled: false,
+    const [planApiSnapshot, setPlanApiSnapshot] = useState(() => readCachedCurrentPlanSnapshot());
+    const [planDetails, setPlanDetails] = useState(() => {
+        const cached = readCachedCurrentPlanSnapshot();
+        const end =
+            parseBillingDate(cached?.nextChargeAt) ||
+            parseBillingDate(cached?.planEndDate) ||
+            parseBillingDate(currentUser?.planEndDate);
+        const status = cached?.subscriptionStatus || currentUser?.subscriptionStatus || null;
+        const statusLower = String(status || '').toLowerCase();
+        const inTrial =
+            Boolean(cached?.isInTrial) ||
+            statusLower === 'authenticated' ||
+            statusLower === 'created';
+        return {
+            planEndDate: end,
+            nextChargeAt: end,
+            subscriptionStatus: status,
+            isInTrial: inTrial,
+            subscriptionCancelled: Boolean(cached?.subscriptionCancelled),
+        };
     });
     const [cancellationMessage, setCancellationMessage] = useState('');
     const [billingAlert, setBillingAlert] = useState(() => readStoredOwnerBillingAlert());
@@ -289,16 +330,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
         return dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
-    const parseBillingDate = (raw) => {
-        if (!raw) return null;
-        const d = raw instanceof Date ? raw : new Date(raw);
-        return Number.isNaN(d.getTime()) ? null : d;
-    };
-
     const getNextPaymentDate = useCallback(() => {
+        const fromApi =
+            parseBillingDate(planApiSnapshot?.nextChargeAt) ||
+            parseBillingDate(planApiSnapshot?.planEndDate);
+        if (fromApi) return fromApi;
         const d = planDetails.nextChargeAt || planDetails.planEndDate;
         return d instanceof Date && !Number.isNaN(d.getTime()) ? d : parseBillingDate(d);
-    }, [planDetails.nextChargeAt, planDetails.planEndDate]);
+    }, [planApiSnapshot, planDetails.nextChargeAt, planDetails.planEndDate]);
 
     const getAccessEndLabel = useCallback(() => {
         const formatted = formatDate(getNextPaymentDate());
@@ -373,41 +412,51 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
     ]);
 
     const isCurrentlyInTrial = useCallback(() => {
-        if (planDetails.isInTrial) return true;
-        const status = String(planDetails.subscriptionStatus || '').toLowerCase();
+        if (planApiSnapshot?.isInTrial === false) return false;
+        if (planDetails.isInTrial === false && planApiSnapshot?.isInTrial !== true) return false;
+        if (planDetails.isInTrial || planApiSnapshot?.isInTrial === true) return true;
+        const status = String(
+            planDetails.subscriptionStatus ||
+                planApiSnapshot?.subscriptionStatus ||
+                ''
+        ).toLowerCase();
         if (status === 'trial_cancellation_pending') return false;
+        if (status === 'active') return false;
         if (status === 'authenticated' || status === 'created') return true;
-        const paymentDate = planDetails.nextChargeAt || planDetails.planEndDate;
-        if (
-            status === 'active' &&
-            paymentDate &&
-            paymentDate > new Date()
-        ) {
-            return true;
-        }
         return false;
-    }, [planDetails.isInTrial, planDetails.planEndDate, planDetails.nextChargeAt, planDetails.subscriptionStatus]);
+    }, [
+        planDetails.isInTrial,
+        planDetails.subscriptionStatus,
+        planApiSnapshot,
+    ]);
 
     const fetchPlanData = useCallback(async () => {
         setIsLoading(true);
         const localFallbackPlan = String(currentUser?.plan || 'BASIC').toUpperCase();
         try {
             const planResponse = await apiClient.get(API.currentPlan);
-            const fetchedPlanName = planResponse?.data?.plan?.toUpperCase() || localFallbackPlan;
+            const payload = extractCurrentPlanApiPayload(planResponse);
+            writeCachedCurrentPlanSnapshot(payload);
+            setPlanApiSnapshot(payload);
+
+            const fetchedPlanName = payload?.plan?.toUpperCase() || localFallbackPlan;
             let fetchedPlanEndDate =
-                parseBillingDate(planResponse?.data?.nextChargeAt) ||
-                parseBillingDate(planResponse?.data?.planEndDate);
+                parseBillingDate(payload?.nextChargeAt) ||
+                parseBillingDate(payload?.planEndDate);
             let fetchedNextCharge =
-                parseBillingDate(planResponse?.data?.nextChargeAt) || fetchedPlanEndDate;
+                parseBillingDate(payload?.nextChargeAt) || fetchedPlanEndDate;
             if (!fetchedPlanEndDate) {
                 fetchedPlanEndDate = parseBillingDate(currentUser?.planEndDate);
                 fetchedNextCharge = fetchedPlanEndDate;
             }
-            const fetchedSubscriptionStatus = planResponse?.data?.subscriptionStatus || null;
+            const fetchedSubscriptionStatus = payload?.subscriptionStatus || null;
             const statusLower = String(fetchedSubscriptionStatus || '').toLowerCase();
-            const fromApiCancelled = Boolean(planResponse?.data?.subscriptionCancelled);
+            const fromApiCancelled = Boolean(payload?.subscriptionCancelled);
             const fromStatusCancelled = isTerminalCancelledSubscriptionStatus(fetchedSubscriptionStatus);
-            const apiInTrial = Boolean(planResponse?.data?.isInTrial);
+            const apiInTrial =
+                payload?.isInTrial === true ||
+                payload?.isInTrial === 1 ||
+                String(payload?.isInTrial || '').toLowerCase() === 'true';
             const paymentDate = fetchedNextCharge || fetchedPlanEndDate;
             const hasFutureCharge = paymentDate && paymentDate > new Date();
             const statusIsLive =
@@ -415,26 +464,14 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
                 statusLower === 'created';
 
             let subscriptionCancelled;
-            if (
-                apiInTrial &&
-                hasFutureCharge &&
-                statusIsLive &&
-                statusLower !== 'trial_cancellation_pending'
-            ) {
+            if (apiInTrial && statusLower !== 'trial_cancellation_pending') {
                 clearOwnerSubscriptionCancelledState();
                 setOwnerMarkedCancelled(false);
                 subscriptionCancelled = false;
             } else if (
                 isActiveSubscriptionStatus(fetchedSubscriptionStatus) &&
                 !fromApiCancelled &&
-                hasFutureCharge
-            ) {
-                clearOwnerSubscriptionCancelledState();
-                setOwnerMarkedCancelled(false);
-                subscriptionCancelled = false;
-            } else if (
-                (isActiveSubscriptionStatus(fetchedSubscriptionStatus) && !fromApiCancelled) ||
-                (apiInTrial && !fromStatusCancelled)
+                !fromStatusCancelled
             ) {
                 clearOwnerSubscriptionCancelledState();
                 setOwnerMarkedCancelled(false);
@@ -454,12 +491,13 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
                     apiInTrial);
 
             setCurrentPlan(fetchedPlanName);
-            const inferredInTrial =
-                !subscriptionCancelled &&
-                (apiInTrial ||
-                    statusLower === 'authenticated' ||
-                    statusLower === 'created' ||
-                    (hasFutureCharge && statusIsLive));
+            const inferredInTrial = subscriptionCancelled
+                ? false
+                : apiInTrial
+                  ? true
+                  : payload?.isInTrial === false
+                    ? false
+                    : statusLower === 'authenticated' || statusLower === 'created';
             setPlanDetails({
                 planEndDate: fetchedPlanEndDate,
                 nextChargeAt: fetchedNextCharge,
@@ -467,7 +505,13 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
                 isInTrial: subscriptionCancelled ? false : inferredInTrial,
                 subscriptionCancelled,
             });
-            const alertFromApi = planResponse?.data?.billingAlert;
+            syncCurrentUserPlanFields(fetchedPlanName, {
+                planEndDate: fetchedPlanEndDate?.toISOString?.() || payload?.planEndDate || null,
+                nextChargeAt: fetchedNextCharge?.toISOString?.() || payload?.nextChargeAt || null,
+                subscriptionStatus: fetchedSubscriptionStatus,
+                isInTrial: subscriptionCancelled ? false : inferredInTrial,
+            });
+            const alertFromApi = payload?.billingAlert;
             if (apiSaysActive) {
                 setBillingAlert(null);
             } else if (alertFromApi?.show) {
@@ -480,15 +524,36 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
             setAvailablePlans(plansAtOrAboveCurrent(DEMO_PLANS, fetchedPlanName));
 
             if (
-                planResponse?.data?.success &&
-                planResponse.data.accessAllowed === false &&
-                !planResponse.data.mandateRestoreRequired
+                payload?.success &&
+                payload.accessAllowed === false &&
+                !payload.mandateRestoreRequired
             ) {
                 onSubscriptionAccessEnded?.();
             }
         } catch (error) {
             console.error("Error fetching plan data:", error);
-            setCurrentPlan(localFallbackPlan);
+            const cached = readCachedCurrentPlanSnapshot();
+            if (cached?.plan) {
+                setPlanApiSnapshot(cached);
+                const end =
+                    parseBillingDate(cached.nextChargeAt) ||
+                    parseBillingDate(cached.planEndDate);
+                const status = cached.subscriptionStatus || null;
+                const statusLower = String(status || '').toLowerCase();
+                setCurrentPlan(String(cached.plan).toUpperCase());
+                setPlanDetails({
+                    planEndDate: end,
+                    nextChargeAt: end,
+                    subscriptionStatus: status,
+                    isInTrial:
+                        Boolean(cached.isInTrial) ||
+                        statusLower === 'authenticated' ||
+                        statusLower === 'created',
+                    subscriptionCancelled: Boolean(cached.subscriptionCancelled),
+                });
+            } else {
+                setCurrentPlan(localFallbackPlan);
+            }
             setAvailablePlans(plansAtOrAboveCurrent(DEMO_PLANS, localFallbackPlan));
             showToast('Failed to sync billing data.', 'error');
         } finally {
@@ -527,6 +592,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
         setIsUpgrading(true);
         setShowConfirmModal(false);
         let reloadAfter = false;
+        let verifiedPlanUpper = null;
         try {
             const verificationResponse = await apiClient.post(API.verifyPlanChange, {
                 razorpay_payment_id: response.razorpay_payment_id,
@@ -535,15 +601,16 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
                 newPlan: newPlanId.toUpperCase(),
             });
             if (verificationResponse.data.success) {
-                const planUpper = newPlanId.toUpperCase();
+                verifiedPlanUpper = newPlanId.toUpperCase();
                 applyActiveSubscriptionLocalState(
-                    planUpper,
+                    verifiedPlanUpper,
                     setCurrentPlan,
                     setPlanDetails,
                     setBillingAlert,
-                    setOwnerMarkedCancelled
+                    setOwnerMarkedCancelled,
+                    setPlanApiSnapshot
                 );
-                showToast(`Plan updated to ${planUpper}. Refreshing…`, 'success');
+                showToast(`Plan updated to ${verifiedPlanUpper}. Refreshing…`, 'success');
                 reloadAfter = true;
             } else {
                 showToast(verificationResponse.data.error || 'Verification failed.', 'error');
@@ -555,7 +622,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
             if (!reloadAfter) fetchPlanData();
         }
         if (reloadAfter) {
-            reloadAppAfterSubscriptionChange(newPlanId);
+            reloadAppAfterSubscriptionChange(verifiedPlanUpper);
         }
     };
 
@@ -670,8 +737,29 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
         }
     };
 
-    const subscriptionIsActive = isActiveSubscriptionStatus(planDetails.subscriptionStatus);
+    const effectiveSubscriptionStatus =
+        planDetails.subscriptionStatus ||
+        planApiSnapshot?.subscriptionStatus ||
+        currentUser?.subscriptionStatus ||
+        null;
+    const effectiveIsInTrial =
+        planApiSnapshot?.isInTrial === false
+            ? false
+            : Boolean(planDetails.isInTrial || planApiSnapshot?.isInTrial === true);
+    const subscriptionIsActive = isActiveSubscriptionStatus(effectiveSubscriptionStatus);
+    const trialBillingUi = resolveOwnerTrialBillingState({
+        subscriptionStatus: effectiveSubscriptionStatus,
+        planEndDate: planDetails.planEndDate,
+        nextChargeAt: getNextPaymentDate(),
+        apiInTrial: effectiveIsInTrial,
+        subscriptionCancelled: planDetails.subscriptionCancelled,
+    });
+    const onActiveFreeTrial =
+        trialBillingUi.isOnFreeTrial ||
+        (isCurrentlyInTrial() && planApiSnapshot?.isInTrial !== false);
+
     const ownerCancelledHint =
+        !onActiveFreeTrial &&
         !subscriptionIsActive &&
         (planDetails.subscriptionCancelled ||
             ownerMarkedCancelled ||
@@ -679,10 +767,10 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
             hasCancelledSubscriptionStatus());
 
     const billingStatusDisplay = getPlanBillingStatusDisplay({
-        subscriptionStatus: planDetails.subscriptionStatus,
+        subscriptionStatus: effectiveSubscriptionStatus,
         planEndDate: getNextPaymentDate(),
         billingAlert,
-        isInTrial: ownerCancelledHint ? false : planDetails.isInTrial,
+        isInTrial: onActiveFreeTrial,
         subscriptionCancelled: ownerCancelledHint,
     });
 
@@ -694,11 +782,12 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
         return <PlanUpgradeInitialSkeleton darkMode={darkMode} />;
     }
 
-    const statusLower = String(planDetails.subscriptionStatus || '').toLowerCase();
+    const statusLower = String(effectiveSubscriptionStatus || '').toLowerCase();
     const cancelledByStatus = hasCancelledSubscriptionStatus();
     const isPlanExpiring = isAlreadyCancelledOrPending();
     const alreadyInTerminalState = isAlreadyCancelledOrPending();
     const needsResubscribe =
+        !onActiveFreeTrial &&
         !subscriptionIsActive &&
         (ownerCancelledHint ||
             cancelledByStatus ||
@@ -708,10 +797,12 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
             billingStatusDisplay?.title === 'Subscription cancelled');
     const isTrialCancelled =
         statusLower === 'trial_cancellation_pending' ||
-        (needsResubscribe && planDetails.isInTrial);
-    const stillHasAccess = hasInclusiveBillingAccess(
-        planDetails.nextChargeAt || planDetails.planEndDate
-    );
+        (needsResubscribe && effectiveIsInTrial);
+    const effectiveAccessEnd = getNextPaymentDate();
+    const stillHasAccess =
+        hasInclusiveBillingAccess(effectiveAccessEnd) ||
+        onActiveFreeTrial ||
+        subscriptionIsActive;
 
     const isCancelledLike =
         cancelledByStatus ||
@@ -719,21 +810,23 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
         CANCELLED_ACCESS_STATUSES.has(statusLower) ||
         ['cancelled', 'cancellation_no_refund', 'trial_cancellation_pending'].includes(statusLower);
     const showTrialBadge =
-        !needsResubscribe &&
         !isTrialCancelled &&
-        (planDetails.isInTrial ||
-            isCurrentlyInTrial() ||
+        (trialBillingUi.showTrialBadge ||
+            onActiveFreeTrial ||
             billingStatusDisplay?.title === 'Free trial active');
 
-    const renewLabel = !stillHasAccess && !isCurrentlyInTrial() && !planDetails.isInTrial
-        ? 'Access period ended'
-        : isCancelledLike || billingStatusDisplay?.variant === 'cancelled' || isPlanExpiring
-          ? `Access until ${getAccessEndLabel()}`
-          : planDetails.subscriptionStatus === 'pending'
-            ? 'Payment retry — see notice below'
-            : isCurrentlyInTrial() || planDetails.isInTrial
-              ? `First charge ${getAccessEndLabel()}`
-              : `Renews ${getAccessEndLabel()}`;
+    const renewLabel =
+        onActiveFreeTrial
+            ? trialBillingUi.chargeLabel
+            : !stillHasAccess
+              ? 'Access period ended'
+              : isCancelledLike || billingStatusDisplay?.variant === 'cancelled' || isPlanExpiring
+                ? `Access until ${getAccessEndLabel()}`
+                : statusLower === 'pending'
+                  ? 'Payment retry — see notice below'
+                  : trialBillingUi.paymentLabel
+                    ? `Renews ${trialBillingUi.paymentLabel}`
+                    : 'Renewal date pending';
 
     const getModalWarningMessage = (plan) => {
         const action = isSamePlanAndCancelled(plan) ? 're-subscribe' : 'upgrade';
@@ -810,7 +903,7 @@ const PlanUpgrade = ({ apiClient, showToast, currentUser, onBack, darkMode, onSu
                     />
                 )}
 
-                {currentPlan && !needsResubscribe && (
+                {currentPlan && (
                     <section
                         className={`overflow-hidden rounded-2xl border shadow-sm ${darkMode ? 'border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'}`}
                     >

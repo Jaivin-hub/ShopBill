@@ -59,7 +59,7 @@ const ChatListSidebar = ({
 
     return (
         <div 
-            className={`w-full md:w-80 ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full transition-all duration-300 ${sidebarBg} overflow-hidden`}
+            className={`w-full ${selectedChat ? 'md:w-80' : 'md:w-full'} ${selectedChat ? 'hidden md:flex' : 'flex'} ${selectedChat ? 'md:border-r' : ''} ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex-col h-full transition-all duration-300 ${sidebarBg} overflow-hidden`}
         >
             {/* Scrollable Container - Required for sticky to work */}
             <div className="flex-1 overflow-y-auto chat-scroll custom-scrollbar">

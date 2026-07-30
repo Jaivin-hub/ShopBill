@@ -7,6 +7,72 @@ export const CANCELLED_ACCESS_STATUSES = new Set([
 
 export const OWNER_BILLING_ALERT_STORAGE_KEY = 'pocketpos_owner_billing_alert';
 export const OWNER_SUBSCRIPTION_CANCELLED_STORAGE_KEY = 'pocketpos_owner_subscription_cancelled';
+export const CURRENT_PLAN_SNAPSHOT_STORAGE_KEY = 'pocketpos_current_plan_snapshot';
+
+export function parseBillingDate(raw) {
+    if (!raw) return null;
+    const d = raw instanceof Date ? raw : new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Normalize axios / fetch body from GET /auth/current-plan */
+export function extractCurrentPlanApiPayload(response) {
+    const body = response?.data ?? response ?? {};
+    if (body && typeof body === 'object' && body.success !== undefined && body.plan !== undefined) {
+        return body;
+    }
+    if (body?.data && typeof body.data === 'object' && body.data.success !== undefined) {
+        return body.data;
+    }
+    return body && typeof body === 'object' ? body : {};
+}
+
+export function readCachedCurrentPlanSnapshot() {
+    try {
+        const raw = sessionStorage.getItem(CURRENT_PLAN_SNAPSHOT_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+export function writeCachedCurrentPlanSnapshot(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    try {
+        sessionStorage.setItem(
+            CURRENT_PLAN_SNAPSHOT_STORAGE_KEY,
+            JSON.stringify({ ...payload, cachedAt: Date.now() })
+        );
+    } catch {
+        /* ignore quota */
+    }
+}
+
+export function clearCachedCurrentPlanSnapshot() {
+    try {
+        sessionStorage.removeItem(CURRENT_PLAN_SNAPSHOT_STORAGE_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+export function syncCurrentUserPlanFields(planUpper, fields = {}) {
+    try {
+        const raw = localStorage.getItem('currentUser');
+        if (!raw) return;
+        const u = JSON.parse(raw);
+        if (planUpper) u.plan = String(planUpper).toUpperCase();
+        if (fields.planEndDate !== undefined) u.planEndDate = fields.planEndDate;
+        if (fields.nextChargeAt !== undefined) u.nextChargeAt = fields.nextChargeAt;
+        if (fields.subscriptionStatus !== undefined) u.subscriptionStatus = fields.subscriptionStatus;
+        if (fields.isInTrial !== undefined) u.isInTrial = fields.isInTrial;
+        localStorage.setItem('currentUser', JSON.stringify(u));
+    } catch {
+        /* ignore */
+    }
+}
 
 /** True when auto-debit is off (trial or paid cancel). */
 export function isTerminalCancelledSubscriptionStatus(status) {
@@ -67,6 +133,53 @@ export function clearOwnerSubscriptionCancelledState() {
 export function isActiveSubscriptionStatus(status) {
     const s = String(status || '').toLowerCase().trim();
     return s === 'active' || s === 'authenticated';
+}
+
+/** Trial + next payment display for Subscription & Billing page */
+export function resolveOwnerTrialBillingState({
+    subscriptionStatus,
+    planEndDate,
+    nextChargeAt,
+    apiInTrial = false,
+    subscriptionCancelled = false,
+}) {
+    const status = String(subscriptionStatus || '').toLowerCase().trim();
+    const paymentDateRaw = nextChargeAt || planEndDate;
+    const paymentDate =
+        paymentDateRaw instanceof Date
+            ? paymentDateRaw
+            : paymentDateRaw
+              ? new Date(paymentDateRaw)
+              : null;
+    const paymentDateValid = paymentDate && !Number.isNaN(paymentDate.getTime());
+    const hasFutureCharge = paymentDateValid && paymentDate > new Date();
+    const paymentLabel = paymentDateValid
+        ? paymentDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        : null;
+
+    const explicitlyCancelledTrial = status === 'trial_cancellation_pending';
+    const isOnFreeTrial =
+        !explicitlyCancelledTrial &&
+        !subscriptionCancelled &&
+        Boolean(apiInTrial);
+
+    const showTrialBadge = isOnFreeTrial;
+    const chargeLabel = isOnFreeTrial
+        ? paymentLabel
+            ? `First charge ${paymentLabel}`
+            : 'First charge at end of free trial'
+        : paymentLabel
+          ? `Renews ${paymentLabel}`
+          : 'Renewal date pending';
+
+    return {
+        isOnFreeTrial,
+        showTrialBadge,
+        chargeLabel,
+        paymentDate: paymentDateValid ? paymentDate : null,
+        paymentLabel,
+        hasFutureCharge,
+    };
 }
 
 /** After a successful cancel API call, derive local plan state for the billing page. */

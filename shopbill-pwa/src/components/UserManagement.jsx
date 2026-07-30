@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle, Mail, RotateCw, Search, Power, PowerOff, Filter, Eye } from 'lucide-react';
+import { Store, Plus, Trash2, Loader, MapPin, Building, Shield, Users, User, X, IndianRupee, TrendingUp, TrendingDown, Minus, ArrowUpDown, Phone, Calendar, Clock, CreditCard, CheckCircle, XCircle, AlertCircle, Mail, RotateCw, Search, Power, PowerOff, Filter, Eye, ChevronRight } from 'lucide-react';
 import { SuperAdminShopsInitialSkeleton, PaymentHistoryModalSkeleton } from './skeletons/PageSkeletons';
 import ConfirmationModal from './ConfirmationModal';
 import AppModalOverlay from './AppModalOverlay';
@@ -190,6 +190,7 @@ const MOBILE_SORT_OPTIONS = [
     { key: 'dateJoined', label: 'Newest joined' },
     { key: 'name', label: 'Shop name (A–Z)' },
     { key: 'plan', label: 'Plan tier' },
+    { key: 'status', label: 'Account status' },
     { key: 'performance', label: 'Performance score' },
 ];
 
@@ -197,9 +198,16 @@ const MOBILE_SORT_OPTIONS = [
 const PlanHistoryHint = ({ plan, planHistoryDisplay, darkMode = true, compact = false }) => {
     const display = planHistoryDisplay || {};
     const current = String(display.currentPlan || plan || 'BASIC').toUpperCase();
-    const summary = display.summaryLine;
+    const timeline =
+        display.timelineShort ||
+        (display.previousPlan && display.previousPlan !== current
+            ? `${display.previousPlan} → ${current}`
+            : display.summaryLine);
     const segments = Array.isArray(display.segments) ? display.segments : [];
     const muted = darkMode ? 'text-gray-500' : 'text-slate-500';
+    const timelineParts = timeline && timeline.includes('→')
+        ? timeline.split('→').map((s) => s.trim()).filter(Boolean)
+        : null;
 
     return (
         <div
@@ -208,12 +216,36 @@ const PlanHistoryHint = ({ plan, planHistoryDisplay, darkMode = true, compact = 
             <span className={`px-2.5 py-1 rounded-md text-[10px] font-black tracking-tighter border ${getPlanStyles(current, darkMode)}`}>
                 {current}
             </span>
-            {summary ? (
+            {timelineParts && timelineParts.length > 1 ? (
+                <span
+                    className={`inline-flex flex-wrap items-center gap-0.5 text-[10px] font-medium leading-tight max-w-[220px] ${compact ? 'justify-start' : 'justify-center'} ${muted}`}
+                    title={segments.map((s) => s.label).join('\n')}
+                >
+                    {timelineParts.map((part, i) => (
+                        <React.Fragment key={`${part}-${i}`}>
+                            {i > 0 && (
+                                <ChevronRight className={`w-3 h-3 shrink-0 ${darkMode ? 'text-gray-600' : 'text-slate-400'}`} />
+                            )}
+                            <span
+                                className={
+                                    i === timelineParts.length - 1
+                                        ? darkMode
+                                            ? 'text-indigo-300 font-bold'
+                                            : 'text-indigo-700 font-bold'
+                                        : ''
+                                }
+                            >
+                                {part}
+                            </span>
+                        </React.Fragment>
+                    ))}
+                </span>
+            ) : timeline ? (
                 <span
                     className={`text-[10px] font-medium leading-tight max-w-[200px] ${compact ? 'text-left' : 'text-center'} ${muted}`}
                     title={segments.map((s) => s.label).join('\n')}
                 >
-                    {summary}
+                    {timeline}
                 </span>
             ) : segments.length > 1 ? (
                 <span
@@ -287,7 +319,10 @@ const ShopDetailsModal = ({ isOpen, onClose, shop, darkMode, onViewStaff }) => {
                         <h2 id="shop-details-modal-title" className={`text-base font-bold truncate ${textPrimary}`}>
                             {shop.name}
                         </h2>
-                        <p className={`text-xs mt-0.5 ${textMuted}`}>Contact, performance &amp; team</p>
+                        <div className="mt-1.5">
+                            <AccountStatusBadge isActive={shop.isActive} compact />
+                        </div>
+                        <p className={`text-xs mt-1 ${textMuted}`}>Contact, performance &amp; team</p>
                     </div>
                     <button
                         type="button"
@@ -417,11 +452,7 @@ const MobileShopCard = ({
                         <h3 className={`text-base font-bold leading-snug truncate ${textPrimary}`}>{shop.name}</h3>
                         <p className={`text-xs mt-0.5 ${textMuted}`}>Joined {shop.dateJoined}</p>
                     </div>
-                    {!shop.isActive && (
-                        <span className="shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/25">
-                            Off
-                        </span>
-                    )}
+                    <AccountStatusBadge isActive={shop.isActive} compact />
                 </div>
 
                 <div className="[&>span]:w-full [&>span]:justify-center">
@@ -943,6 +974,34 @@ const PerformanceTrendIndicator = ({ performance, showScore = true, showLabel = 
     );
 };
 
+const AccountStatusBadge = ({ isActive, compact = false }) => {
+    const active = isActive !== false;
+    const size = compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs';
+    const iconSize = compact ? 'w-3 h-3' : 'w-3.5 h-3.5';
+
+    if (active) {
+        return (
+            <span
+                className={`inline-flex items-center justify-center gap-1 rounded-lg font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 ${size}`}
+                title="Shop account is active"
+            >
+                <Power className={iconSize} />
+                Active
+            </span>
+        );
+    }
+
+    return (
+        <span
+            className={`inline-flex items-center justify-center gap-1 rounded-lg font-semibold bg-red-500/10 text-red-500 border border-red-500/30 ${size}`}
+            title="Shop account is deactivated"
+        >
+            <PowerOff className={iconSize} />
+            Inactive
+        </span>
+    );
+};
+
 const SubscriptionStatusBadge = ({ status, compact = false }) => {
     let icon, color, bgColor, borderColor, text;
     const normalizedStatus = status ? status.toLowerCase() : 'unknown';
@@ -1070,7 +1129,9 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
 
         (async () => {
             try {
-                const response = await apiClient.get(API.superadminShopPayments(shopId));
+                const response = await apiClient.get(API.superadminShopPayments(shopId), {
+                    timeout: 45000,
+                });
                 if (cancelled) return;
                 if (response.data.success) {
                     setPaymentData(response.data.data);
@@ -1095,9 +1156,80 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
     const getStatusBadge = (status) => {
         const s = status?.toLowerCase();
         if (s === 'paid') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30"><CheckCircle className="w-3.5 h-3.5" />Paid</span>;
-        if (s === 'failed') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30"><XCircle className="w-3.5 h-3.5" />Failed</span>;
+        if (s === 'failed' || s === 'overdue') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30"><XCircle className="w-3.5 h-3.5" />{s === 'overdue' ? 'Overdue' : 'Failed'}</span>;
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"><AlertCircle className="w-3.5 h-3.5" />Pending</span>;
     };
+
+    const renderPaymentRow = (payment, index) => {
+        const amount = Number(payment.amount);
+        const failureLabel = formatPaymentFailureLabel(payment.failureReason);
+        const isFailed = ['failed', 'overdue'].includes(payment.status?.toLowerCase());
+        const rowKey = payment.id || `${payment.transactionId}-${index}`;
+
+        return (
+            <article key={rowKey} className={`rounded-lg p-3 md:p-4 border transition-all ${historyCard}`}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className={`text-sm font-semibold ${textPrimary}`}>
+                                ₹{Number.isFinite(amount) ? amount.toFixed(2) : '0.00'}
+                            </span>
+                            {getStatusBadge(payment.status)}
+                            {payment.eventType && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-md ${darkMode ? 'bg-gray-700/60 text-gray-300' : 'bg-slate-200 text-slate-600'}`}>
+                                    {payment.eventType.replace(/_/g, ' ')}
+                                </span>
+                            )}
+                        </div>
+                        <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] md:text-xs ${textSecondary}`}>
+                            <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                {payment.date ? formatDateUTC(payment.date) : '—'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                                {payment.method || 'Online'}
+                            </span>
+                            {payment.transactionId && (
+                                <span className={`truncate max-w-full sm:max-w-[200px] ${textMuted}`}>
+                                    ID: {payment.transactionId}
+                                </span>
+                            )}
+                        </div>
+                        {isFailed && (failureLabel || payment.failureDetail) && (
+                            <div className={`mt-2 rounded-lg px-2.5 py-2 text-[10px] md:text-xs border ${darkMode ? 'bg-rose-950/40 border-rose-500/30 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                                {failureLabel && (
+                                    <p className="font-semibold flex items-center gap-1">
+                                        <XCircle className="w-3.5 h-3.5 shrink-0" />
+                                        {failureLabel}
+                                    </p>
+                                )}
+                                {payment.failureDetail && (
+                                    <p className={`mt-0.5 ${darkMode ? 'text-rose-300/90' : 'text-rose-800'}`}>
+                                        {payment.failureDetail}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </article>
+        );
+    };
+
+    const paymentHistoryGroups =
+        paymentData?.paymentHistoryGroups?.length > 0
+            ? paymentData.paymentHistoryGroups
+            : paymentData?.paymentHistory?.length
+              ? [
+                    {
+                        plan: paymentData.currentPlan || shopPlan,
+                        isCurrent: true,
+                        label: `${paymentData.currentPlan || shopPlan} plan`,
+                        payments: paymentData.paymentHistory,
+                    },
+                ]
+              : [];
 
     const nextPaymentStatus = paymentData
         ? calculateDueStatus(paymentData.upcomingPayment?.date)
@@ -1149,8 +1281,13 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                         <IndianRupee className="w-4 h-4 md:w-5 md:h-5 text-indigo-500" />
                                         <h3 className={`text-[10px] md:text-sm font-semibold tracking-wider ${textSecondary}`}>Plan</h3>
                                     </div>
-                                    <p className={`text-lg md:text-2xl font-bold mb-1 ${textPrimary}`}>{paymentData.currentPlan || shopPlan}</p>
-                                    <p className={`text-[10px] md:text-sm ${textSecondary}`}>Monthly</p>
+                                    <PlanHistoryHint
+                                        plan={paymentData.currentPlan || shopPlan}
+                                        planHistoryDisplay={paymentData.planHistoryDisplay}
+                                        darkMode={darkMode}
+                                        compact
+                                    />
+                                    <p className={`text-[10px] md:text-xs mt-2 ${textSecondary}`}>Monthly billing</p>
                                 </div>
 
                                 <div className={`bg-gradient-to-br rounded-xl p-3 md:p-5 border transition-all duration-300 ${nextPaymentStatus.isUrgent ? 'from-red-500/10 to-orange-500/10 border-red-500/40' : darkMode ? 'from-indigo-500/10 to-purple-500/10 border-indigo-500/30' : 'from-indigo-50 to-purple-50 border-indigo-200'}`}>
@@ -1175,64 +1312,34 @@ const PaymentModal = ({ isOpen, onClose, shopName, shopPlan, shopId, apiClient, 
                                     <Clock className="w-5 h-5 text-indigo-500 shrink-0" />
                                     Transaction history
                                 </h3>
-                                <div className="space-y-3">
-                                    {paymentData.paymentHistory?.length > 0 ? (
-                                        paymentData.paymentHistory.map((payment, index) => {
-                                            const amount = Number(payment.amount);
-                                            const failureLabel = formatPaymentFailureLabel(payment.failureReason);
-                                            const isFailed = payment.status?.toLowerCase() === 'failed';
-                                            const rowKey = payment.id || `${payment.transactionId}-${index}`;
-
-                                            return (
-                                                <article key={rowKey} className={`rounded-lg p-3 md:p-4 border transition-all ${historyCard}`}>
-                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                                <span className={`text-sm font-semibold ${textPrimary}`}>
-                                                                    ₹{Number.isFinite(amount) ? amount.toFixed(2) : '0.00'}
-                                                                </span>
-                                                                {getStatusBadge(payment.status)}
-                                                                {payment.eventType && (
-                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-md ${darkMode ? 'bg-gray-700/60 text-gray-300' : 'bg-slate-200 text-slate-600'}`}>
-                                                                        {payment.eventType.replace(/_/g, ' ')}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] md:text-xs ${textSecondary}`}>
-                                                                <span className="flex items-center gap-1">
-                                                                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                                                                    {payment.date ? formatDateUTC(payment.date) : '—'}
-                                                                </span>
-                                                                <span className="flex items-center gap-1">
-                                                                    <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                                                                    {payment.method || 'Online'}
-                                                                </span>
-                                                                {payment.transactionId && (
-                                                                    <span className={`truncate max-w-full sm:max-w-[200px] ${textMuted}`}>
-                                                                        ID: {payment.transactionId}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {isFailed && (failureLabel || payment.failureDetail) && (
-                                                                <div className={`mt-2 rounded-lg px-2.5 py-2 text-[10px] md:text-xs border ${darkMode ? 'bg-rose-950/40 border-rose-500/30 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                                                                    {failureLabel && (
-                                                                        <p className="font-semibold flex items-center gap-1">
-                                                                            <XCircle className="w-3.5 h-3.5 shrink-0" />
-                                                                            {failureLabel}
-                                                                        </p>
-                                                                    )}
-                                                                    {payment.failureDetail && (
-                                                                        <p className={`mt-0.5 ${darkMode ? 'text-rose-300/90' : 'text-rose-800'}`}>
-                                                                            {payment.failureDetail}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                <div className="space-y-5">
+                                    {paymentHistoryGroups.length > 0 ? (
+                                        paymentHistoryGroups.map((group, groupIndex) => (
+                                            <div key={`${group.plan}-${groupIndex}`}>
+                                                {paymentHistoryGroups.length > 1 && (
+                                                    <div
+                                                        className={`flex items-center gap-2 mb-3 ${
+                                                            groupIndex > 0 ? 'pt-4 border-t border-dashed' : ''
+                                                        } ${darkMode ? 'border-gray-700/80' : 'border-slate-200'}`}
+                                                    >
+                                                        <span
+                                                            className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-tighter border ${getPlanStyles(group.plan, darkMode)}`}
+                                                        >
+                                                            {group.plan}
+                                                        </span>
+                                                        <span className={`text-[10px] font-medium ${textMuted}`}>
+                                                            {group.isCurrent ? 'Current plan' : 'Previous plan'}
+                                                        </span>
+                                                        <div className={`flex-1 h-px ${darkMode ? 'bg-gray-700/60' : 'bg-slate-200'}`} />
                                                     </div>
-                                                </article>
-                                            );
-                                        })
+                                                )}
+                                                <div className="space-y-3">
+                                                    {group.payments.map((payment, index) =>
+                                                        renderPaymentRow(payment, index)
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
                                     ) : (
                                         <p className={`text-center py-8 border border-dashed rounded-lg text-sm ${textMuted} ${darkMode ? 'border-gray-800' : 'border-slate-300'}`}>
                                             No previous transaction records.
@@ -1790,13 +1897,16 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                                 <div className="flex items-center justify-center">Plan / history <SortIcon columnKey="plan" /></div>
                                             </th>
                                             <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Subscription</th>
+                                            <th onClick={() => handleSort('status')} className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider cursor-pointer hover:${textPrimary} transition-colors`}>
+                                                <div className="flex items-center justify-center">Account <SortIcon columnKey="status" /></div>
+                                            </th>
                                             <th className={`px-6 py-4 text-center text-xs font-semibold ${textSecondary} tracking-wider`}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className={`divide-y ${borderColor}`}>
                                         {filteredAndSortedShops.length === 0 ? (
                                             <tr>
-                                                <td colSpan="5" className={`px-6 py-20 text-center ${textMuted}`}>
+                                                <td colSpan="6" className={`px-6 py-20 text-center ${textMuted}`}>
                                                     {lifecycleTab === 'trial'
                                                         ? 'No shops on trial period match your search or filters.'
                                                         : lifecycleTab === 'billing'
@@ -1829,6 +1939,9 @@ const UserManagement = ({ apiClient, API, showToast, currentUser, darkMode = tru
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center"><SubscriptionStatusBadge status={shop.subscriptionStatus} /></td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <AccountStatusBadge isActive={shop.isActive} />
+                                                    </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         <div className="flex justify-center gap-2">
                                                             <button type="button" title="View contact, performance & team" onClick={() => openDetailsModal(shop)} className={`p-2 rounded-lg transition-all cursor-pointer ${darkMode ? 'text-sky-400 hover:bg-sky-500/10' : 'text-sky-600 hover:bg-sky-50'}`}>

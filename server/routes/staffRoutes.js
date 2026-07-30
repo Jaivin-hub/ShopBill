@@ -822,6 +822,13 @@ router.put('/:id/active', protect, async (req, res) => {
             return res.status(400).json({ error: 'Cannot deactivate the primary owner account.' });
         }
 
+        const actorUserId = String(req.user.id || req.user._id || '');
+        const targetUserId = String(staffMember.userId || '');
+        if (targetActive === false && actorUserId && targetUserId && actorUserId === targetUserId) {
+            console.log('[staffRoutes] PUT /:id/active → 400 cannot deactivate self');
+            return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+        }
+
         const linkedUser = await User.findById(staffMember.userId);
         if (!linkedUser) {
             console.log('[staffRoutes] PUT /:id/active → 404 linked user missing');
@@ -886,6 +893,12 @@ router.put('/:id/toggle', protect, async (req, res) => {
         }
 
         const currentlyActive = staffMember.active === true;
+        const actorUserId = String(req.user.id || req.user._id || '');
+        const targetUserId = String(staffMember.userId || '');
+        if (currentlyActive && actorUserId && targetUserId && actorUserId === targetUserId) {
+            console.log('[staffRoutes] PUT /:id/toggle → 400 cannot deactivate self');
+            return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+        }
         const isPendingInvite = !!linkedUser.resetPasswordToken && !currentlyActive;
 
         // Pending invite: always treat toggle as "turn off" (revoke), never activate without password
@@ -952,6 +965,13 @@ router.delete('/:id', protect, async (req, res) => {
         if (isowner(staffMember.role)) {
             console.log('[staffRoutes] DELETE /:id → 400 cannot remove owner');
             return res.status(400).json({ error: 'Cannot remove the primary owner account.' });
+        }
+
+        const actorUserId = String(req.user.id || req.user._id || '');
+        const targetUserId = String(staffMember.userId || '');
+        if (actorUserId && targetUserId && actorUserId === targetUserId) {
+            console.log('[staffRoutes] DELETE /:id → 400 cannot remove self');
+            return res.status(400).json({ error: 'You cannot remove your own account.' });
         }
 
         const userId = staffMember.userId;

@@ -7,9 +7,17 @@ const Sale = require('../models/Sale');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Payment = require('../models/Payment');
+const Notification = require('../models/Notification');
 const Chat = require('../models/Chat');
 const { deleteStoreCascade } = require('../utils/deleteStoreCascade');
 const { classifyOwnerPaymentBucket } = require('../utils/ownerPaymentBucket');
+const {
+    fetchRazorpaySubscriptionTransactions,
+    mergePaymentHistory,
+    groupPaymentHistoryByPlanPeriod,
+    inferPlanFromAmount,
+    planAmount,
+} = require('../utils/razorpaySubscriptionHistory');
 const MandateRestoreRequest = require('../models/MandateRestoreRequest');
 const {
     createRecoverySubscriptionForOwner,
@@ -764,6 +772,12 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
         // Plan Mapping (Must match UserSchema)
         const PLANS = ['BASIC', 'PRO', 'PREMIUM'];
 
+        const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const thisMonthPaidMatch = {
+            paymentDate: { $gte: thisMonthStart, $lt: thisMonthEnd },
+            status: 'paid',
+        };
+
         // --- Parallel Data Fetching & Aggregation ---
         const [
             shopStats,
@@ -771,6 +785,7 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
             newShopsThisMonth,
             newUsersThisMonth,
             allTimeSubscriptionRevenue,
+            monthlySubscriptionRevenueTotal,
             monthlyPlanRevenueBreakdown
         ] = await Promise.all([
             // 1. Shop Counts and Activity
@@ -794,72 +809,45 @@ router.get('/dashboard', superadminProtect, async (req, res) => {
                 { $group: { _id: null, totalLifetime: { $sum: '$amount' } } }
             ]),
 
-            // 6. Monthly Subscription Revenue Aggregation and Breakdown
+            // 6. Monthly subscription revenue — all paid charges this calendar month
             Payment.aggregate([
-                { 
-                    $match: { 
-                        paymentDate: { $gte: thisMonthStart, $lt: new Date(now.getFullYear(), now.getMonth() + 1, 1) }, 
-                        status: 'paid' 
-                    } 
-                },
-                // De-duplication: Group by shopId to get the latest payment per shop
-                { 
-                    $group: {
-                        _id: '$shopId',
-                        latestAmount: { $last: '$amount' }, 
-                    }
-                },
-                // Join with User to get plan if not available on Payment model
-                { 
-                    $lookup: {
-                        from: 'users', 
-                        localField: '_id', 
-                        foreignField: '_id',
-                        as: 'ownerDetails'
-                    }
-                },
-                { $unwind: '$ownerDetails' },
-                // Group by the plan and sum the latest amounts
-                {
-                    $group: {
-                        _id: '$ownerDetails.plan',
-                        revenue: { $sum: '$latestAmount' }
-                    }
-                }
+                { $match: thisMonthPaidMatch },
+                { $group: { _id: null, total: { $sum: '$amount' } } },
             ]),
+
+            // 7. Same month paid charges — tier from payment amount (not owner’s current plan)
+            Payment.find(thisMonthPaidMatch).select('amount').lean(),
         ]);
 
-        // --- Calculate totalPlanRevenue from the breakdown result ---
+        // --- Calculate plan revenue from charge amounts (handles PRO → PREMIUM upgrades) ---
         const actualPlanRevenueMap = new Map();
-        let calculatedMonthlyPlanRevenue = 0;
+        for (const payment of monthlyPlanRevenueBreakdown) {
+            const tier = inferPlanFromAmount(payment.amount);
+            if (!tier) continue;
+            actualPlanRevenueMap.set(tier, (actualPlanRevenueMap.get(tier) || 0) + payment.amount);
+        }
 
-        monthlyPlanRevenueBreakdown.forEach(item => {
-            if (item._id) {
-                actualPlanRevenueMap.set(item._id, item.revenue);
-                calculatedMonthlyPlanRevenue += item.revenue;
-            }
-        });
-
-        const monthlyPlanRevenue = calculatedMonthlyPlanRevenue;
+        const monthlyPlanRevenue = monthlySubscriptionRevenueTotal[0]?.total || 0;
         const totalPlanRevenue = allTimeSubscriptionRevenue[0]?.totalLifetime || 0;
         
         const yearStart = new Date(trendYear, 0, 1);
         const yearEnd = new Date(trendYear + 1, 0, 1);
 
-        // --- POS sales revenue trend (calendar year, all shops) ---
-        const monthlyTrendData = await Sale.aggregate([
+        // --- Subscription plan revenue trend (calendar year, paid payments) ---
+        const monthlyTrendData = await Payment.aggregate([
             {
                 $match: {
-                    timestamp: { $gte: yearStart, $lt: yearEnd },
+                    status: 'paid',
+                    paymentDate: { $gte: yearStart, $lt: yearEnd },
                 },
             },
             {
                 $group: {
                     _id: {
-                        month: { $month: '$timestamp' },
-                        year: { $year: '$timestamp' },
+                        month: { $month: '$paymentDate' },
+                        year: { $year: '$paymentDate' },
                     },
-                    revenue: { $sum: '$totalAmount' },
+                    revenue: { $sum: '$amount' },
                 },
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } },
@@ -1123,74 +1111,157 @@ router.get('/shops/:id/payments', superadminProtect, async (req, res) => {
 
         const plan = owner.plan || 'BASIC';
         const subscriptionId = owner.transactionId;
+        const planHistoryDisplay = buildPlanHistoryDisplay(
+            owner.planHistory,
+            owner.plan,
+            owner.createdAt
+        );
 
         // 2. Fetch Local Payment History
         const paymentHistory = await Payment.find({ shopId: shopId })
             .sort({ paymentDate: -1 })
-            .limit(12);
+            .limit(100);
 
-        // 3. FETCH DATA DIRECTLY FROM RAZORPAY API (The Source of Truth)
+        const localHistoryRows = paymentHistory.map((p) => ({
+            id: String(p._id),
+            date: p.paymentDate ? p.paymentDate.toISOString() : null,
+            amount: p.amount ?? 0,
+            status: p.status,
+            transactionId: p.paymentId || p.subscriptionId,
+            subscriptionId: p.subscriptionId || null,
+            method: 'Razorpay Auto-Debit',
+            eventType: p.eventType || null,
+            failureReason: p.failureReason || null,
+            failureDetail: p.failureDetail || null,
+            source: 'local',
+        }));
+
+        // 3. FETCH DATA FROM RAZORPAY — current + one prior subscription (fast path)
         let nextPaymentDate = null;
+        let razorpayHistoryRows = [];
 
+        const idsOrdered = [];
+        if (subscriptionId) idsOrdered.push(subscriptionId);
+        for (const p of paymentHistory) {
+            if (
+                p.subscriptionId &&
+                !idsOrdered.includes(p.subscriptionId)
+            ) {
+                idsOrdered.push(p.subscriptionId);
+            }
+        }
+        const idsToFetch = idsOrdered.slice(0, 2);
+
+        const planBySubscriptionId = new Map();
         if (subscriptionId) {
-            try {
-                // Fetch the live subscription object
-                const subscription = await rzp.subscriptions.fetch(subscriptionId);
-                
-                /**
-                 * ⭐ FIXED LOGIC:
-                 * During trial, Razorpay uses 'charge_at'.
-                 * During active billing, Razorpay uses 'current_end'.
-                 * We take whichever one represents the "Next Due Date".
-                 */
+            planBySubscriptionId.set(subscriptionId, plan);
+        }
+
+        const rzpResults = await Promise.allSettled(
+            idsToFetch.map(async (sid) => {
+                const subscription = await rzp.subscriptions.fetch(sid);
+                const notePlan = String(subscription?.notes?.plan_name || '')
+                    .trim()
+                    .toUpperCase();
+                const subPlan = notePlan || planBySubscriptionId.get(sid) || plan;
+                const subRows = await fetchRazorpaySubscriptionTransactions(
+                    rzp,
+                    sid,
+                    subPlan,
+                    { includePaymentScan: false, maxInvoicePaymentFetches: 0 }
+                );
+                return { sid, subscription, subPlan, subRows };
+            })
+        );
+
+        for (const result of rzpResults) {
+            if (result.status !== 'fulfilled') {
+                console.error(
+                    'Razorpay API Sync Error:',
+                    result.reason?.description || result.reason?.message || result.reason
+                );
+                continue;
+            }
+            const { sid, subscription, subPlan, subRows } = result.value;
+            if (subPlan) planBySubscriptionId.set(sid, subPlan);
+            if (sid === subscriptionId) {
                 const rzpTimestamp = subscription.charge_at || subscription.current_end;
-                
                 if (rzpTimestamp) {
                     nextPaymentDate = new Date(rzpTimestamp * 1000);
                 }
-            } catch (rzpError) {
-                console.error('Razorpay API Sync Error:', rzpError.description || rzpError);
+            }
+            for (const row of subRows) {
+                razorpayHistoryRows.push({
+                    ...row,
+                    subscriptionId: sid,
+                    date: row.date instanceof Date ? row.date.toISOString() : row.date,
+                });
             }
         }
 
+        const mergedHistory = mergePaymentHistory(localHistoryRows, razorpayHistoryRows).slice(0, 50);
+        const paymentHistoryGroups = groupPaymentHistoryByPlanPeriod(
+            mergedHistory,
+            planHistoryDisplay
+        );
+
         // 4. FALLBACK (Only if Razorpay API fails or subscriptionId is missing)
         if (!nextPaymentDate) {
-            // Use the planEndDate stored in DB (which is now synced via Webhook/Verify routes)
-            // or default to owner creation + 30 days
-            nextPaymentDate = owner.planEndDate || new Date(new Date(owner.createdAt).setDate(new Date(owner.createdAt).getDate() + 30));
+            nextPaymentDate =
+                owner.planEndDate ||
+                new Date(
+                    new Date(owner.createdAt).setDate(
+                        new Date(owner.createdAt).getDate() + 30
+                    )
+                );
+        }
+        if (!(nextPaymentDate instanceof Date) || Number.isNaN(nextPaymentDate.getTime())) {
+            nextPaymentDate = owner.planEndDate ? new Date(owner.planEndDate) : new Date();
+        }
+        if (Number.isNaN(nextPaymentDate.getTime())) {
+            nextPaymentDate = new Date();
         }
 
         // 5. Response Formatting
-        const planPrices = { 'BASIC': 499, 'PRO': 999, 'PREMIUM': 2999 };
-        const price = planPrices[plan] || planPrices['BASIC'];
+        const price = planAmount(plan);
 
         const now = new Date();
         const diffTime = nextPaymentDate - now;
         const daysUntilPayment = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
+        const serializePaymentRow = (p, planPeriodFallback = null) => ({
+            id: p.id,
+            date: p.date instanceof Date ? p.date.toISOString() : p.date,
+            amount: p.amount ?? 0,
+            status: p.status,
+            transactionId: p.transactionId,
+            method: p.method || 'Razorpay Auto-Debit',
+            eventType: p.eventType || null,
+            failureReason: p.failureReason || null,
+            failureDetail: p.failureDetail || null,
+            planPeriod: p.planPeriod || planPeriodFallback || null,
+        });
+
         res.json({
             success: true,
             data: {
-                paymentHistory: paymentHistory.map(p => ({
-                    id: p._id,
-                    date: p.paymentDate ? p.paymentDate.toISOString() : null,
-                    amount: p.amount ?? 0,
-                    status: p.status,
-                    transactionId: p.paymentId || p.subscriptionId,
-                    method: 'Razorpay Auto-Debit',
-                    eventType: p.eventType || null,
-                    failureReason: p.failureReason || null,
-                    failureDetail: p.failureDetail || null,
+                paymentHistory: mergedHistory.map((p) => serializePaymentRow(p)),
+                paymentHistoryGroups: paymentHistoryGroups.map((g) => ({
+                    plan: g.plan,
+                    isCurrent: g.isCurrent,
+                    label: g.label,
+                    payments: (g.payments || []).map((p) => serializePaymentRow(p, g.plan)),
                 })),
                 upcomingPayment: {
                     date: nextPaymentDate.toISOString(),
                     amount: price,
-                    daysUntil: daysUntilPayment
+                    daysUntil: daysUntilPayment,
                 },
                 currentPlan: plan,
+                planHistoryDisplay,
                 billingCycle: 'Monthly',
-                subscriptionId: subscriptionId
-            }
+                subscriptionId: subscriptionId,
+            },
         });
     } catch (error) {
         console.error('Payment History Fetch Error:', error);
@@ -1215,7 +1286,21 @@ router.get('/recent-activity', superadminProtect, async (req, res) => {
         since.setDate(since.getDate() - days);
 
         // Fetch recent items from multiple collections in parallel
-        const [recentShops, recentSales, recentCustomers, recentInventories] = await Promise.all([
+        const subscriptionActivityTypes = [
+            'shop_subscription_cancelled',
+            'shop_subscription_payment_failed',
+            'shop_subscription_halted',
+            'shop_subscription_billing_activated',
+            'shop_subscription_mandate_activated',
+            'shop_subscription_upgraded',
+            'shop_subscription_resubscribed',
+            'shop_subscription_mandate_revoked',
+            'shop_subscription_lapsed',
+            'new_shop_registered',
+        ];
+
+        const [recentShops, recentSales, recentCustomers, recentInventories, recentSubscriptionAlerts] =
+            await Promise.all([
             // newly created owner accounts (shops)
             User.find({ role: 'owner', createdAt: { $gte: since } })
                 .select('email createdAt location plan')
@@ -1247,7 +1332,17 @@ router.get('/recent-activity', superadminProtect, async (req, res) => {
                 .select('shopId name sku qty createdAt updatedAt action')
                 .sort({ updatedAt: -1, createdAt: -1 })
                 .limit(limit)
-                .lean()
+                .lean(),
+
+            Notification.find({
+                forSuperAdmin: true,
+                type: { $in: subscriptionActivityTypes },
+                createdAt: { $gte: since },
+            })
+                .select('type title message metadata createdAt storeId ownerId category')
+                .sort({ createdAt: -1 })
+                .limit(limit)
+                .lean(),
         ]);
 
         // Build map of shop details referenced in results
@@ -1256,6 +1351,10 @@ router.get('/recent-activity', superadminProtect, async (req, res) => {
         recentSales.forEach(s => s.shopId && shopIds.add(s.shopId.toString()));
         recentCustomers.forEach(c => c.shopId && shopIds.add(c.shopId.toString()));
         recentInventories.forEach(i => i.shopId && shopIds.add(i.shopId.toString()));
+        recentSubscriptionAlerts.forEach((n) => {
+            if (n.ownerId) shopIds.add(String(n.ownerId));
+            if (n.storeId) shopIds.add(String(n.storeId));
+        });
 
         const shopDocs = await User.find({ _id: { $in: Array.from(shopIds) } })
             .select('email location')
@@ -1314,6 +1413,50 @@ router.get('/recent-activity', superadminProtect, async (req, res) => {
                 qty: inv.qty,
                 action: inv.action || (inv.createdAt && inv.updatedAt && inv.createdAt.getTime() === inv.updatedAt.getTime() ? 'created' : 'updated'),
                 meta: {}
+            });
+        });
+
+        const subscriptionActivityMap = {
+            shop_subscription_cancelled: 'subscription_cancelled',
+            shop_subscription_payment_failed: 'payment_failed',
+            shop_subscription_halted: 'subscription_halted',
+            shop_subscription_billing_activated: 'payment_received',
+            shop_subscription_mandate_activated: 'mandate_activated',
+            shop_subscription_upgraded: 'plan_upgraded',
+            shop_subscription_resubscribed: 'subscription_resubscribed',
+            shop_subscription_mandate_revoked: 'mandate_revoked',
+            shop_subscription_lapsed: 'subscription_lapsed',
+            new_shop_registered: 'shop_created',
+        };
+
+        recentSubscriptionAlerts.forEach((n) => {
+            const shopLabel =
+                n.metadata?.shopName ||
+                (n.ownerId && shopMap.get(String(n.ownerId))?.email) ||
+                'Shop';
+            const status =
+                n.category === 'Urgent' || n.type === 'shop_subscription_payment_failed'
+                    ? 'error'
+                    : n.category === 'Success'
+                      ? 'success'
+                      : n.type === 'shop_subscription_cancelled'
+                        ? 'warning'
+                        : 'info';
+
+            activities.push({
+                type: subscriptionActivityMap[n.type] || 'subscription_event',
+                time: n.createdAt,
+                shopId: n.ownerId || n.storeId,
+                shop: shopLabel,
+                amount: n.metadata?.amount,
+                from: n.metadata?.fromPlan,
+                to: n.metadata?.toPlan || n.metadata?.plan,
+                status,
+                meta: {
+                    message: n.message,
+                    title: n.title,
+                    notificationType: n.type,
+                },
             });
         });
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { 
-    AlertTriangle, CheckCircle, Info, X, BellOff, 
+    AlertTriangle, AlertCircle, CheckCircle, Info, X, BellOff, 
     ShieldAlert, Sparkles, Trash2, Clock, Activity,
     ShieldCheck, Zap, Layers, Bell, CreditCard, DollarSign, ArrowDown, ArrowUp, Store
 } from 'lucide-react';
@@ -126,6 +126,15 @@ const getNotificationTypeDetails = (type) => {
                 borderColor: 'border-emerald-500/20',
                 glow: 'shadow-emerald-500/5',
                 label: 'Billing activated'
+            };
+        case 'shop_subscription_payment_failed':
+            return {
+                icon: AlertCircle,
+                color: 'text-rose-500',
+                bgColor: 'bg-rose-500/10',
+                borderColor: 'border-rose-500/20',
+                glow: 'shadow-rose-500/5',
+                label: 'Payment failed'
             };
         case 'shop_subscription_mandate_activated':
             return {
@@ -310,8 +319,8 @@ const NotificationsPage = ({ notifications, setNotifications, darkMode, setCurre
             `}</style>
 
             {/* --- ELITE HEADER --- */}
-            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-6 py-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-6 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
+                <div className="w-full flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div>
                             <h1 className={`text-lg font-bold tracking-tight uppercase leading-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>

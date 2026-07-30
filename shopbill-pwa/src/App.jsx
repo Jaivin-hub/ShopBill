@@ -22,6 +22,7 @@ import {
   registerPwaSwipeHapticLifecycle,
 } from './utils/swipeHaptic';
 import { USER_ROLES } from './utils/constants';
+import { isPremiumPlan, isProOrPremium, isPageAllowedForPlan } from './utils/subscription';
 import Header from './components/Header';
 import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import SEO from './components/SEO';
@@ -223,8 +224,8 @@ const App = () => {
 
   const userRole = currentUser?.role?.toLowerCase() || USER_ROLES.CASHIER;
   const planUpper = currentUser?.plan?.toUpperCase();
-  const isPremium = planUpper === 'PREMIUM';
-  const hasSupplyChainAccess = planUpper === 'PREMIUM' || planUpper === 'PRO';
+  const isPremium = isPremiumPlan(currentUser);
+  const hasSupplyChainAccess = isProOrPremium(currentUser);
   const rolePagePermissions = useMemo(() => {
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return null;
     const serverPages = currentUser?.permissions?.pages;
@@ -235,13 +236,14 @@ const App = () => {
     return normalizeStaffPagesFromServer({});
   }, [userRole, currentUser?.permissions?.pages]);
   const canAccessPage = useCallback((pageId) => {
+    if (currentUser && !isPageAllowedForPlan(currentUser, pageId)) return false;
     if (userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return true;
     if (STAFF_COMMON_PAGE_KEYS.includes(pageId)) return true;
     if (pageId === 'reports' && userRole === USER_ROLES.MANAGER && currentUser?.permissions?.reports === true) {
       return true;
     }
     return rolePagePermissions?.[pageId] === true;
-  }, [userRole, rolePagePermissions, currentUser?.permissions?.reports]);
+  }, [userRole, rolePagePermissions, currentUser?.permissions?.reports, currentUser]);
   const mergeCurrentUserFields = useCallback((partial) => {
     if (!partial || typeof partial !== 'object') return;
     setCurrentUser((prev) => {
@@ -287,16 +289,12 @@ const App = () => {
       return;
     }
     const publicIds = new Set(['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription']);
-    if (
-      !publicIds.has(page) &&
-      currentUser &&
-      userRole !== USER_ROLES.OWNER &&
-      userRole !== USER_ROLES.SUPERADMIN &&
-      rolePagePermissions &&
-      Object.prototype.hasOwnProperty.call(rolePagePermissions, page) &&
-      !canAccessPage(page)
-    ) {
-      showToast('Access restricted by owner permissions.', 'info');
+    if (!publicIds.has(page) && currentUser && userRole !== USER_ROLES.SUPERADMIN && !canAccessPage(page)) {
+      if (!isPageAllowedForPlan(currentUser, page)) {
+        showToast('This feature requires a Pro or Premium plan.', 'info');
+      } else {
+        showToast('Access restricted by owner permissions.', 'info');
+      }
       return;
     }
     if (page === 'inventory' && opts?.lowStockSort) {
@@ -1550,10 +1548,14 @@ useEffect(() => {
   useEffect(() => {
     const publicPages = ['staffSetPassword', 'resetPassword', 'checkout', 'terms', 'policy', 'support', 'affiliate', 'mandateRestore', 'renewSubscription'];
     if (publicPages.includes(currentPage)) return;
-    if (!currentUser || userRole === USER_ROLES.OWNER || userRole === USER_ROLES.SUPERADMIN) return;
+    if (!currentUser || userRole === USER_ROLES.SUPERADMIN) return;
     if (!canAccessPage(currentPage)) {
       navigateTo('dashboard', { replace: true });
-      showToast('Access restricted by owner permissions.', 'info');
+      if (!isPageAllowedForPlan(currentUser, currentPage)) {
+        showToast('This feature requires a Pro or Premium plan.', 'info');
+      } else if (userRole !== USER_ROLES.OWNER) {
+        showToast('Access restricted by owner permissions.', 'info');
+      }
     }
   }, [currentUser, userRole, currentPage, canAccessPage, navigateTo, showToast]);
 
@@ -1803,7 +1805,7 @@ useEffect(() => {
   }, [currentPage]);
 
   const containerBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
-  const sidebarBg = darkMode ? 'bg-gray-950 border-gray-900' : 'bg-white border-slate-200';
+  const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-white';
   const navText = darkMode ? 'text-gray-500 hover:bg-gray-900 hover:text-gray-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900';
 
   return (
@@ -1846,7 +1848,7 @@ useEffect(() => {
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {showAppUI && (
-            <aside className={`hidden md:flex flex-col w-64 border-r z-[30] fixed inset-y-0 left-0 transition-colors duration-300 ${sidebarBg}`}>
+            <aside className={`hidden md:flex flex-col w-64 z-[30] fixed inset-y-0 left-0 transition-colors duration-300 shadow-none ${sidebarBg}`}>
               <div className="p-8 flex items-start gap-2">
                 <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-900/50 shrink-0">
                   <Smartphone className="w-6 h-6 text-white" />
@@ -1886,22 +1888,10 @@ useEffect(() => {
                     currentUser={currentUser}
                     currentOutletId={currentOutletId}
                     onOutletSwitch={handleOutletSwitch}
+                    onManageOutlets={() => navigateTo('outlets')}
                     showToast={showToast}
                     darkMode={darkMode}
                   />
-                  <button
-                    type="button"
-                    onClick={() => navigateTo('outlets')}
-                    className={`w-full px-3 py-2 rounded-lg text-xs font-bold tracking-tight transition-colors border ${
-                      currentPage === 'outlets'
-                        ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-lg shadow-indigo-900/20'
-                        : darkMode
-                        ? 'bg-gray-800/90 text-gray-300 hover:bg-gray-700 border-gray-700/80'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
-                    }`}
-                  >
-                    Manage outlets
-                  </button>
                 </div>
               )}
 
@@ -1950,7 +1940,7 @@ useEffect(() => {
                             ))}
                         </div>
                 </nav>
-              <div className="p-4 space-y-2 border-t border-inherit">
+              <div className={`p-4 space-y-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                 <button 
                   onClick={() => setDarkMode(!darkMode)} 
                   className={`w-full flex items-center px-4 py-3 rounded-xl transition-all border border-transparent ${navText}`}
@@ -1971,10 +1961,10 @@ useEffect(() => {
           )}
           <main
             ref={mainScrollRef}
-            className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 overscroll-none ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-x-hidden overflow-y-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-6 md:pb-6 overflow-x-hidden overflow-y-hidden' : 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-6 md:pb-6 overflow-x-hidden overflow-y-auto')) : 'w-full overflow-y-auto overflow-x-hidden custom-scrollbar'}`}
+            className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 overscroll-none ${containerBg} app-main-scroll ${showAppUI ? (isChatSelected ? 'md:ml-64 overflow-x-hidden overflow-y-hidden' : (currentPage === 'chat' ? 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-0 md:pb-6 overflow-x-hidden overflow-y-hidden' : 'md:ml-64 pt-[var(--app-mobile-header-offset)] max-md:pb-[var(--app-mobile-footer-bar)] md:pt-0 md:pb-6 overflow-x-hidden overflow-y-auto')) : 'w-full overflow-y-auto overflow-x-hidden custom-scrollbar'}`}
           >
             <div
-              className={`${currentPage === 'chat' && isChatSelected ? 'h-full min-h-0 flex-1 overflow-hidden' : (currentPage === 'chat' ? 'h-full min-h-0 flex-1 overflow-hidden' : `max-w-7xl mx-auto w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} ${currentPage === 'chat' ? 'px-0' : 'px-0 md:px-6'} ${showAppUI ? 'overflow-x-hidden' : ''}`}
+              className={`${currentPage === 'chat' && isChatSelected ? 'h-full min-h-0 flex-1 overflow-hidden' : (currentPage === 'chat' ? 'h-full min-h-0 flex-1 overflow-hidden' : `w-full ${showAppUI ? 'flex-1 min-h-0 flex flex-col' : 'min-h-0'}`)} px-0 ${showAppUI ? 'overflow-x-hidden' : ''}`}
             >
               <div
                 className={`${

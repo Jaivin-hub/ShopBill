@@ -105,14 +105,30 @@ const ScannerModal = ({
         }
         setLookupStatus('lookingUp');
         const normalizedCode = decodedText.toLowerCase().trim();
-        const existingItem = inventory.find(item => 
-            item.hsn && item.hsn.toLowerCase().trim() === normalizedCode
-        );
+        let existingItem = null;
+        let matchedVariant = null;
+        for (const item of inventory) {
+            if (item.hsn && item.hsn.toLowerCase().trim() === normalizedCode) {
+                existingItem = item;
+                break;
+            }
+            if (item.variants?.length) {
+                const v = item.variants.find((variant) => {
+                    const code = String(variant.hsn || variant.sku || '').toLowerCase().trim();
+                    return code && code === normalizedCode;
+                });
+                if (v) {
+                    existingItem = item;
+                    matchedVariant = v;
+                    break;
+                }
+            }
+        }
         setTimeout(() => {
             isProcessingRef.current = false; 
             if (existingItem) {
                 setLookupStatus('found');
-                if (onScanSuccess) onScanSuccess(existingItem);
+                if (onScanSuccess) onScanSuccess(existingItem, matchedVariant);
             } else {
                 setLookupStatus('notFound'); 
                 setLookupError(`Item "${decodedText}" not found.`);

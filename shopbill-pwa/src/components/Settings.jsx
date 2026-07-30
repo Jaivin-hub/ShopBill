@@ -486,7 +486,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     const sectionLabelClass = `text-[10px] font-black tracking-[0.2em] flex items-center uppercase ${darkMode ? 'text-slate-400' : 'text-slate-700'}`;
 
     const renderSettingsList = () => (
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 max-w-7xl mx-auto">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 w-full">
             {/* 1. Account Management Section */}
             <section className={sectionClass}>
                 <div className={sectionHeaderClass}>
@@ -657,8 +657,8 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
     return (
         <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-gray-200' : 'bg-slate-100 text-black'} selection:bg-indigo-500/30`}>
             {/* STICKY HEADER */}
-            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 py-5 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} backdrop-blur-md border-b px-4 md:px-6 pt-0 pb-3 ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
+                <div className="w-full flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         {currentView !== 'main' && (
                             <button 
@@ -679,7 +679,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
                     </div>
 
                     {cloudUploadStatus === 'loading' && (
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full animate-pulse ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-100 border-indigo-200'}`}>
+                        <div className={`mt-1 flex items-center gap-2 px-4 py-2 rounded-full animate-pulse ${darkMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-100 border-indigo-200'}`}>
                             <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
                             <span className="text-[9px] font-black text-indigo-600  tracking-widest">Encrypting...</span>
                         </div>
@@ -688,7 +688,7 @@ function Settings({ apiClient, onLogout, showToast, setCurrentPage, setPageOrigi
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 md:p-8 pb-32">
+            <div className="w-full px-4 md:px-6 py-4 md:py-6 pb-8 md:pb-12">
                 {renderContent()}
             </div>
             </div>

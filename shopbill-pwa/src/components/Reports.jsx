@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, IndianRupee, List, BarChart, CreditCard,
     Package, Truck, AlertTriangle, ShoppingCart, Users,
-    Activity, Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download, Settings2
+    Layers, Printer, ChevronRight, PieChart, Wallet, Calendar, ArrowRight, Check, RefreshCw, Download, Settings2, PackageX
 } from 'lucide-react';
 import SalesChart from './SalesChart';
 import { exportRowsToExcel } from '../utils/exportExcel';
@@ -53,6 +53,26 @@ const toIsoDateSafe = (value) => {
     return date.toISOString().split('T')[0];
 };
 
+const formatDisplayDate = (value) => {
+    if (!value) return 'Not recorded';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Not recorded';
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const daysSinceDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const diffMs = Date.now() - date.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+};
+
+const STOCK_SOURCE_LABEL = {
+    supply_chain: 'Supply Chain',
+    stock_hub: 'Stock Hub',
+};
+
 const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, onOpenSalesHistory, setCurrentPage }) => {
     const [selectedFilter, setSelectedFilter] = useState('7d');
     const [viewType, setViewType] = useState('Day');
@@ -68,6 +88,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     const [purchases, setPurchases] = useState([]);
     const [showAllBestSellers, setShowAllBestSellers] = useState(false);
     const [allBestSellers, setAllBestSellers] = useState([]);
+    const [showAllNotSelling, setShowAllNotSelling] = useState(false);
     const [showAnalyticsHeaderControls, setShowAnalyticsHeaderControls] = useState(true);
     const handleOpenSalesHistory = useCallback(() => {
         try {
@@ -116,10 +137,12 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             const rawSummary = summaryResponse?.data || {};
             const normalizedSummary = {
                 revenue: Number(rawSummary.revenue || 0),
+                profit: Number(rawSummary.profit || 0),
                 billsRaised: Number(rawSummary.billsRaised || 0),
                 averageBillValue: Number(rawSummary.averageBillValue || 0),
                 volume: Number(rawSummary.volume || 0),
                 topItems: Array.isArray(rawSummary.topItems) ? rawSummary.topItems : [],
+                notSellingItems: Array.isArray(rawSummary.notSellingItems) ? rawSummary.notSellingItems : [],
                 totalCreditOutstanding: Number(rawSummary.totalCreditOutstanding || 0),
                 totalAllTimeBills: Number(rawSummary.totalAllTimeBills || 0),
                 totalAllTimeRevenue: Number(rawSummary.totalAllTimeRevenue || 0),
@@ -193,18 +216,21 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
     }, [purchases, suppliers, selectedFilter, customStartDate, customEndDate]);
 
     const data = summaryData || {
-        revenue: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
-        topItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
+        revenue: 0, profit: 0, billsRaised: 0, averageBillValue: 0, volume: 0,
+        topItems: [], notSellingItems: [], totalCreditOutstanding: 0, totalAllTimeBills: 0, totalAllTimeRevenue: 0,
         paymentTotals: { cashTotal: 0, upiTotal: 0, cardTotal: 0, creditTotal: 0 },
         textileInsights: { topSizes: [], topColors: [], topFabrics: [], topBrands: [] }
     };
+
+    const notSellingItems = data.notSellingItems || [];
+    const visibleNotSellingItems = showAllNotSelling ? notSellingItems : notSellingItems.slice(0, 5);
 
     const handleDownloadReport = useCallback(() => {
         const rows = [];
         rows.push(['Metric', 'Value']);
         rows.push(['Revenue', data.revenue || 0]);
+        rows.push(['Profit', data.profit || 0]);
         rows.push(['Invoices', data.billsRaised || 0]);
-        rows.push(['Average Bill Value', data.averageBillValue || 0]);
         rows.push(['Items Sold', data.volume || 0]);
         rows.push(['Credit Outstanding', data.totalCreditOutstanding || 0]);
         rows.push(['All Time Revenue', data.totalAllTimeRevenue || 0]);
@@ -222,13 +248,29 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             rows.push([item.name || '', item.quantity || 0]);
         });
         rows.push([]);
+        rows.push(['Not Selling (in stock, zero sales in period)']);
+        rows.push(['Product', 'Stock', 'In Stock Since', 'Source', 'SCM Purchase Date', 'Stock Hub Added', 'Days Since']);
+        notSellingItems.forEach((item) => {
+            const refDate = item.stockReferenceDate || item.lastPurchaseDate || item.stockHubAddedDate;
+            const days = daysSinceDate(refDate);
+            rows.push([
+                item.name || '',
+                item.stock || 0,
+                formatDisplayDate(refDate),
+                STOCK_SOURCE_LABEL[item.stockSource] || '',
+                formatDisplayDate(item.lastPurchaseDate),
+                formatDisplayDate(item.stockHubAddedDate),
+                days != null ? days : '',
+            ]);
+        });
+        rows.push([]);
         rows.push(['Purchase Insights']);
         rows.push(['Total Purchased Value', scmInsights.totalStockValue || 0]);
         rows.push(['Active Suppliers', scmInsights.activeSuppliers || 0]);
         rows.push(['Purchases (Filtered)', scmInsights.filteredPurchaseCount || 0]);
         exportRowsToExcel(rows, `reports-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Reports');
         showToast('Reports downloaded as Excel.', 'success');
-    }, [allBestSellers, data, scmInsights, showAllBestSellers, showToast]);
+    }, [allBestSellers, data, notSellingItems, scmInsights, showAllBestSellers, showToast]);
 
     const plan = currentUser?.plan?.toUpperCase();
     const isBasicPlanOwner = userRole === 'owner' && plan !== 'PREMIUM' && plan !== 'PRO';
@@ -243,7 +285,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
         <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
             {/* CLEAN PROFESSIONAL HEADER */}
             <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-                <div className="max-w-7xl mx-auto space-y-3">
+                <div className="w-full space-y-3">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                         <div className="flex items-center justify-between gap-3">
                             <div>
@@ -255,7 +297,7 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                             <button
                                 type="button"
                                 onClick={() => setShowAnalyticsHeaderControls((prev) => !prev)}
-                                className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
+                                className={`lg:hidden p-2.5 rounded-xl border transition-all ${darkMode ? 'bg-gray-900 border-gray-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-sm'}`}
                                 title={showAnalyticsHeaderControls ? 'Hide controls' : 'Show controls'}
                                 aria-label={showAnalyticsHeaderControls ? 'Hide controls' : 'Show controls'}
                             >
@@ -263,14 +305,13 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                             </button>
                         </div>
 
-                        {showAnalyticsHeaderControls && (
-                        <div className="flex items-center gap-2">
-                            <div className={`flex overflow-x-auto no-scrollbar ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border flex-1 md:flex-none`}>
+                        <div className={`${showAnalyticsHeaderControls ? 'flex' : 'hidden'} lg:flex items-center gap-2`}>
+                            <div className={`grid grid-cols-5 gap-1 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'} p-1 rounded-lg border flex-1 md:flex-none`}>
                                 {DATE_FILTERS.map(filter => (
                                     <button 
                                         key={filter.id} 
                                         onClick={() => setSelectedFilter(filter.id)} 
-                                        className={`px-3 py-1.5 rounded-md transition-all text-[10px] font-bold tracking-tight whitespace-nowrap ${selectedFilter === filter.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                                        className={`px-1.5 py-1.5 rounded-md transition-all text-[10px] font-bold tracking-tight ${selectedFilter === filter.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                                     >
                                         {filter.label}
                                     </button>
@@ -300,7 +341,6 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                                 <Printer className="w-4 h-4" />
                             </button>
                         </div>
-                        )}
                     </div>
 
                     {/* ULTRA COMPACT SINGLE ROW CUSTOM RANGE */}
@@ -340,13 +380,13 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
             </header>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-20">
+            <div className="w-full p-4 md:p-8 space-y-6 pb-20">
                 {/* KPI DASHBOARD */}
                 <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                         { title: "Net Revenue", value: formatCurrency(data.revenue), icon: IndianRupee, color: "text-emerald-500" },
                         { title: "Total Invoices", value: data.billsRaised, icon: List, color: "text-indigo-500", onClick: handleOpenSalesHistory },
-                        { title: "Avg Order Value", value: formatCurrency(data.averageBillValue), icon: Activity, color: "text-amber-500" },
+                        { title: "Profit", value: formatCurrency(data.profit), icon: TrendingUp, color: "text-amber-500" },
                         { title: "Items Sold", value: data.volume, icon: Package, color: "text-sky-500" }
                     ].map((m, i) => (
                         <button
@@ -478,6 +518,78 @@ const Reports = ({ apiClient, API, showToast, darkMode, currentUser, userRole, o
                             {showAllBestSellers && allBestSellers.length === 0 && (
                                 <div className={`text-center py-6 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
                                     <p className="text-[11px] font-medium text-gray-400">No products found</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* NOT SELLING — in-stock products with zero sales in selected period */}
+                    <div className={`${cardBase} rounded-xl p-6`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className={`text-sm font-bold tracking-wider ${darkMode ? 'text-white' : 'text-slate-800'} flex items-center gap-2`}>
+                                <PackageX className="w-4 h-4 text-rose-500" />
+                                Not Selling
+                            </h3>
+                            {notSellingItems.length > 5 && (
+                                <button
+                                    onClick={() => setShowAllNotSelling(!showAllNotSelling)}
+                                    className={`text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg transition-all ${
+                                        darkMode
+                                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    {showAllNotSelling ? 'Show Less' : `View All (${notSellingItems.length})`}
+                                </button>
+                            )}
+                        </div>
+                        <p className={`text-[10px] font-medium mb-5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                            In-stock products with zero sales in the selected period. Date uses Supply Chain purchase when available, otherwise Stock Hub add date.
+                        </p>
+                        <div className="space-y-2">
+                            {isLoading ? (
+                                <div className={`h-24 ${skel(darkMode, 'rounded-lg')}`} />
+                            ) : visibleNotSellingItems.length > 0 ? (
+                                visibleNotSellingItems.map((item, idx) => {
+                                    const refDate = item.stockReferenceDate || item.lastPurchaseDate || item.stockHubAddedDate;
+                                    const days = daysSinceDate(refDate);
+                                    const sourceLabel = STOCK_SOURCE_LABEL[item.stockSource] || null;
+                                    return (
+                                        <div
+                                            key={item.productId || `${item.name}-${idx}`}
+                                            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 ${darkMode ? 'bg-gray-950/80 border-gray-800/50' : 'bg-slate-50 border-slate-100 shadow-sm'} border rounded-lg`}
+                                        >
+                                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                                                <span className={`text-[10px] font-bold text-slate-500 w-4 shrink-0 pt-0.5`}>#{idx + 1}</span>
+                                                <div className="min-w-0">
+                                                    <p className={`text-xs font-bold truncate ${darkMode ? 'text-gray-300' : 'text-slate-700'}`}>{item.name}</p>
+                                                    <p className={`text-[10px] font-medium mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                        In stock since: {formatDisplayDate(refDate)}
+                                                        {days != null && (
+                                                            <span className="ml-1.5">· {days} day{days !== 1 ? 's' : ''}</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0 pl-6 sm:pl-0">
+                                                {sourceLabel && (
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${darkMode ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                                                        {sourceLabel}
+                                                    </span>
+                                                )}
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                                                    {item.stock} in stock
+                                                </span>
+                                                <span className="text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded border border-rose-500/20">
+                                                    0 sold
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className={`text-center py-6 ${darkMode ? 'bg-gray-950/40' : 'bg-slate-100/50'} rounded-lg border border-dashed ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
+                                    <p className="text-[11px] font-medium text-gray-400">All in-stock products had sales in this period</p>
                                 </div>
                             )}
                         </div>

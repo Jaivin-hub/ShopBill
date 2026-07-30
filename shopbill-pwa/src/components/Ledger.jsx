@@ -24,6 +24,7 @@ import {
   formatReminderCooldownTitle,
   getReminderCooldownRemainingMs,
 } from '../utils/ledgerReminderCooldown';
+import { hasLedgerReminderFeatures } from '../utils/subscription';
 
 const scrollbarStyles = `
   .custom-ledger-scroll::-webkit-scrollbar { width: 4px; }
@@ -41,7 +42,7 @@ const scrollbarStyles = `
 const initialNewCustomerState = { name: '', phone: '', creditLimit: '', initialDue: '' };
 
 const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, currentUser, currentOutletId }) => {
-  const showRemindOption = ['PRO', 'PREMIUM'].includes((currentUser?.plan || '').toUpperCase());
+  const showRemindOption = hasLedgerReminderFeatures(currentUser);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   /** After first fetch, keep terminal chrome and only skeleton the list on refresh (same pattern as Dashboard). */
@@ -328,37 +329,39 @@ const Ledger = ({ darkMode, apiClient, API, showToast, onModalStateChange, curre
                           Customer account management system.
                         </p>
                       </div>
-                      <button
-                        onClick={fetchCustomers}
-                        disabled={loading}
-                        className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-                        title="Refresh Ledger"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'} ${loading ? 'animate-spin' : ''}`} />
-                      </button>
-                      <button
-                        onClick={handleDownloadReport}
-                        className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-                        title="Download Ledger Report"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Download className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`} />
-                          <span className={`hidden md:inline text-[10px] font-black tracking-[0.18em] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                            DOWNLOAD REPORT
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Desktop total outstanding */}
+                        {!loading && (
+                          <div className="hidden md:flex items-baseline gap-2 shrink-0 pr-2">
+                            <p className={`text-xs font-bold ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
+                              Total outstanding:
+                            </p>
+                            <p className={`text-lg font-black tabular-nums ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
+                              ₹{totalOutstanding.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        )}
+                        <button
+                          onClick={fetchCustomers}
+                          disabled={loading}
+                          className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                          title="Refresh Ledger"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'} ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button
+                          onClick={handleDownloadReport}
+                          className={`p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${cardBase} ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                          title="Download Ledger Report"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Download className={`w-4 h-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`} />
+                            <span className={`hidden md:inline text-[10px] font-black tracking-[0.18em] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                              DOWNLOAD REPORT
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                      {/* Desktop total outstanding */}
-                      {!loading && (
-                        <div className="hidden md:flex items-baseline gap-2 shrink-0 pl-2">
-                          <p className={`text-xs font-bold ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
-                            Total outstanding:
-                          </p>
-                          <p className={`text-lg font-black tabular-nums ${totalOutstanding > 0 ? (darkMode ? 'text-rose-400' : 'text-rose-600') : (darkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
-                            ₹{totalOutstanding.toLocaleString('en-IN')}
-                          </p>
-                        </div>
-                      )}
+                        </button>
+                      </div>
                     </div>
                     {/* Mobile total outstanding - dedicated row to avoid collapse on large amounts */}
                     {!loading && (

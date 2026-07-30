@@ -494,6 +494,12 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
     const [activeTab, setActiveTab] = React.useState('creditBills'); // 'creditBills' | 'payments' | 'reminders'
 
     React.useEffect(() => {
+        if (!showReminderTab && activeTab === 'reminders') {
+            setActiveTab('creditBills');
+        }
+    }, [showReminderTab, activeTab]);
+
+    React.useEffect(() => {
         const loadHistory = async () => {
             try {
                 const data = await fetchCustomerHistory(customer._id);
@@ -562,12 +568,14 @@ export const HistoryModal = ({ customer, onClose, fetchCustomerHistory, darkMode
                         >
                             <CheckCircle size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">PAYMENT HISTORY</span><span className="sm:hidden">PAY</span>
                         </button>
+                        {showReminderTab && (
                         <button 
                             onClick={() => setActiveTab('reminders')}
                             className={`${tabBtnBase} ${activeTab === 'reminders' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             <BellRing size={12} className="sm:w-[14px] sm:h-[14px]" /> <span className="hidden sm:inline">REMINDER HISTORY</span><span className="sm:hidden">REM</span>
                         </button>
+                        )}
                     </div>
                 </div>
 

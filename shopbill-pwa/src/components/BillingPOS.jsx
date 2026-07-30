@@ -65,6 +65,7 @@ function restoreCartFromDraftLines(lines, inventory, showToast) {
       _id: inv._id,
       name: line.name || inv.name,
       price: Number(line.price) || 0,
+      manualDiscount: Number(line.manualDiscount) || 0,
       originalPrice: line.originalPrice != null ? Number(line.originalPrice) : Number(line.price) || 0,
       discountAmount: Number(line.discountAmount) || 0,
       appliedOfferId: line.appliedOfferId || null,
@@ -101,9 +102,20 @@ function sumSaleOfferSavings(items) {
   return items.reduce((acc, it) => acc + (Number(it.discountAmount) || 0) * (Number(it.quantity) || 1), 0);
 }
 
+function getCartItemManualDiscount(item) {
+  return Math.max(0, Number(item?.manualDiscount || 0));
+}
+
+function getCartItemEffectiveUnitPrice(item) {
+  const unit = Math.max(0, Number(item?.price) || 0);
+  const manual = getCartItemManualDiscount(item);
+  return Math.max(0, Number((unit - manual).toFixed(2)));
+}
+
 const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSalesRef, currentUser, requestAttendanceDecision }) => {
   const isTextileShop = (currentUser?.businessType || 'grocery') === 'textile';
   const [cart, setCart] = useState([]);
+  const [discountMode, setDiscountMode] = useState('bill'); // bill | item
   const [searchTerm, setSearchTerm] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -320,17 +332,19 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
   }, [cart.length]);
 
-  // Fetch shop info for bill display
+  // Fetch shop info for bill display (outlet-specific via x-store-id on apiClient)
   useEffect(() => {
     const fetchShopInfo = async () => {
       try {
         const response = await apiClient.get(API.profile);
-        if (response.data) {
+        const profile = response.data?.user || response.data?.data || response.data;
+        if (profile) {
           setShopInfo({
-            shopName: response.data.shopName || 'Shop',
-            address: response.data.address || '',
-            phone: response.data.phone || '',
-            email: response.data.email || ''
+            shopName: profile.shopName || 'Shop',
+            address: profile.address || '',
+            taxId: profile.taxId || '',
+            phone: profile.phone || '',
+            email: profile.email || ''
           });
         }
       } catch (error) {
@@ -400,7 +414,14 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   }, [fetchSaleDetail]);
 
   // --- Core POS Logic ---
-  const totalAmount = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+  const cartSubtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + getCartItemEffectiveUnitPrice(item) * item.quantity, 0),
+    [cart]
+  );
+  const totalItemWiseDiscount = useMemo(
+    () => cart.reduce((sum, item) => sum + getCartItemManualDiscount(item) * item.quantity, 0),
+    [cart]
+  );
   const activeOffers = useMemo(() => {
     const now = Date.now();
     return offers.filter((offer) => {
@@ -470,6 +491,10 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       item.name.toLowerCase().includes(term) || 
       (item.barcode && item.barcode.includes(term)) || 
       (item.hsn && item.hsn.includes(term)) ||
+      (item.variants?.some((v) => {
+        const code = String(v.hsn || v.sku || '').toLowerCase();
+        return code && code.includes(term);
+      })) ||
       (isTextileShop && (
         item.textileMeta?.brand?.toLowerCase()?.includes(term) ||
         item.textileMeta?.fabric?.toLowerCase()?.includes(term) ||
@@ -624,9 +649,21 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     });
   }, []);
 
+  const updateCartItemDiscount = useCallback((itemId, discount, variantId = null) => {
+    const normalized = Math.max(0, Number(discount) || 0);
+    setCart((prevCart) => prevCart.map((item) => {
+      const sameItem = String(item._id) === String(itemId);
+      const sameVariant = String(item.variantId || '') === String(variantId || '');
+      if (!sameItem || !sameVariant) return item;
+      const maxAllowed = Math.max(0, Number(item.price) || 0);
+      return { ...item, manualDiscount: Math.min(normalized, maxAllowed) };
+    }));
+  }, []);
+
   const handleCancelTransaction = () => {
     if (cart.length === 0) return;
     setCart([]);
+    setDiscountMode('bill');
     setSearchTerm('');
     setActiveBillDraftId(null);
     setPaymentCustomerPreset(null);
@@ -663,7 +700,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       itemId: id,
       name: item.name,
       quantity: item.quantity,
-      price: item.price,
+      price: getCartItemEffectiveUnitPrice(item),
+      manualDiscount: getCartItemManualDiscount(item),
       originalPrice: item.originalPrice ?? item.price,
       discountAmount: item.discountAmount || 0,
       appliedOfferId: item.appliedOfferId || null,
@@ -680,7 +718,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     }
     const body = {
       items,
-      totalAmount,
+      totalAmount: cartSubtotal,
+      discountMode,
       customerId: paymentCustomerPreset && String(paymentCustomerPreset.id) !== 'walk_in' ? paymentCustomerPreset.id : null,
       customerName: paymentCustomerPreset && String(paymentCustomerPreset.id) !== 'walk_in' ? (paymentCustomerPreset.name || '') : '',
     };
@@ -716,7 +755,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
     } finally {
       setSavingBillDraft(false);
     }
-  }, [API, cart, totalAmount, activeBillDraftId, paymentCustomerPreset, apiClient, showToast, fetchBillDrafts, refreshPendingCount]);
+  }, [API, cart, cartSubtotal, discountMode, activeBillDraftId, paymentCustomerPreset, apiClient, showToast, fetchBillDrafts, refreshPendingCount]);
 
   const resumeBillDraft = useCallback(async (draft) => {
     if (cart.length > 0) {
@@ -749,6 +788,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       return;
     }
     setCart(restored);
+    setDiscountMode(d.discountMode === 'item' ? 'item' : 'bill');
     setActiveBillDraftId(d._id);
     if (d.customerId) {
       const cid = String(d.customerId);
@@ -808,14 +848,20 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
   }, [requestAttendanceDecision]);
 
   // UPDATED: Process Payment now handles mixed/split data correctly
-  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, paidVia = null) => {
-    if (totalAmount <= 0) return;
+  const processPayment = useCallback(async (amountPaid, amountCredited, paymentMethod, finalCustomer, paidVia = null, billDiscount = 0) => {
+    if (cartSubtotal <= 0) return;
+
+    const subtotal = Number(cartSubtotal.toFixed(2));
+    const discount = Math.min(Math.max(0, Number(billDiscount) || 0), subtotal);
+    const finalTotal = Number(Math.max(0, subtotal - discount).toFixed(2));
     
     const customerToBill = finalCustomer || WALK_IN_CUSTOMER;
     
     // Construct the payload to match the backend expectation
     const saleData = {
-      totalAmount: totalAmount,
+      subtotalAmount: subtotal,
+      billDiscount: discount,
+      totalAmount: finalTotal,
       paymentMethod: paymentMethod, // 'Split Payment', 'Cash/UPI', or 'Credit'
       paidVia: paymentMethod === 'Mixed' ? paidVia : null,
       customer: customerToBill.name,
@@ -824,7 +870,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         itemId: item._id, 
         name: item.name, 
         quantity: item.quantity, 
-        price: item.price,
+        price: getCartItemEffectiveUnitPrice(item),
+        manualDiscount: getCartItemManualDiscount(item),
         originalPrice: item.originalPrice ?? item.price,
         discountAmount: item.discountAmount || 0,
         appliedOfferId: item.appliedOfferId || null,
@@ -837,6 +884,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       // Ensure these are numbers
       amountPaid: parseFloat(amountPaid) || 0,
       amountCredited: parseFloat(amountCredited) || 0,
+      discountMode,
     };
 
     const offlineClientId =
@@ -887,6 +935,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       const draftIdToRemove = activeBillDraftId;
       setCart([]);
       setIsPaymentModalOpen(false);
+      setDiscountMode('bill');
       setPaymentCustomerPreset(null);
       setActiveBillDraftId(null);
       if (draftIdToRemove && storeId) {
@@ -909,6 +958,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       showToast('Sale Success', 'success');
       setCart([]);
       setIsPaymentModalOpen(false);
+      setDiscountMode('bill');
       setPaymentCustomerPreset(null);
       if (draftIdToRemove && API.billDraftById) {
         try {
@@ -935,7 +985,8 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       throw error; 
     }
   }, [
-    totalAmount,
+    cartSubtotal,
+    discountMode,
     cart,
     inventory,
     apiClient,
@@ -1040,7 +1091,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       `}</style>
 
       <header className={`sticky top-0 z-[100] shrink-0 w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 transition-colors ${headerBg} ${darkMode ? 'border-slate-800/60' : 'border-slate-200'} ${darkMode ? 'bg-gray-950/95' : 'bg-slate-50/95'}`}>
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h1 className="text-2xl font-black tracking-tight">
@@ -1100,7 +1151,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
-        <div className="max-w-7xl mx-auto space-y-8 pb-36 md:pb-44">
+        <div className="w-full space-y-8 pb-36 md:pb-44">
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex items-center gap-2">
@@ -1166,19 +1217,56 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                 <ShoppingCart className="w-4 h-4 text-indigo-500" />
                 <p className="text-[10px] font-black text-slate-500 tracking-widest">Billing List ({cart.length})</p>
               </div>
+              <div className={`mb-3 inline-flex items-center rounded-xl border p-1 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <button
+                  type="button"
+                  onClick={() => setDiscountMode('bill')}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest transition-all ${discountMode === 'bill' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-400' : 'text-slate-500')}`}
+                >
+                  BILL DISCOUNT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountMode('item')}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest transition-all ${discountMode === 'item' ? 'bg-indigo-600 text-white' : (darkMode ? 'text-slate-400' : 'text-slate-500')}`}
+                >
+                  ITEM DISCOUNT
+                </button>
+              </div>
 
               <div className="space-y-2">
                   {[...cart].reverse().map(item => {
                     const cartItemId = item.variantId ? `${item._id}_${item.variantId}` : item._id;
+                    const lineUnit = getCartItemEffectiveUnitPrice(item);
                     return (
                       <div key={cartItemId} className={`rounded-2xl border p-3 md:p-4 flex items-center justify-between transition-all hover:bg-indigo-500/[0.02] ${cardBase}`}>
                         <div className="flex-1 truncate pr-2 md:pr-4 min-w-0">
                           <p className="text-xs font-black truncate mb-0.5">{item.name}</p>
-                          <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{item.price.toLocaleString()}</p>
+                          <p className="text-[9px] font-bold text-slate-500 tracking-wider">Unit: ₹{lineUnit.toLocaleString()}</p>
                           {item.discountAmount > 0 && item.originalPrice > item.price && (
                             <p className="text-[8px] font-bold text-emerald-500 tracking-wider">
                               Offer: ₹{item.originalPrice.toLocaleString()} - ₹{item.discountAmount.toLocaleString()}
                             </p>
+                          )}
+                          {discountMode === 'item' && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className="text-[8px] font-black text-slate-500 tracking-wider">Item discount ₹</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={item.manualDiscount > 0 ? String(item.manualDiscount) : ''}
+                                placeholder="0"
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                                    updateCartItemDiscount(item._id, val, item.variantId);
+                                  }
+                                }}
+                                onBlur={() => updateCartItemDiscount(item._id, item.manualDiscount, item.variantId)}
+                                className={`w-20 ${inputBase} px-2 py-1 rounded-md border text-[10px] font-black focus:border-indigo-500 outline-none`}
+                                style={{ fontSize: '16px' }}
+                              />
+                            </div>
                           )}
                         </div>
                         
@@ -1190,7 +1278,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                           </div>
                           
                           <div className="text-right min-w-[70px] md:min-w-[90px]">
-                            <p className="text-sm font-black text-emerald-500">₹{(item.quantity * item.price).toLocaleString()}</p>
+                            <p className="text-sm font-black text-emerald-500">₹{(item.quantity * lineUnit).toLocaleString()}</p>
                             <button onClick={() => removeItemFromCart(item._id, item.variantId)} className="text-[8px] font-black text-rose-500/60 hover:text-rose-500 tracking-widest">Remove</button>
                           </div>
                         </div>
@@ -1212,14 +1300,25 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       </div>
 
       {cart.length > 0 && (
-        <footer className={`fixed bottom-0 left-0 right-0 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[var(--app-mobile-footer-offset)]`}>
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:pb-5">
+        <footer className={`fixed bottom-0 left-0 right-0 md:left-64 z-[40] md:z-[100] border-t shadow-[0_-20px_40px_rgba(0,0,0,0.3)] md:shadow-none backdrop-blur-2xl transition-colors ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'} md:bottom-0 bottom-[var(--app-mobile-footer-offset)]`}>
+          <div className="w-full flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:pb-5">
             {/* Mobile: single compact row */}
             <div className="w-full md:flex-1 flex flex-row md:flex-row items-center gap-2 md:gap-4">
+              <button
+                onClick={handleCancelTransaction}
+                className={`hidden md:flex group h-[68px] px-6 border rounded-2xl items-center justify-center gap-2 transition-all active:scale-95 shrink-0 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
+                aria-label="Discard"
+              >
+                <XCircle className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                <span className="text-[10px] font-black tracking-widest">Discard</span>
+              </button>
               <div className={`flex-1 min-w-0 border rounded-xl md:rounded-2xl px-3 py-2 md:px-6 md:py-4 flex flex-row md:flex-row items-center justify-between gap-2 shadow-inner ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className="min-w-0">
                   <p className="text-[8px] md:text-[9px] font-black text-slate-500 tracking-[0.15em] md:tracking-[0.2em]">Total</p>
-                  <p className="text-lg md:text-2xl font-black tracking-tighter text-indigo-500 truncate">₹{totalAmount.toLocaleString('en-IN')}</p>
+                  <p className="text-lg md:text-2xl font-black tracking-tighter text-indigo-500 truncate">₹{cartSubtotal.toLocaleString('en-IN')}</p>
+                  {discountMode === 'item' && totalItemWiseDiscount > 0 && (
+                    <p className="text-[8px] font-black text-emerald-500 tracking-wider mt-0.5">Item discount: ₹{totalItemWiseDiscount.toLocaleString('en-IN')}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
                   <span className="text-[10px] md:text-[9px] font-black text-slate-500">{cart.length}×{cart.reduce((a, b) => a + b.quantity, 0)}</span>
@@ -1250,7 +1349,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
             <div className="w-full md:w-auto flex flex-row items-center gap-2 md:gap-3 h-11 md:h-[68px]">
               <button
                 onClick={handleCancelTransaction}
-                className={`group h-full px-4 md:px-6 border rounded-xl md:rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 transition-all active:scale-95 shrink-0 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
+                className={`group h-full px-4 md:px-6 border rounded-xl md:rounded-2xl flex md:hidden items-center justify-center gap-1.5 md:gap-2 transition-all active:scale-95 shrink-0 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:text-rose-600'}`}
                 aria-label="Discard"
               >
                 <XCircle className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-90 transition-transform" />
@@ -1284,7 +1383,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        totalAmount={totalAmount}
+        subtotalAmount={cartSubtotal}
         allCustomers={allCustomers}
         processPayment={processPayment}
         showToast={showToast}
@@ -1292,6 +1391,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         customerPreset={paymentCustomerPreset}
         onRegisterCustomer={handleRegisterCustomer}
         onAddNewCustomer={handleCustomerAdded}
+        allowBillDiscount={discountMode === 'bill'}
       />
       {/* Bill drafts: pause billing and resume later */}
       {isBillDraftsModalOpen && (
@@ -1423,7 +1523,7 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
         inventory={inventory}
-        onScanSuccess={(item) => { setIsCameraScannerOpen(false); addItemToCart(item); }}
+        onScanSuccess={(item, variant) => { setIsCameraScannerOpen(false); addItemToCart(item, variant || null); }}
         onScanNotFound={(code) => { 
           showToast(`Item "${code}" not found.`, 'error'); 
           setIsCameraScannerOpen(false);
@@ -1688,6 +1788,11 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                           {shopInfo.address}
                         </p>
                       )}
+                      {shopInfo.taxId && (
+                        <p className="text-[9px] font-black tracking-widest text-indigo-500">
+                          GSTIN: {shopInfo.taxId}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1774,6 +1879,12 @@ const BillingPOS = memo(({ darkMode, apiClient, API, showToast, refreshRecentSal
                     <div className={`flex justify-between items-center px-1 ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
                       <span className="text-[10px] font-black tracking-widest">Total offer savings</span>
                       <span className="text-sm font-black tabular-nums">₹{sumSaleOfferSavings(selectedSale.items).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {Number(selectedSale.billDiscount) > 0 && (
+                    <div className={`flex justify-between items-center px-1 ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                      <span className="text-[10px] font-black tracking-widest">Bill discount</span>
+                      <span className="text-sm font-black tabular-nums">−₹{Number(selectedSale.billDiscount).toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center">

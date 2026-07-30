@@ -40,7 +40,7 @@ const PLAN_DETAILS = {
         color: 'from-slate-600 to-slate-800',
         featured: false,
         tagline: 'For multi-store chains',
-        items: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management', 'Sales reports', 'Realtime team chat system', 'Employee Audit Logs', 'Multishop management', 'Up to 10 outlets management'],
+        items: ['Unlimited Billing', 'Unlimited Staff & Managers', 'Smart Stock & Auto-PO', 'Auto SMS Payment Reminders', 'Supplier Management', 'Sales reports', 'Realtime team chat system', 'Employee Audit Logs', 'Multishop management', 'Up to 5 outlets management'],
         excludedItems: [],
     }
 };

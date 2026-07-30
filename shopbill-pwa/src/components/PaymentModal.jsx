@@ -13,7 +13,7 @@ export const ADD_NEW_CUSTOMER_ID = 'add_new';
 const PaymentModal = ({
     isOpen,
     onClose,
-    totalAmount,
+    subtotalAmount,
     allCustomers = [],
     processPayment,
     showToast,
@@ -21,10 +21,12 @@ const PaymentModal = ({
     onAddNewCustomer,
     onRegisterCustomer,
     customerPreset = null,
+    allowBillDiscount = true,
 }) => {
     const dropdownRef = useRef(null);
     const [localSelectedCustomer, setLocalSelectedCustomer] = useState(WALK_IN_CUSTOMER);
     const [amountPaidInput, setAmountPaidInput] = useState('');
+    const [billDiscountInput, setBillDiscountInput] = useState('');
     const [paymentType, setPaymentType] = useState('UPI'); 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false); 
     const [searchTerm, setSearchTerm] = useState(''); 
@@ -44,17 +46,39 @@ const PaymentModal = ({
         return num.toFixed(2);
     };
 
+    const payableAmount = useMemo(() => {
+        const sub = parseFloat(subtotalAmount) || 0;
+        const disc = allowBillDiscount ? (parseFloat(billDiscountInput) || 0) : 0;
+        return Math.max(0, Number((sub - disc).toFixed(2)));
+    }, [subtotalAmount, billDiscountInput, allowBillDiscount]);
+
     // Only set defaults when modal opens. Do NOT re-run when user selects a customer—otherwise partial pay (Cash/UPI/Card + 200) would get overwritten to Credit + full amount.
     useEffect(() => {
         if (isOpen) {
-            setAmountPaidInput(formatAmountInput(totalAmount));
+            setBillDiscountInput(allowBillDiscount ? '' : '0');
+            setAmountPaidInput(formatAmountInput(subtotalAmount));
             setPaymentType('UPI');
             setSearchTerm(''); 
             setCreditError(null); 
             setIsNewCustomerFormOpen(false);
             setFormErrors({});
         }
-    }, [isOpen, totalAmount]);
+    }, [isOpen, subtotalAmount, allowBillDiscount]);
+
+    // When discount changes, sync payment amount if it still matches previous payable
+    const prevPayableRef = useRef(null);
+    useEffect(() => {
+        if (!isOpen) {
+            prevPayableRef.current = null;
+            return;
+        }
+        const paid = parseFloat(amountPaidInput) || 0;
+        const prev = prevPayableRef.current;
+        if (prev != null && Math.abs(paid - prev) < 0.02) {
+            setAmountPaidInput(formatAmountInput(payableAmount));
+        }
+        prevPayableRef.current = payableAmount;
+    }, [payableAmount, isOpen]);
 
     // Apply draft / parent-selected customer when opening settlement (does not reset on every totalAmount tick).
     useEffect(() => {
@@ -88,7 +112,7 @@ const PaymentModal = ({
     const { amountCredited, changeDue, backendMethod, effectiveAmountPaid } = useMemo(() => {
         let amtCred = 0, chgDue = 0, effPaid = 0;
         let finalMethod = paymentType;
-        const total = parseFloat(totalAmount) || 0;
+        const total = payableAmount;
         const paid = parseFloat(amountPaidInput) || 0;
 
         if (paymentType === 'Credit') {
@@ -109,7 +133,7 @@ const PaymentModal = ({
             }
         }
         return { amountCredited: amtCred, changeDue: chgDue, backendMethod: finalMethod, effectiveAmountPaid: effPaid };
-    }, [amountPaidInput, totalAmount, paymentType]);
+    }, [amountPaidInput, payableAmount, paymentType]);
 
     // Proactive credit limit check for credit customers (before they click Finalize)
     const creditLimitExceeded = useMemo(() => {
@@ -202,9 +226,22 @@ const PaymentModal = ({
         if (creditLimitExceeded) {
             return showToast('Customer exceeds credit limit. Collect more amount or reduce items.', 'error');
         }
+        const disc = allowBillDiscount ? (parseFloat(billDiscountInput) || 0) : 0;
+        const sub = parseFloat(subtotalAmount) || 0;
+        if (disc > sub + 0.01) {
+            return showToast('Discount cannot exceed subtotal.', 'error');
+        }
         setIsSubmitting(true);
         try {
-            await processPayment(effectiveAmountPaid, amountCredited, backendMethod, localSelectedCustomer, paymentType);
+            const billDiscount = allowBillDiscount ? (parseFloat(billDiscountInput) || 0) : 0;
+            await processPayment(
+                effectiveAmountPaid,
+                amountCredited,
+                backendMethod,
+                localSelectedCustomer,
+                paymentType,
+                billDiscount
+            );
             setCreditError(null);
             onClose();
         } catch (error) {
@@ -298,12 +335,50 @@ const PaymentModal = ({
                 </div>
 
                 <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-                    {/* Amount Banner */}
-                    <div className={`p-4 rounded-xl border flex justify-between items-center ${darkMode ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
-                        <span className={theme.muted}>Final Payable</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-sm font-black text-indigo-500/60">₹</span>
-                            <h3 className={`text-3xl font-black tracking-tighter ${theme.text}`}>{totalAmount.toLocaleString()}</h3>
+                    {/* Subtotal, optional discount, payable */}
+                    <div className={`p-4 rounded-xl border space-y-3 ${darkMode ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+                        <div className="flex justify-between items-center text-[10px] font-bold">
+                            <span className={theme.muted}>Subtotal</span>
+                            <span className={theme.text}>₹{(parseFloat(subtotalAmount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        {allowBillDiscount && (
+                            <div className="space-y-1.5">
+                                <label className={theme.muted}>Discount (optional)</label>
+                                <div className="relative group">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xs text-slate-400 group-focus-within:text-indigo-500 transition-colors">₹</span>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="0"
+                                        value={billDiscountInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                                                setBillDiscountInput(val);
+                                                setCreditError(null);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            const sub = parseFloat(subtotalAmount) || 0;
+                                            let disc = parseFloat(billDiscountInput) || 0;
+                                            if (disc > sub) disc = sub;
+                                            if (disc < 0) disc = 0;
+                                            setBillDiscountInput(disc > 0 ? String(disc) : '');
+                                        }}
+                                        className={`w-full border rounded-xl py-2.5 pl-8 pr-4 text-sm font-black outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${theme.input}`}
+                                        style={{ fontSize: '16px' }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center pt-2 border-t border-indigo-500/15">
+                            <span className={theme.muted}>Final Payable</span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-sm font-black text-indigo-500/60">₹</span>
+                                <h3 className={`text-3xl font-black tracking-tighter ${theme.text}`}>
+                                    {payableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </h3>
+                            </div>
                         </div>
                     </div>
 

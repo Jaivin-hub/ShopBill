@@ -146,33 +146,15 @@ export function ChatThreadMessagesSkeleton({ darkMode }) {
 export function ChatInitialSkeleton({ darkMode }) {
   const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
   const sidebarBg = darkMode ? 'bg-gray-950' : 'bg-slate-50';
-  const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
 
   return (
-    <div className={`flex h-full w-full flex-col overflow-hidden md:flex-row ${themeBase}`}>
-      {/* Sidebar — same shell as ChatListSidebar */}
-      <div className={`flex h-full w-full shrink-0 flex-col overflow-hidden md:w-80 ${sidebarBg}`}>
+    <div className={`flex h-full w-full flex-col overflow-hidden ${themeBase}`}>
+      {/* Sidebar-only initial state (matches desktop no-thread layout) */}
+      <div className={`flex h-full w-full shrink-0 flex-col overflow-hidden ${sidebarBg}`}>
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
           <ChatSidebarHeaderSkeleton darkMode={darkMode} />
 
           <ChatSidebarGroupsRowsSkeleton darkMode={darkMode} count={8} />
-        </div>
-      </div>
-
-      {/* Main — same visibility as Chat when no thread selected: desktop only, empty-state layout */}
-      <div className="relative hidden min-h-0 w-full flex-1 flex-col overflow-hidden md:flex">
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className={`w-full max-w-md rounded-2xl border p-8 ${cardBase}`}>
-            <div className={`mx-auto mb-6 h-20 w-20 rounded-full ${skel(darkMode)}`} />
-            <div className={`mx-auto mb-3 h-6 max-w-[220px] rounded-lg ${skel(darkMode)}`} />
-            <div className={`mx-auto mb-6 h-10 max-w-[280px] rounded-lg ${skel(darkMode)}`} />
-            <div
-              className={`h-12 w-full rounded-xl animate-pulse ${
-                darkMode ? 'bg-indigo-500/25' : 'bg-indigo-200/90'
-              }`}
-            />
-            <div className={`mx-auto mt-4 h-2.5 max-w-[180px] rounded ${skel(darkMode)}`} />
-          </div>
         </div>
       </div>
     </div>
@@ -188,7 +170,7 @@ export function ReportsInitialSkeleton({ darkMode }) {
   return (
     <div className={`h-full flex flex-col min-h-0 ${themeBase} transition-colors duration-200`}>
       <header className={`sticky top-0 z-[100] shrink-0 ${headerBase} px-4 md:px-8 py-4 border-b backdrop-blur-md`}>
-        <div className="max-w-7xl mx-auto space-y-3">
+        <div className="w-full space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="space-y-2">
               <div className={`h-7 w-48 ${skel(darkMode)}`} />
@@ -204,7 +186,7 @@ export function ReportsInitialSkeleton({ darkMode }) {
         </div>
       </header>
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 pb-20">
+        <div className="w-full p-4 md:p-8 space-y-6 pb-20">
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className={`${cardBase} p-5 rounded-xl border`}>
@@ -248,7 +230,7 @@ export function ReportsInitialSkeleton({ darkMode }) {
 export function StockHubListSkeleton({ darkMode }) {
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+    <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
       {Array.from({ length: 12 }, (_, i) => (
         <div key={i} className={`rounded-2xl border p-4 ${cardBase}`}>
           <div className={`h-24 w-full mb-3 ${skel(darkMode, 'rounded-xl')}`} />
@@ -266,7 +248,7 @@ export function StockHubInitialSkeleton({ darkMode }) {
   return (
     <div className={`h-full flex flex-col min-h-0 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 border-b px-4 md:px-8 py-4 backdrop-blur-xl ${darkMode ? 'bg-gray-950/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className={`h-8 w-56 ${skel(darkMode)}`} />
             <div className={`h-2.5 w-40 ${skel(darkMode)}`} />
@@ -277,7 +259,7 @@ export function StockHubInitialSkeleton({ darkMode }) {
             <div className={`h-10 w-32 ${skel(darkMode, 'rounded-xl')}`} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto mt-4">
+        <div className="w-full mt-4">
           <div className={`h-11 w-full max-w-xl ${skel(darkMode, 'rounded-xl')}`} />
         </div>
       </header>
@@ -292,7 +274,7 @@ export function StockHubInitialSkeleton({ darkMode }) {
 export function SupplyChainContentSkeleton({ darkMode }) {
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+    <div className="w-full space-y-8 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
         <div className={`rounded-2xl border p-5 md:p-6 ${cardBase} space-y-5`}>
           <div className={`h-4 w-32 ${skel(darkMode)}`} />
@@ -334,7 +316,7 @@ export function SupplyChainInitialSkeleton({ darkMode }) {
   return (
     <div className={`h-full flex flex-col min-h-0 transition-colors duration-300 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-8 py-4 ${headerBg}`}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
+        <div className="w-full flex justify-between items-center gap-4">
           <div className="space-y-2">
             <div className={`h-8 w-48 ${skel(darkMode)}`} />
             <div className={`h-2.5 w-40 ${skel(darkMode)}`} />
@@ -352,40 +334,65 @@ export function SupplyChainInitialSkeleton({ darkMode }) {
 /** Billing POS: header + two columns */
 export function BillingTerminalInitialSkeleton({ darkMode }) {
   const themeBase = darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900';
-  const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   return (
     <div className={`h-full flex flex-col min-h-0 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 w-full backdrop-blur-xl border-b px-4 md:px-8 py-4 ${darkMode ? 'border-slate-800/60 bg-gray-950/95' : 'border-slate-200 bg-slate-50/95'}`}>
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="w-full space-y-4">
           <div className="flex justify-between items-center">
             <div className="space-y-2">
-              <div className={`h-8 w-44 ${skel(darkMode)}`} />
-              <div className={`h-2.5 w-32 ${skel(darkMode)}`} />
+              <div className={`h-8 w-52 ${skel(darkMode)}`} />
+              <div className={`h-2.5 w-52 ${skel(darkMode)}`} />
             </div>
-            <div className={`h-10 w-28 ${skel(darkMode, 'rounded-xl')}`} />
+            <div className="flex items-center gap-2">
+              <div className={`h-10 w-10 ${skel(darkMode, 'rounded-xl')}`} />
+              <div className={`h-10 w-10 ${skel(darkMode, 'rounded-xl')}`} />
+              <div className={`h-10 w-10 ${skel(darkMode, 'rounded-xl')}`} />
+            </div>
           </div>
-          <div className={`h-12 w-full max-w-2xl ${skel(darkMode, 'rounded-xl')}`} />
+          <div className={`h-12 w-full ${skel(darkMode, 'rounded-2xl')}`} />
         </div>
       </header>
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-4 md:p-6 overflow-hidden">
-        <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-          <div className={`h-10 w-full ${skel(darkMode, 'rounded-xl')}`} />
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-y-auto content-start">
-            {Array.from({ length: 9 }, (_, i) => (
-              <div key={i} className={`h-28 rounded-xl border ${cardBase} ${skel(darkMode, 'border-0')}`} />
-            ))}
-          </div>
-        </div>
-        <div className={`w-full lg:w-[380px] shrink-0 rounded-2xl border p-4 ${cardBase}`}>
-          <div className={`h-6 w-24 mb-4 ${skel(darkMode)}`} />
-          <div className="space-y-3 mb-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className={`h-12 ${skel(darkMode, 'rounded-lg')}`} />
-            ))}
-          </div>
-          <div className={`h-12 w-full ${skel(darkMode, 'rounded-xl')}`} />
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-8 py-6">
+        <div className="w-full space-y-8 pb-36 md:pb-44">
+          <section>
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <div className={`h-4 w-4 ${skel(darkMode, 'rounded')}`} />
+              <div className={`h-3 w-40 ${skel(darkMode)}`} />
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+              {Array.from({ length: 20 }, (_, i) => (
+                <div key={i} className={`h-20 rounded-xl ${skel(darkMode)}`} />
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <div className={`h-4 w-4 ${skel(darkMode, 'rounded')}`} />
+              <div className={`h-3 w-36 ${skel(darkMode)}`} />
+            </div>
+            <div className={`mb-3 h-8 w-40 ${skel(darkMode, 'rounded-xl')}`} />
+            <div className="space-y-2">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className={`h-16 rounded-2xl ${skel(darkMode)}`} />
+              ))}
+            </div>
+          </section>
         </div>
       </div>
+
+      <footer className={`fixed bottom-0 left-0 right-0 md:left-64 z-[40] md:z-[100] border-t backdrop-blur-2xl ${darkMode ? 'bg-gray-950/90 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
+        <div className="w-full flex flex-col md:flex-row items-center gap-3 md:gap-4 px-3 py-2.5 md:px-8 md:py-5">
+          <div className="w-full md:flex-1 flex items-center gap-2 md:gap-4">
+            <div className={`flex-1 h-14 md:h-[68px] ${skel(darkMode, 'rounded-2xl')}`} />
+          </div>
+          <div className="w-full md:w-auto flex items-center gap-2 md:gap-3 h-11 md:h-[68px]">
+            <div className={`h-full w-24 md:w-28 ${skel(darkMode, 'rounded-2xl')}`} />
+            <div className={`h-full w-24 md:w-32 ${skel(darkMode, 'rounded-2xl')}`} />
+            <div className={`h-full flex-1 md:w-[260px] ${skel(darkMode, 'rounded-2xl')}`} />
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -397,8 +404,8 @@ export function ProfileInitialSkeleton({ darkMode }) {
   const sectionBg = darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-200 shadow-sm';
   return (
     <div className={`h-full flex flex-col min-h-0 ${mainBg}`}>
-      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-md border-b px-6 py-6 ${headerBg}`}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-md border-b px-4 md:px-6 py-6 ${headerBg}`}>
+        <div className="w-full flex justify-between items-center">
           <div className="space-y-2">
             <div className={`h-8 w-48 ${skel(darkMode)}`} />
             <div className={`h-2.5 w-36 ${skel(darkMode)}`} />
@@ -406,8 +413,8 @@ export function ProfileInitialSkeleton({ darkMode }) {
           <div className={`h-10 w-24 ${skel(darkMode, 'rounded-xl')}`} />
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
+        <div className="w-full space-y-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className={`rounded-xl border overflow-hidden ${sectionBg}`}>
               <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
@@ -430,8 +437,28 @@ export function ProfileInitialSkeleton({ darkMode }) {
 export function OffersInitialSkeleton({ darkMode }) {
   const cardBase = darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
   return (
-    <div className={`h-full min-h-0 overflow-y-auto px-4 md:px-8 py-6 ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className={`h-full min-h-0 flex flex-col ${darkMode ? 'bg-gray-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      <header className={`sticky top-0 z-[100] shrink-0 border-b px-3 sm:px-4 md:px-8 pt-3 pb-3 md:py-4 backdrop-blur-md ${darkMode ? 'bg-gray-950/95 border-slate-800/60' : 'bg-white/95 border-slate-200 shadow-sm'}`}>
+        <div className="w-full space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 pr-2">
+              <div className={`h-7 w-44 sm:w-48 ${skel(darkMode)}`} />
+              <div className={`h-2.5 w-32 mt-1.5 ${skel(darkMode)}`} />
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className={`h-11 w-11 ${skel(darkMode, 'rounded-xl')}`} />
+              <div className={`h-11 w-11 ${skel(darkMode, 'rounded-xl')}`} />
+            </div>
+          </div>
+          <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-slate-100 border-slate-200'}`}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className={`h-11 rounded-lg ${skel(darkMode)}`} />
+            ))}
+          </div>
+        </div>
+      </header>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className="w-full px-3 sm:px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-20">
         <section className={`${cardBase} border rounded-2xl p-5`}>
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-2 flex-1">
@@ -472,6 +499,7 @@ export function OffersInitialSkeleton({ darkMode }) {
             ))}
           </div>
         </section>
+        </div>
       </div>
     </div>
   );
@@ -505,7 +533,7 @@ export function TeamManagementInitialSkeleton({ darkMode }) {
   return (
     <div className={`h-full flex flex-col min-h-0 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 backdrop-blur-xl border-b px-4 md:px-6 py-4 ${headerBg} ${borderStyle} shadow-lg ${darkMode ? 'bg-gray-950/95' : 'bg-white/95'}`}>
-        <div className="max-w-7xl mx-auto space-y-3">
+        <div className="w-full space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-2">
               <div className={`h-7 w-48 md:w-56 ${skel(darkMode)}`} />
@@ -516,8 +544,8 @@ export function TeamManagementInitialSkeleton({ darkMode }) {
           <div className={`h-11 w-full rounded-xl ${skel(darkMode)}`} />
         </div>
       </header>
-      <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-6 py-4 md:py-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className="w-full p-4 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
           <TeamDirectorySkeleton darkMode={darkMode} />
         </div>
       </div>
@@ -565,7 +593,7 @@ export function OutletManagerInitialSkeleton({ darkMode }) {
   return (
     <div className={`h-full flex min-h-0 flex-col transition-colors duration-300 ${themeBase}`}>
       <header className={`sticky top-0 z-[100] shrink-0 border-b backdrop-blur-xl px-4 md:px-8 py-4 ${headerBg}`}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
+        <div className="w-full flex justify-between items-center gap-4">
           <div className="min-w-0 flex-1 space-y-2">
             <div className={`h-8 w-52 max-w-[85%] ${skel(darkMode)}`} />
             <div className={`h-2.5 w-64 max-w-full ${skel(darkMode)}`} />
@@ -574,7 +602,7 @@ export function OutletManagerInitialSkeleton({ darkMode }) {
         </div>
       </header>
       <div className="custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto w-full">
+        <div className="px-4 md:px-8 py-6 w-full">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className={`rounded-2xl border p-6 ${cardBase}`}>
@@ -663,12 +691,14 @@ export function SettingsHomeSkeleton({ darkMode }) {
   const sectionClass = `${darkMode ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-slate-300 shadow-md'} border rounded-xl overflow-hidden`;
   return (
     <div className={`h-full flex flex-col min-h-0 ${darkMode ? 'bg-gray-950' : 'bg-slate-50'}`}>
-      <header className={`sticky top-0 z-[100] shrink-0 border-b px-6 py-5 backdrop-blur-md ${darkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-slate-200'}`}>
-        <div className={`h-7 w-40 ${skel(darkMode)}`} />
-        <div className={`h-2.5 w-56 mt-2 ${skel(darkMode)}`} />
+      <header className={`sticky top-0 z-[100] shrink-0 border-b px-4 md:px-6 pt-0 pb-3 backdrop-blur-md ${darkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-slate-200'}`}>
+        <div className="w-full">
+          <div className={`h-7 w-40 ${skel(darkMode)}`} />
+          <div className={`h-2.5 w-56 mt-1.5 ${skel(darkMode)}`} />
+        </div>
       </header>
-      <div className="flex-1 overflow-y-auto p-6">
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 pb-8 md:pb-12">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 w-full">
           {[1, 2, 3, 4].map((i) => (
             <section key={i} className={sectionClass}>
               <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-800' : 'border-slate-200'}`}>
